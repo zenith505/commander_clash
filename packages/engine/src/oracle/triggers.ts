@@ -2763,6 +2763,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
   // the entering land's controller, as it triggers and resolves (rulings).
   const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  // Confounding Conundrum: "Whenever a land an opponent controls enters, if that player had another land enter the
+  // battlefield under their control this turn": that land's controller, as it triggers and resolves (CR 603.4).
+  const otherLand = intervening && /^Whenever a land an opponent controls enters$/.test(intervening[1]!) && intervening[2] === "that player had another land enter the battlefield under their control this turn";
   // "At the beginning of each opponent's end step, if that player controls more creatures than you" (Keeper of the
   // Accord): the active player, as it triggers and resolves (rulings).
   const activeMore = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
@@ -2813,13 +2816,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
   const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
   const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
-  const ifCond = activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
     // Feast of the Victorious Dead: "if one or more creatures died this turn, you gain that much life and distribute that
     // many +1/+1 counters": the number of creatures that died this turn, counted as it resolves.
     let rest = kwIf && /^~ /.test(intervening[2]!) ? intervening[3]!.replace(/^it (?=(?:loses|gains|gets|has|becomes)\b)/, "~ ") : intervening[3]!;
+    if (otherLand) rest = rest.replace(/^they return a land they control /, "that player returns a land they control ");
     if (/^one or more creatures died this turn$/.test(intervening[2]!) && /\bthat (much|many)\b/.test(rest)) {
       const died = "the number of creatures that died this turn";
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");

@@ -881,6 +881,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // battlefield, gain control of that permanent, it loses all abilities, and it can't attack or block.": three effects
   // of one duration, ending when ~ leaves the battlefield, whoever controls it (rulings, CR 611.2b).
   text = text.replace(/^[Cc]hoose (target [^.]+)\. For as long as ~ remains on the battlefield, gain control of that permanent, it loses all abilities, and it can't attack or block\.$/, "Gain control of $1 for as long as ~ remains on the battlefield. It loses all abilities for as long as ~ remains on the battlefield. It can't attack or block for as long as ~ remains on the battlefield.");
+  // Ursine Monstrosity: "mill a card and choose an opponent at random. ~ attacks that player this combat if able. Until end
+  // of turn, ~ gains indestructible and gets +1/+1 for each card type among cards in your graveyard.": in that order, the
+  // bonus counted as it resolves, after the mill (CR 608.2h).
+  text = text
+    .replace(/^[Mm]ill a card and choose an opponent at random\. (?=~ attacks that player this combat if able\.)/, "Mill a card. Choose an opponent at random. ")
+    .replace(/(^|\. )Until end of turn, ~ gains ([a-z]+) and gets (\+\d+\/\+\d+) for each ([^.]+)\.$/, "$1~ gains $2 until end of turn. ~ gets $3 until end of turn for each $4.");
+  // Advanced Reconstruction: "then exile a card from your graveyard at random. You may play the exiled card this turn."
+  // The same as Tersa Lightshatter's wording.
+  text = text.replace(/\b([Ee])xile a card from your graveyard at random\. You may play the exiled card this turn\./, "$1xile a card at random from your graveyard. You may play that card this turn.");
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
@@ -2392,6 +2401,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!reflexive || filter?.kind !== "object") return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacMany[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, xSacrificed: true }] });
+      si++;
+      continue;
+    }
+    // Loamcrafter Faun: "you may discard one or more land cards. When you do, return up to that many target nonland
+    // permanent cards from your graveyard to your hand." Any number, none too; the reflexive trigger (CR 603.12) has up to
+    // as many targets as were discarded, chosen as it's put on the stack.
+    const discardMany = /^[Yy]ou may discard one or more ([a-z]+) cards$/.exec(s);
+    const discardWhen = discardMany && /^When you do, (return up to (?:that many|X) (target .+))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (discardMany && discardWhen) {
+      const filter = parseSearchFilter(`${discardMany[1]} card`);
+      const reflexive = filter ? reflexiveBody(capital(discardWhen[1]!.replace(/^return up to (?:that many|X) /, "return up to X ")), ctx, false, false, true) : null;
+      if (!reflexive || !filter) return null;
+      effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true, filter });
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay" } }, min: 1 }, effects: [{ type: "reflexive", body: reflexive, xDiscarded: true }] });
       si++;
       continue;
     }
@@ -4977,6 +5000,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!r) return null;
       effects.push({ type: "revealTop", look: true }, r.effect);
       si = r.next - 1;
+      // Sidequest: Catch a Fish: "If you put a card into your hand this way, create a Food token and transform ~": only
+      // after the card went to your hand.
+      const putThen = /^If you put a card into your hand this way, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const may = r.effect.type === "if" && r.effect.cond.kind === "revealedIs" && !r.effect.otherwise?.length && r.effect.effects.length === 1 ? r.effect.effects[0] : undefined;
+      if (putThen) {
+        const before = ctx.targets.length;
+        const then = parseOne(capital(putThen[1]!), ctx);
+        if (!then || ctx.targets.length !== before || may?.type !== "may" || may.otherwise || !may.effects.some((x) => x.type === "bounce" && x.what.ref === "revealed")) return null;
+        may.effects.push(...then);
+        si++;
+      }
       continue;
     }
     // Sorin the Mirthless: "Look at the top card of your library. You may reveal that card and put it into your hand. If you
@@ -11121,7 +11155,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes)) return false;
+    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

@@ -400,3 +400,154 @@ describe("copy a creature spell that doesn't share a creature type with your cre
     expect(s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Test Wizard").length).toBe(1);
   });
 });
+const confoundingConundrum = card("Confounding Conundrum", "Enchantment", "{1}{U}", {"cmc":2,"keywords":[],"oracleText":"When this enchantment enters, draw a card.\nWhenever a land an opponent controls enters, if that player had another land enter the battlefield under their control this turn, they return a land they control to its owner's hand.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+
+describe("whenever a land an opponent controls enters, if they had another land enter this turn, they return a land (Confounding Conundrum)", () => {
+  it("compile", () => supported(confoundingConundrum));
+
+  it("the first land of the turn: nothing; the second: that player returns a land they control of their choice", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, confoundingConundrum);
+    let s = passUntil(s0, "main1", opp);
+    const old = putOnBattlefield(s, opp, card("Old Land", "Land"));
+    const l1 = into(s, opp, card("Land One", "Land"), "hand");
+    const l2 = into(s, opp, card("Land Two", "Land"), "hand");
+    s = act(s, { type: "playLand", player: opp, objectId: l1 });
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    s.players[opp]!.landsPlayedThisTurn = 0;
+    s = act(s, { type: "playLand", player: opp, objectId: l2 });
+    expect(s.stack.length + s.triggerQueue.length).toBeGreaterThan(0);
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // The player may return any land they control, not just one that entered this turn (rulings).
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp, action: "bounce", count: 1 });
+    s = settle(act(s, { type: "pickPermanents", player: opp, ids: [old] }));
+    expect(s.objects[old]!.zone).toBe("hand");
+    expect(s.objects[l1]!.zone).toBe("battlefield");
+    expect(s.objects[l2]!.zone).toBe("battlefield");
+  });
+
+  it("its own controller's lands don't trigger it", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, confoundingConundrum);
+    const l1 = into(s0, ap, card("Land One", "Land"), "hand");
+    const l2 = into(s0, ap, card("Land Two", "Land"), "hand");
+    let s = act(s0, { type: "playLand", player: ap, objectId: l1 });
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = act(s, { type: "playLand", player: ap, objectId: l2 });
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+  });
+});
+const ursineMonstrosity = card("Ursine Monstrosity", "Creature — Bear Mutant", "{2}{G}", {"cmc":3,"power":"3","toughness":"3","keywords":["Trample","Mill"],"oracleText":"Trample\nAt the beginning of combat on your turn, mill a card and choose an opponent at random. This creature attacks that player this combat if able. Until end of turn, this creature gains indestructible and gets +1/+1 for each card type among cards in your graveyard.","colors":["G"],"colorIdentity":["G"],"layout":"normal"});
+
+describe("mill a card and choose an opponent at random; attacks that player; indestructible and +1/+1 per card type in your graveyard (Ursine Monstrosity)", () => {
+  it("compile", () => supported(ursineMonstrosity));
+
+  it("mills an artifact creature: +2/+2 and indestructible; it must attack the chosen opponent", () => {
+    const { s: s0, ap } = setup([]);
+    emptyHand(s0, ap);
+    const u = putOnBattlefield(s0, ap, ursineMonstrosity);
+    into(s0, ap, card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" }), "library");
+    let s = passUntil(s0, "beginCombat", ap);
+    s = settle(s);
+    expect(power(s, s.objects[u]!)).toBe(5);
+    expect(objHasKeyword(s, s.objects[u]!, "Indestructible")).toBe(true);
+    s = passUntil(s, "declareAttackers", ap);
+    const others = s.turnOrder.filter((p) => p !== ap);
+    const legal = others.filter((p) => {
+      try {
+        act(structuredClone(s), { type: "declareAttackers", player: ap, attacks: [{ attacker: u, defender: p }] });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(legal.length).toBe(1);
+    expect(() => act(structuredClone(s), { type: "declareAttackers", player: ap, attacks: [] })).toThrow();
+  });
+});
+const loamcrafterFaun = card("Loamcrafter Faun", "Creature — Satyr Druid", "{2}{G}", {"cmc":3,"power":"3","toughness":"3","keywords":[],"oracleText":"When this creature enters, you may discard one or more land cards. When you do, return up to that many target nonland permanent cards from your graveyard to your hand.","colors":["G"],"colorIdentity":["G"],"layout":"normal"});
+
+describe("you may discard one or more land cards; when you do, return up to that many nonland permanent cards (Loamcrafter Faun)", () => {
+  it("compile", () => supported(loamcrafterFaun));
+
+  it("two lands discarded: up to two targets, returned to your hand", () => {
+    const { s: s0, ap } = setup([]);
+    emptyHand(s0, ap);
+    const f = into(s0, ap, loamcrafterFaun, "hand");
+    const lands = [into(s0, ap, card("Land One", "Land"), "hand"), into(s0, ap, card("Land Two", "Land"), "hand")];
+    const spell = into(s0, ap, card("Test Spell", "Sorcery", "{1}"), "hand");
+    const yard = [into(s0, ap, bear({ name: "Dead One" }), "graveyard"), into(s0, ap, rock(), "graveyard"), into(s0, ap, bear({ name: "Dead Two" }), "graveyard")];
+    s0.players[ap]!.manaPool.G = 3;
+    let s = run(s0, planCast(s0, ap, f, []));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap, count: 2, upTo: true });
+    // Only land cards (CR 701.9).
+    expect(() => act(s, { type: "discard", player: ap, objectIds: [spell] })).toThrow();
+    s = act(s, { type: "discard", player: ap, objectIds: lands });
+    s = settle(s, { targets: [tgt(yard[0]!), tgt(yard[1]!)] });
+    expect(lands.every((id) => s.objects[id]!.zone === "graveyard")).toBe(true);
+    expect(s.objects[yard[0]!]!.zone).toBe("hand");
+    expect(s.objects[yard[1]!]!.zone).toBe("hand");
+    expect(s.objects[yard[2]!]!.zone).toBe("graveyard");
+  });
+});
+const sidequestCatchAFish = scry("transform", [{"name":"Sidequest: Catch a Fish","mana_cost":"{2}{W}","type_line":"Enchantment","oracle_text":"At the beginning of your upkeep, look at the top card of your library. If it's an artifact or creature card, you may reveal it and put it into your hand. If you put a card into your hand this way, create a Food token and transform this enchantment."},{"name":"Cooking Campsite","mana_cost":"","type_line":"Land","oracle_text":"{T}: Add {W}.\n{3}, {T}, Sacrifice an artifact: Put a +1/+1 counter on each creature you control. Activate only as a sorcery."}], { keywords: ["Transform","Food"], color_identity: ["W"] });
+
+describe("look at the top card; an artifact or creature card may go to your hand, then a Food and transform (Sidequest: Catch a Fish)", () => {
+  it("compile", () => supported(sidequestCatchAFish));
+
+  const upkeep = (top: CardDef, may: boolean) => {
+    const { s: s0, ap, opp } = setup([]);
+    const q = putOnBattlefield(s0, ap, sidequestCatchAFish);
+    let s = passUntil(s0, "end", ap);
+    const t = into(s, ap, top, "library");
+    s = passUntil(s, "upkeep", ap);
+    // The next turn may be another player's: go round to ours.
+    while (s.activePlayer !== ap || s.step !== "upkeep") s = passUntil(s, "upkeep");
+    s = settle(s, { may });
+    return { s, ap, opp, q, t };
+  };
+  const foods = (s: GameState, ap: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === ap && characteristics(s, s.objects[id]!).subtypes.includes("Food")).length;
+
+  it("a creature card put into your hand: a Food token, and it transforms into Cooking Campsite", () => {
+    const { s, ap, q, t } = upkeep(bear(), true);
+    expect(s.objects[t]!.zone).toBe("hand");
+    expect(foods(s, ap)).toBe(1);
+    expect(characteristics(s, s.objects[q]!).name).toBe("Cooking Campsite");
+  });
+
+  it("not taking it, or a land on top: no Food, no transform", () => {
+    const a = upkeep(bear(), false);
+    expect(a.s.objects[a.t]!.zone).toBe("library");
+    expect(foods(a.s, a.ap)).toBe(0);
+    expect(characteristics(a.s, a.s.objects[a.q]!).name).toBe("Sidequest: Catch a Fish");
+    const b = upkeep(card("Test Land", "Land"), true);
+    expect(b.s.objects[b.t]!.zone).toBe("library");
+    expect(foods(b.s, b.ap)).toBe(0);
+  });
+});
+const advancedReconstruction = card("Advanced Reconstruction", "Enchantment — Class", "{3}{R}", {"cmc":4,"keywords":["Mill"],"oracleText":"(Gain the next level as a sorcery to add its ability.)\nAt the beginning of your first main phase, mill a card, then exile a card from your graveyard at random. You may play the exiled card this turn.\n{1}{R}: Level 2\nWhenever one or more cards leave your graveyard, this Class deals 2 damage to each opponent.\n{1}{R}: Level 3\nSpells you cast from anywhere other than your hand cost {2} less to cast.","colors":["R"],"colorIdentity":["R"],"layout":"class"});
+
+describe("mill a card, then exile a card from your graveyard at random; you may play it this turn (Advanced Reconstruction)", () => {
+  it("compile", () => supported(advancedReconstruction));
+
+  it("the milled card is the only one: exiled, and playable this turn", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, advancedReconstruction);
+    let s = passUntil(s0, "end", ap);
+    s = passUntil(s, "upkeep", ap);
+    const t = into(s, ap, card("Test Land", "Land"), "library");
+    into(s, ap, bear({ name: "Drawn Bear" }), "library");
+    // An empty graveyard (cleanup discards went there).
+    for (const id of s.players[ap]!.graveyard.splice(0)) {
+      s.objects[id]!.zone = "exile";
+      s.players[ap]!.exile.push(id);
+    }
+    s = passUntil(s, "main1", ap);
+    s = settle(s);
+    expect(s.objects[t]!.zone).toBe("exile");
+    expect(s.objects[t]!.mayPlay).toMatchObject({ player: ap });
+    s = act(s, { type: "playLand", player: ap, objectId: t });
+    expect(s.objects[t]!.zone).toBe("battlefield");
+  });
+});

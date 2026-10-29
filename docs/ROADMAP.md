@@ -511,7 +511,7 @@ line blocks.
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
    Appropriation, Ixhel, Cybership, Impulsivity, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
-   Inexorable, Yuffie, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
+   Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
    Drowner of Truth, Command the Dreadhorde.
    Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
@@ -900,6 +900,34 @@ line blocks.
    the Aura's own source); Gluttonous Hellkite (counters for each creature sacrificed by its cast trigger); Insatiable
    Frugivore ("repeat this process" after an optional exile); Broodguard Elite (warp {X}); Mog, Moogle Warrior (what each
    player discarded decides two effects).
+   Round 210 went on from the top: "spells you cast have delve" (Teval, Arbiter of Virtue); "you can't spend mana to cast
+   this spell", paid only by convoke and delve (Hogaak, Arisen Necropolis); "the next spell you cast this turn has affinity
+   for artifacts" (Saheeli, the Gifted); "deals combat damage to a player for the first time each turn" (Raphael, Tag Team
+   Tough); "the greatest power among them" for the attacking artifact creatures (Aloy, Savior of Meridian); "you may
+   remove all of them. If you do, ... the number of counters removed this way" (Sarulf, Realm Eater); "mills a card for
+   each 1 damage ... If the player mills at least one creature card this way" (Anowon, the Ruin Thief); "if that artifact
+   is put into a graveyard this way" (Tuktuk Scrapper); "each opponent sacrifices a permanent of their choice that shares
+   a card type with it" (Martyr's Bond); "each opponent chooses a creature card in their graveyard. Put those cards onto
+   the battlefield under your control" (Dredge the Mire); "until your next turn, prevent all damage target permanent would
+   deal" and a can't-lose emblem that works only while you control a Gideon (Gideon of the Trials); "reveal the top card
+   ... cast it free if its mana value is odd. If you don't cast it, draw a card" (Yennett, Cryptic Sovereign); "untap up to
+   four target Forests" and "those lands become 4/4 Elemental creatures" after a search (Nissa, Worldwaker); "gain control
+   of that creature for as long as it has a shield counter on it" (Shield Broker); "put an Aura card from your hand onto
+   the battlefield attached to it" (Holy Avenger); "then you may attach an Equipment you control to ~", a one-Equipment
+   picker with a browser test (Yuffie, Materia Hunter); devotion increased by one and "if you control a God, a Demigod, or
+   a legendary enchantment" (Altar of the Pantheon); "that player or that planeswalker's controller discards seven cards,
+   then sacrifices seven permanents" (Nicol Bolas, Planeswalker); "cast target instant or sorcery card with mana value 3 or
+   less from your graveyard" as it resolves, paying for it (Chandra, Acolyte of Flame); "put five cards from your
+   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,716 of 31,936 with round 209 and Lane B round B39); the same text also covers Winter Soldier, Icy Assassin, Fendeep
+   Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
+   Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
+   a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
+   Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter
+   (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
+   control"); Dragon's Approach (exiling four named cards as an optional cost); Signal the Clans (a random pick if the
+   three names differ); Fblthp, the Lost (entered or cast from the library; "becomes the target of a spell");
+   Dack Fayden ("gain control of those permanents" a spell targets); Ashiok, Nightmare Muse ("then that player exiles a
+   card from their hand", cast face-up exiled cards).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1074,8 +1102,7 @@ line blocks.
    controller is the only opponent they have left. Smaller gaps from round 135: bots use Doubling Cube only for a plan of eight or more land taps that ends
    in one spell or ability (not with convoke or improvise). Smaller gaps from round 134: Astarion's Thirst has no rulings
    and follows CR 608.2h and 903.9a (a commander exiled this way is still in exile as it resolves). Smaller gaps from round 133: "put your
-   choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen; Yennett's "if
-   its mana value is odd" is out. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
+   choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
    permanents and take Atraxa's cards one at a time, the first that fits. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
    power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
    Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
@@ -1500,8 +1527,7 @@ line blocks.
      is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
-     (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and
-     Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
+     (Caparocti Sunborn), "the mana value of the exiled card" (Ellie and Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
    - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
      battlefield, that creature is also goaded" (Hot Pursuit).
    - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).

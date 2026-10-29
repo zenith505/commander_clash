@@ -519,6 +519,8 @@ export function parseBecomes(text: string): Modification[] | null {
   // The color or basic land type chosen as it resolves (see parseBody). A land's basic land type replaces its land
   // types and the abilities from its rules text (CR 305.7): "becomes an Island" too.
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
+  // Scrapbasket: "becomes all colors" (CR 105.2): all five, in place of its others (layer 5, CR 613.1e).
+  if (/^all colors$/i.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   if (/^the chosen colors$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: "colors" }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
   // "Becomes snow" (Arcum's Weathervane, Thermal Flux): it gains the supertype and keeps its others (CR 205.4a, rulings).

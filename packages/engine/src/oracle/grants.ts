@@ -155,8 +155,9 @@ export function parseGrants(text: string): Modification[] | null {
       continue;
     }
     // Annihilator too (CR 702.86b): "has trample and annihilator 2" (Eldrazi Conscription); afflict (CR 702.130b) and
-    // bushido (CR 702.45b) the same: "Artifact creatures you control have afflict 3" (Cyberman Patrol).
-    if (/^(?:annihilator|afflict|bushido) \d+$/i.test(w)) {
+    // bushido (CR 702.45b) the same: "Artifact creatures you control have afflict 3" (Cyberman Patrol); frenzy (CR
+    // 702.68b): "All Sliver creatures have frenzy 1" (Frenzy Sliver).
+    if (/^(?:annihilator|afflict|bushido|frenzy) \d+$/i.test(w)) {
       out.push({ kind: "addAbility", text: `${w.charAt(0).toUpperCase()}${w.slice(1).toLowerCase()}` });
       continue;
     }

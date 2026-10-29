@@ -11433,6 +11433,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "03dc8820-ec10-42c1-8200-d323cfcbf2b0",
+  "name": "Misinformation",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put up to three target cards from an opponent's graveyard on top of their library in any order.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eaffdf95-8e20-408d-99fa-3adc9e19523d",
   "name": "Misleading Signpost",
   "manaCost": "{2}{U}",

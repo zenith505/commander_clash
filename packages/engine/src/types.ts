@@ -487,6 +487,8 @@ export interface GameObject {
   manaSpent?: number;
   /** As a spell, and as the permanent it became: which spell cast this turn it was (StackItem.castNth). */
   castNth?: number;
+  /** As a spell, and as the permanent it became: it was cast during its caster's main phase (addendum, StackItem.castInMain). */
+  castInMain?: true;
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
   spent?: SpentMana;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
@@ -1371,7 +1373,7 @@ export type PendingDecision =
    * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
    * top of the library or at the bottom, and the owner arranges them without revealing the order.
    */
-  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Whose library, if not `player`'s (Misinformation). */ owner?: PlayerId; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
 
 export interface GameEvent {
   seq: number;
@@ -1557,7 +1559,7 @@ export interface GameState {
   zoneBatch?: ZoneMove[];
   /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
   /** `library`: a merged permanent's cards put into its owner's library together (CR 730.3a), unless it's shuffled since (`shuffles`, Player.shuffles then). */
-  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number; /** What put them there, for the prompt (a merged permanent's cards if left out). */ source?: string } }[];
+  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number; /** What put them there, for the prompt (a merged permanent's cards if left out). */ source?: string; /** Who arranges them, if not their owner ("in any order", Misinformation). */ by?: PlayerId } }[];
   /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */

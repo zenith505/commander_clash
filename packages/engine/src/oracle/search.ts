@@ -115,7 +115,9 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // The shuffle and putting the card on top are one action (rulings).
   if (/^then shuffle and put (?:that card|the card|it) on top(?: of your library)?$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop" } }];
   // "Then shuffle and put those cards on top in any order" (Goblin Recruiter, Insidious Dreams): the searcher orders them.
-  if (/^then shuffle and put (?:those cards|them) on top(?: of your library)? in any order$/i.test(rest) && n !== 1) return [{ ...base, dest: { zone: "libraryTop" } }];
+  // Scouting Trek's "then shuffle and put them on top" is the same: the owner orders cards put into a library together
+  // (CR 401.4).
+  if (/^then shuffle and put (?:those cards|them) on top(?: of your library)?(?: in any order)?$/i.test(rest) && n !== 1) return [{ ...base, dest: { zone: "libraryTop" } }];
   if (/^then shuffle and put that card third from the top$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop", third: true } }];
   if (/^put (?:it|that card) on top of your library, then shuffle$/i.test(rest)) return null; // shuffled away again: not a real template
   return null;

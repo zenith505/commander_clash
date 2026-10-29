@@ -898,6 +898,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "orderGraveyard") return [{ type: "orderGraveyard", player: pid, order: orderOwnGraveyard(s, pend.cards) }];
     // A merged permanent's cards on top of its library: the cheapest drawn first; at the bottom it doesn't matter.
+    // An opponent's library (Misinformation): the cards least useful to them first, lands and then the costliest.
+    const isLand = (id: ObjectId) => (defOf(s, s.objects[id]!).types.includes("Land") ? 0 : 1);
+    if (pend.kind === "orderLibrary" && pend.owner !== undefined) return [{ type: "orderLibrary", player: pid, order: [...pend.cards].sort((a, b) => isLand(a) - isLand(b) || mv(s, b) - mv(s, a)) }];
     if (pend.kind === "orderLibrary") return [{ type: "orderLibrary", player: pid, order: pend.bottom ? pend.cards : [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)) }];
     if (pend.kind === "mulligan") return [{ type: "mulligan", player: pid, keep: !pend.canMulligan || keepsHand(s, pid, pend.taken) }];
     if (pend.kind === "bottomCards") return [{ type: "bottomCards", player: pid, objectIds: chooseBottom(s, pid, pend.count) }];
@@ -4002,6 +4005,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
+      // Gomazoa: shuffling itself away is only worth it to take an attacker it blocks along, one that costs at least as much.
+      const takesBlocked = ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "inCombatWithSelf" && e.what.andSelf);
+      if (takesBlocked && !(o.blocking ?? []).some((a) => s.objects[a]?.attacking !== undefined && mv(s, a) >= mv(s, id))) continue;
       // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
       if (!craft && doesNothingNow(s, id, ab.body)) continue;
       // "Search your library for a card named Sphinx Sovereign" (the Heralds): not with none of them left to find.

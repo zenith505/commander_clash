@@ -450,7 +450,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
     // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => (o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
+    const them = s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
+    return ref.andSelf ? [me, ...them] : them;
   }
   if (ref.ref === "blockingIt") {
     const me = ref.subject ? objects(s, { ref: "subject" }, ctx)[0] : objects(s, { ref: "self" }, ctx)[0];

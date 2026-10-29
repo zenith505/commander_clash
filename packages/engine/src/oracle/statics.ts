@@ -1241,6 +1241,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "It" is the source only when the ability is about the source itself.
   if (/^at least one creature is blocking ~$/.test(text)) return { kind: "self", is: "hasBlockers" };
   if (/^two or more creatures are blocking (?:~|it)$/.test(text)) return { kind: "self", is: "twoOrMoreBlockers" };
+  // Warchanter Skald: "if it's enchanted or equipped": either.
+  if (/^(?:~|it)(?:'s| is) enchanted or equipped$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "anyOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }] };
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
   const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
@@ -1297,11 +1299,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Liu Bei, Lord of Shu: "as long as you control a permanent named Guan Yu, Sainted Warrior or a permanent named Zhang Fei,
   // Fierce Warrior"; Rufus Shinra: "if you don't control a creature named Darkstar": by name (CR 201.2), any of them.
-  if ((m = /^you (don't )?control an? (permanent|creature|land|artifact) named ([^~]+?)(?: or an? \2 named ([^~]+))?$/.exec(text))) {
+  // Mine Worker: "if you control creatures named Power Plant Worker and Tower Worker": one of each.
+  if ((m = /^you control (creature|permanent)s named ([^~]+?) and ([^~]+)$/.exec(text)) && !/ named /.test(m[2]! + m[3]!)) text = `you control a ${m[1]} named ${m[2]} and a ${m[1]} named ${m[3]}`;
+  if ((m = /^you (don't )?control an? (permanent|creature|land|artifact) named ([^~]+?)(?: (or|and) an? \2 named ([^~]+))?$/.exec(text))) {
+    if (m[1] && m[4] === "and") return null;
     const type = m[2] === "permanent" ? [] : [capital(m[2]!)];
     const filter = (name: string): TargetSpec => ({ kind: "object", types: type, notTypes: [], notColors: [], named: name, text: `${m![2]} named ${name}` });
-    const conds: StaticCondition[] = [m[3]!, m[4]].filter((x): x is string => !!x).map((name) => ({ kind: "control", who: "you", filter: filter(name), ...(m![1] ? { max: 0 } : { min: 1 }) }));
-    return conds.length === 1 ? conds[0]! : m[1] ? { kind: "allOf", conds } : { kind: "anyOf", conds };
+    const conds: StaticCondition[] = [m[3]!, m[5]].filter((x): x is string => !!x).map((name) => ({ kind: "control", who: "you", filter: filter(name), ...(m![1] ? { max: 0 } : { min: 1 }) }));
+    return conds.length === 1 ? conds[0]! : m[1] || m[4] === "and" ? { kind: "allOf", conds } : { kind: "anyOf", conds };
   }
   // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
   // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
@@ -1815,6 +1820,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
   // "Each nonland permanent you control is all colors" (Leyline of the Guildpact): layer 5 (CR 105.2, 613.1e).
   if (/^(?:is|are) all colors$/.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
+  // Shifting Sky: "All nonland permanents are the chosen color": the color chosen as the source entered (CR 614.12),
+  // replacing their colors (layer 5, CR 105.3).
+  if (/^(?:is|are) the chosen color$/.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
   // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".
   if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
     const filter = parseTargetPhrase(/^an enchantment or an enchanted permanent$/.test(m[1]!) ? m[1]! : m[1]!.replace(/^an? /, ""));
@@ -2476,7 +2484,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

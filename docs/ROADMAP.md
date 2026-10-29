@@ -2596,7 +2596,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Skald), heroic counter plus "prevent all damage ... this turn" (Favored Hoplite), "it deals 4 damage" from a dying
   source (Volatile Rig), X/X plus one with "the colors" (Fractalize), "becomes all colors" (Scrapbasket), "are the
   chosen color" (Shifting Sky), "if you cast it during your main phase" (Sentinel's Mark, addendum, CR 207.2c).
-  +26 (27,506 of 31,936 with B35 and rounds 202 to 204).
+  +26 (27,526 of 31,936 with B35 and rounds 202 to 205).
 - Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
   opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent ("for each {U}{U}

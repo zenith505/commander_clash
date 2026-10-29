@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, applyAction, castProblem, destroyPermanent, gameEndBlocked, loseLife, characteristics, spellCost, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { evalAmount } from "../src/amounts";
+import { abilitiesOf, applyAction, controllerOf, castProblem, destroyPermanent, gameEndBlocked, loseLife, characteristics, spellCost, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -378,5 +379,122 @@ describe("search for any number of basic lands onto the battlefield; those lands
       expect([power(s, s.objects[id]!), toughness(s, s.objects[id]!)]).toEqual([4, 4]);
     }
     expect(characteristics(s, s.objects[old]!).types).not.toContain("Creature");
+  });
+});
+
+const shieldBroker = card("Shield Broker", "Creature — Octopus Advisor", "{3}{U}{U}", {"cmc": 5, "power": "3", "toughness": "3", "keywords": [], "oracleText": "When this creature enters, put a shield counter on target noncommander creature you don't control. You gain control of that creature for as long as it has a shield counter on it. (If it would be dealt damage or destroyed, remove a shield counter from it instead.)", "colors": ["U"], "colorIdentity": ["U"], "layout": "normal"});
+const holyAvenger = card("Holy Avenger", "Artifact — Equipment", "{2}{W}", {"cmc": 3, "keywords": ["Equip"], "oracleText": "Equipped creature has double strike.\nWhenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it.\nEquip {2}{W}", "colors": ["W"], "colorIdentity": ["W"], "layout": "normal"});
+const testAura = card("Test Aura", "Enchantment — Aura", "{1}{W}", { cmc: 2, oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+
+describe("put a shield counter on target creature; gain control of it for as long as it has a shield counter", () => {
+  it("compile", () => supported(shieldBroker));
+
+  it("Shield Broker: you control the creature until its shield counter is gone", () => {
+    const { s: s0, ap, opp } = setup([shieldBroker]);
+    const sb = s0.players[ap]!.hand.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Shield Broker")!;
+    const b = putOnBattlefield(s0, opp, bear());
+    s0.players[ap]!.manaPool.U = 5;
+    let s = run(s0, planCast(s0, ap, sb));
+    s = settle(s, { targets: [tgt(b)] });
+    expect(s.objects[b]!.counters.shield).toBe(1);
+    expect(controllerOf(s, s.objects[b]!)).toBe(ap);
+    s.objects[b]!.counters.shield = 0;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(controllerOf(s, s.objects[b]!)).toBe(opp);
+  });
+});
+
+describe("whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it", () => {
+  it("compile", () => supported(holyAvenger));
+
+  it("Holy Avenger: the Aura enters enchanting the equipped creature", () => {
+    const { s: s0, ap, opp } = setup([testAura]);
+    emptyHand(s0, ap);
+    const aura = into(s0, ap, testAura, "hand");
+    const c = putOnBattlefield(s0, ap, bear());
+    const eq = putOnBattlefield(s0, ap, holyAvenger);
+    s0.objects[eq]!.attachedTo = c;
+    invalidateCharacteristics(s0);
+    const life = s0.players[opp]!.life;
+    let s = attack(s0, ap, opp, [c]);
+    for (let i = 0; i < 50 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+    for (let i = 0; i < 50 && !s.pending; i++) s = settle(act(s, { type: "passPriority", player: waitingOn(s)! }), { may: true });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [aura] }));
+    expect(s.objects[aura]!.zone).toBe("battlefield");
+    expect(s.objects[aura]!.attachedTo).toBe(c);
+    expect([power(s, s.objects[c]!), toughness(s, s.objects[c]!)]).toEqual([3, 3]);
+    // First strike damage, then regular damage with the Aura's +1/+1 (CR 702.4b).
+    s = settle(passUntil(s, "main2", ap));
+    expect(s.players[opp]!.life).toBe(life - 5);
+  });
+});
+
+const yuffieMateriaHunter = card("Yuffie, Materia Hunter", "Legendary Creature — Human Ninja", "{2}{R}", {"cmc": 3, "power": "3", "toughness": "3", "keywords": ["Ninjutsu"], "oracleText": "Ninjutsu {1}{R} ({1}{R}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhen Yuffie enters, gain control of target noncreature artifact for as long as you control Yuffie. Then you may attach an Equipment you control to Yuffie.", "colors": ["R"], "colorIdentity": ["R"], "layout": "normal"});
+const testSword = card("Test Sword", "Artifact — Equipment", "{1}", { cmc: 1, oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
+
+describe("gain control of target noncreature artifact for as long as you control ~; then you may attach an Equipment you control to ~", () => {
+  it("compile", () => supported(yuffieMateriaHunter, testSword));
+
+  it("Yuffie: the opponent's Equipment is yours, and you may attach it to her", () => {
+    const { s: s0, ap, opp } = setup([yuffieMateriaHunter]);
+    const y = s0.players[ap]!.hand.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Yuffie, Materia Hunter")!;
+    const sword = putOnBattlefield(s0, opp, testSword);
+    s0.players[ap]!.manaPool.R = 3;
+    let s = run(s0, planCast(s0, ap, y));
+    s = settle(s, { targets: [tgt(sword)] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "attach", count: 1, min: 0, options: [sword] });
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [sword] }));
+    expect(s.objects[sword]!.attachedTo).toBe(y);
+    expect(controllerOf(s, s.objects[sword]!)).toBe(ap);
+    expect(power(s, s.objects[y]!)).toBe(5);
+  });
+
+  it("Yuffie: attaching is optional", () => {
+    const { s: s0, ap, opp } = setup([yuffieMateriaHunter]);
+    const y = s0.players[ap]!.hand.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Yuffie, Materia Hunter")!;
+    const rockId = putOnBattlefield(s0, opp, rock());
+    const mine = putOnBattlefield(s0, ap, testSword);
+    s0.players[ap]!.manaPool.R = 3;
+    let s = run(s0, planCast(s0, ap, y));
+    s = settle(s, { targets: [tgt(rockId)] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", options: [mine] });
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [] }));
+    expect(s.objects[mine]!.attachedTo).toBeUndefined();
+    expect(controllerOf(s, s.objects[rockId]!)).toBe(ap);
+  });
+});
+
+const altarOfThePantheon = card("Altar of the Pantheon", "Artifact", "{3}", {"cmc": 3, "keywords": [], "oracleText": "Your devotion to each color and each combination of colors is increased by one.\n{T}: Add one mana of any color. If you control a God, a Demigod, or a legendary enchantment, you gain 1 life.", "colors": [], "colorIdentity": [], "layout": "normal"});
+
+describe("your devotion to each color and each combination of colors is increased by one; mana with a life rider", () => {
+  it("compile", () => supported(altarOfThePantheon));
+
+  it("Altar of the Pantheon: one more devotion to a color and to two colors together, even with no symbols of them", () => {
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, card("Green Elf", "Creature — Elf", "{1}{G}{G}", { cmc: 3, power: "2", toughness: "2" }));
+    const dev = (colors: ("W" | "U" | "B" | "R" | "G")[]) => evalAmount(s, { count: { kind: "devotion", colors } }, { controller: ap });
+    expect(dev(["G"])).toBe(2);
+    putOnBattlefield(s, ap, altarOfThePantheon);
+    expect(dev(["G"])).toBe(3);
+    expect(dev(["R", "G"])).toBe(3);
+    expect(dev(["W"])).toBe(1);
+  });
+
+  it("Altar of the Pantheon: you gain 1 life only while you control a God, a Demigod, or a legendary enchantment", () => {
+    const { s: s0, ap } = setup([]);
+    const a = putOnBattlefield(s0, ap, altarOfThePantheon);
+    const life = s0.players[ap]!.life;
+    let s = act(s0, { type: "activateAbility", player: ap, objectId: a, index: 0, mana: "W" });
+    expect(s.players[ap]!.manaPool.W).toBe(1);
+    expect(s.players[ap]!.life).toBe(life);
+    const { s: t0, ap: ap2 } = setup([]);
+    const a2 = putOnBattlefield(t0, ap2, altarOfThePantheon);
+    putOnBattlefield(t0, ap2, card("Test Saga", "Legendary Enchantment", "{2}", { cmc: 2 }));
+    const life2 = t0.players[ap2]!.life;
+    s = act(t0, { type: "activateAbility", player: ap2, objectId: a2, index: 0, mana: "B" });
+    expect(s.players[ap2]!.manaPool.B).toBe(1);
+    expect(s.players[ap2]!.life).toBe(life2 + 1);
   });
 });

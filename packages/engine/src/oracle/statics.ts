@@ -767,6 +767,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
   if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment": any one of them.
+  if ((m = /^you control (an? [^,]+), (an? [^,]+), or (an? [^,]+)$/.exec(text))) {
+    const conds = [m[1]!, m[2]!, m[3]!].map((x) => parseStaticCondition(`you control ${x}`, st));
+    return conds.every((c) => c?.kind === "control") ? { kind: "anyOf", conds: conds as StaticCondition[] } : null;
+  }
   // Of One Mind: "if you control a Human creature and a non-Human creature": two different creatures, since none can be
   // both.
   if ((m = /^you control an? ([A-Z][a-z]+) creature and an? non-([A-Z][a-z]+) creature$/.exec(text)) && m[1] === m[2]) {

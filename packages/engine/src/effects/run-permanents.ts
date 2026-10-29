@@ -1448,7 +1448,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sc.queue = [ctx.controller];
         sc.chosen = {};
         const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
+        s.pending = e.one
+          ? { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: 1, min: 0, prompt: `you may click one of your Equipment to attach to ${to}, then attach it (or attach none).` }
+          : { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
         return "paused";
       }
       const chosen = sc.chosen?.[ctx.controller] ?? [];

@@ -1978,7 +1978,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // ~" (Danitha): only to the source, still on the battlefield as the same object (CR 400.7).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : undefined);
+      // Holy Avenger: the trigger's creature, if it's still on the battlefield as that object (CR 400.7).
+      const subject = e.attachToSubject ? objects(s, { ref: "subject" }, ctx).find((o) => o.zone === "battlefield") : undefined;
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : e.attachToSubject ? (subject?.id ?? null) : undefined);
       if (hosts === "paused") return "paused";
       // "That creature gains haste": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];

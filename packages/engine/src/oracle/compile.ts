@@ -2585,6 +2585,11 @@ export function compile(d: CardDef): CompiledCard {
       (out.spellsHaveDelve ??= []).push({ filter: { kind: "spell", text: "spell" }, text: line });
       continue;
     }
+    // Altar of the Pantheon: one more to its controller's devotion to any color or combination of colors (CR 700.5).
+    if (line === "Your devotion to each color and each combination of colors is increased by one.") {
+      out.devotionBonus = (out.devotionBonus ?? 0) + 1;
+      continue;
+    }
     // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.
     const giveImprovise = /^([A-Z][a-z]+) spells you cast have improvise\.$/.exec(line);
     if (giveImprovise) {

@@ -8697,6 +8697,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...e, duration: "game", whileCounter: counter });
       continue;
     }
+    // Shield Broker: "Put a shield counter on target noncommander creature you don't control. You gain control of that
+    // creature for as long as it has a shield counter on it": control (layer 2) of what the counter was just put on, ending
+    // once it has none (CR 611.2b; the shield counter, CR 122.1c).
+    const ctlCtr = new RegExp(`^You gain control of (that creature|that permanent|it) for as long as it has an? ${COUNTER} counter on it$`).exec(s);
+    if (ctlCtr) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(ctlCtr[2]!);
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
+      effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "control" }], duration: "game", whileCounter: counter });
+      continue;
+    }
     // Ultima, Origin of Oblivion: "Put a blight counter on target land. For as long as that land has a blight counter on it,
     // it loses all land types and abilities and has "{T}: Add {C}."": its land types go (CR 305.7; card types and
     // supertypes stay, rulings), then all its abilities, then it has that one, all in this effect's timestamp.
@@ -9382,7 +9393,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond, subject: { ref: "attached" } }, effects: fx });
       continue;
     }
-    const ifState = /^If ([^,]+), (.+)$/.exec(s);
+    // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment, ...": a list in the condition.
+    const ifState = /^If (you control an? [^,]+, an? [^,]+, or an? [^,]+), (.+)$/.exec(s) ?? /^If ([^,]+), (.+)$/.exec(s);
     // Sphinx Sovereign: "If ~ is untapped, ...": ~ itself, as it resolves or as it last existed (rulings).
     const selfTapped = !!ifState && /^~ is (?:un)?tapped$/.test(ifState[1]!);
     // Ayara's Oathsworn: "Put a +1/+1 counter on it. Then if it has exactly four +1/+1 counters on it, ...": ~, which the

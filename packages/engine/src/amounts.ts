@@ -7,6 +7,7 @@
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
+import { compileCard } from "./oracle";
 import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
@@ -730,6 +731,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if (view(o)?.controller !== ctx.controller) continue;
         n += manaSymbolsOf(defOf(s, o).manaCost, c.colors);
+        // Altar of the Pantheon: one more for each color or combination of colors (CR 700.5), even if it has lost its
+        // abilities (rulings: the effect applies before any that would remove them), so from the card itself.
+        n += compileCard(defOf(s, o)).devotionBonus ?? 0;
       }
       return n;
     }

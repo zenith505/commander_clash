@@ -1712,6 +1712,8 @@ export function searchBarred(s: GameState, pid: PlayerId): boolean {
 
 /** Stranglehold: an opponent's permanent keeps this player from searching any library; Mindlock Orb, anyone's. */
 export function cantSearch(s: GameState, pid: PlayerId): boolean {
+  // Shadow of Doubt: "Players can't search libraries this turn."
+  if (s.noSearchTurn === s.turn) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);

@@ -2864,6 +2864,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   is that Dragon's power), Lichenthrope and Phytohydra (damage replaced by counters, not prevented), Tobias,
   Whipkeeper, Rag Man, Howling Galefang, Swift Reckoning, Sewer Crocodile, Primitive Justice (each needs a new
   mechanic or a new prompt).
+- Round B43 (harder skipped cards, least played first): colored and conditional cost cuts ("costs {2}{U} less if",
+  "costs {U} less if an opponent cast two or more spells", "during your end step", "if it targets a creature card with
+  mana value 3 or less" from a graveyard: Stormwing Entity, Ertai's Scorn, Closing Statement, Revoke Demise, No One
+  Left Behind), "if you cycled two or more cards this turn" and "a card with a cycling ability" (Spellpyre Phoenix,
+  Rooting Moloch), "if ~ is in your graveyard or on the battlefield" (Firemane Angel; one trigger per zone, and the
+  card that moves between them doesn't count, rulings), "When ~ is put into your hand from your graveyard" (Golgari
+  Brownscale, CR 113.6k), "Whenever a permanent is put into an opponent's graveyard" (Patron of the Nezumi), "Players
+  can't search libraries this turn" (Shadow of Doubt), "return ... attached to this creature" (Magnetic Snuffler),
+  "if the sacrificed creature was red / a Saproling was sacrificed this way" (Lyzolda, Thallid Omnivore), "Sacrifice a
+  creature. ... equal to that creature's power" (Rupture), spell mastery returns and digs (Necromantic Summons, Gather
+  the Pack), the Empires trio (Throne, Scepter, Crown), Destroy the Evidence, Oathsworn Knight, Relic Amulet, Seeds of
+  Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,843 of
+  31,936 with rounds 209 to 211 and B40-B42).
+- Out after round B43: Cinderheart Giant (damage to a creature chosen at random, not targeted), Torment of Venom and
+  Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
+  hand this way" after a search or a fixed-count reveal, not parsed yet).
 - Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
   Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first
@@ -2871,7 +2887,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond
-  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
+  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from

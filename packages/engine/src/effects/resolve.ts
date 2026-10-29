@@ -1045,6 +1045,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnExiled":
     case "exileIfDies":
     case "exileDyingThisTurn":
+    case "noSearchThisTurn":
     case "exileReturnThisTurn":
     case "exileIfLeaves":
     case "noRegen":

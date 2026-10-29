@@ -1563,9 +1563,10 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if (inGraveyard && (m = /(?:^| )with (cycling|awaken|foretell|mutate|flashback|madness|disturb)$/.exec(p))) {
+  } else if (inGraveyard && (m = /(?:^| )with (cycling|awaken|foretell|mutate|flashback|madness|disturb|a (?=cycling ability$)cycling)(?: ability)?$/.exec(p))) {
     // Sacred Excavation: "cards with cycling from your graveyard": a card's printed keyword abilities, typecycling being
-    // cycling too (CR 702.29e; the card data lists "Cycling" with it).
+    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Spellpyre Phoenix: "with a cycling ability", the same.
+    if (m[1]!.startsWith("a ")) m[1] = "cycling";
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
   } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {

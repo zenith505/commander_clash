@@ -794,6 +794,16 @@ export function compile(d: CardDef): CompiledCard {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
     }
+    // Firemane Angel: "At the beginning of your upkeep, if ~ is in your graveyard or on the battlefield, you may gain 1 life":
+    // an ability that works in both zones, one of each, each checking it's still the same object there as it resolves
+    // (CR 603.4; moved between them before then, nothing happens, rulings).
+    const yardOrField = /^(At the beginning of your upkeep), if ~ is in your graveyard or on the battlefield, (.+)$/.exec(line);
+    if (yardOrField && !/~|\bit\b/.test(yardOrField[2]!)) {
+      const t = parseTrigger(`${yardOrField[1]}, ${yardOrField[2]}`);
+      if (!t || t === "fail" || t.zone || t.ifCond || t.host) out.unsupported.push(raw);
+      else out.triggers.push({ ...t, ifCond: { kind: "selfStill", zone: "battlefield" } }, { ...t, zone: "graveyard", ifCond: { kind: "selfStill", zone: "graveyard" } });
+      continue;
+    }
     // "∞ — [Ability]": "As long as this permanent is harnessed, it has [ability]" (CR 702.186b).
     const infinity = /^∞ — (.+)$/.exec(line);
     if (infinity) {
@@ -3111,7 +3121,8 @@ export function compile(d: CardDef): CompiledCard {
       out.phantom = true;
       continue;
     }
-    if (line === "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove a +1/+1 counter from ~.") {
+    // Oathsworn Knight: "... from it." the same.
+    if (/^If damage would be dealt to ~ while it has a \+1\/\+1 counter on it, prevent that damage and remove a \+1\/\+1 counter from (?:~|it)\.$/.test(line)) {
       out.phantom = "whileCounter";
       continue;
     }
@@ -4659,7 +4670,18 @@ function checkCastingLinks(out: CompiledCard) {
     delete k.cost;
   }
   const visit = (v: unknown): void => {
-    if (Array.isArray(v)) return v.forEach(visit);
+    if (Array.isArray(v)) {
+      // Rupture: "Sacrifice a creature. ~ deals damage equal to the sacrificed creature's power ...": an effect's own
+      // sacrifice of one creature, for the instructions after it (s.resolving.sacrificedThisWay).
+      const was = effectSac;
+      for (const x of v) {
+        visit(x);
+        const e = x as { type?: string; action?: string; n?: unknown; who?: { ref?: string } } | null;
+        if (e?.type === "pick" && e.action === "sacrifice" && e.n === 1 && e.who?.ref === "you") effectSac = true;
+      }
+      effectSac = was;
+      return;
+    }
     if (!v || typeof v !== "object") return;
     const o = v as Record<string, unknown>;
     if ((o.kind === "kicked" || o.kind === "wasKicked") && !("filter" in o)) {
@@ -4696,7 +4718,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedColor") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
@@ -4724,6 +4746,7 @@ function checkCastingLinks(out: CompiledCard) {
   // with nothing sacrificed to share the record.
   const yardExileOne = (costs: AdditionalCost[] | undefined) => costs?.filter((c) => c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && c.n === 1).length === 1 && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage" || c.kind === "craft");
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice") || yardExileOne(out.additionalCosts);
+  let effectSac = false;
   let exileCost = false;
   let yardExile = yardExileOne(out.additionalCosts);
   let handExileCost = false;

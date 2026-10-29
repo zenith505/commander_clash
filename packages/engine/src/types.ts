@@ -1098,6 +1098,8 @@ export interface LastKnown {
   suspected?: true;
   /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
   legendary?: true;
+  /** Its colors as it last existed: "if the sacrificed creature was red" (Lyzolda). */
+  colors?: Color[];
   /** It was a commander: "if the sacrificed permanent was a commander" (Tevesh Szat, CR 903.3). */
   commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
@@ -1771,6 +1773,8 @@ export interface GameState {
   damagedThisTurn?: PlayerId[];
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): the turn it applies in (CR 614.1a). */
   exileDyingTurn?: number;
+  /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */
+  noSearchTurn?: number;
   /** How much damage each player was dealt this turn (Spinerock Knoll). */
   damageThisTurn?: Record<number, number>;
   /** What the Traps' "this turn" conditions look back at (StaticCondition opponentSearched and the rest); cleared each turn. */

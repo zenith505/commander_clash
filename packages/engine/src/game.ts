@@ -4780,7 +4780,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "... if it targets a spell or ability that targets a creature you control with power 7 or greater" (Not of This
   // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? [])
-    if (how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false)) || (t.kind === "stack" && c.filter.kind === "spell" && !!c.filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], c.filter.targetsWhat, pid)) || (t.kind === "stack" && c.filter.kind === "spell" && !c.filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, c.filter, x))(s.stack.find((x) => x.id === t.id))))) less += c.n;
+    if (how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false)) || (t.kind === "object" && c.filter.kind === "card" && s.objects[t.id]?.zone === "graveyard" && printedMatches(c.filter, defOf(s, obj(s, t.id)))) || (t.kind === "stack" && c.filter.kind === "spell" && !!c.filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], c.filter.targetsWhat, pid)) || (t.kind === "stack" && c.filter.kind === "spell" && !c.filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, c.filter, x))(s.stack.find((x) => x.id === t.id))))) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
   return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more - less) });
 }
@@ -6596,7 +6596,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), subtypes: [...ch.subtypes], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }

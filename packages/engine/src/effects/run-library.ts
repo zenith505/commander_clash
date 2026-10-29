@@ -530,11 +530,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const looked = sc.looked ?? [];
       const found = sc.found.filter((id) => obj(s, id).zone === "library");
+      const at = s.nextTimestamp;
       for (const id of found) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
         if (o.zone !== "exile") continue;
-        o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], ...(e.castAnyType ? { label: "Face down" } : {}) };
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], at, ...(e.castAnyType ? { label: "Face down" } : {}) };
         // Gonti: its controller may cast it for as long as it remains exiled, even after Gonti has left (rulings).
         if (e.castAnyType) {
           o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, anyType: true };
@@ -768,10 +769,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const cards = ids.filter((id) => p.hand.includes(id));
       if (!cards.length) return;
+      const at = s.nextTimestamp;
       for (const id of cards) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        if (o.zone === "exile") o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], label: "Face down" };
+        if (o.zone === "exile") o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], label: "Face down", at };
       }
       log(s, `${p.name} exiles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand face down.`);
       // Only as many as the library has; not a draw (rulings).
@@ -1160,6 +1162,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // same time). A permanent card still in exile as the object it became (CR 400.7).
       const held = e.withHeld ? (r.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc && isPermanentCard(defOf(s, obj(s, l.id)))).map((l) => l.id) : [];
       if (e.withHeld) r.held = undefined;
+      const at = s.nextTimestamp;
       enterTogether(s, () => {
         for (const id of held) {
           log(s, `${src} returns ${defOf(s, obj(s, id)).name} to the battlefield under ${player(s, ctx.controller).name}'s control.`);
@@ -1184,7 +1187,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           } else moveObject(s, id, to.zone);
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.
           if (to.faceDown && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
-            obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down" };
+            obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down", at };
             r.faceDownExiled = [...(r.faceDownExiled ?? []), id];
           }
           // Praetor's Grasp, Ugin: the player who searched may play it, this object only (CR 400.7).

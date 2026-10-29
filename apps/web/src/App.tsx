@@ -137,6 +137,8 @@ import {
   beholdCandidates,
   beholdWhat,
   linkedExileCards,
+  processCandidates,
+  hiddenInExile,
   tapCostCandidates,
   counterOnCandidates,
   untapViaMana,
@@ -807,6 +809,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const what = c.filter?.text ?? "card";
         return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `exile from your hand ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id)))), chosen: [] });
       }
+      if (c.kind === "exileFromGraveyard" && c.process) {
+        // The Eldrazi processors (Void Attendant): a card an opponent owns in exile, into its owner's graveyard.
+        if (d.exileCards !== undefined) continue;
+        return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: "put a card an opponent owns from exile into that player's graveyard", n: 1, candidates: processCandidates(s, HUMAN), chosen: [] });
+      }
       if (c.kind === "exileFromGraveyard" && c.linked) {
         // Jester's Scepter: pick one of the cards exiled with it (you may look at them) to put into its owner's graveyard.
         if (d.exileCards !== undefined) continue;
@@ -1021,6 +1028,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
+      // Processor Assault: a card an opponent owns in exile, into its owner's graveyard (a face-down one shows its back).
+      if (c.kind === "exileFromGraveyard" && c.process)
+        return setCostPick({ draft: d, kind: "exileCards", label: card.name, what: "put a card an opponent owns from exile into that player's graveyard", n: 1, candidates: processCandidates(s, HUMAN), chosen: [] });
       if (c.kind === "returnToHand")
         return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
       // "Tap an untapped creature you control" (Lashknife's alternative cost): clicked on the battlefield.
@@ -2445,6 +2455,14 @@ function CardChoice({
         <div className="modal-cards">
           {cards.map((id) => {
             const d = cardOf(s, id);
+            // A card in exile face down that you may not look at (CR 406.3): its back, and whose it is.
+            if (hiddenInExile(s.objects[id]!, HUMAN))
+              return (
+                <div key={id} className={`card big back ${chosen.includes(id) ? "selected" : "targetable"}`} data-pick={id} onClick={() => onToggle(id)}>
+                  <div className="back-design" />
+                  <span className="zone-label">{`${s.players[s.objects[id]!.owner]!.name}'s, face down`}</span>
+                </div>
+              );
             return (
               <div key={id} className={`card big ${chosen.includes(id) ? "selected" : "targetable"}`} data-pick={id} onClick={() => onToggle(id)} {...hoverProps(d, onHover)}>
                 <CardFace d={d} />
@@ -3990,6 +4008,14 @@ function LibrarySearch({
               <div className="modal-cards">
                 {found.map((id, i) => {
                   const d = cardOf(s, id);
+                  if (pending.exiled && hiddenInExile(s.objects[id]!, HUMAN))
+                    return (
+                      <div key={id} className="arrange-card">
+                        <div className="card big back" data-found={id} onClick={() => setFound(found.filter((x) => x !== id))} title="Click to put it back">
+                          <div className="back-design" />
+                        </div>
+                      </div>
+                    );
                   return (
                     <div key={id} className="arrange-card">
                       <div className="card big" data-found={id} onClick={() => setFound(found.filter((x) => x !== id))} {...hoverProps(d, onHover)} title="Click to put it back">
@@ -4011,6 +4037,14 @@ function LibrarySearch({
                   .map((id) => {
                     const d = cardOf(s, id);
                     const can = pending.cards.includes(id) && found.length < pending.max && !clashes(id);
+                    // A processor's pick: a card exiled face down that you may not look at shows its back (CR 406.3).
+                    if (pending.exiled && hiddenInExile(s.objects[id]!, HUMAN))
+                      return (
+                        <div key={id} className={`card big back ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])}>
+                          <div className="back-design" />
+                          <span className="zone-label">{`${s.players[s.objects[id]!.owner]!.name}'s, face down`}</span>
+                        </div>
+                      );
                     return (
                       <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)} title={pending.cards.includes(id) && clashes(id) && pending.oneOfEach ? "You already took a card of this kind" : undefined}>
                         <CardFace d={d} />

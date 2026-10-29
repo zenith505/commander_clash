@@ -163,6 +163,10 @@ export type Count =
   | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** "Draw a card for each spell countered this way" (Swift Silence). */
+  | { kind: "spellsCounteredThisWay" }
+  /** Leeches: "that much", the poison counters its loseAllCounters instruction removed. */
+  | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
   /** Sacred Boon's delayed trigger: "for each 1 damage prevented this way", all the damage rule `rule` prevented (GameState.preventedTally). */
@@ -2200,6 +2204,11 @@ export type Effect =
    */
   | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[] }
   /**
+   * The Eldrazi processors: "put a card an opponent owns from exile into that player's graveyard", "put two cards your
+   * opponents own from exile into their owners' graveyards", chosen as it resolves (game.ts processCandidates).
+   */
+  | { type: "processExile"; n: number }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
@@ -3394,7 +3403,7 @@ export type Effect =
   /** Rad counters' inherent triggered ability (CR 728.1), for the player whose precombat main phase it is (its controller). */
   | { type: "radiation" }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
-  | { type: "loseAllCounters"; who: PlayerRef }
+  | { type: "loseAllCounters"; who: PlayerRef; /** "Loses all poison counters" (Leeches): only those; how many is kept for "that much" (Count poisonLostThisWay). */ poison?: true }
   /** "Double the number of each kind of counter you have" (CR 701.10e): that many more of each. */
   | { type: "doublePlayerCounters"; who: PlayerRef }
   /**
@@ -3813,7 +3822,7 @@ export type SpellCondition =
   | { kind: "atRandom" }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
-  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string }
+  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string; /** "If a white creature dies this way" (Cinder Cloud): of that color as it last existed. */ color?: Color }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true; /** "If you sacrifice an Island this way" (Serendib Djinn): one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
@@ -4273,6 +4282,8 @@ export type TriggerEvent =
   | "dayNightChanges"
   /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
   | "youCounterSpell"
+  /** "Whenever a spell you've cast is countered" (Multani's Presence): a spell you cast, not a copy (CR 707.10), countered by anything. */
+  | "yourSpellCountered"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
   | "youFullyUnlockRoom" // "Whenever you fully unlock a Room" (CR 709.5i): one of your Rooms gets its second unlocked designation
@@ -4487,7 +4498,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -5223,7 +5234,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**
@@ -5923,6 +5934,8 @@ export interface CompiledCard {
   opponentsCantSearch?: true;
   /** Mindlock Orb: "Players can't search libraries." Stranglehold's rule for every player, its controller too. */
   playersCantSearch?: true;
+  /** "Players can't play lands." (Territorial Dispute): no land plays for anyone, whatever lets them (CR 305.2, 101.2). */
+  playersCantPlayLands?: true;
   /**
    * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
    * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).
@@ -6126,6 +6139,8 @@ export interface CompiledCard {
   untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true }[];
   /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
   ninjutsuLess?: number;
+  /** "Boast abilities you activate cost {1} less to activate for each Dragon you control" (Dragonkin Berserker): generic mana only (CR 602.2b applies 601.2f). */
+  boastLess?: AmountExpr;
   /** "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): these abilities for its controller's cards in hand that match (CR 113.6, 702.49a). */
   handGrants?: { filter: TargetSpec; activated: ActivatedAbility[]; /** "In each player's hand" (Homing Sliver): every player's cards, not only its controller's. */ everyHand?: true }[];
   /**

@@ -111,6 +111,8 @@ export interface Ctx {
   dugToHand?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
+  /** With `afterMill`: that mill was of exactly one card, so "the milled card" is that card (Heed the Mists). */
+  afterMillOne?: boolean;
   /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
   afterAnyMill?: boolean;
   /** An instruction before in this ability discarded cards of yours: "for each card discarded this way" (Pyretic Charge). */
@@ -345,6 +347,9 @@ const checkableMay = (e: Effect): boolean =>
   (e.type === "gainLife" && e.who.ref === "you") ||
   // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there; "eight cards"
   // (Emeritus of Ideation), only with eight there.
+  // "You may put a card an opponent owns from exile into that player's graveyard. If you do, ..." (the Eldrazi processors):
+  // only with enough cards there (rulings).
+  e.type === "processExile" ||
   (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n >= 1 && !e.nAmount && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may discard a card or sacrifice a land. If you do, ..." (Highway Robbery): one of them, only one that can be done.
   (e.type === "either" && !!e.onlyDoable && e.options.every((o) => o.length === 1 && checkableMay(o[0]!))) ||
@@ -1357,6 +1362,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Balance of Power: "If target opponent has more cards in hand than you, draw cards equal to the difference.": with
   // fewer or as many, the difference is nothing to draw (handMoreThanYou).
   text = text.replace(/^If target opponent has more cards in hand than you, draw cards equal to the difference\.$/, "Draw X cards, where X is the number of cards in target opponent's hand minus the number of cards in your hand.");
+  // Leeches: "~ deals that much damage to that player": the poison counters the sentence before took.
+  text = text.replace(/^(Target player loses all poison counters\.) ~ deals that much damage to that player\.$/, "$1 ~ deals X damage to that player, where X is the number of poison counters lost this way.");
   // Suffocating Blast: "Counter target spell and ~ deals 3 damage to target creature.": two instructions, in order.
   text = text.replace(/^Counter target spell and (~ deals \d+ damage to target creature\.)$/, "Counter target spell. $1");
   // Unagi's Spray: "If you control a Fish, Octopus, Otter, Seal, Serpent, or Whale, draw a card": the list with "or"s, so
@@ -2275,6 +2282,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
+    ctx.afterMillOne = ctx.afterMill && last?.type === "mill" && last.n === 1;
     ctx.afterAnyMill = last?.type === "mill";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
@@ -7711,6 +7719,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Destroy target creature. If that creature dies this way, ..." (Saw in Half, Kaervek's Purge): only if it was put
     // into a graveyard, not if it survived or a replacement effect moved it elsewhere (CR 700.4, rulings).
+    // Cinder Cloud: "If a white creature dies this way, ...": the destroyed creature, white as it last existed (CR 608.2h).
+    const ifColorDies = /^If an? (white|blue|black|red|green) creature dies this way, (.+)$/.exec(s);
+    if (ifColorDies) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "destroy" || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
+      const then = ifColorDies[2]!.replace(/\bthe creature's\b/g, "that creature's");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", died: true, color: COLOR_WORDS[ifColorDies[1]!]! }, effects: inner });
+      continue;
+    }
     const ifDies = /^If that creature dies this way, (.+)$/.exec(s);
     if (ifDies) {
       const prev = effects[effects.length - 1];
@@ -10206,7 +10225,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const has = /^(?:It has|They have|They each have|Those tokens have) "(.+)"$/.exec(s);
     if (has) {
       const prev = effects[effects.length - 1];
-      const last = prev?.type === "may" ? prev.effects[prev.effects.length - 1] : prev;
+      // Blight Herder: "If you do, create three 1/1 ... tokens. They have ...": the tokens that "if" creates.
+      const last = prev?.type === "may" ? prev.effects[prev.effects.length - 1] : prev?.type === "if" && prev.cond.kind === "youDid" && !prev.otherwise ? prev.effects[prev.effects.length - 1] : prev;
       if (last?.type !== "createToken" || last.token.abilities || !compileQuoted(has[1]!)) return null;
       last.token = { ...last.token, abilities: has[1]! };
       continue;
@@ -10587,8 +10607,9 @@ function insteadOfAffected(fx: Effect[], previous: Effect[]): Effect[] | null {
  */
 /** `inIf`: inside an "if", which keeps its place among its instructions, so one that waits on a player may come first. */
 function parseThen(s: string, ctx: Ctx, inIf = false): Effect[] | null {
-  // "Then shuffle" ends a search; "then shuffle your graveyard into your library" (The Mending of Dominaria) is its own.
-  const parts = s.split(/, then (?!shuffle(?! your graveyard into your library$))/);
+  // "Then shuffle" ends a search; "then shuffle your graveyard into your library" (The Mending of Dominaria) is its own,
+  // and so is "then shuffle all creature cards from your graveyard into your library" (Barishi).
+  const parts = s.split(/, then (?!shuffle(?! your graveyard into your library$| all [a-z]+ cards from your graveyard into your library$))/);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const [i, p] of parts.entries()) {

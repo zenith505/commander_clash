@@ -121,6 +121,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
   if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
+  if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
+  // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
+  if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
@@ -260,7 +264,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: `${m[1]!} you controlled` } } };
   }
   // Reign of Terror: "for each creature that died this way": those the destroy put into a graveyard (CR 700.4).
-  if (each && (m = /^([a-z]+) that died this way$/i.exec(p))) {
+  // Hellfire: "the number of creatures that died this way": the same.
+  if ((each && (m = /^([a-z]+) that died this way$/i.exec(p))) || (m = /^the number of ([a-z]+?)s that died this way$/i.exec(p))) {
     const spec = parseTargetPhrase(m[1]!, { chosen: true });
     return spec?.kind === "object" ? { count: { kind: "destroyedThisWay", filter: { ...spec, text: m[1]! }, died: true } } : null;
   }

@@ -108,7 +108,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
 export function modsAreHarmful(mods: Modification[]): boolean {
   let pt = 0;
   for (const m of mods) {
-    if (m.kind === "modifyPT") pt += estimate(m.power) + estimate(m.toughness);
+    // "-X/-X" (Skullmane Baku) shrinks whatever X is: counted as 1, not 0.
+    if (m.kind === "modifyPT") pt += estimate(m.power, 1) + estimate(m.toughness, 1);
     if (m.kind === "addAbility") pt -= grantCost(m.text);
     if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
     // A small base P/T hurts a creature, but not a land made into one (awaken's counters come with it).

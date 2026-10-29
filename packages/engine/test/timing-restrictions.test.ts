@@ -62,7 +62,8 @@ const ability = (s: GameState, id: string, zone: "battlefield" | "graveyard" = "
 describe("cast only during", () => {
   it("parses", () => supported(heavyFog, remove, panic, festival, reset, necrologia, savageBeating, teleport, feast, afterBlocks, eternalDragon, gutterbones, kongming, lavinia, desert, kuldotha));
 
-  it("leaves out an ability about the defending player of a combat its source isn't in (Arcum's Sleigh)", () => expect(isFullySupported(arcumsSleigh)).toBe(false));
+  // Lane B round B32: any one of the defending players, the controller's choice (CR 802.2a); behavior in laneb-round32.test.ts.
+  it("supports an ability about the defending player of a combat its source isn't in (Arcum's Sleigh)", () => expect(isFullySupported(arcumsSleigh)).toBe(true));
 
   it("Heavy Fog: only in the declare attackers step, by a player a creature attacks", () => {
     const { s: s0, ap, opp } = setup([]);

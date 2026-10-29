@@ -456,7 +456,10 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
     return body ? { event: "opponentDealtDamageBySource", body, minDamage: num(single[1]!) } : "fail";
   }
   const m0 = /^Whenever a source you control deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage to a player, (.+)$/.exec(line);
-  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
+  // Talon of Pain: "a source you control other than ~"; Night Dealings: "to another player", every other player being an
+  // opponent in this free-for-all game (CR 102.3).
+  const m1 = m0 ? null : /^Whenever a source you control( other than ~)? deals (noncombat )?damage to (?:an opponent|another player), (.+)$/.exec(line);
+  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : m1 ? ([m1[0], m1[2], m1[3]] as const) : null;
   if (!m) return null;
   let text = m[2]!;
   // Fear of Burning Alive: "..., if there are four or more card types among cards in your graveyard, ...": an
@@ -471,7 +474,7 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   let body = parseBody(text, { eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}) };
+  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}), ...(m1?.[1] ? { otherSource: true as const } : {}) };
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -789,6 +792,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "A spell with cascade" (Aurora Phoenix): printed or given to it as it's cast (effects/triggers.ts hasCascade).
   const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
+  // Garenbrig Squire: "a creature spell that has an Adventure": an adventurer card cast as the creature (CR 715.2, 715.3).
+  const advM = !pw && !kwM ? / that has an Adventure$/.exec(what) : null;
+  if (advM) what = what.slice(0, advM.index);
   // "A spell with {X} in its mana cost", "a permanent spell with a mana cost that contains {X}" (Unbound Flourishing): the
   // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
   const xM = !pw && !kwM ? / with (?:\{X\} in its mana cost|a mana cost that contains \{X\})$/.exec(what) : null;
@@ -858,7 +864,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -2122,6 +2128,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // ED-E, Lonesome Eyebot: "Whenever you attack, if ... quest counters on ~, put a quest counter on it": "it" can only be
     // ~, the one object the trigger names.
     .replace(/^(Whenever you attack, if [^,]* on ~, put an? [a-z]+ counter on) it\.$/, "$1 ~.")
+    // Clockwork Beast: "At end of combat, if ~ attacked or blocked this combat, remove a +1/+0 counter from it": the
+    // intervening if (CR 603.4) is about ~, and so is "it".
+    .replace(/^(At end of combat, if ~ attacked or blocked this combat, remove an? \S+ counter from) it\.$/, "$1 ~.")
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
@@ -3013,7 +3022,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (attacked && (/^Whenever a player/.test(line) ? /^you with one or more creatures$/.test(attacked[1]!) : true)) {
     const thatMany = /\bthat many\b/.test(attacked[2]!);
     if (thatMany && (/\bX\b/.test(attacked[2]!) || !/^you with/.test(attacked[1]!))) return "fail";
-    let body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player").replace(/\bthat many\b/g, "X"), { eventPlayer: true });
+    // Sabotage Strategist: "those creatures get -1/-0 until end of turn": the ones attacking you (the trigger's group).
+    let body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player").replace(/\bthat many\b/g, "X"), { eventPlayer: true, eventGroup: true });
     if (!body) return "fail";
     if (thatMany) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: attacked[2]! };
     return { event: "opponentAttacksYou", attacksYou: { min: /two or more/.test(attacked[1]!) ? 2 : 1, ...(/planeswalkers you control/.test(attacked[1]!) ? { orPlaneswalkers: true as const } : {}), ...(/^with creatures, if /.test(attacked[1]!) ? { recheck: true as const } : {}) }, body: { ...body, text: attacked[2]! } };

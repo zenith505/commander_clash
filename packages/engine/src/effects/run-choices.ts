@@ -419,7 +419,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
         // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
         // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
-        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        ...(e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
@@ -440,6 +440,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.n = o.counters.age ?? 0;
         log(s, put ? `${src} gets ${put === 1 ? "an age counter" : `${put} age counters`} (${sc.n}).` : `${src} gets no age counter (${sc.n}).`);
       }
+      if (e.selfCounter) return runEffect(s, { type: "may", effects: sc.n ? [{ type: "counters", what: { ref: "self" }, counter: e.selfCounter, n: sc.n }] : [], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.selfCounter} counter${sc.n === 1 ? "" : "s"} on ~ to keep it (cumulative upkeep)`, keep: true }, ctx);
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
@@ -567,7 +568,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)))
             : e.cond.kind === "sacrificedThisWay"
-            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander))
+            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && (!(e.cond as { subtype?: string }).subtype || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))
             : e.cond.kind === "anotherDied"
             ? ((t) => (s.diedThisTurn?.length ?? 0) - (t?.kind === "object" && s.resolving!.destroyed?.some((d) => d.died && d.o.id === t.id) ? 1 : 0) > 0)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetSpellTargets"
@@ -670,6 +671,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"
             ? !!s.resolving!.unlessPaid
+            : e.cond.kind === "spellCountered"
+            ? !!s.resolving!.spellCountered
             : e.cond.kind === "targetPlayerIsYou"
             ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && t.id === ctx.controller)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetWasYours"
@@ -690,6 +693,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "activatedTimes"
             ? ((src, index) => index !== undefined && !!src && (src.zoneChanges ?? 0) === s.resolving!.item.sourceZc && (src.activatedThisTurn ?? []).filter((n) => n === index).length >= (e.cond as { n: number }).n)(s.objects[s.resolving!.item.sourceId ?? ""], s.resolving!.item.activatedIndex)
+            : e.cond.kind === "costExiledIs"
+            ? ((f) => (s.resolving!.item.costExiled ?? []).some((c) => !!s.objects[c.id] && printedMatches(f, defOf(s, s.objects[c.id]!))))(e.cond.filter)
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"
@@ -1130,9 +1135,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
-function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number } {
+function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number; losesSource?: true } {
   const [f] = e.effects;
   if (e.effects.length !== 1 || !f) return {};
+  if (f.type === "sacrifice" && f.what.ref === "self") return { losesSource: true };
   if (f.type === "loseLife" && typeof f.n === "number") return { lose: f.n };
   if (f.type === "damage" && typeof f.amount === "number") return { lose: f.amount };
   if (f.type === "createToken") return { tokens: 1 };

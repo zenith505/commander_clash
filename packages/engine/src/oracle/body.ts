@@ -1962,6 +1962,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
   // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
   text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
+  // Anthroplasm: "Remove all +1/+1 counters from ~ and put X +1/+1 counters on it": one, then the other.
+  text = text.replace(/^Remove all \+1\/\+1 counters from ~ and put X \+1\/\+1 counters on it\.$/, "Remove all +1/+1 counters from ~. Put X +1/+1 counters on ~.");
   // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
   // +2/+2 until end of turn before it fights if you control a creature with power 4 or greater.": the bonus first,
   // checked as it resolves (CR 608.2c; rulings), then the fight.
@@ -5047,7 +5049,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
     // refers to the card.
-    const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's) library$/.exec(s);
+    const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's|defending player's) library$/.exec(s);
     // "Look at the top card of your library. If it's a snow card, you may reveal it and put it into your hand" (Frost
     // Augur; Scrying Sheets: you can't reveal a card that isn't snow, and needn't reveal one that is, rulings).
     if (lookTop?.[1] === "your" && /^If (?:it's|that card is) /.test(sentences[si + 1] ?? "")) {
@@ -5187,6 +5189,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", text: "card" } }, effects: [{ type: "if", cond: { kind: "revealedIs", filter: named }, effects: [{ type: "bounce", what: { ref: "revealed" } }], otherwise }] },
       );
       si += 3;
+      continue;
+    }
+    // Prophecy: "Reveal the top card of target opponent's library. If it's a land, you gain 1 life. Then that player
+    // shuffles.": you reveal their top card (CR 701.20a), "a land" being a land card there, and they shuffle whatever it was.
+    const revealTheirs = /^Reveal the top card of (target opponent|target player)'s library$/.exec(s);
+    if (revealTheirs && /^Then that player shuffles\.?$/.test(sentences[si + 2] ?? "")) {
+      const who = parsePlayer(revealTheirs[1]!.toLowerCase(), ctx);
+      const rest = sentences.map((x, i) => (i === si + 1 ? x.replace(/^If it's an? (land|creature|artifact|enchantment|instant|sorcery), /, "If it's a $1 card, ") : x));
+      const r = who && parseRevealedIf(rest, si + 1, ctx);
+      if (!who || !r || r.next !== si + 2 || /\b(?:it|that card)\b/.test(rest[si + 1]!.replace(/^If it's /, ""))) return null;
+      effects.push({ type: "revealTop", who }, r.effect, { type: "shuffle", who: parsePlayer("that player", ctx)! });
+      si += 2;
       continue;
     }
     // Aven Windreader: "Target player reveals the top card of their library." (CR 701.20a), on its own; Cerebral Eruption:
@@ -7373,7 +7387,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "playerDamagedThisWay" }, effects: [{ type: "tap", what: { ref: "self" } }] });
       continue;
     }
-    const dealtIs = /^If an? ([A-Z][a-z]+|creature) is dealt damage this way, (.+)$/.exec(s);
+    // Redcap Melee: "If a nonred permanent is dealt damage this way, you sacrifice a land".
+    const dealtIs = /^If an? ([A-Z][a-z]+|creature|non(?:white|blue|black|red|green) (?:creature|permanent)) is dealt damage this way, (.+)$/.exec(s);
     if (dealtIs && effects.some((e) => e.type === "damage")) {
       const filter = parseTargetPhrase(dealtIs[1]!);
       const before = ctx.targets.length;
@@ -10785,6 +10800,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "counterSpell" || !prev.unless || Object.keys(prev.unless).join() !== "cost") return null;
     return { effects: [{ ...prev, unless: { cost: morePay[1]! } }], instead };
+  }
+  // Silumgar's Scorn: "Counter target spell unless its controller pays {1}. If you revealed a Dragon card or controlled a
+  // Dragon as you cast ~, counter that spell instead" (read as kicked): the same counter, with no chance to pay.
+  if (instead && t === "Counter that spell") {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "counterSpell" || !prev.unless) return null;
+    const { unless: _unless, ...uncond } = prev;
+    return { effects: [uncond], instead };
   }
   // Chocobo Kick: "Target creature you control deals damage equal to its power to target creature an opponent controls. If
   // ~ was kicked, the creature you control deals twice that much damage instead": the same bite, at twice its power.

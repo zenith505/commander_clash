@@ -677,8 +677,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Discard three cards at the beginning of the next end step" (Ideas Unbound), "create a 4/4 red Bird creature token
     // with flying at the beginning of the next end step" (Rukh Egg), "you lose the game" (Glorious End): about no object,
     // only its controller.
-    // "Untap up to two lands" (Teferi, Hero of Dominaria): chosen then (rulings).
-    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type)))
+    // "Untap up to two lands" (Teferi, Hero of Dominaria): chosen then (rulings). False Memories: "exile seven cards from
+    // your graveyard", chosen then.
+    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type) || (y.type === "chooseFromGraveyard" && y.dest === "exile" && !y.who)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     if (!players || refs.size !== 1 || when === "yourNextUpkeep") return null;
     const [ref] = refs;
@@ -1406,6 +1407,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;
     return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: amt(m[3]!) }];
+  }
+  // Taste of Paradise: "You gain 3 life plus an additional 3 life for each time ~ was kicked" (as compile reads it): one
+  // life gain of the total (CR 119.9).
+  if ((m = /^You gain (\d+) life plus an additional (\d+) life for each (.+)$/.exec(s))) {
+    const c = parseCount(m[3]!, ctx, true);
+    if (!c || c.times || c.plus || c.half) return null;
+    return [{ type: "gainLife", who: { ref: "you" }, n: { ...c, times: Number(m[2]), plus: Number(m[1]) } }];
   }
   // Vitalizing Cascade: "You gain X plus 3 life".
   if ((m = /^You gain X plus (one|two|three|four|five|\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: { ...X, plus: num(m[1]!) } }];

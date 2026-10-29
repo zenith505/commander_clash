@@ -549,6 +549,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "handMoreThanYou", who });
   }
+  // Bulwark: "the number of cards in your hand minus the number of cards in that player's hand": the other way round, 0 if
+  // that's less (CR 107.1b).
+  if ((m = /^(?:the number of )?cards in your hand minus the number of cards in (that player's|target opponent's|target player's|defending player's) hand$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "handMoreThanYou", who, yoursMinus: true });
+  }
   // Enemy of Enlightenment: "for each card in your opponents' hands": all of them together.
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });
   // Realm Seekers: "the total number of cards in all players' hands", every player's added up.

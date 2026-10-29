@@ -931,6 +931,7 @@ export function moveObject(
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
+    o.kickedByControl = undefined;
     o.colorsSpent = undefined;
     o.phyrexianLife = undefined;
     o.convoked = undefined;
@@ -3981,6 +3982,8 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   // Territorial Dispute: "Players can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
+  // Rock Jockey: "You can't play lands if ~ was cast this turn".
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).noLandsIfCastThisTurn && controllerOf(s, obj(s, id)) === pid && obj(s, id).wasCast && obj(s, id).enteredTurn === s.turn)) return 0;
   let n = 1;
   const extra = player(s, pid).extraLands;
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
@@ -5321,8 +5324,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
   if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
-  const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
+  // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
+  // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
+  const ifControl = compileCard(d).kicker?.ifControl;
+  const byControl = !!ifControl && !choices.kicks?.length && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === p.id && objectMatches(s, ifControl, obj(s, b), p.id, false));
+  const kicks = byControl ? [0] : choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
+  o.kickedByControl = byControl || undefined;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   o.phyrexianLife = paid.phyrexianLife;
   o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;
@@ -5440,6 +5448,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(kicks ? { kicked: kicks } : {}),
+    ...(byControl ? { kickedByControl: true as const } : {}),
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
@@ -5459,7 +5468,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const convoked =
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
-  const kickText = kicks ? describeKicks(d, kicks) : "";
+  const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
@@ -5643,6 +5652,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
       if (controllerOf(s, o) !== pid && printedMatches(f, d)) return `${characteristics(s, o).name}: opponents can't cast ${f.text.replace(/ spell$/, "")} spells`;
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    for (const f of abilitiesOf(s, o).enchantedControllerCantCast ?? [])
+      if (host?.zone === "battlefield" && controllerOf(s, host) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: enchanted creature's controller can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;

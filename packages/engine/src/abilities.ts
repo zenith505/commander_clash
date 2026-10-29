@@ -125,7 +125,7 @@ export type Count =
    * "The number of cards in that player's hand minus the number of cards in your hand" (Dark Suspicions), "draw cards
    * equal to the difference" if they have more (Balance of Power): never below 0 (CR 107.1b).
    */
-  | { kind: "handMoreThanYou"; who: PlayerRef }
+  | { kind: "handMoreThanYou"; who: PlayerRef; /** "Cards in your hand minus the number of cards in that player's hand" (Bulwark): yours less theirs. */ yoursMinus?: true }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
   | { kind: "timesAffectedAttacked" }
   /** "Creatures you don't control get -1/-1 for each slime counter on them" (Toxrill): each affected object's own counters. */
@@ -489,6 +489,8 @@ export type Count =
 export interface TargetSpec {
   /** An "enchant player" Aura's target when the Aura helps the player it enchants (Paradox Haze): bots choose themselves. */
   helpsEnchanted?: true;
+  /** An Aura's target when what the Aura does hurts the enchanted permanent's controller (Brand of Ill Omen): bots aim it at an opponent's. */
+  harmsEnchanted?: true;
   /**
    * "object" = a permanent, "player", "any" = creature/planeswalker/player (CR 115.4),
    * "spell" = an object on the stack, "card" = a card in a graveyard ("target creature card
@@ -842,6 +844,8 @@ export interface TargetSpec {
    * still legal (rulings on Deflection).
    */
   singleTarget?: boolean;
+  /** "Target spell that's the second spell cast this turn" (Second Guess): its StackItem.castNth (0 for the first). */
+  castNth?: number;
   /** "Target spell or ability with one or more targets" (Wyll's Reversal). */
   hasTargets?: true;
   /**
@@ -1600,6 +1604,8 @@ export type Affects =
   | { kind: "attached" } // "enchanted creature", "equipped creature"
   /** Soulbond's "each of those creatures" / "both creatures": the source and the creature it's paired with (CR 702.95b). */
   | { kind: "paired" }
+  /** "Creatures blocking or blocked by ~" (Alms Beast): those in combat with the source now (CR 509.1h). */
+  | { kind: "inCombatWithSelf" }
   | {
       kind: "filter";
       types: string[]; // all of these card types, e.g. ["Creature"]
@@ -2358,7 +2364,7 @@ export type Effect =
    */
   /** Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control" (CR 903.3, 110.2a): every player's. */
   | { type: "commandersOntoBattlefield" }
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** With `toHand`: "Mill six cards, then put all instant and sorcery cards from among them into your hand" (Gleam of Death): only the cards the mill just before put there, still those cards (CR 400.7). */ milled?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; /** "With an additional -1/-1 counter on it" (Pyrrhic Revival). */ counters?: Record<string, number>; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** With `toHand`: "Mill six cards, then put all instant and sorcery cards from among them into your hand" (Gleam of Death): only the cards the mill just before put there, still those cards (CR 400.7). */ milled?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
   /**
@@ -5730,6 +5736,8 @@ export interface CompiledCard {
   cantBeCountered?: boolean;
   /** Banefire: "If X is 5 or more, ~ can't be countered": while its X is at least this (CR 101.2). */
   cantBeCounteredX?: number;
+  /** "If you revealed a Dragon card or controlled a Dragon as you cast ~, ~ can't be countered" (Dragonlord's Prerogative): read as kicked. */
+  cantBeCounteredKicked?: true;
   /**
    * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
    * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).
@@ -5787,6 +5795,10 @@ export interface CompiledCard {
   cantBeCast?: { filter: TargetSpec; hasX?: true; text: string }[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */
   opponentsCantCast?: TargetSpec[];
+  /** "You can't play lands if ~ was cast this turn" (Rock Jockey): its controller, while it's a permanent that was cast this turn. */
+  noLandsIfCastThisTurn?: true;
+  /** "Enchanted creature's controller can't cast creature spells." (Brand of Ill Omen): that creature's controller now. */
+  enchantedControllerCantCast?: TargetSpec[];
   /**
    * "During your turn, your opponents can't ... activate abilities of artifacts, creatures, or enchantments" (Grand
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
@@ -6460,6 +6472,12 @@ export interface CompiledCard {
      * additional cost was paid", "if a Dragon was beheld" read as kicked. Not "kicked" for other cards.
      */
     optional?: true;
+    /**
+     * "As an additional cost to cast this spell, you may reveal a Dragon card from your hand" with "if you revealed a Dragon
+     * card or controlled a Dragon as you cast this spell" (the Dragons of Tarkir cycle): also counted as paid when its
+     * caster controls a permanent like this as they cast it (checked then, rulings).
+     */
+    ifControl?: TargetSpec;
   };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];

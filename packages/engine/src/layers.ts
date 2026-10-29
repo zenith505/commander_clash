@@ -1256,6 +1256,12 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     const other = pairedWith(s, s.objects[e.sourceId!]!);
     return other && chars.has(other.id) ? [e.sourceId!, other.id] : [];
   }
+  if (a.kind === "inCombatWithSelf") {
+    // Blocking it, or attacking and blocked by it, while both are in combat (CR 509.1h, 506.4).
+    const me = s.objects[e.sourceId!];
+    if (!me || me.zone !== "battlefield") return [];
+    return s.battlefield.filter((id) => chars.has(id) && ((s.objects[id]!.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(id) && s.objects[id]!.attacking !== undefined)));
+  }
   const you = controllerOfInst(e, chars);
   const out: ObjectId[] = [];
   // "Creatures you control of the chosen type": the choice made as the source entered.

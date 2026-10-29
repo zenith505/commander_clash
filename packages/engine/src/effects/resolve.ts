@@ -107,7 +107,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.sharesCardTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
   });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -1185,6 +1185,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "revealUntilLandToGraveyard":
+    case "revealTopLandsToGraveyard":
     case "exileUntilTotalMv":
     case "exileTop":
     case "putFromExiledTop":

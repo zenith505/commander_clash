@@ -117,6 +117,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const hit = hits[0];
+      s.resolving!.revealedUntilCount = seen.length;
       if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
       else delete s.resolving!.revealedUntilMv;
       log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);

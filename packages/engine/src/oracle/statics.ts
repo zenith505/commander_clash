@@ -1156,6 +1156,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Pestilence: "if no creatures are on the battlefield".
   // Wirecat: "if an enchantment is on the battlefield": anyone's. Knight of Malice: "as long as any player controls a white
   // permanent": the same.
+  // Pious Kitsune: "if a creature named Eight-and-a-Half-Tails is on the battlefield": anyone's, by its name (CR 201.2).
+  if ((m = /^an? (creature|permanent) named ([A-Z][^,~]*) is on the battlefield$/.exec(text)))
+    return { kind: "onBattlefield", filter: { kind: "object", types: m[1] === "creature" ? ["Creature"] : [], notTypes: [], notColors: [], named: m[2]!, text: `${m[1]} named ${m[2]}` }, min: 1 };
   if ((m = /^an? (.+) is on the battlefield$/.exec(text.replace(/^any player controls (an? [a-z]+ permanent)$/, "$1 is on the battlefield")))) {
     const g = parseGroup(`all ${m[1]}s`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;
@@ -2084,6 +2087,9 @@ export function parseIsA(phrase: string, only: boolean): Modification[] | null {
 function parseStaticLine(line: string): StaticAbility | null {
   // Song of Serenity: "Creatures that are enchanted can't attack or block" is about enchanted creatures.
   let text = line.replace(/\.$/, "").replace(/^Creatures that are enchanted (?=can't )/, "Enchanted creatures ");
+  // Animate Wall: "Enchanted Wall can attack as though it didn't have defender": its "Enchant Wall" keeps it on a Wall, a
+  // creature type (CR 205.3d, 303.4c), so it's the enchanted creature.
+  text = text.replace(/^Enchanted Wall (?=can attack as though it didn't have defender$)/, "Enchanted creature ");
   // Lifecraft Engine: "Each creature you control of the chosen type other than ~ gets +1/+1": the other ones.
   text = text.replace(/^Each creature you control of the chosen type other than ~ (gets .+)$/, "Other creatures you control of the chosen type $1").replace(/^(Other creatures you control of the chosen type) gets /, "$1 get ");
   // Katilda's Rising Dawn: "Enchanted creature has flying, lifelink, and protection from Vampires, and it gets +X/+X,

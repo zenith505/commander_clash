@@ -1330,7 +1330,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "loseTypes":
       c.types = c.types.filter((t) => !m.types.includes(t));
       c.supertypes = c.supertypes.filter((t) => !m.types.includes(t)); // "isn't legendary" (Aeve), "is no longer snow" (Melting)
-      c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
+      c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? "") && !m.subtypes?.includes(st));
       // Planeswalker types (CR 205.3j) aren't in a list of their own: no longer a planeswalker, it has none (CR 205.3d).
       if (m.types.includes("Planeswalker") && !c.types.includes("Battle")) c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== null);
       if (m.types.includes("Creature")) c.allCreatureTypes = false;

@@ -625,6 +625,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.created ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "putIntoHandIs"
             ? (s.resolving!.putIntoHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
+            : e.cond.kind === "returnedToHandIs"
+            ? (s.resolving!.returnedToHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "impulsedIs"
             ? (s.resolving!.impulsed ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedTopIs"
@@ -923,6 +925,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    if (e.type === "counters" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
     // longer control ~ (CR 611.2b), so it can't be done.
     if (e.type === "continuous" && e.duration === "whileControlled" && !e.whileOnBattlefield && !(ctx.sourceId && whileControlledHolds(s, { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, controller: ctx.controller }))) return false;

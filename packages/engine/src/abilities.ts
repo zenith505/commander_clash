@@ -177,6 +177,8 @@ export type Count =
   | { kind: "dugToHand" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
+  /** "The number of cards revealed this way" after revealUntil (Madcap Experiment): all of them, the one found included (rulings). */
+  | { kind: "revealedUntilCount" }
   /** Parley: "for each nonland card revealed this way" after "each player reveals the top card of their library" (`land`: land cards instead). */
   | { kind: "parleyRevealed"; land?: true }
   | { kind: "bottomedFromHand" }
@@ -740,6 +742,8 @@ export interface TargetSpec {
   sharesPermanentTypeWithSubject?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
+  /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
+  sharesCardTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
   differentNameFrom?: number[];
   /**
@@ -1379,7 +1383,7 @@ export type Modification =
    * ones, and it loses the abilities from its rules text, gaining each basic type's mana ability instead (CR 305.7).
    */
   | { kind: "setLandTypes"; subtypes: string[] }
-  | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
+  | { kind: "loseTypes"; types: string[]; /** "That's no longer an Equipment" (Haunted Plate Mail): those subtypes go too. */ subtypes?: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   /** Layer 4, "loses all creature types" (Amoeboid Changeling): its creature types go, changeling's too; ones gained later come back (rulings, CR 613.7). */
   | { kind: "loseCreatureTypes" }
   /** `chosen`: "becomes the color of your choice", the color chosen as it resolved; "colors": "the color or colors of your choice", the colors chosen. */
@@ -2736,6 +2740,8 @@ export type Effect =
    * rest on the bottom of your library in a random order" (`found` "battlefield", `rest` "bottom"), `tapped`.
    */
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
+  /** "Reveal the top card of your library. If it's a land card, put it into your graveyard and repeat this process" (Countryside Crusher): lands one at a time, until a nonland card (left on top) or an empty library. */
+  | { type: "revealTopLandsToGraveyard" }
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef; /** "Until they reveal X land cards" (Mind Grind): this many land cards; one if left out. */ n?: Amount }
   /** "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value 20 or greater" (Tasha's Hideous Laughter). */
   | { type: "exileUntilTotalMv"; who: PlayerRef; total: number }
@@ -3948,6 +3954,8 @@ export type SpellCondition =
   | { kind: "createdNone" }
   /** "If you put a Town card into your hand this way" (Town Greeter): a card the instruction before put into your hand from among the milled cards is one, still in the hand. */
   | { kind: "putIntoHandIs"; filter: TargetSpec }
+  /** "If you return a nonland card to your hand this way" (Vengeful Rebirth): a card this resolution returned to its owner's hand is one, still there. */
+  | { kind: "returnedToHandIs"; filter: TargetSpec }
   /** "If you put a Cave onto the battlefield this way" (Spelunking): a permanent the instruction before put there matches, as it is now. */
   | { kind: "putThisWayIs"; filter: TargetSpec }
   /**

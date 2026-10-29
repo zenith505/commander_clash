@@ -358,6 +358,9 @@ const checkableMay = (e: Effect): boolean =>
   // "Whenever another nontoken creature you control dies, you may exile it. If you do, ..." (Nightmare Shepherd): only
   // while it's still that card, in the graveyard it went to (CR 400.7).
   (e.type === "exile" && e.what.ref === "subjectCard") ||
+  // Wall of Resurgence: "You may put three +1/+1 counters on target land you control. If you do, ...": only on a target
+  // still there.
+  (e.type === "counters" && e.what.ref === "target" && !e.what.n && typeof e.n === "number" && e.n > 0) ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
   // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
@@ -1412,8 +1415,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // removal.
   text = text.replace(/^(remove an? ([a-z]+) counter from ~\. If there are no \2 counters on ~, sacrifice) it\.$/i, "$1 ~.");
   // Archfiend of the Dross: "Remove an oil counter from ~. Then if it has no oil counters on it, you lose the game": ~,
-  // checked after the removal. Thing in the Ice: "..., transform it" too.
-  text = text.replace(/(\b[Rr]emove an? ([a-z]+) counter from ~\.) Then if it has no \2 counters on it, (you lose the game|transform it)\./, (_, rm: string, kind: string, then: string) => `${rm} If there are no ${kind} counters on ~, ${then.replace(/ it$/, " ~")}.`);
+  // checked after the removal. Thing in the Ice: "..., transform it" too; Evolved Spinoderm: "..., sacrifice it".
+  text = text.replace(/(\b[Rr]emove an? ([a-z]+) counter from ~\.) Then if it has no \2 counters on it, (you lose the game|transform it|sacrifice it)\./, (_, rm: string, kind: string, then: string) => `${rm} If there are no ${kind} counters on ~, ${then.replace(/ it$/, " ~")}.`);
   // Amalia Benavides Aguirre: "~ explores. Then destroy all other creatures if its power is exactly 20": ~ is the only
   // object named, checked once as the ability resolves, after the explore (rulings).
   text = text.replace(/^(~ explores\. Then [^.~]+ if )its (power|toughness)\b/, "$1~'s $2");
@@ -4164,6 +4167,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: ctx.lastObjectTarget!, filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } }, effects: then });
       continue;
     }
+    // Countryside Crusher: "Reveal the top card of your library. If it's a land card, put it into your graveyard and repeat
+    // this process.": one process (run-library.ts).
+    if (/^[Rr]eveal the top card of your library$/.test(s) && /^If it's a land card, put it into your graveyard and repeat this process\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
+      effects.push({ type: "revealTopLandsToGraveyard" });
+      si++;
+      continue;
+    }
+    // Madcap Experiment: "~ deals damage to you equal to the number of cards revealed this way", after revealing until an
+    // artifact card: every card revealed, the one found too (rulings).
+    if (/^~ deals damage to you equal to the number of cards revealed this way$/.test(s) && last?.type === "revealUntil" && !last.who) {
+      effects.push({ type: "damage", amount: { count: { kind: "revealedUntilCount" } }, to: { ref: "you" } });
+      continue;
+    }
     // Primal Surge: all three sentences, one process (run-library.ts).
     if (s === "Exile the top card of your library" && sentences[si + 1] === "If it's a permanent card, you may put it onto the battlefield" && /^If you do, repeat this process\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
       effects.push({ type: "surge" });
@@ -6347,6 +6363,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // Skirk Drill Sergeant: "you may pay {2}{R}. If you do, reveal the top card of your library. If it's a Goblin
+      // permanent card, put it onto the battlefield. Otherwise, put it into your graveyard.": the reveal and what's done
+      // with the card, only if paid.
+      if (!payFirst.payX && /^reveal the top card of your library$/.test(then[1]!) && /^If it's /.test(sentences[si + 1] ?? "")) {
+        const revealed = parseBody(`${[cap(then[1]!), ...sentences.slice(si + 1)].join(". ")}.`);
+        if (!revealed || revealed.targets.length || revealed.effects[0]?.type !== "revealTop") return null;
+        effects.push({ type: "may", effects: [], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` }, { type: "if", cond: { kind: "youDid" }, effects: revealed.effects });
+        payFirst = null;
+        si = sentences.length;
+        continue;
+      }
       // "You may pay {R}{G}{W}{U}. If you do, until end of turn, whenever he deals combat damage to an opponent, ..."
       // (Human Torch): the delayed triggered ability, and the rest of the paragraph its instructions, if paid.
       const floatingPaid = payFirst.payX ? undefined : floatingTrigger(then[1]!, sentences.slice(si + 1));
@@ -7917,6 +7944,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
       continue;
     }
+    // Vengeful Rebirth: "Return target card from your graveyard to your hand. If you return a nonland card to your hand this
+    // way, ~ deals damage equal to that card's mana value to any target": only if that card went to the hand (not if it
+    // left the graveyard first, rulings), by its printed types; its mana value as it is in the hand.
+    const returnedHand = /^If you return an? ([a-z]+ card) to your hand this way, (.+)$/.exec(s);
+    if (returnedHand) {
+      const last = effects[effects.length - 1];
+      const filter = parseSearchFilter(returnedHand[1]!);
+      const inner = parseOne(capital(returnedHand[2]!), ctx);
+      if (last?.type !== "bounce" || last.what.ref !== "target" || last.what.n || ctx.targets[last.what.index]?.kind !== "card" || !filter || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "returnedToHandIs", filter }, effects: inner });
+      continue;
+    }
     // Return Upon the Tide: "Return target creature card from your graveyard to the battlefield. If it's an Elf, create two
     // 1/1 green Elf Warrior creature tokens": about the permanent it returned as, once it's on the battlefield (rulings).
     const returnedIs = /^If it's an? ([A-Z][a-z]+), (.+)$/.exec(s);
@@ -9061,7 +9100,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Lightning Surge: "instead ~ deals 6 damage to that permanent or player and the damage can't be prevented" (CR 615.12).
       const unpreventable = / and the damage can't be prevented$/.test(ifState[2]!);
       // Dark Temper: "destroy the creature instead" is the creature the sentence before named.
-      const t = ifState[2]!.replace(/ and the damage can't be prevented$/, "").replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "").replace(/^destroy the creature$/, "destroy that creature");
+      const t0 = ifState[2]!.replace(/ and the damage can't be prevented$/, "").replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "").replace(/^destroy the creature$/, "destroy that creature");
+      // Festering Newt: "target creature ... gets -1/-1 until end of turn. That creature gets -4/-4 instead if ...": the
+      // same instruction with the other amount, so for the same duration.
+      const prevPT = previous.length === 1 && previous[0]!.type === "continuous" ? previous[0]! : null;
+      const t = /^that creature gets [+-]\d+\/[+-]\d+$/.test(t0) && prevPT && prevPT.duration === "endOfTurn" && prevPT.what.ref === "target" && !prevPT.what.n && prevPT.mods.length === 1 && prevPT.mods[0]!.kind === "modifyPT" && ctx.lastObjectTarget === prevPT.what.index ? `${t0} until end of turn` : t0;
       const before = ctx.targets.length;
       // "Create a Treasure token. If you've completed a dungeon, create three of those tokens instead" (Safana).
       const those = new RegExp(`^create ${NUMX} of those tokens$`, "i").exec(t);

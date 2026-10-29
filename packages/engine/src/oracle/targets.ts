@@ -429,6 +429,14 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const at = ctx.targets.flatMap((t, i) => (t.kind === "object" && (named[1] ? t.subtypes?.includes(named[1]) : t.types?.includes("Creature")) ? [i] : []));
     return at.length === 1 ? { ref: "target", index: at[0]! } : null;
   }
+  // Wall of Resurgence: "put three +1/+1 counters on target land you control. If you do, that land becomes ...": the one
+  // target of that card type.
+  const thatType = /^that (land|artifact|enchantment)$/.exec(x);
+  if (thatType && !cards) {
+    const type = capital(thatType[1]!);
+    const at = ctx.targets.flatMap((t, i) => (t.kind === "object" && t.types?.includes(type) ? [i] : []));
+    return at.length === 1 && ctx.targets.length === 1 && !ctx.targets[at[0]!]!.many ? { ref: "target", index: at[0]! } : null;
+  }
   // "Put a +1/+1 counter on target creature you control, then it fights target creature you don't control. ... the
   // creature you control gains indestructible" (Outmuscle): the one target described that way.
   const described = /^the (creature you control|creature you don't control)$/i.exec(x);
@@ -730,6 +738,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Two target creatures controlled by different players" (Run Away Together, Switcheroo's kin): each a different
   // controller from the others', checked both ways (rulings: two creatures of one player are both illegal).
   const diffCtl = n > 1 && !many && / controlled by different players$/.test(mine0);
+  // Shifting Loyalties: "two target permanents that share a card type": each sharing one with the other (CR 205.2a).
+  const shareCard = n > 1 && !many && / that share a card type$/.test(mine0);
   // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
@@ -739,7 +749,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Any number of target creatures with equal toughness" (V.A.T.S.).
   const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
+  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
   // "Up to three target creatures with toughness X or less" (Finale of Eternity): each one, with the spell's X.
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
@@ -792,7 +802,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...(share && k ? { sharesCreatureTypeWith: group } : {}),
       ...(differ && k ? { differentNameFrom: group } : {}),
       ...(diffCtl ? { differentControllerFrom: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
-      ...(single || share || differ || diffCtl ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}${diffCtl ? " controlled by a different player" : ""}` } : {}),
+      ...(shareCard ? { sharesCardTypeWith: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
+      ...(single || share || differ || diffCtl || shareCard ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}${diffCtl ? " controlled by a different player" : ""}${shareCard ? " sharing a card type" : ""}` } : {}),
     });
   }
   // "It" can't mean one of several; "they" / "those creatures" means all of them.

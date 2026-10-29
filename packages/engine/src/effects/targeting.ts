@@ -13,6 +13,8 @@ import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 
+const CARD_TYPES = new Set(["Artifact", "Battle", "Creature", "Enchantment", "Kindred", "Land", "Planeswalker", "Instant", "Sorcery"]);
+
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
 const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : want === "notAll" ? n < 5 : n === 0);
 
@@ -878,7 +880,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -900,6 +902,9 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (o.zone === "battlefield" && others(spec.differentControllerFrom).some((x) => ctl(x) === controllerOf(s, o))) return false;
   if (others(spec.differentNameFrom).some((x) => sameName(defOf(s, x).name, defOf(s, o).name))) return false;
   if (others(spec.differentManaValueFrom).some((x) => defMv(defOf(s, x)) === defMv(defOf(s, o)))) return false;
+  // Shifting Loyalties: a card type in common, as they are now (CR 205.2a).
+  const cardTypes = (x: GameObject) => characteristics(s, x).types.filter((ty) => CARD_TYPES.has(ty));
+  if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
 }
 
@@ -1005,7 +1010,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

@@ -1,7 +1,7 @@
 # Roadmap
 
-27,493 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,087 of
+27,521 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,089 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -829,7 +829,7 @@ line blocks.
    "you may cast target artifact / enchantment card from your graveyard this turn" as a trigger (Heiko and Norika
    Yamazaki); "switch the power and toughness of each of up to two / any number of target creatures" (Invert // Invent
    with "an instant card and/or a sorcery card", Inversion Behemoth); "each creature you control that didn't attack or
-   enter this turn" (The Fifth Doctor). +21 (27,493 of 31,936 with round 205).
+   enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
    Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist ("remove all
    counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Honest Work

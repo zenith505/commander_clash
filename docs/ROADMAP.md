@@ -1,7 +1,7 @@
 # Roadmap
 
-27,692 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
+27,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,138 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -928,6 +928,36 @@ line blocks.
    three names differ); Fblthp, the Lost (entered or cast from the library; "becomes the target of a spell");
    Dack Fayden ("gain control of those permanents" a spell targets); Ashiok, Nightmare Muse ("then that player exiles a
    card from their hand", cast face-up exiled cards).
+   Round 211 went on from the top: "you may pay any amount of {E}" with "destroy each ... with mana value less than or
+   equal to the amount of {E} paid this way" (Wrath of the Skies) and "counter that spell unless its controller pays {1}
+   for each {E} paid this way" (Aether Spike; "Choose target spell" now targets spells only, not abilities); "you may pay
+   one or more {E}. If you do, each creature you control with power equal to the amount ..." (Localized Destruction);
+   "costs {1} less to cast for each {E} you've paid or lost this turn", energy paid or lost now counted per turn (Blaster
+   Hulk); "you may get {E}{E}. If you don't, you may play that card this turn" (Synth Eradicator); "put all enchantment
+   cards from among them into your hand" and "lock or unlock a door of target Room you control", a new lock-or-unlock
+   choice with a browser test (Marina Vendrell, Keys to the House); "defending player reveals cards until they reveal a
+   land card ... +1/+0 for each card revealed this way" (Trepanation Blade); "roll a d20 and add the number of creature
+   cards put into your graveyard from the battlefield this turn" (Revivify); "for as long as ~ remains on the
+   battlefield, gain control of that permanent, it loses all abilities, and it can't attack or block" (Opportunistic
+   Dragon); "a creature spell that doesn't share a creature type with a creature you control or a creature card in your
+   graveyard" (Volo, Guide to Monsters); "if that player had another land enter the battlefield under their control this
+   turn" (Confounding Conundrum); "mill a card and choose an opponent at random" (Ursine Monstrosity); "you may discard
+   one or more land cards. When you do, return up to that many ..." (Loamcrafter Faun); "If you put a card into your
+   hand this way" (Sidequest: Catch a Fish); "exile a card from your graveyard at random. You may play the exiled card
+   this turn" (Advanced Reconstruction); "starting with the next opponent in turn order, each opponent chooses a creature
+   card in your graveyard that hasn't been chosen" (Rejoin the Fight); "if that spell is countered this way, exile it
+   ..., then you may cast it without paying its mana cost" (Transcendent Dragon), "you may play it without paying its
+   mana cost for as long as it remains exiled" (Spelljack, Kheru Spellsnatcher); "cast target instant or sorcery card
+   from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
+   Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
+   The Kenriths' Royal Funeral (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
+   creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
+   among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
+   sharing a name with one attached to that player); Archmage Ascension (a "would draw" replacement by a search);
+   Eumidian Wastewaker ("discard a card or sacrifice a permanent", then counting lands put into graveyards this way);
+   Plasma Caster ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
+   copy with an extra ability); Spry and Mighty (the difference between two chosen creatures' powers); Eventide's Shadow
+   (remove any number of counters from among permanents).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

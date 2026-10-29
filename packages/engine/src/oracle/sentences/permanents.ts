@@ -94,6 +94,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     ctx.targets[what.index] = { ...t, subtypes: ["Room"], text: "target Room you control" };
     return [{ type: "unlockDoor", what }];
   }
+  // Marina Vendrell, Keys to the House: "Lock or unlock a door of target Room you control" (CR 709.5f-g): its controller
+  // chooses one of its doors, locked or unlocked, and it becomes the other.
+  if (/^[Ll]ock or unlock a door of target Room you control$/.test(s)) {
+    const what = parseObject("target enchantment you control", ctx);
+    if (what?.ref !== "target") return null;
+    ctx.targets[what.index] = { ...ctx.targets[what.index]!, subtypes: ["Room"], text: "target Room you control" };
+    return [{ type: "unlockDoor", what, orLock: true }];
+  }
   // "Return an enchantment card from your graveyard to your hand or unlock a locked door of a Room you control" (Ghostly
   // Dancers): one or the other, chosen as it resolves, never one that can't be done (CR 608.2d).
   if ((m = /^[Rr](eturn an? [^,]+? card from your graveyard to your hand) or (unlock a locked door of a Room you control)$/.exec(s))) {

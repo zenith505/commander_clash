@@ -1822,6 +1822,16 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   fireEvent(s, { type: "lifeGained", player: pid, amount: n, first });
 }
 
+/** `pid` pays or loses `n` energy counters (CR 107.14, 122.1), counted for the turn (Blaster Hulk). */
+export function loseEnergy(s: GameState, pid: PlayerId, n: number) {
+  const p = player(s, pid);
+  const lost = Math.min(n, p.energy ?? 0);
+  if (lost <= 0) return;
+  p.energy = (p.energy ?? 0) - lost;
+  const total = ((s.turnLog ??= {}).energyLost ??= {});
+  total[pid] = (total[pid] ?? 0) + lost;
+}
+
 /** A rule for one player this turn (Courageous Resolve): see GameState.turnRules. */
 const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === rule);
 
@@ -4132,7 +4142,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
-  if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
@@ -7160,13 +7170,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   loseLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
-  if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) {
     log(s, `${p.name} discards their hand${p.hand.length ? "" : " (no cards)"}.`);
     discardCards(s, p.id, [...p.hand]);
   }
   if (ab.energyX && x) {
-    p.energy = (p.energy ?? 0) - x;
+    loseEnergy(s, p.id, x);
     log(s, `${p.name} pays ${x} energy.`);
   }
   const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
@@ -8492,7 +8502,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
     loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
-    p.energy = (p.energy ?? 0) - energy;
+    loseEnergy(s, p.id, energy);
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
   }
   if (pend.clash) {

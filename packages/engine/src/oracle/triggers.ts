@@ -758,6 +758,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
   if (shares) what = what.slice(0, shares.index);
+  // Volo, Guide to Monsters: "a creature spell that doesn't share a creature type with a creature you control or a creature
+  // card in your graveyard", as it's cast.
+  const sharesNone = / that doesn't share a creature type with a creature you control or a creature card in your graveyard$/.exec(what);
+  if (sharesNone) what = what.slice(0, sharesNone.index);
   // "Whenever you cast a spell that targets a creature you control" (Season of Growth), "an instant or sorcery spell that
   // targets a creature" (repartee), "... that targets an opponent or a creature an opponent controls" (Danitha): what
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
@@ -869,7 +873,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -2783,6 +2787,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
   // the entering land's controller, as it triggers and resolves (rulings).
   const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  // Confounding Conundrum: "Whenever a land an opponent controls enters, if that player had another land enter the
+  // battlefield under their control this turn": that land's controller, as it triggers and resolves (CR 603.4).
+  const otherLand = intervening && /^Whenever a land an opponent controls enters$/.test(intervening[1]!) && intervening[2] === "that player had another land enter the battlefield under their control this turn";
   // "At the beginning of each opponent's end step, if that player controls more creatures than you" (Keeper of the
   // Accord): the active player, as it triggers and resolves (rulings).
   const activeMore = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
@@ -2833,13 +2840,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
   const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
   const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
-  const ifCond = activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
     // Feast of the Victorious Dead: "if one or more creatures died this turn, you gain that much life and distribute that
     // many +1/+1 counters": the number of creatures that died this turn, counted as it resolves.
     let rest = kwIf && /^~ /.test(intervening[2]!) ? intervening[3]!.replace(/^it (?=(?:loses|gains|gets|has|becomes)\b)/, "~ ") : intervening[3]!;
+    if (otherLand) rest = rest.replace(/^they return a land they control /, "that player returns a land they control ");
     if (/^one or more creatures died this turn$/.test(intervening[2]!) && /\bthat (much|many)\b/.test(rest)) {
       const died = "the number of creatures that died this turn";
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");

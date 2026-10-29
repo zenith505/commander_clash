@@ -80,12 +80,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
       // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).
       // Mind Grind: until X land cards, all of the library with fewer (rulings).
+      // Trepanation Blade: "for each card revealed this way" (ResolvingState.revealedUntilCount).
+      s.resolving!.revealedUntilCount = 0;
       for (const pid of apnap(s, players(s, e.who, ctx))) {
         const p = player(s, pid);
         let lands = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         const at = lands < 1 ? -1 : p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") && --lands === 0);
         const ids = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         if (!ids.length) continue;
+        s.resolving!.revealedUntilCount += ids.length;
         log(s, `${p.name} reveals ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} and puts ${ids.length === 1 ? "it" : "them"} into their graveyard.`);
         for (const id of ids) moveObject(s, id, "graveyard");
       }

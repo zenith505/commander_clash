@@ -148,17 +148,25 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   switch (e.type) {
     case "unlockDoor": {
       // CR 709.5f: its controller chooses a locked door of a Room they control, and the Room gets that designation.
-      const doors = lockedDoors(s, ctx.controller, e.what ? objects(s, e.what, ctx).map((o) => o.id) : undefined);
+      const among = e.what ? objects(s, e.what, ctx).map((o) => o.id) : undefined;
+      // "Lock or unlock" (CR 709.5g): its unlocked doors too, each to be locked.
+      const doors = [...lockedDoors(s, ctx.controller, among), ...(e.orLock ? unlockedDoors(s, ctx.controller, among).map((d) => ({ ...d, lock: true })) : [])];
       if (!doors.length) return;
       const sc = (s.resolving!.scratch ??= {});
-      if (doors.length > 1 && sc.door === undefined) {
+      if ((doors.length > 1 || e.orLock) && sc.door === undefined) {
         const rooms = new Set(doors.map((d) => d.id)).size;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "unlockDoor", options: doors.map((d) => `${d.id}:${d.door}`), labels: doors.map((d) => (rooms > 1 ? `${d.name} (${defOf(s, obj(s, d.id)).name})` : d.name)), prompt: "choose a locked door to unlock" };
+        const name = (d: (typeof doors)[number]) => (rooms > 1 ? `${d.name} (${defOf(s, obj(s, d.id)).name})` : d.name);
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "unlockDoor", options: doors.map((d) => `${d.id}:${d.door}`), labels: doors.map((d) => (e.orLock ? `${"lock" in d ? "Lock" : "Unlock"} ${name(d)}` : name(d))), prompt: e.orLock ? "choose a door to lock or unlock" : "choose a locked door to unlock" };
         return "paused";
       }
       const pick = doors.find((d) => `${d.id}:${d.door}` === sc.door) ?? doors[0]!;
       sc.door = undefined;
       const o = obj(s, pick.id);
+      if ("lock" in pick) {
+        log(s, `${player(s, ctx.controller).name} locks ${pick.name} (${src}).`);
+        setUnlocked(s, o, (o.unlocked ?? []).filter((i) => i !== pick.door));
+        return;
+      }
       log(s, `${player(s, ctx.controller).name} unlocks ${pick.name} (${src}).`);
       setUnlocked(s, o, [...(o.unlocked ?? []), pick.door]);
       return;
@@ -1735,13 +1743,18 @@ export function attachTo(s: GameState, me: GameObject, host: GameObject, asCreat
 }
 
 /** The locked doors of Rooms `pid` controls (CR 709.5c), of `among` only if given: what "unlock a locked door" can unlock. */
-export function lockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]): { id: ObjectId; door: number; name: string }[] {
+export function lockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[], unlocked = false): { id: ObjectId; door: number; name: string }[] {
   return s.battlefield.flatMap((id) => {
     const o = obj(s, id);
     const d = roomOf(s, o);
     if (!d || o.unlocked === undefined || controllerOf(s, o) !== pid || (among && !among.includes(id))) return [];
-    return [0, 1].filter((door) => !o.unlocked!.includes(door) && d.faces![door]).map((door) => ({ id, door, name: d.faces![door]!.name }));
+    return [0, 1].filter((door) => o.unlocked!.includes(door) === unlocked && d.faces![door]).map((door) => ({ id, door, name: d.faces![door]!.name }));
   });
+}
+
+/** The unlocked doors of Rooms `pid` controls (among `among`), the ones they could lock (CR 709.5g). */
+export function unlockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]) {
+  return lockedDoors(s, pid, among, true);
 }
 
 /**

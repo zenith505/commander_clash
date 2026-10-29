@@ -138,6 +138,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Alms Beast: "Creatures blocking or blocked by ~ have lifelink": while they're in combat with it.
+  if ((m = /^Creatures blocking or blocked by ~ (have|get) (.+)$/.exec(text))) {
+    const mods = parseStaticMods(`${m[1]} ${m[2]}`);
+    return mods ? { affects: { kind: "inCombatWithSelf" }, mods, text: line } : null;
+  }
   // Sting, the Glinting Dagger: "Equipped creature has first strike as long as it's blocking or blocked by a Goblin or Orc":
   // blocking one or blocked by one (CR 509.1g-h); one removed from combat no longer counts (CR 506.4).
   if ((m = /^Equipped creature has ([a-z ]+) as long as it's blocking or blocked by an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && [m[2], m[3]].every((x) => !x || CREATURE_TYPES.has(x))) {
@@ -285,6 +290,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Wirecat: "~ can't attack or block if an enchantment is on the battlefield"; Branded Brawlers: "~ can't block if you
   // control an untapped land": the restriction applies while that's so.
   else if ((m = /^(~ can't (?:attack or block|attack|block)) if (an? [^,]+ is on the battlefield|you control (?!more )[^,]+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Shauku, Endbringer: "~ can't attack if there's another creature on the battlefield": anyone's but its own.
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) if there's (another [a-z]+) on the battlefield$/.exec(text))) [statement, cond] = [m[1], `${m[2]} is on the battlefield`];
   // Glacial Crasher: "~ can't attack unless there is a Mountain on the battlefield": anyone's (rulings).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless there is (an? [^,]+) on the battlefield$/.exec(text))) [statement, cond] = [m[1], `no ${m[2]!.replace(/^an? /, "").replace(/(?<!s)$/, "s")} are on the battlefield`];
   // Monstrous Hound: "~ can't block unless you control more lands than attacking player": the active player, the only
@@ -337,6 +344,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseBecomes(artifactCreature[1]!);
     if (!mods || mods.some((x) => x.kind === "setColors")) return null;
     const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
+  // Circle of the Moon Druid: "During your turn, ~ is a Bear with base power and toughness 4/2": a Bear instead of its
+  // other creature types (CR 205.1b, the reminder text says so), with that base power and toughness (layers 4 and 7b).
+  const typedBase = /^~ is an? ([A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)$/.exec(statement);
+  if (typedBase && CREATURE_TYPES.has(typedBase[1]!)) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setSubtypes", subtypes: [typedBase[1]!] }, { kind: "setPT", power: Number(typedBase[2]), toughness: Number(typedBase[3]) }], text: line };
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
@@ -1236,6 +1251,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Pious Kitsune: "if a creature named Eight-and-a-Half-Tails is on the battlefield": anyone's, by its name (CR 201.2).
   if ((m = /^an? (creature|permanent) named ([A-Z][^,~]*) is on the battlefield$/.exec(text)))
     return { kind: "onBattlefield", filter: { kind: "object", types: m[1] === "creature" ? ["Creature"] : [], notTypes: [], notColors: [], named: m[2]!, text: `${m[1]} named ${m[2]}` }, min: 1 };
+  // Shauku, Endbringer: "if there's another creature on the battlefield": anyone's, not counting ~.
+  if ((m = /^another ([a-z]+) is on the battlefield$/.exec(text))) {
+    const g = parseGroup(`all ${m[1]}s`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1, other: true } : null;
+  }
   if ((m = /^an? (.+) is on the battlefield$/.exec(text.replace(/^any player controls (an? [a-z]+ permanent)$/, "$1 is on the battlefield")))) {
     const g = parseGroup(`all ${m[1]}s`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;

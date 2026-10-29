@@ -276,7 +276,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
     case "handMoreThanYou": {
       const theirs = refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
-      return Math.max(0, theirs - s.players[ctx.controller]!.hand.length);
+      const yours = s.players[ctx.controller]!.hand.length;
+      return Math.max(0, c.yoursMinus ? yours - theirs : theirs - yours);
     }
     case "greatestPowerExiled":
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
@@ -363,6 +364,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.objects?.({ ref: "self" })[0]?.blocking?.length ?? 0;
     case "dugToHand":
       return s.resolving?.dugToHand ?? 0;
+    case "dugToHandMv":
+      return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
@@ -932,7 +935,7 @@ function describeCount(c: Count): string {
     case "cardsInHand":
       return "#cards in hand";
     case "handMoreThanYou":
-      return "#cards in their hand minus yours";
+      return c.yoursMinus ? "#cards in your hand minus theirs" : "#cards in their hand minus yours";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
     case "affectedKeywordCount":
@@ -979,6 +982,8 @@ function describeCount(c: Count): string {
       return "#creatures it's blocking";
     case "dugToHand":
       return "#cards put into your hand";
+    case "dugToHandMv":
+      return "that card's mana value";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":

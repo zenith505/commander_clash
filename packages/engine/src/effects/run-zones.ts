@@ -1929,7 +1929,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileHand": {
-      const p = player(s, ctx.controller);
+      const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (whose === undefined) return;
+      const p = player(s, whose);
       const ids = [...p.hand];
       for (const id of ids) {
         moveObject(s, id, "exile");
@@ -2480,7 +2482,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // black Zombies ...". They are already that as they enter, before their enters abilities trigger (rulings on Chainer,
       // Dementia Master's like ability).
       enterTogether(s, () => {
-        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) }));
+        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id), ...(e.counters ? { counters: e.counters } : {}) }));
         const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.alsoMods && entered.length) {
           s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });

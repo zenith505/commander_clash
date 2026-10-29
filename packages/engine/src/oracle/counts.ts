@@ -441,6 +441,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
   // Search for Blex: "You lose 3 life for each card you put into your hand this way", after its look at the top cards.
   if (ctx?.dugToHand && each && /^card you put into your hand this way$/.test(p)) return { count: { kind: "dugToHand" } };
+  // Reviving Vapors: "put one of them into your hand. You gain life equal to that card's mana value."
+  if (ctx?.dugOneToHand && /^that card's mana value$/.test(p)) return { count: { kind: "dugToHandMv" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
   if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
   // The Master of Lake-town: "for each graveyard with seven or more cards in it": each player's graveyard (CR 404.1), of
@@ -547,6 +549,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(?:the number of )?cards in (that player's|target opponent's|target player's|defending player's) hand minus the number of cards in your hand$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "handMoreThanYou", who });
+  }
+  // Bulwark: "the number of cards in your hand minus the number of cards in that player's hand": the other way round, 0 if
+  // that's less (CR 107.1b).
+  if ((m = /^(?:the number of )?cards in your hand minus the number of cards in (that player's|target opponent's|target player's|defending player's) hand$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "handMoreThanYou", who, yoursMinus: true });
   }
   // Enemy of Enlightenment: "for each card in your opponents' hands": all of them together.
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });

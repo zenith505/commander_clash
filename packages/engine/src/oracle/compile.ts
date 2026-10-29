@@ -1789,6 +1789,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.landsFromGraveyardOf ??= []).push(typedYard[1] === "Plains" ? "Plains" : typedYard[1]!.slice(0, -1));
       continue;
     }
+    // Hazezon, Shaper of Sand: "You may play Desert lands from your graveyard." Land cards with that subtype (CR 205.3i).
+    const nonbasicYard = /^You may play (Desert|Gate|Cave|Sphere|Town) lands from your graveyard\.$/.exec(line);
+    if (nonbasicYard) {
+      (out.landsFromGraveyardOf ??= []).push(nonbasicYard[1]!);
+      continue;
+    }
     // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
     // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
     // Zask, Skittering Swarmlord: "You may play lands and cast Insect spells from your graveyard": cards with that
@@ -1859,9 +1865,10 @@ export function compile(d: CardDef): CompiledCard {
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
     // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
+    // Edgar, Master Machinist: "If you cast a spell this way, that artifact enters tapped" (the permanent it becomes).
     // Exploration Broodship: "... from your graveyard by sacrificing a land in addition to paying its other costs": an
     // additional cost of that permission (CR 601.2f-h), paid with the spell's other costs.
-    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard( by (?:sacrificing|exiling|discarding|tapping) .+? in addition to paying its other costs)?\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard( by (?:sacrificing|exiling|discarding|tapping) .+? in addition to paying its other costs)?\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?( If you cast a spell this way, that (?:artifact|creature|permanent) enters tapped\.)?$/.exec(line);
     // Kotis: "exiling three other cards from your graveyard": other than the spell, which is on the stack by then (CR 601.2a).
     const permitCost = onceYard?.[3] ? parseAdditionalCost(onceYard[3].replace(/^ by (\w+)ing /, (_, v: string) => `${v === "sacrific" ? "sacrifice" : v === "exil" ? "exile" : v} `).replace(/ in addition to paying its other costs$/, "").replace(/^exile (\w+) other cards from your graveyard$/, "exile $1 cards from your graveyard")) : undefined;
     if (permitCost === null) {
@@ -1876,7 +1883,7 @@ export function compile(d: CardDef): CompiledCard {
       else {
         const { owner: _, manaValue: _mv, ...f } = filter;
         const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
-        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: permitCost ? [permitCost] : [], exile: !!onceYard?.[4] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: permitCost ? [permitCost] : [], exile: !!onceYard?.[4] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}), ...(onceYard?.[5] ? { entersTapped: true as const } : {}) });
         if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
@@ -1907,6 +1914,13 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(playWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
       if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }, cond] };
+      continue;
+    }
+    // Nightveil Specter: "You may play lands and cast spells from among cards exiled with ~": always, with the usual
+    // costs and timing (rulings), no other mana (an empty allOf always holds).
+    if (line === "You may play lands and cast spells from among cards exiled with ~.") {
+      if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedWhile = { kind: "allOf", conds: [] };
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -4304,10 +4318,11 @@ function linkExile(out: CompiledCard) {
     else exiles[0]!.linked = true;
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
-  // (CR 607.2a).
+  // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.
   if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
-    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "you" && !e.putAll);
+    // Nightveil Specter: "that player exiles the top card of their library", the damaged player's card, linked the same.
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && (e.who.ref === "you" || e.who.ref === "eventPlayer") && !e.putAll);
     const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || tops.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
     else tops[0]!.linked = true;

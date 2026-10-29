@@ -69,6 +69,9 @@ export const SUPPORTED_KEYWORDS = [
   // blessing, you get the city's blessing for the rest of the game." See checkAscend. On an instant or sorcery
   // it's a spell ability instead (702.131a), compiled into the spell.
   "Ascend",
+  // CR 702.195a: "Any time you control three or more permanents that are artifacts, Sagas, and/or legendary and you
+  // don't have an enduring story, you have an enduring story for the rest of the game." See checkAscend.
+  "Storied",
   // CR 702.22: attacking bands are declared with attackers (see finishAttacks), a block spreads to the whole band, and
   // the other player divides combat damage (see bandSplit). "Bands with other" isn't modeled.
   "Banding",

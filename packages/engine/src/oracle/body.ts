@@ -117,6 +117,8 @@ export interface Ctx {
   afterYourDiscard?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
   discardedOne?: boolean;
+  /** After "you may exile a creature card from your hand. If you do": "the exiled card" is that card (Nexus of Becoming). */
+  mayExiledFromHand?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
@@ -264,7 +266,9 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   if (enters) return floatingTrigger(`This turn, whenever ${enters[1]!} enters, ${enters[2]!}`, after, ctx);
   // "Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
-  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
+  // The Girl in the Fireplace: "Whenever a creature you control deals combat damage to a player this turn, time travel":
+  // once for each creature (CR 603.7b).
+  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players|a creature you control deals combat damage to a player) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn, that player loses 1
   // life": once for each card (CR 603.7b), not a token (rulings), each opponent's.
@@ -659,8 +663,9 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
       : /^You may cast that card this turn$/.test(cast)
         ? "thisTurn"
         : undefined;
-  // "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime, CR 702.62).
-  const suspend = exile && !then ? new RegExp(`^Put ${NUM} time counters? on that card$`).exec(cast) : null;
+  // "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime, CR 702.62); "Put three
+  // time counters on it." (The Tenth Doctor).
+  const suspend = exile && !then ? new RegExp(`^Put ${NUM} time counters? on (?:that card|it)$`).exec(cast) : null;
   if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
     return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
@@ -1664,6 +1669,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Commodore Guff: "You draw X cards and ~ deals X damage to each opponent, where X is the number of planeswalkers you
   // control": one X for both instructions.
   text = text.replace(/(^|\. )You draw X cards and ~ deals X damage to each opponent, where X is ([^.]+)\./, "$1You draw X cards, where X is $2. ~ deals X damage to each opponent, where X is $2.");
+  // Balin, Loremaster: "Draw X cards, where X is the number of cards discarded this way. If you have an enduring story, ~
+  // deals X damage to each opponent.": the same X.
+  text = text.replace(/(^|\. )(Draw X cards), where X is ([^.]+)\. (If [^,.]+, ~ deals X damage to each opponent)\./, "$1$2, where X is $3. $4, where X is $3.");
   // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
   // number of descent counters on ~": the same X for both, which nothing in between changes.
   text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
@@ -2177,7 +2185,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
-    ctx.afterYourDiscard = effects.some((e) => e.type === "discard" && e.who.ref === "you");
+    // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
+    ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
     ctx.afterExileTop = last?.type === "exileTop";
     // Kari Zev, Skyship Raider: "Create Ragavan, a legendary 2/1 red Monkey creature token. Ragavan enters tapped and
     // attacking.": the token is created tapped and attacking (CR 506.3d), as "a token that's tapped and attacking".
@@ -2187,6 +2196,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       s = `${s} that's tapped and attacking`;
     }
     if (!s) continue;
+    // The Parting of the Ways: "Exile the top five cards of your library. For each nonland card exiled this way, put a
+    // number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (CR
+    // 702.62): each such card, with no time counters for a mana value of 0, so not suspended (CR 702.62b).
+    const suspendEach = ctx.afterExileTop && last?.type === "exileTop" && last.who.ref === "you" ? /^For each (nonland) card exiled this way, put a number of time counters on that card equal to its mana value$/.exec(s) : null;
+    if (suspendEach && sentences[si + 1] === "If it doesn't have suspend, it gains suspend") {
+      effects.push({ type: "suspendExiledTop", filter: { kind: "card", notTypes: ["Land"], text: "nonland card" } });
+      si++;
+      continue;
+    }
     // Atemsis, All-Seeing: "you may reveal your hand. If cards with at least six different mana values are revealed this
     // way, that player loses the game." Only a hand revealed counts, so the condition is part of the "you may"; the mana
     // values are the cards' in your hand (CR 202.3), each counted once.
@@ -8570,6 +8588,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const inner = parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledThisWay", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }, min: 1 }, effects: inner });
+        continue;
+      }
+      // "You may exile an artifact or creature card from your hand. If you do, create a token that's a copy of the exiled
+      // card" (Nexus of Becoming): only if a card was exiled, which can't be with none that fits in hand (CR 609.3).
+      const fromHand = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0]! : undefined;
+      if (ifDid[1] === "do" && fromHand?.type === "takeFromHand" && fromHand.who.ref === "you" && fromHand.action === "exile" && (fromHand.n === undefined || fromHand.n === 1) && !fromHand.upTo && !fromHand.until && !fromHand.ownerMay && !fromHand.plot && !fromHand.linked && !noDamage && !where) {
+        const inner = parseOne(capital(ifDid[2]!), { ...ctx, mayExiledFromHand: true });
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "tookFromHand" } }, min: 1 }, effects: inner });
         continue;
       }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent

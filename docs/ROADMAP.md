@@ -1,7 +1,7 @@
 # Roadmap
 
-27,390 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,043 of
+27,413 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,056 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -241,7 +241,7 @@ line blocks.
    counters are put on a creature"), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
    among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
-   attacked player, activated by that player), Rotating Fireplace (time travel), Aggressive Mining ("you can't play
+   attacked player, activated by that player), Aggressive Mining ("you can't play
    lands"), Essence Sliver (any damage by a Sliver), Hunting Wilds (Forests put onto the battlefield this way become
    3/3), Overwhelming Splendor (a player can't activate abilities that aren't mana abilities), Gandalf, Goblins' Bane
    (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
@@ -360,7 +360,7 @@ line blocks.
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void, In Too Deep, Dollhouse of Horrors, Harald
-   Unites the Elves, Soul Foundry, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
+   Unites the Elves, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact, Fear of Infinity, Elderscale Wurm, Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
    Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
@@ -761,12 +761,28 @@ line blocks.
    counters), Bladegriff Prototype (a target the damaged player chooses), Bronze Bombshell, Zidane, Tantalus Thief ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
    hand), Obeka, Splitter of Seconds (extra upkeep steps after this phase).
+   Round 203 went on from the top: storied and the enduring story (CR 702.195: Balin, Bifur, Bombur, Dáin, Fíli, Kíli,
+   Óin, Ori, Thorin), "artifacts and creatures you control" as one group (Thorin), time travel (CR 701.56a, a prompt
+   for each permanent with a time counter and each suspended card, then all the changes at once: Wibbly-wobbly,
+   Timey-wimey, All of History, All at Once, Time Beetle, Rotating Fireplace, The Tenth Doctor, The Girl in the
+   Fireplace, The Parting of the Ways), "you may exile an artifact or creature card from your hand. If you do, create a
+   token that's a copy of the exiled card" (Nexus of Becoming), no activated abilities of cards in graveyards (Ashes of
+   the Abhorrent), cards in graveyards can't be targeted (Ground Seal, Underworld Cerberus), "target player other than
+   ~'s owner" (Crown of Doom), an X the ability's text sets (CR 107.3c: Prototype Portal, Soul Foundry; the app doesn't
+   ask for it). New prompt: time travel.
+   Out after round 203 (looked at, not done): Coward // Killer (the face named Coward, and "each other creature that
+   shares a creature type with it"), The Wedding of River Song, The Aesir Escape Valhalla ("the exiled card" across
+   chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Hylda of the Icy Crown
+   ("whenever you tap an untapped creature an opponent controls"), Admiral Beckett Brass (combat damage by three or
+   more Pirates to one player), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
+   nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
+   Summary Dismissal, Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
-   7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
+   7, Obosh, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
@@ -1424,7 +1440,7 @@ line blocks.
      damage or +X/±X by its mana value; still out: several targets (Kaboom!), a reflexive trigger after (Calibrated
      Blast), Undying Flames' epic, "if the spell's mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair,
      Solstice Revelations), paying life or energy instead (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
-     suspend and time counters (Kang Prime, The Tenth Doctor), Neera, Demonlord Belzenlok ("repeat this process").
+     suspend and time counters (Kang Prime), Neera, Demonlord Belzenlok ("repeat this process").
    Left from the round after dice (choose an opponent, choose a die result, leaves-the-battlefield triggers, searching
    another player's library):
    - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that
@@ -1528,7 +1544,7 @@ line blocks.
    - Reflexive spells still out: Ill-Timed Explosion ("the greatest mana value among cards discarded this way" carried
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
-   - "Triggers an additional time" still out: Bifur, Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
+   - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
      of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All, The
      Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
    - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you

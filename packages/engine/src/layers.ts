@@ -1127,6 +1127,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.lastTurn?.lostLife ?? []).some((p) => p !== you);
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
+    case "enduringStory":
+      return !!s.players[you]?.enduringStory !== !!cond.not;
     case "self": {
       if (cond.not) return !conditionMet(s, { kind: "self", is: cond.is }, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
       if (cond.is === "attacking") return src.attacking !== undefined;

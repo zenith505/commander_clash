@@ -11,7 +11,7 @@ import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
-import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
+import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses, parseActivateCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
@@ -1766,9 +1766,12 @@ export function compile(d: CardDef): CompiledCard {
       out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
       continue;
     }
-    const firstEquip = /^You may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
-    if (firstEquip) {
-      out.firstEquipFree = firstEquip[1] === "each turn" ? "eachTurn" : "yourTurn";
+    // Kíli the Resourceful: "As long as you have an enduring story, you may pay {0} ...": only while that's so.
+    const firstEquip = /^(?:As long as ([^,]+), y|Y)ou may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
+    const firstEquipWhile = firstEquip?.[1] ? parseActivateCondition(firstEquip[1]) : undefined;
+    if (firstEquip && firstEquipWhile !== null) {
+      out.firstEquipFree = firstEquip[2] === "each turn" ? "eachTurn" : "yourTurn";
+      if (firstEquipWhile) out.firstEquipFreeWhile = firstEquipWhile;
       continue;
     }
     if (line === "You may play lands from your graveyard.") {
@@ -3066,6 +3069,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Playing a land from there is still allowed (rulings on Grafdigger's Cage): it isn't cast (CR 305.1).
+    // Ashes of the Abhorrent: "Players can't cast spells from graveyards or activate abilities of cards in graveyards."
+    if (line === "Players can't cast spells from graveyards or activate abilities of cards in graveyards.") {
+      out.cantCastFrom = { zones: ["graveyard"] };
+      out.noGraveyardActivations = true;
+      continue;
+    }
+    if (line === "Cards in graveyards can't be the targets of spells or abilities.") {
+      out.graveyardUntargetable = true;
+      continue;
+    }
     const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
     if (noCasting) {
       out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
@@ -4332,7 +4345,11 @@ function linkExile(out: CompiledCard) {
     const plain = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const exiles = plain.length ? plain : all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    // Prototype Portal: "Imprint — When ~ enters, you may exile an artifact card from your hand": its only exile.
+    const imprints = all.filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
+    const imprintOnly = !exiles.length && imprints.length === 1 && !imprints[0]!.until && out.triggers.some((t) => t.event === "selfEnters" && allEffects(t.body.effects).includes(imprints[0]!)) && !all.some((e) => e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    if (imprintOnly && !out.spell) imprints[0]!.linked = true;
+    else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
@@ -4697,6 +4714,13 @@ export function parseFromTop(text: string): FromTop | null | undefined {
  * "if a triggered ability of a Ninja creature you control triggers, ..." (Splinter): CR 603.2d.
  */
 function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
+  // Bifur, Melodic Rider: "As long as you have an enduring story, if a triggered ability of a Dwarf you control triggers,
+  // ..." (CR 702.195b).
+  const story = /^As long as you have an enduring story, if (.+)$/.exec(line);
+  if (story) {
+    const again = triggersAgainLine(`If ${story[1]!}`);
+    return again && !again.anchor ? { ...again, enduringStory: true } : null;
+  }
   // "Wolf or battle you control", "land or Bird you control": any of them.
   // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when
   // `spells`.

@@ -259,7 +259,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Copies of the sacrificed creature" (Cleaver Skaab): of the one sacrificed for the cost, as it last existed, copy
     // effects included (CR 707.2, rulings).
     const sacrificed = /^the sacrificed (?:creature|artifact|permanent)$/.test(m[4]!);
-    const what0 = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    // "A copy of the exiled card" after "you may exile an artifact or creature card from your hand. If you do" (Nexus of
+    // Becoming): that card, copied as it is in exile (CR 707.2).
+    const fromHand = ctx.mayExiledFromHand && /^(?:the exiled card|it|that card)$/.test(m[4]!);
+    const what0 = fromHand ? { ref: "exiledFromHand" as const } : ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     // "A copy of that card" about a creature that died (Myrkul, Lord of Bones): of the card, not of the creature it was
     // as it last existed (rulings).
     const what = what0?.ref === "subjectCard" && m[4] === "that card" ? { ...what0, printed: true as const } : what0;
@@ -361,6 +364,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => ("what" in y && !selfTransform(y)) || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
     return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: m[1]! }];
   }
+  // Time travel (CR 701.56a): "Time travel three times" (The Tenth Doctor) is three time travel actions, one after another.
+  if (/^Time travel$/i.test(s)) return [{ type: "timeTravel" }];
+  if ((m = /^Time travel (twice|three times)$/i.exec(s))) return [{ type: "repeat", n: m[1] === "twice" ? 2 : 3, effects: [{ type: "timeTravel" }] }];
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
   if (/^Proliferate twice$/i.test(s)) return [{ type: "proliferate", twice: true }];

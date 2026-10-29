@@ -122,6 +122,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
+  // Bombur, Gentle Dreamer: "~ doesn't untap during your untap step unless you have an enduring story": as long as you
+  // don't (CR 702.195b).
+  if (/^~ doesn't untap during your untap step unless you have an enduring story\.$/.test(line)) {
+    const st = parseConditionalStatic("As long as you don't have an enduring story, ~ doesn't untap during your untap step.");
+    return st && { ...st, text: line };
+  }
   const text = line.replace(/^[A-Z][A-Za-z' -]+(?: \d+)? — /, "").replace(/\.$/, "");
   let statement: string | undefined;
   let cond: string | undefined;
@@ -1011,6 +1017,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
     return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
+  if ((m = /^you (have|don't have) an enduring story$/.exec(text))) return { kind: "enduringStory", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.195b
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
@@ -1477,6 +1484,10 @@ export function parseAffected(subject: string): Affects | null {
     const anyOf: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact creature" }, { kind: "object", subtypes: [sub], text: `${sub} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `artifact creature or ${sub}` } };
   }
+  // Thorin Oakenshield: "Artifacts and creatures you control": permanents of either card type, an artifact creature once.
+  // Only that pair: the general path takes the other "X and Y you control" pairs.
+  const artCre = /^(other )?(?:artifacts and creatures|creatures and artifacts) you control$/i.exec(x);
+  if (artCre) return { kind: "filter", types: [], controller: "you", other: !!artCre[1], spec: { kind: "object", types: ["Artifact", "Creature"], text: "artifact or creature" } };
   // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
   const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
   if (typeList) {

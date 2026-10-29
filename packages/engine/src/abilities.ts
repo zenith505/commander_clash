@@ -664,6 +664,8 @@ export interface TargetSpec {
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
+  /** "Target player other than ~'s owner" (Crown of Doom): `notPlayer` set to that owner as targets are chosen and checked. */
+  notSourceOwner?: true;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
   optional?: boolean;
   /**
@@ -1062,6 +1064,8 @@ export type ObjRef =
   | { ref: "milled" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledTop" }
+  /** "The exiled card" after "you may exile a creature card from your hand" (Nexus of Becoming): the one card this resolution's takeFromHand exiled, while it's still that card in exile (CR 400.7). */
+  | { ref: "exiledFromHand" }
   /** "Defending player chooses a nonland card in your graveyard. Return that card to your hand." (O-Kagachi Made Manifest): the card this resolution's chooseFromGraveyard moved, where it went, while it's still that card (CR 400.7). */
   | { ref: "chosenFromYard" }
   /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
@@ -1730,6 +1734,8 @@ export type StaticCondition =
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
+  /** "As long as you have an enduring story" (CR 702.195b). */
+  | { kind: "enduringStory"; /** "Unless you have an enduring story". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
   | { kind: "yourTurn"; not?: true }
   /** "During extra turns" (Medomai the Ageless): the turn being taken is an extra turn (CR 500.7), whoever's it is. */
@@ -2431,6 +2437,8 @@ export type Effect =
   | { type: "turnFaceUp"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
+  /** Time travel (CR 701.56a): for each permanent you control with a time counter and suspended card you own, you may put a time counter on it or remove one. */
+  | { type: "timeTravel" }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
@@ -2959,6 +2967,8 @@ export type Effect =
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
+  /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
+  | { type: "suspendExiledTop"; filter: TargetSpec }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
@@ -4804,6 +4814,11 @@ export interface ActivatedAbility {
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
   xMin?: number;
+  /**
+   * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
+   * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
+   */
+  xIs?: "linkedCardMv";
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -5838,6 +5853,10 @@ export interface CompiledCard {
   cantEnterFrom?: { zones: ("graveyard" | "library")[]; what: "creature" | "permanent" | "nonlandPermanent" };
   /** "Players can't cast spells from graveyards or libraries." (Grafdigger's Cage), "... noncreature spells from graveyards or exile" (Soulless Jailer). */
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
+  /** Ashes of the Abhorrent: "Players can't ... activate abilities of cards in graveyards." Triggered abilities still work (rulings). */
+  noGraveyardActivations?: true;
+  /** Ground Seal: "Cards in graveyards can't be the targets of spells or abilities." Untargeted effects still reach them (rulings). */
+  graveyardUntargetable?: true;
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
   /**
@@ -6082,6 +6101,8 @@ export interface CompiledCard {
    * turns" (`"yourTurn"`); Bruenor Battlehammer: "... you activate each turn" (`"eachTurn"`).
    */
   firstEquipFree?: "yourTurn" | "eachTurn";
+  /** Kíli the Resourceful: only as long as this holds ("as long as you have an enduring story"). */
+  firstEquipFreeWhile?: StaticCondition;
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
@@ -6096,7 +6117,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

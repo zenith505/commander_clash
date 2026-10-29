@@ -17,6 +17,7 @@ import {
   blocksMayCost,
   livingPlayers,
   abilityProblem,
+  definedX,
   faceUpWays,
   faceUpManaCost,
   dredgeAmount,
@@ -531,6 +532,22 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
+    }
+    // Time travel (CR 701.56a): a suspended card or an impending permanent comes sooner with one fewer; a permanent with
+    // vanishing lasts longer, and one whose mana or power counts its time counters grows, with one more. Anything else
+    // stays as it is.
+    if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const mine = o?.zone === "battlefield" && controllerOf(s, o) === pid;
+      const cc = o ? compileCard(defOf(s, o)) : undefined;
+      const choice = !o
+        ? "none"
+        : o.zone === "exile" || (mine && o.castAlt === "impending")
+          ? "remove"
+          : mine && (cc!.triggers.some((t) => t.event === "selfLastTimeCounterRemoved") || /"counter":"time"/.test(JSON.stringify([cc!.mana, cc!.statics])))
+            ? "add"
+            : "none";
+      return [{ type: "chooseOption", player: pid, choice }];
     }
     // "Enters with your choice of a flying counter or a first strike counter": evasion first, then what wins fights.
     if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
@@ -4031,7 +4048,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (!craft && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
-      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      // Prototype Portal: X set by the ability (CR 107.3c).
+      const fixedX = definedX(s, o, ab);
+      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];

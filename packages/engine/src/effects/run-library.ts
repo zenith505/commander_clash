@@ -10,7 +10,7 @@ import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatch
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
-import { attackChoices, chooseAuraHosts } from "./run-zones";
+import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
 import { namesFrom } from "./run-names";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
@@ -141,6 +141,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${player(s, ctx.controller).name} puts ${put.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
           enterTogether(s, () => put.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
         }
+      }
+      return;
+    case "suspendExiledTop":
+      for (const id of s.resolving?.exiledTopCards ?? []) {
+        const o = s.objects[id];
+        if (o?.zone === "exile" && printedMatches(e.filter, defOf(s, o))) suspendExiled(s, o, defMv(defOf(s, o)));
       }
       return;
     case "putFromExiledTop": {
@@ -421,6 +427,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
+        s.resolving!.exiledFromHandCards = [];
         // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
         const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         if (!cards.length || n <= 0) return;
@@ -477,6 +484,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
+          (s.resolving!.exiledFromHandCards ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           // Pick the Brain: "the same name as the exiled card" (SameNameRef exiledThisWay).
           (s.resolving!.exiledCards ??= []).push(id);
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });

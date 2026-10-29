@@ -103,6 +103,8 @@ export interface Ctx {
    * battlefield"): "it" and "that creature" are the permanent it became (CR 400.7), kept in `created` like a token.
    */
   lastPut?: boolean;
+  /** The last sentence manifested one card ("manifest dread"): "that creature" is the face-down 2/2 (CR 701.40a, 701.62a). */
+  lastManifested?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
   /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
@@ -3575,6 +3577,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Hurl Through Hell: "Exile target creature. Until the end of your next turn, you may cast that card and you may spend
     // mana as though it were mana of any color to cast that spell": the card the creature became in exile (CR 400.7), a
     // token ceasing to exist (CR 704.5d); cast only, so an animated land card can't be played (rulings).
+    // Norin, Swift Survivalist: "you may exile it. You may play that card from exile this turn": the card the creature the
+    // trigger is about became in exile (CR 400.7), with its usual timing and costs (rulings); a token can't be played.
+    if (/^You may play that card from exile this turn$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      const ex = prev?.type === "may" && !prev.pay && prev.effects.length === 1 ? prev.effects[0] : prev;
+      if (ex?.type !== "exile" || ex.what.ref !== "subject" || ex.until || ex.linked || ex.ownerMay || ex.youMay) return null;
+      ex.youMay = { thisTurn: true, play: true };
+      continue;
+    }
     const untilNext = /^Until the end of your next turn, you may (cast|play) that card( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(s);
     const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
@@ -8684,6 +8695,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const fromMilled =
       // Nashi, Searcher in the Dark: "You may put any number of legendary and/or enchantment cards from among them into your hand".
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
+      // Mole Module: "mill four cards. You may put a permanent card from among them onto the battlefield".
+      /^[Yy]ou may put (an? .+? card) from among (?:them|the cards milled this way|the milled cards) (onto the battlefield)$/.exec(s) ??
       // Lluwen, Imperfect Naturalist: "you may put a creature or land card from among the milled cards on top of your library".
       /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s) ??
       // Free the Fae: "Then put an instant, sorcery, or Faerie card from among the milled cards into your hand": one if any
@@ -11340,6 +11353,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // token doubler) just made.
     const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
+    ctx.lastManifested = faceDown && last.count === 1;
     ctx.lastCreatedCreature = last?.type === "createToken" && last.n === 1 && last.token.types.includes("Creature") && !last.attachTo;
     // The creature that player chose is "that creature" (Imperial Edict).
     if (picked && pk.who.ref === "target") ctx.lastPut = true;
@@ -11789,6 +11803,7 @@ export function addTarget(ctx: Ctx, spec: TargetSpec): number {
   ctx.lastCreated = false;
   ctx.lastCreatedCreature = false;
   ctx.lastPut = false;
+  ctx.lastManifested = false;
   const i = ctx.targets.length - 1;
   if (spec.kind === "object" || spec.kind === "spell") ctx.lastObjectTarget = i;
   return i;

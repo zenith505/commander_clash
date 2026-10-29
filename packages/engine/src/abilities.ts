@@ -1228,6 +1228,8 @@ export type PlayerRef =
   | { ref: "opponentsEmptyHanded" }
   /** "Each opponent who has three or more poison counters" (Phyrexian Atlas): as it resolves. */
   | { ref: "opponentsWithPoison"; n: number }
+  /** "Each player with exactly 13 life" (Triskaidekaphobia): as it resolves. */
+  | { ref: "playersWithLife"; n: number }
   /** "Each opponent dealt combat damage this game by a creature named ~" (Gollum, Obsessed Stalker): by any creature with this source's name, whoever controlled it (rulings; Player.combatDamagedByNames). */
   | { ref: "opponentsCombatDamagedByName" }
   /** "Each of its controller's opponents" (Bounty Board): every other player than the subject's controller (CR 102.2, 800.4), as it last existed. */
@@ -1702,7 +1704,8 @@ export type StaticCondition =
   | { kind: "subjectDamagedBy"; subtypes: string[]; spell: boolean }
   /** A number compared to fixed bounds: "as long as your devotion to black is less than five" (Theros gods, CR 700.5). */
   /** `moreThan`: "if the number of attacking creatures is greater than the number of quest counters on ~" (ED-E): both counted now. */
-  | { kind: "amount"; amount: Amount; min?: number; max?: number; moreThan?: Amount }
+  /** `parity`: "as long as ~'s power is even" (Kianne, Corrupted Memory): 0 counts as even. */
+  | { kind: "amount"; amount: Amount; min?: number; max?: number; moreThan?: Amount; parity?: "even" | "odd" }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
@@ -3567,7 +3570,7 @@ export type Effect =
   | { type: "noLifeGainForGame"; who: PlayerRef }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
   /**
@@ -5901,6 +5904,8 @@ export interface CompiledCard {
   surveilMore?: number;
   /** "If you would scry a number of cards, scry that many cards plus one instead." (Kenessos, Priest of Thassa, CR 614.1a): one more for each. */
   scryMore?: number;
+  /** "If you would scry a number of cards, draw that many cards instead." (Eligeth, Crossroads Augur, CR 614.1a). */
+  scryToDraw?: true;
   /** "You gain life rather than lose life from radiation" (Strong, the Brutish Thespian; CR 728.1, 614.1a). */
   radiationGains?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
@@ -6090,7 +6095,11 @@ export interface CompiledCard {
   /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */
   attackPowerCapHand?: true;
   /** "Your maximum hand size is eight", "... is increased by one", "Each opponent's maximum hand size is reduced by seven" (CR 402.2). */
-  handSize?: { who: "you" | "opponents"; set?: number; plus?: number }[];
+  /**
+   * `minus`: Winter, Misanthropic Guide's "each opponent's maximum hand size is equal to seven minus the number of those
+   * card types", `set` less this, counted as it applies; `if`: only while this holds (its delirium).
+   */
+  handSize?: { who: "you" | "opponents"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
@@ -6317,6 +6326,8 @@ export interface CompiledCard {
   flashFor?: TargetSpec[];
   /** "As long as ~ is tapped, you may cast spells as though they had flash" (Quicksilver, Speedster): any spell, while one of these holds. */
   flashWhile?: StaticCondition[];
+  /** "As long as ~'s power is even, you may cast noncreature spells as though they had flash" (Kianne): spells like this, while the condition holds. */
+  flashForWhile?: { filter: TargetSpec; condition: StaticCondition }[];
   /** "During each opponent's end step, you may cast spells as though they had flash" (Final-Word Phantom, CR 702.8a). */
   flashInOpponentsEndStep?: true;
   /** "Any player may cast Sliver spells as though they had flash" (Quick Sliver, CR 702.8a): every player may, not only its controller. */

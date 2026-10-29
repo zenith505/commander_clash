@@ -275,6 +275,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `Players${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "cantWinGame" ? " can't win the game" : "")).join(",")} this turn.`);
         return;
       }
+      if (e.opponents) {
+        for (const pid of opponents(s, ctx.controller)) for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: pid, rule });
+        log(s, `${player(s, ctx.controller).name}'s opponents${e.rules.map((r) => (r === "noLoyalty" ? " can't activate planeswalkers' loyalty abilities" : "")).join(",")} this turn.`);
+        return;
+      }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, ...(e.byColors ? { byColors: e.byColors } : {}) });
       if (e.rules[0] === "seeHexproof") {
         log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);

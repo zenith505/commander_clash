@@ -163,6 +163,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (/^each opponent (?:with|who has) no cards in hand$/.test(x)) return { ref: "opponentsEmptyHanded" };
   const poisoned = new RegExp(`^each opponent (?:with|who has) ${NUM} or more poison counters$`).exec(x);
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
+  const life = /^each player with exactly (\d+) life$/.exec(x);
+  if (life) return { ref: "playersWithLife", n: Number(life[1]) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
   if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
@@ -421,7 +423,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "~ and that creature each get +2/+0 and gain haste until end of turn" (Gogo, Mysterious Mime): the source and the target.
   if (/^~ and that creature(?: each)?$/i.test(x) && !ctx.spell && !ctx.selfCard && ctx.lastObjectTarget !== undefined && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget, andSelf: true };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
-    if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
+    // "Manifest dread, then put three +1/+1 counters on that creature" (Weight Room): the face-down 2/2 just manifested.
+    if (ctx.lastCreated && (/^it$/i.test(x) || ((ctx.lastPut || ctx.lastManifested) && /^that creature$/i.test(x)))) return { ref: "created" };
     // "Create a 1/1 ... Otter creature token ... put a +1/+1 counter on that creature" (Otterball Antics): a spell's one
     // token, with no other creature it could mean.
     if (ctx.lastCreatedCreature && ctx.spell && /^that creature$/i.test(x) && !ctx.targets.length && !ctx.subject && !ctx.subjectIt) return { ref: "created" };
@@ -1411,7 +1414,8 @@ export function parseTargetPhrase(
   // it", "permanents you control with counters on them" (any kind)
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

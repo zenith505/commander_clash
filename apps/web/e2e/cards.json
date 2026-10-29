@@ -15336,6 +15336,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7234bbf8-b962-4515-bedf-68d111c6137e",
+  "name": "Sabin, Master Monk",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Noble Monk",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Noble",
+   "Monk"
+  ],
+  "oracleText": "Double strike\nBlitz—{2}{R}{R}, Discard a card. (If you cast this spell for its blitz cost, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)\nYou may cast this card from your graveyard using its blitz ability.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blitz",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "068b3692-411b-44d4-a7e9-005262760cfc",
   "name": "Sacrifice",
   "manaCost": "{B}",
@@ -18195,6 +18232,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "598e3ed2-659f-4400-b41d-3aee8068fba6",
+  "name": "Tenacious Underdog",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "Blitz—{2}{B}{B}, Pay 2 life. (If you cast this spell for its blitz cost, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)\nYou may cast this card from your graveyard using its blitz ability.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Blitz"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3dd196b6-a85a-4e3e-bb57-ec34241f8117",
   "name": "Terminus",
   "manaCost": "{4}{W}{W}",
@@ -18218,6 +18288,41 @@
   "commanderLegal": "legal",
   "set": "dsc",
   "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7565c101-a479-4812-9d18-63918084bfca",
+  "name": "Tetzimoc, Primal Death",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Elder Dinosaur",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elder",
+   "Dinosaur"
+  ],
+  "oracleText": "Deathtouch\n{B}, Reveal this card from your hand: Put a prey counter on target creature. Activate only during your turn.\nWhen Tetzimoc enters, destroy each creature your opponents control with a prey counter on it.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "rix",
+  "releasedAt": "2018-01-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

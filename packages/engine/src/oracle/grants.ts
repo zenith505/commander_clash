@@ -28,7 +28,7 @@ export function compileGranted(text: string): CompiledCard {
     const own = innerQuotes(text);
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
     // a Vehicle (Swift Reconfiguration), read ahead to a Saga (Barbara Wright).
-    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
+    const subtypes = /^Equip (?:Knight )?\{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
@@ -230,9 +230,10 @@ export function parseGrants(text: string): Modification[] | null {
       continue;
     }
     // "Equipment you control have equip {0}" (Puresteel Paladin): another equip ability (CR 702.6a, 702.6e).
-    const equip = /^equip (\{\d+\})$/i.exec(w);
+    // Syr Gwyn, Hero of Ashvale: "Equipment you control have equip Knight {0}": only onto a Knight you control (CR 702.6c).
+    const equip = /^equip (?:(Knight) )?(\{\d+\})$/i.exec(w);
     if (equip) {
-      out.push({ kind: "addAbility", text: `Equip ${equip[1]}` });
+      out.push({ kind: "addAbility", text: `Equip ${equip[1] ? `${equip[1]} ` : ""}${equip[2]}` });
       continue;
     }
     // "Is a Vehicle artifact with crew 5" (Swift Reconfiguration): a crew ability of its own (CR 702.122a), on top of any

@@ -704,7 +704,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // "Among lands that player controls" (Mask of Intolerance): the trigger's player.
       const ctx = { controller: you, sourceId, view: (o: GameObject) => chars.get(o.id), ...(eventPlayer !== undefined ? { event: { player: eventPlayer } } : {}) };
       const n = evalAmount(s, cond.amount, ctx);
-      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx));
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
     case "monarch":
       if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;

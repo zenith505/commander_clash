@@ -3354,8 +3354,9 @@ export function maxHandSize(s: GameState, pid: PlayerId): number {
     .map((id) => obj(s, id))
     .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
     .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : opponents(s, controllerOf(s, o)).includes(pid)))
+    .filter(({ h, o }) => !h.if || staticConditionNow(s, h.if, o.id, controllerOf(s, o)))
     .sort((a, b) => a.o.timestamp - b.o.timestamp);
-  for (const { h } of mods) n = h.set !== undefined ? h.set : n + (h.plus ?? 0);
+  for (const { h, o } of mods) n = h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
   return Math.max(0, n);
 }
 
@@ -5238,6 +5239,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     // Final-Word Phantom: any spell, during an opponent's end step.
     if (abilitiesOf(s, o).flashInOpponentsEndStep && s.step === "end" && s.activePlayer !== pid) return true;
     if (abilitiesOf(s, o).flashWhile?.some((c) => staticConditionNow(s, c, id, pid))) return true;
+    if (abilitiesOf(s, o).flashForWhile?.some((f) => printedMatches(f.filter, d) && staticConditionNow(s, f.condition, id, pid))) return true;
     // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
     const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));
     return !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d)) || !!abilitiesOf(s, o).flashForFirst?.some(first);
@@ -5742,7 +5744,10 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
         else out.push({ ...g.way, mana: d.manaCost, permits });
         continue;
       }
-      if (out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
+      // Its caster would choose a permission that doesn't exile the spell afterwards over one that does (Jaya Ballard's emblem).
+      const had = out.findIndex((w) => w.kind === g.way.kind);
+      if (had >= 0 && g.way.kind === "permission" && out[had]!.exileIfToGraveyard && !g.way.exileIfToGraveyard) out.splice(had, 1);
+      else if (had >= 0 || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
   }
@@ -6750,6 +6755,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const sun = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).noLoyaltyAbilities);
     if (sun) return `${characteristics(s, obj(s, sun)).name}: players can't activate planeswalkers' loyalty abilities`;
+    // Revel in Silence: this turn only, for the players it named.
+    if (turnRule(s, pid, "noLoyalty")) return "you can't activate planeswalkers' loyalty abilities this turn";
   }
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).

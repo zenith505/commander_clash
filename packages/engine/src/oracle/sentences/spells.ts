@@ -671,10 +671,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // value, as it resolves, is countered (rulings).
   if (/^Target spell can't be countered$/i.test(s)) return [{ type: "spellUncounterable", index: addTarget(ctx, { kind: "spell", text: "target spell" }) }];
   // Double Negative: "Counter up to two target spells": each one chosen, two different spells (CR 115.3, 115.6).
-  if (/^Counter up to two target spells$/.test(s)) {
-    const a = addTarget(ctx, { kind: "spell", text: "target spell", optional: true });
-    const b = addTarget(ctx, { kind: "spell", text: "target spell", optional: true, distinctFrom: [a] });
-    return [{ type: "counterSpell", index: a }, { type: "counterSpell", index: b }];
+  // Katara's Reversal: "Counter up to four target spells and/or abilities": spells, activated and triggered abilities.
+  if ((m = /^Counter up to (two|four) target spells( and\/or abilities)?$/.exec(s))) {
+    const base: TargetSpec = m[2] ? { ...stackSpec("spell or ability"), text: "target spell or ability" } : { kind: "spell", text: "target spell" };
+    const idx: number[] = [];
+    for (let i = 0; i < num(m[1]!); i++) idx.push(addTarget(ctx, { ...base, optional: true, ...(idx.length ? { distinctFrom: [...idx] } : {}) }));
+    return idx.map((index): Effect => ({ type: "counterSpell", index }));
   }
   // Parallectric Feedback: "~ deals damage to target spell's controller equal to that spell's mana value": its mana value
   // with the X chosen for it (CR 202.3e), and the spell stays on the stack.

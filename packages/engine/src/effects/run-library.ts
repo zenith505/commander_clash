@@ -585,6 +585,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Kenessos, Priest of Thassa: a scry of one or more is a scry of one more, for each (CR 614.1a; scry 0 isn't a scry,
         // 701.22b).
         if (e.type === "scry" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).scryMore ?? 0;
+        // Eligeth, Crossroads Augur: a scry of one or more is a draw of that many instead, so it's no scry (no "whenever you
+        // scry"). With Kenessos too, its controller would order the replacements (CR 616.1): one more card is drawn here.
+        // The draw can stop for dredge (CR 702.52a); `scryDrew` keeps it from drawing again when it carries on.
+        if (r.scratch?.scryDrew) return;
+        if (e.type === "scry" && n > 0 && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).scryToDraw)) {
+          (r.scratch ??= {}).scryDrew = true;
+          log(s, `${p.name} draws ${n} card${n === 1 ? "" : "s"} instead of scrying.`);
+          if (!draw(s, p.id, n)) return "paused";
+          return;
+        }
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).

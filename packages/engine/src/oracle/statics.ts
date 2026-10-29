@@ -1266,6 +1266,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(m[1]!, null);
     return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
   }
+  // Kianne, Corrupted Memory: "as long as ~'s power is even" (0 is even).
+  if ((m = /^(~'s power) is (even|odd)$/.exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount ? { kind: "amount", amount, parity: m[2] as "even" | "odd" } : null;
+  }
   // Pestilence: "if no creatures are on the battlefield".
   // Wirecat: "if an enchantment is on the battlefield": anyone's. Knight of Malice: "as long as any player controls a white
   // permanent": the same.
@@ -1299,6 +1304,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ has (?:counters|a counter|one or more counters) on it$/.test(text)) return { kind: "self", is: "hasCounter" };
   // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
   if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
+  // Timber Paladin: "as long as ~ is enchanted by exactly two Auras".
+  if ((m = new RegExp(`^~ is enchanted by exactly (one|${NUM}) Auras?$`).exec(text))) {
+    const n = m[1] === "one" ? 1 : num(m[1]!);
+    return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: n, max: n };
+  }
   // Brass Knuckles: "Equipped creature has double strike as long as two or more Equipment are attached to it": to the
   // equipped creature, this one included.
   if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "attached") return { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Equipment"] } }, min: num(m[1]!) };
@@ -1709,6 +1719,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Archon of the Wild Rose: "have base power and toughness 4/4 and have flying" (layers 6 and 7b).
   if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+) and ((?:has|have) [a-z ,]+)$/.exec(rest))) {
     const more = parseStaticMods(m[3]!);
+    return more?.length && more.every((x) => x.kind === "addKeywords") ? [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more] : null;
+  }
+  // Timber Paladin: "has base power and toughness 5/5 and vigilance", "... 10/10, vigilance, and trample": the keywords
+  // it has (layer 6) after the base power and toughness (layer 7b).
+  if ((m = /^has base power and toughness (\d+)\/(\d+)(?: and |, )((?!has |have |is |are )[a-z ,]+)$/.exec(rest))) {
+    const more = parseStaticMods(`has ${m[3]}`);
     return more?.length && more.every((x) => x.kind === "addKeywords") ? [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more] : null;
   }
   // Sigarda's Summons: "have base power and toughness 4/4, have flying, and are Angels in addition to their other types"
@@ -2351,6 +2367,19 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Hivestone: "Creatures you control are Slivers in addition to their other creature types"; Earl of Squirrel: "Creature
   // tokens you control are Squirrels ...": a creature type added in layer 4 (CR 205.1b, 613.1d), to whichever creatures
   // are in the group then.
+  // Arterial Alchemy: "Blood tokens you control are Equipment in addition to their other types and have "Equipped creature
+  // gets +2/+0" and equip {2}"; Senator Peacock: "Artifacts you control are Clues ... and have "..."": an artifact type
+  // for artifacts only (CR 205.3d), added in layer 4, and the abilities in layer 6 (CR 613.1d, 613.1f). An Equipment
+  // that's also a creature can't be attached (CR 301.5c); one that stops being an Equipment becomes unattached (704.5p).
+  const artifactType = /^(.+?) are ([A-Z][a-z]+?)s? in addition to their other types and (have .+)$/.exec(text);
+  const artifactTypeAffects = artifactType && parseAffected(artifactType[1]!);
+  if (artifactType && artifactTypeAffects?.kind === "filter" && artifactTypeAffects.spec && !artifactTypeAffects.spec.many) {
+    const spec = artifactTypeAffects.spec;
+    const sub = artifactType[2] === "Equipment" ? "Equipment" : artifactType[2]!;
+    const artifactsOnly = (spec.types?.length === 1 && spec.types[0] === "Artifact") || (!spec.types?.length && !!spec.subtypes?.length && spec.subtypes.every((t) => subtypeSet(t) === "Artifact"));
+    const more = parseStaticMods(artifactType[3]!);
+    if (subtypeSet(sub) === "Artifact" && artifactsOnly && more) return { affects: artifactTypeAffects, mods: [{ kind: "addTypes", types: [], subtypes: [sub] }, ...more], text: line };
+  }
   const areAlso = /^(.+?) are ([A-Z][a-z]+) in addition to their other (?:creature )?types$/.exec(text);
   const areAlsoAffects = areAlso && / have | and /.test(areAlso[1]!) ? null : areAlso && parseAffected(areAlso[1]!);
   if (areAlso && areAlsoAffects?.kind === "filter" && areAlsoAffects.types.includes("Creature") && !/ cards? /.test(areAlso[1]!)) {

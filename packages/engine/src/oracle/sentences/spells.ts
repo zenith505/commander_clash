@@ -130,6 +130,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "skip", who, skip: "combat", n: 1, wholeTurn: true }] : null;
   }
+  // Celestial Convergence (one sentence by now, body.ts): the one player with the most life wins; a tie is a draw.
+  if (/^the player with the highest life total wins the game, a tie being a draw$/i.test(s)) return [{ type: "highestLifeWins" }];
   if ((m = /^(.+?) (loses?|wins?) the game$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: /^lose/.test(m[2]!) ? "loseGame" : "winGame", who }] : null;

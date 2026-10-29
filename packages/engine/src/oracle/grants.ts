@@ -45,7 +45,7 @@ export function compileGranted(text: string): CompiledCard {
  * keywords join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
  * would have to come out of earlier layers than the one that grants them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "noMaxHandSize", "targetTax"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "noMaxHandSize", "targetTax", "combatLimit"]);
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
 /**
@@ -61,6 +61,9 @@ function grantable(text: string): boolean {
   if (!Object.keys(rest).every((k) => GRANTED_FIELDS.has(k))) return false;
   // "Players have no maximum hand size" stays a permanent's own.
   if (rest.noMaxHandSize === "all") return false;
+  // Tomik, Orzhov Lawmage's granted "No more than one creature can attack this planeswalker each combat": a limit on the
+  // permanent that has it only (CR 508.1c), not on every attack.
+  if (rest.combatLimit && Object.keys(rest.combatLimit).some((k) => k !== "attackSelf")) return false;
   return statics.every((st) => grantedStaticOk(st.mods));
 }
 

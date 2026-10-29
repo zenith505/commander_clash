@@ -597,6 +597,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
     return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
   }
+  // Rofellos's Gift: "Reveal any number of green cards in your hand. Return an enchantment card from your graveyard to your
+  // hand for each card revealed this way": that many, chosen as it resolves (rulings), not targeted.
+  if ((m = /^[Rr]eturn an? ([a-z]+ card) from your graveyard to your hand for each card revealed this way$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: { count: { kind: "revealedFromHand" } }, filter }] : null;
+  }
   // "Return X creature cards from your graveyard to the battlefield", after "sacrifice any number of ..." (Lich-Knights'
   // Conquest): that many, chosen as it resolves.
   if ((m = /^[Rr]eturn X (creature cards) from your graveyard to the battlefield$/.exec(s))) {
@@ -1154,6 +1160,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "exileHand", who }] : null;
   }
+  // Fear of Abduction: "When ~ leaves the battlefield, put each card exiled with it into its owner's hand": the card its
+  // enters ability exiled and the one exiled to pay its cost (CR 607.2a, 607.2q; compile() links them).
+  if (/^Put each card exiled with (?:it|~) into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one
@@ -1200,6 +1209,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
     if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?$/i.exec(s)))
       return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}) }];
+    // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
+    // they are now (rulings).
+    if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).

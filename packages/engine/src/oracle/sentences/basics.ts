@@ -586,6 +586,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Exchange your hand and library, then shuffle$/.test(s)) {
     return [{ type: "shuffleZones", who: { ref: "you" }, hand: true, exchange: true }, { type: "shuffle", who: { ref: "you" } }];
   }
+  // Harness Infinity: "Exchange your hand and graveyard": both at once, and the cards put into the graveyard aren't
+  // discarded (rulings).
+  if (/^Exchange your hand and graveyard$/.test(s)) {
+    return [{ type: "shuffleZones", who: { ref: "you" }, hand: true, graveyard: true, exchange: true }];
+  }
   // Morality Shift: "Exchange your graveyard and library. Then shuffle your library."
   if (/^Exchange your graveyard and library$/.test(s)) {
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];

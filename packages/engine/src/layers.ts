@@ -760,7 +760,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return ok !== !!cond.not;
     }
     case "attackedThisTurn":
-      return (s.players[you]?.attackedTurn === s.turn) !== !!cond.not;
+      return (cond.anyone ? s.turnOrder.some((p) => s.players[p]!.attackedTurn === s.turn) : s.players[you]?.attackedTurn === s.turn) !== !!cond.not;
     case "activatedLoyaltyThisTurn":
       return (s.players[you]?.loyaltyTurn === s.turn) !== !!cond.not;
     case "committedCrime":

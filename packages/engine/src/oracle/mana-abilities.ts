@@ -404,10 +404,17 @@ function parseManaProduced(text: string): ManaProduce | null {
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only on costs that contain {X}.") return { xCosts: true, text: sentence };
+  // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
+  if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
+  // Unblinking Observer: "only to pay a disturb cost or cast an instant or sorcery spell": a spell cast for its disturb cost
+  // (CR 702.146a), or an instant or sorcery spell.
+  if (sentence === "Spend this mana only to pay a disturb cost or cast an instant or sorcery spell.") return { disturb: true, spells: spellFilter("instant or sorcery")!, text: sentence };
   // Jegantha, the Wellspring: on any cost, but never on generic mana (rulings: a hybrid {2/W} only as its {W}).
   if (sentence === "This mana can't be spent to pay generic mana costs.") return { spells: { kind: "spell", text: "spells" }, abilities: "any", other: true, notGeneric: true, text: sentence };
   // Thran Turbine: "This mana can't be spent to cast spells": on abilities and other costs only (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells.") return { abilities: "any", other: true, text: sentence };
+  // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand": on anything else (CR 106.6).
+  if (sentence === "This mana can't be spent to cast spells from your hand.") return { spells: { kind: "spell", text: "spells" }, notFromHand: true, abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).
   const cant = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(sentence);
   if (cant) {

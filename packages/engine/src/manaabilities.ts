@@ -488,6 +488,8 @@ export function activatedAsMana(ab: ActivatedAbility): ManaAbility | null {
     ...(ab.energyCost ? { energyCost: ab.energyCost } : {}),
     ...(ab.removeCounters ? { removeCounters: ab.removeCounters } : {}),
     ...(ab.exertCost ? { skipNextUntap: true } : {}),
+    // "This mana can't be spent to cast spells from your hand" (Vhal): the rider's restriction, for autopay (CR 106.6).
+    ...(e.only ? { spendOnly: e.only } : {}),
   };
 }
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-27,737 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,138 of
 9,979 (91%).
 
@@ -918,7 +918,7 @@ line blocks.
    a legendary enchantment" (Altar of the Pantheon); "that player or that planeswalker's controller discards seven cards,
    then sacrifices seven permanents" (Nicol Bolas, Planeswalker); "cast target instant or sorcery card with mana value 3 or
    less from your graveyard" as it resolves, paying for it (Chandra, Acolyte of Flame); "put five cards from your
-   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,716 of 31,936 with round 209 and Lane B round B39); the same text also covers Winter Soldier, Icy Assassin, Fendeep
+   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,766 of 31,936 with round 209 and Lane B rounds B39 to B41); the same text also covers Winter Soldier, Icy Assassin, Fendeep
    Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
    Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
    a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
@@ -948,7 +948,7 @@ line blocks.
    card in your graveyard that hasn't been chosen" (Rejoin the Fight); "if that spell is countered this way, exile it
    ..., then you may cast it without paying its mana cost" (Transcendent Dragon), "you may play it without paying its
    mana cost for as long as it remains exiled" (Spelljack, Kheru Spellsnatcher); "cast target instant or sorcery card
-   from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,737 of 31,936 with round 210).
+   from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
    Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
    The Kenriths' Royal Funeral (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
    creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
@@ -973,8 +973,8 @@ line blocks.
    Alchemy, Armed with Proof, Dan Lewis) and "artifacts you control are Clues / Foods in addition to their other types"
    (Senator Peacock, Ragost, Gourmand's Talent); "{B}, Reveal this card from your hand" with prey counters, with a
    browser test (Tetzimoc); "you may exile it. You may play that card from exile this turn" (Norin); "each opponent's
-   maximum hand size is equal to seven minus the number of those card types" (Winter, Misanthropic Guide). +24 (27,761
-   of 31,936 with round 211).
+   maximum hand size is equal to seven minus the number of those card types" (Winter, Misanthropic Guide). +24 (27,867
+   of 31,936 with rounds 210, 211 and B40 to B43).
    Out after round 212 (looked at, not done): Sheltering Ancient (cumulative upkeep putting a counter on an opponent's
    creature); Power Sink ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
    Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
@@ -2833,16 +2833,83 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lumengrid Augur and Desecrator Hag (what the chosen or discarded card was), Canker Abomination (counters for the
   chosen opponent's creatures), Drake Familiar ("unless you return an enchantment"), Cabal Slaver ("Whenever a Goblin
   deals combat damage to a player"), Aven Warcraft (threshold choice of a color).
-- Next for Lane B, least played first (up from about 21,900): Fickle Efreet, Bill Ferny, Bullseye, Rayami, Boom
-  Scholar, Hypnox, Hankyu, The Abyss, Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
+- Round B40 (harder skipped cards, least played first): "draw N cards, then discard one of them" picks only among the
+  cards just drawn (Soldevi Sage, Casting of Bones, Krovikan Sorcerer; browser test), "discard any number of creature
+  cards ... for each card discarded this way" (Mind Maggots), "if you discard a creature card this way ... that card's
+  power" (Cragganwick Cremator), Reviving Vapors ("that card's mana value"), "As ~ enters, discard your hand"
+  (Heightened Awareness), "Sacrifice an artifact or another creature" as a cost (Malevolent Noble), "a land card of each
+  basic land type" (Gaea's Balance), rhystic payments: "unless ... pays {2}. If they do, ..." (Rhystic Lightning),
+  "Then if any player pays {2}" (Rhystic Scrying), "unless any player pays {X}" (Soul Strings); "the number of Islands
+  tapped this way" (Monsoon), "each of those creatures with flying" (Winter Blast), "gets an additional" after kicker
+  (Tribute to Urborg), morbid "instead that player reveals their hand, you choose two cards" (Gruesome Discovery),
+  "Whenever you cast an Aura spell that targets ~" (Druid of Horns), "at end of combat, sacrifice it and it deals 5
+  damage to you" (Time Elemental), "return it and ~ to their owners' hands at end of combat" (Contempt), "exile all
+  cards from target opponent's hand" (Hypnox). +20 (27,712 of 31,936 with round 209).
+- Out after round B40: Erosion, Insubordination and Aggression (the enchanted creature is locked in as the upkeep
+  trigger triggers, rulings), Bramble Elemental (no "becomes attached" event), Hipparion (a cost to block), Agonizing
+  Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),
+  Fickle Efreet ("an opponent gains control of ~" after a lost coin flip), The Abyss (the active player chooses the
+  target), Retribution, Barrin's Spite, Vicious Betrayal, Sacred Guide, Scrounge.
+- Round B41 (harder skipped cards, least played first): "Whenever you activate an exhaust ability" (Afterburner
+  Expert, Adrenaline Jockey, Rangers' Aetherhive, Rangers' Refueler), "Exhaust abilities you activate cost {1} less"
+  (Boom Scholar), "Whenever you activate ~'s outlast ability" (Herald of Anafenza), "if it had no time counters on it"
+  as it dies (Deadly Grub, Chronozoa, Lost Auramancers), "each player who controls the most lands" (Tectonic Hellion),
+  "each player other than target player" (Death by Dragons), "Loyalty abilities ... cost {1} more" (Eidolon of
+  Obstruction), graveyard triggers "if ~ is in your graveyard, you may (pay ...) return it / put it on top of your
+  library" (Pyrewild Shaman, Moss-Pit Skeleton, Dungeon Crawler, Auntie's Snitch, Blood Operative), "you may have her
+  deal 2 damage to you. When you do" (Elektra), "That artifact deals damage equal to its mana value to ~" as it last
+  existed (Goblin Tinkerer), "During your turn, ~ is a Bear with base power and toughness 4/2" (Circle of the Moon
+  Druid), "can't attack if there's another creature on the battlefield" (Shauku), "put that permanent on the
+  bottom of its owner's library instead" after kicker (Rona's Vortex), "If that permanent is black, exile it instead"
+  of phasing out (Divine Smite), Heated Argument, Monoist Circuit-Feeder, "return it ... and it loses all abilities"
+  (Retched Wretch), Sudden Reclamation, Mind Bomb (each player discards up to three), Renounce ("sacrifice any number
+  of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
+- Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
+  Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst, Sivvi's Valor, Treacherous Link,
+  Kitesail Skirmisher, Bill Ferny, Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
+- Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
+  hand ... If you revealed a Dragon card or controlled a Dragon as you cast this spell" cycle (Draconic Roar,
+  Dragonlord's Prerogative, Foul-Tongue Invocation, Orator of Ojutai, Silumgar's Scorn, Scaleguard Sentinels; control
+  is checked as the cast finishes, and a copy keeps the bonus only for a revealed card, rulings; the reveal offer is
+  skipped while you control a Dragon; browser test), "you may pay {1}{G} any number of times" (Taste of Paradise;
+  browser test), "the second spell cast this turn" (Second Guess), "damage to target spell's controller equal to that
+  spell's mana value" (Parallectric Feedback, Refuse // Cooperate), "with an additional -1/-1 counter on it" (Pyrrhic
+  Revival), "an artifact creature and a nonartifact creature" (Perilous Predicament), Metallic Mastery, "If a nonred
+  permanent is dealt damage this way" (Redcap Melee), Prophecy, False Memories, "a card with disturb" (Shipwreck
+  Sifters, Phantom Carriage), "Enchanted creature's controller can't cast creature spells" (Brand of Ill Omen; bots aim
+  it at an opponent's creature), "Creatures blocking or blocked by ~ have lifelink" (Alms Beast), "cards in your hand
+  minus the number of cards in that player's hand" (Bulwark), "for each Cave you control and each Cave card in your
+  graveyard" (Gargantuan Leech; Machinist's Dismissal, not Commander-legal, compiles with it too), Anthroplasm, Rock
+  Jockey, "When you play a card" (Juju Bubble), Coral Fighters. +26 (27,792 of 31,936 with rounds 209 and 210 and B40).
+- Out after round B42: Visions (looking at another player's library needs a viewer), Primordial Ooze ("you may pay
+  {X}, where X is ...; If you don't"), Dragon's Fire (reveal a Dragon card or choose a Dragon you control: the damage
+  is that Dragon's power), Lichenthrope and Phytohydra (damage replaced by counters, not prevented), Tobias,
+  Whipkeeper, Rag Man, Howling Galefang, Swift Reckoning, Sewer Crocodile, Primitive Justice (each needs a new
+  mechanic or a new prompt).
+- Round B43 (harder skipped cards, least played first): colored and conditional cost cuts ("costs {2}{U} less if",
+  "costs {U} less if an opponent cast two or more spells", "during your end step", "if it targets a creature card with
+  mana value 3 or less" from a graveyard: Stormwing Entity, Ertai's Scorn, Closing Statement, Revoke Demise, No One
+  Left Behind), "if you cycled two or more cards this turn" and "a card with a cycling ability" (Spellpyre Phoenix,
+  Rooting Moloch), "if ~ is in your graveyard or on the battlefield" (Firemane Angel; one trigger per zone, and the
+  card that moves between them doesn't count, rulings), "When ~ is put into your hand from your graveyard" (Golgari
+  Brownscale, CR 113.6k), "Whenever a permanent is put into an opponent's graveyard" (Patron of the Nezumi), "Players
+  can't search libraries this turn" (Shadow of Doubt), "return ... attached to this creature" (Magnetic Snuffler),
+  "if the sacrificed creature was red / a Saproling was sacrificed this way" (Lyzolda, Thallid Omnivore), "Sacrifice a
+  creature. ... equal to that creature's power" (Rupture), spell mastery returns and digs (Necromantic Summons, Gather
+  the Pack), the Empires trio (Throne, Scepter, Crown), Destroy the Evidence, Oathsworn Knight, Relic Amulet, Seeds of
+  Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,843 of
+  31,936 with rounds 209 to 211 and B40-B42).
+- Out after round B43: Cinderheart Giant (damage to a creature chosen at random, not targeted), Torment of Venom and
+  Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
+  hand this way" after a search or a fixed-count reveal, not parsed yet).
+- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
-  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
-  (each player discards up to three). Then the unsupported ones above that, least played first
+  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond
-  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
+  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from

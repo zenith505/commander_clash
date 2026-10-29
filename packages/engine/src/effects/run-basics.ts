@@ -168,7 +168,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const all = [...parts(e.to), ...(e.also ?? []).flatMap((to) => parts(to).map((x) => (alsoN === undefined ? x : { ...x, n: alsoN })))];
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
       const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : [];
-      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target, e.by.lastKnown) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable || (e.unpreventableX !== undefined && (ctx.x ?? 0) >= e.unpreventableX) ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -883,9 +883,14 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
  * Surge, Fiendlash).
  */
 /** A target permanent that deals the damage itself, while it's still a legal target (CR 608.2b). */
-function targetSource(s: GameState, ctx: ResolveCtx, index: number): DamageSource | undefined {
+function targetSource(s: GameState, ctx: ResolveCtx, index: number, lastKnown?: true): DamageSource | undefined {
   const o = ctx.legal[index] ? objects(s, { ref: "target", index }, ctx)[0] : undefined;
-  return o?.zone === "battlefield" ? objectSource(s, o) : undefined;
+  if (o?.zone === "battlefield") return objectSource(s, o);
+  // Moved off the battlefield by this resolution, on its last move: as it last existed there (CR 608.2h).
+  const lk = lastKnown && o ? s.lastKnown?.[o.id] : undefined;
+  if (!o || !lk || lk.zc !== (o.zoneChanges ?? 0) - 1) return undefined;
+  const ref = { object: o.id, zc: lk.zc };
+  return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o), lk.controller, ref);
 }
 
 /**

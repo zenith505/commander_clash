@@ -4890,6 +4890,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "843af5d3-447e-40e4-a562-f5a7ed09ca3e",
+  "name": "Draconic Roar",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may reveal a Dragon card from your hand.\nDraconic Roar deals 3 damage to target creature. If you revealed a Dragon card or controlled a Dragon as you cast this spell, Draconic Roar deals 3 damage to that creature's controller.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3e5d3574-cc92-434a-a210-fcda906391c8",
   "name": "Dragon's Disciple",
   "manaCost": "{1}{W}",
@@ -16822,6 +16848,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1f612df3-53b6-4317-9d63-1f903ee3f0c4",
+  "name": "Soldevi Sage",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{T}, Sacrifice two lands: Draw three cards, then discard one of them.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dcb9c2a7-ae54-4ddc-a567-640bf4bf4366",
   "name": "Solitude",
   "manaCost": "{3}{W}{W}",
@@ -18014,6 +18071,32 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c9a20d03-b90a-43df-8ab4-ff0b38c90a08",
+  "name": "Taste of Paradise",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may pay {1}{G} any number of times.\nYou gain 3 life plus an additional 3 life for each additional {1}{G} you paid.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

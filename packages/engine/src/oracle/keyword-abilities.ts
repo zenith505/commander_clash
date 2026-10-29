@@ -543,6 +543,7 @@ export function parseCostKeyword(
         sorcerySpeed: true,
         body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "Put a +1/+1 counter on ~." },
         text: `Outlast ${cost}`,
+        outlast: true,
       },
     };
   }

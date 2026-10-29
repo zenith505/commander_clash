@@ -434,6 +434,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && b?.ref === "target" && !a.n && !b.n ? [{ type: "bite", a, b, times: 2 }] : null;
   }
+  // Goblin Tinkerer: "Destroy target artifact. That artifact deals damage equal to its mana value to ~": from the artifact
+  // as it last existed on the battlefield (CR 608.2h), destroyed or not (an indestructible one is still there).
+  if (/^That artifact deals damage equal to its mana value to ~$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.lastObjectTarget === ctx.targets.length - 1) {
+    const spec = ctx.targets[ctx.lastObjectTarget]!;
+    if (spec.kind !== "object" || spec.many || spec.types?.join() !== "Artifact") return null;
+    const a = { ref: "target" as const, index: ctx.lastObjectTarget };
+    return [{ type: "damage", amount: { count: { kind: "manaValue", of: a } }, to: { ref: "self" }, by: { target: a.index, lastKnown: true } }];
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).
@@ -670,6 +678,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     for (let i = 0; i < num(m[1]!); i++) idx.push(addTarget(ctx, { ...base, optional: true, ...(idx.length ? { distinctFrom: [...idx] } : {}) }));
     return idx.map((index): Effect => ({ type: "counterSpell", index }));
   }
+  // Parallectric Feedback: "~ deals damage to target spell's controller equal to that spell's mana value": its mana value
+  // with the X chosen for it (CR 202.3e), and the spell stays on the stack.
+  if (/^~ deals damage to target spell's controller equal to that spell's mana value$/.test(s)) {
+    const index = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell" });
+    return [{ type: "damage", amount: { count: { kind: "manaValue", of: { ref: "target", index } } }, to: { ref: "targetController", index } }];
+  }
+  // Second Guess: "Counter target spell that's the second spell cast this turn": the second cast by any player, as it was
+  // cast (CR 601.2i); a copy wasn't cast (CR 707.10).
+  if (/^Counter target spell that's the second spell cast this turn$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", castNth: 1, text: "target spell that's the second spell cast this turn" }) }];
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   // Unified Will: "Counter target spell if you control more creatures than that spell's controller": counted as it resolves
   // (CR 608.2c); a spell of yours is never countered by it.

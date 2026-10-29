@@ -411,7 +411,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield", thisTurn: true, intoYourGraveyard: true }] : null;
   }
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
-  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|up to (?:seven|eight|nine|ten) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|up to (?:seven|eight|nine|ten) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|that artifact|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
     if (!what) return null;
     // "Create a token that's a copy of it .... Then exile all other Nightmare tokens you control" (Abyssal Harvester): other
@@ -489,6 +489,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "exileIfDies", what }] : null;
   }
   if (/^If a creature would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn" }];
+  // Shadow of Doubt: effects that use the word "search" do nothing this turn; "then shuffle" still shuffles (rulings).
+  if (/^Players can't search libraries this turn$/.test(s)) return [{ type: "noSearchThisTurn" }];
   // "Return target creature card from your graveyard to the battlefield. ... If it would leave the battlefield, exile it
   // instead of putting it anywhere else." (Whip of Erebos): a replacement effect for as long as it's that permanent (CR
   // 614.1a, 400.7), from the resolved ability, so it doesn't go away if the permanent loses its abilities.
@@ -1134,7 +1136,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
   // Jet's Brainwashing: "If ~ was kicked, gain control of that creature until end of turn": the target before.
-  if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && ctx.spell) {
+  // Crown of Empires: "Tap target creature. Gain control of that creature instead if ...": an activated ability's target the
+  // same way, for good (CR 611.2a).
+  if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && (ctx.spell || ctx.activated)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }

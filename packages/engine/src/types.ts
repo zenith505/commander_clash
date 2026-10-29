@@ -483,6 +483,8 @@ export interface GameObject {
   tapsThisTurn?: { turn: number; zc: number; n: number };
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
+  /** With `kicked`: a Dragons of Tarkir spell's "controlled a Dragon as you cast it", which a copy doesn't get (rulings). */
+  kickedByControl?: true;
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
   /** How many Phyrexian symbols of its cost its caster paid with life (compleated, CR 702.150a); kept as it enters. */
@@ -916,6 +918,8 @@ export interface StackItem {
   asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
+  /** The `kicked` is a Dragons of Tarkir spell's "controlled a Dragon as you cast it": not copied (rulings). */
+  kickedByControl?: true;
   /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
   colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
@@ -1094,6 +1098,8 @@ export interface LastKnown {
   suspected?: true;
   /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
   legendary?: true;
+  /** Its colors as it last existed: "if the sacrificed creature was red" (Lyzolda). */
+  colors?: Color[];
   /** It was a commander: "if the sacrificed permanent was a commander" (Tevesh Szat, CR 903.3). */
   commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
@@ -1246,7 +1252,7 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ among?: ObjectId[] }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
@@ -1767,6 +1773,8 @@ export interface GameState {
   damagedThisTurn?: PlayerId[];
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): the turn it applies in (CR 614.1a). */
   exileDyingTurn?: number;
+  /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */
+  noSearchTurn?: number;
   /** How much damage each player was dealt this turn (Spinerock Knoll). */
   damageThisTurn?: Record<number, number>;
   /** What the Traps' "this turn" conditions look back at (StaticCondition opponentSearched and the rest); cleared each turn. */
@@ -2169,6 +2177,8 @@ export interface Resolving {
   digTook?: boolean;
   /** How many cards its last look at the top of a library put into a hand (Count "dugToHand"). */
   dugToHand?: number;
+  /** The cards it put there (Count "dugToHandMv"). */
+  dugToHandCards?: ObjectId[];
   /** The cards its last search found (SpellCondition searchFound). */
   searchFound?: ObjectId[];
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */

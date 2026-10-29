@@ -278,7 +278,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -974,6 +974,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCompleteDungeon", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+    // Dungeon Crawler: "Whenever you complete a dungeon, you may return this card from your graveyard to your hand."
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e) => e === "youCompleteDungeon", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player }));
   } else if (ev.type === "landPlayed") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1175,6 +1177,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "Whenever a -1/-1 counter is put on a creature" (Flourishing Defenses): once for each counter.
       for (let i = 0; i < ev.amount; i++) add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, { amount: 1 });
     }
+    // Moss-Pit Skeleton: "Whenever one or more +1/+1 counters are put on a creature you control, if this card is in your
+    // graveyard, ...": only if it's there already (rulings), its owner controlling the ability (CR 113.8).
+    if (o.zone === "battlefield") fromGraveyards((w, owner) => add(w, owner, (e, t) => e === "permanentCountersPut" && !t.countersEach && !t.countersFirstTime && kindOk(t, owner) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, owner, false), undefined, undefined, o, undefined, undefined, undefined, info));
   } else if (ev.type === "playerCountersPut") {
     // "Whenever you put one or more counters on a permanent or player" (All Will Be One): "that much" is how many.
     const info = { amount: ev.amount, player: ev.player };
@@ -1824,7 +1829,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
       const o = s.objects[id];
-      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "selfTargetedByYourSpell", undefined, ev.stackId);
+      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e, t) => e === "selfTargetedByYourSpell" && (!t.heroicSpell || (item ? spellMatches(s, t.heroicSpell, item) : printedMatches(t.heroicSpell, ev.card))), undefined, ev.stackId);
     }
     causedBy = null;
   } else if (ev.type === "targeted") {
@@ -1970,7 +1975,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
+        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
+        // Herald of Anafenza: "Whenever you activate ~'s outlast ability": this object's own.
+        if (a.ownOutlast && (!ev.outlast || ev.source?.snapshot.id !== o.id || (ev.source.snapshot.zoneChanges ?? 0) !== (o.zoneChanges ?? 0))) return false;
         if (a.equipped) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;
@@ -1978,6 +1985,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
       }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+    // Afterburner Expert: "Whenever you activate an exhaust ability, return this card from your graveyard ...".
+    if (ev.exhaust) fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e, t) => e === "abilityActivated" && !!t.activates?.exhaust && t.activates.by === "you", undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
   } else if (ev.type === "searchedLibrary") {
     // Archivist of Oghma: it waits until the search's spell or ability has resolved, like any trigger (rulings).
     for (const id of s.battlefield) {
@@ -2057,6 +2066,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = s.objects[m.id];
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
       batchWatch(w, m.controller!, withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, true);
+    }
+    // Golgari Brownscale: "When ~ is put into your hand from your graveyard": the card's ability, in the hand, under its
+    // owner's control (CR 113.8), the same object that arrived.
+    for (const m of ev.moves) {
+      const card = s.objects[m.id];
+      if (m.from === "graveyard" && m.to === "hand" && !m.notCard && card?.zone === "hand" && (card.zoneChanges ?? 0) === m.zc) add(card, card.owner, (e) => e === "selfToHandFromGraveyard", compileCard(defOf(s, card)).triggers);
     }
     // "For the first time each turn" looks at the events before this one.
     const discards = new Map<PlayerId, string[]>();

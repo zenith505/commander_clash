@@ -138,6 +138,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Alms Beast: "Creatures blocking or blocked by ~ have lifelink": while they're in combat with it.
+  if ((m = /^Creatures blocking or blocked by ~ (have|get) (.+)$/.exec(text))) {
+    const mods = parseStaticMods(`${m[1]} ${m[2]}`);
+    return mods ? { affects: { kind: "inCombatWithSelf" }, mods, text: line } : null;
+  }
   // Sting, the Glinting Dagger: "Equipped creature has first strike as long as it's blocking or blocked by a Goblin or Orc":
   // blocking one or blocked by one (CR 509.1g-h); one removed from combat no longer counts (CR 506.4).
   if ((m = /^Equipped creature has ([a-z ]+) as long as it's blocking or blocked by an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && [m[2], m[3]].every((x) => !x || CREATURE_TYPES.has(x))) {
@@ -285,6 +290,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Wirecat: "~ can't attack or block if an enchantment is on the battlefield"; Branded Brawlers: "~ can't block if you
   // control an untapped land": the restriction applies while that's so.
   else if ((m = /^(~ can't (?:attack or block|attack|block)) if (an? [^,]+ is on the battlefield|you control (?!more )[^,]+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Shauku, Endbringer: "~ can't attack if there's another creature on the battlefield": anyone's but its own.
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) if there's (another [a-z]+) on the battlefield$/.exec(text))) [statement, cond] = [m[1], `${m[2]} is on the battlefield`];
   // Glacial Crasher: "~ can't attack unless there is a Mountain on the battlefield": anyone's (rulings).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless there is (an? [^,]+) on the battlefield$/.exec(text))) [statement, cond] = [m[1], `no ${m[2]!.replace(/^an? /, "").replace(/(?<!s)$/, "s")} are on the battlefield`];
   // Monstrous Hound: "~ can't block unless you control more lands than attacking player": the active player, the only
@@ -337,6 +344,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseBecomes(artifactCreature[1]!);
     if (!mods || mods.some((x) => x.kind === "setColors")) return null;
     const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
+  // Circle of the Moon Druid: "During your turn, ~ is a Bear with base power and toughness 4/2": a Bear instead of its
+  // other creature types (CR 205.1b, the reminder text says so), with that base power and toughness (layers 4 and 7b).
+  const typedBase = /^~ is an? ([A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)$/.exec(statement);
+  if (typedBase && CREATURE_TYPES.has(typedBase[1]!)) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setSubtypes", subtypes: [typedBase[1]!] }, { kind: "setPT", power: Number(typedBase[2]), toughness: Number(typedBase[3]) }], text: line };
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
@@ -504,6 +519,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
   }
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
+    // Revoke Demise: "... if it targets a creature card with mana value 3 or less": a card in a graveyard (its printed
+    // characteristics, CR 109.2a).
+    const card = /^an? (.+? card\b.*)$/.exec(m[2]!);
+    if (card && !/ from /.test(card[1]!)) {
+      const f = parseTargetPhrase(`${card[1]} from a graveyard`);
+      return f?.kind === "card" ? { lessIfTargets: { n: Number(m[1]), filter: f } } : "fail";
+    }
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     // "If it targets a blue spell" (Mystical Dispute), "a creature spell" (Out of Air): a spell on the stack.
     return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
@@ -549,10 +571,20 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return { lessIf: { n: m[3] === "more" ? -n : n, cond: { kind: "yourTurn", ...(m[1] === "your turn" ? {} : { not: true as const }) }, ...(colored.length ? { colored } : {}) } };
   }
   // "As long as" reads the same as "if" here (Drag to the Roots): checked as the cost is determined (CR 601.2f).
+  // Closing Statement: "~ costs {2} less to cast during your end step": the same, checked as it's cast.
+  if ((m = /^~ costs \{(\d+)\} less to cast during your end step$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "phase", phase: "end", yours: true } } };
   if ((m = /^~ costs \{(\d+)\} less to cast (?:if|as long as) (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
     const [n, condText] = /^~/.test(text) ? [m[1]!, m[2]!] : [m[2]!, m[1]!];
     const cond = parseStaticCondition(condText, self);
     return cond ? { lessIf: { n: Number(n), cond } } : "fail";
+  }
+  // Stormwing Entity: "~ costs {2}{U} less to cast if you've cast an instant or sorcery spell this turn": a colored
+  // reduction takes off that colored mana too (CR 601.2f), as Discontinuity's.
+  if ((m = /^~ costs ((?:\{\d+\})?(?:\{[WUBRG]\})+) less to cast if (.+)$/.exec(text))) {
+    const n = Number(/\{(\d+)\}/.exec(m[1]!)?.[1] ?? 0);
+    const colored = [...m[1]!.matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
+    const cond = parseStaticCondition(m[2]!, self);
+    return cond ? { lessIf: { n, cond, colored } } : "fail";
   }
   // "Spells with the chosen name cost {3} more to cast" (Disruptor Flute), "Spells your opponents cast with the chosen name
   // ..." (Anointed Peacekeeper), "... you cast cost {2} less" (Council of the Absolute), "Spells with the chosen name
@@ -1165,6 +1197,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^a player was dealt combat damage by an? ([A-Z][a-z]+) this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature") return { kind: "playerCombatDamaged", subtype: m[1]! };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
+  // Lictor: "if a creature entered the battlefield under an opponent's control this turn": the same as "an opponent had a
+  // creature enter the battlefield under their control this turn".
+  if ((m = /^an? (artifact|creature|land|enchantment|planeswalker) entered the battlefield under an opponent's control this turn$/.exec(text))) return { kind: "opponentEntered", types: [capital(m[1]!)], n: 1 };
   if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))
     return { kind: "opponentEntered", types: [capital(m[3]!)], ...(m[2] ? { color: COLOR_WORDS[m[2]]! } : {}), n: m[1] ? num(m[1]) : 1 };
   if ((m = new RegExp(`^(?:you had )?(?:an?|(another)|${NUM} or more) (nonland permanent|permanent|artifact|creature|land|enchantment|planeswalker|[A-Z][a-z]+)s? (?:entered|enter) (?:the battlefield )?under your control this turn$`).exec(text))) {
@@ -1191,6 +1226,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
   if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
+  if ((m = new RegExp(`^you cycled ${NUM} or more cards this turn$`).exec(text))) return { kind: "cycled", n: num(m[1]!) };
   // "If a permanent you controlled left the battlefield this turn" (Pegasus Guardian): the same (revolt).
   if (/^a permanent (?:left the battlefield under your control|you controlled left the battlefield) this turn$/.test(text)) return { kind: "revolt" };
   if (/^a creature left the battlefield under your control this turn$/.test(text)) return { kind: "revolt", creature: true };
@@ -1241,6 +1277,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Pious Kitsune: "if a creature named Eight-and-a-Half-Tails is on the battlefield": anyone's, by its name (CR 201.2).
   if ((m = /^an? (creature|permanent) named ([A-Z][^,~]*) is on the battlefield$/.exec(text)))
     return { kind: "onBattlefield", filter: { kind: "object", types: m[1] === "creature" ? ["Creature"] : [], notTypes: [], notColors: [], named: m[2]!, text: `${m[1]} named ${m[2]}` }, min: 1 };
+  // Shauku, Endbringer: "if there's another creature on the battlefield": anyone's, not counting ~.
+  if ((m = /^another ([a-z]+) is on the battlefield$/.exec(text))) {
+    const g = parseGroup(`all ${m[1]}s`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1, other: true } : null;
+  }
   if ((m = /^an? (.+) is on the battlefield$/.exec(text.replace(/^any player controls (an? [a-z]+ permanent)$/, "$1 is on the battlefield")))) {
     const g = parseGroup(`all ${m[1]}s`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;
@@ -1355,7 +1396,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Liu Bei, Lord of Shu: "as long as you control a permanent named Guan Yu, Sainted Warrior or a permanent named Zhang Fei,
   // Fierce Warrior"; Rufus Shinra: "if you don't control a creature named Darkstar": by name (CR 201.2), any of them.
   // Mine Worker: "if you control creatures named Power Plant Worker and Tower Worker": one of each.
-  if ((m = /^you control (creature|permanent)s named ([^~]+?) and ([^~]+)$/.exec(text)) && !/ named /.test(m[2]! + m[3]!)) text = `you control a ${m[1]} named ${m[2]} and a ${m[1]} named ${m[3]}`;
+  // Throne of Empires: "if you control artifacts named Crown of Empires and Scepter of Empires", the same, artifacts as it
+  // resolves (rulings).
+  if ((m = /^you control (creature|permanent|artifact)s named ([^~]+?) and ([^~]+)$/.exec(text)) && !/ named /.test(m[2]! + m[3]!)) text = `you control ${m[1] === "artifact" ? "an" : "a"} ${m[1]} named ${m[2]} and ${m[1] === "artifact" ? "an" : "a"} ${m[1]} named ${m[3]}`;
   if ((m = /^you (don't )?control an? (permanent|creature|land|artifact) named ([^~]+?)(?: (or|and) an? \2 named ([^~]+))?$/.exec(text))) {
     if (m[1] && m[4] === "and") return null;
     const type = m[2] === "permanent" ? [] : [capital(m[2]!)];

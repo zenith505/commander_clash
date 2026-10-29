@@ -230,12 +230,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src, ctx.controller);
       return;
     case "tap":
-    case "untap":
+    case "untap": {
+      let tapped = 0;
       for (const o of objects(s, e.what, ctx)) {
-        if (e.type === "tap") tapPermanent(s, o);
-        else untapPermanent(s, o);
+        if (e.type === "untap") untapPermanent(s, o);
+        else if (!o.tapped) {
+          tapPermanent(s, o);
+          if (o.tapped) tapped++;
+        }
       }
+      if (e.type === "tap" && e.noteTapped) s.resolving!.tappedThisWay = tapped;
       return;
+    }
     case "harness": {
       // "Harness ~" (CR 701.64a): the same object only (CR 400.7); it stays harnessed until it leaves (701.64b).
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

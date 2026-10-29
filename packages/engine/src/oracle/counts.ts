@@ -445,6 +445,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
   // Search for Blex: "You lose 3 life for each card you put into your hand this way", after its look at the top cards.
   if (ctx?.dugToHand && each && /^card you put into your hand this way$/.test(p)) return { count: { kind: "dugToHand" } };
+  // Reviving Vapors: "put one of them into your hand. You gain life equal to that card's mana value."
+  if (ctx?.dugOneToHand && /^that card's mana value$/.test(p)) return { count: { kind: "dugToHandMv" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
   if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
   // The Master of Lake-town: "for each graveyard with seven or more cards in it": each player's graveyard (CR 404.1), of
@@ -552,6 +554,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "handMoreThanYou", who });
   }
+  // Bulwark: "the number of cards in your hand minus the number of cards in that player's hand": the other way round, 0 if
+  // that's less (CR 107.1b).
+  if ((m = /^(?:the number of )?cards in your hand minus the number of cards in (that player's|target opponent's|target player's|defending player's) hand$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "handMoreThanYou", who, yoursMinus: true });
+  }
   // Enemy of Enlightenment: "for each card in your opponents' hands": all of them together.
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });
   // Realm Seekers: "the total number of cards in all players' hands", every player's added up.
@@ -594,6 +602,16 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!kinds) return count({ kind: "cardsInGraveyard", who });
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who, filter: { ...spec, text: `${kinds} card` } }) : null;
+  }
+  // Roiling Terrain: "the number of land cards in that land's controller's graveyard": the target's controller, as it last
+  // existed if it's gone.
+  if (ctx && (m = /^(.*?)cards? in that (land|creature|permanent)'s controller's graveyard$/i.exec(p))) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    const kinds = m[1]!.trim();
+    const spec = kinds ? (/^[a-z]+$/.test(kinds) ? parseTargetPhrase(`${kinds} card from a graveyard`, { chosen: true }) : null) : undefined;
+    if (t?.kind !== "object" || t.many || t.optional || (m[2] !== "permanent" && !t.types?.includes(capital(m[2]!))) || spec === null || (spec && spec.kind !== "card")) return null;
+    return count({ kind: "cardsInGraveyard", who: { ref: "targetController", index: i }, ...(spec ? { filter: { ...spec, text: `${kinds} card` } } : {}) });
   }
   // Death's Approach: "Enchanted creature gets -X/-X, where X is the number of creature cards in its controller's
   // graveyard": a static ability's, counted for the permanent it affects (whoever controls it now).

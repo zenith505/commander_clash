@@ -374,7 +374,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const all = player(s, pid).hand;
         // Hint of Insanity: only those sharing a name with another card in that hand.
         const twice = (id: ObjectId) => !e.nameTwice || all.some((x) => x !== id && sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name));
-        const hand = all.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && twice(id));
+        // Soldevi Sage: only the cards just drawn, those still in that hand.
+        const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []) : undefined;
+        const hand = all.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && twice(id) && (!drawn || drawn.includes(id)));
         if (e.downToFewest) {
           if (hand.length > fewest && fewest > 0) {
             s.pending = { kind: "discard", player: pid, count: hand.length - fewest, source: src };
@@ -401,7 +403,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           continue;
         }
         if (!e.hand && hand.length > n) {
-          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
+          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}), ...(drawn ? { among: hand } : {}) };
           return "paused";
         }
         sc.chosen![pid] = [...hand]; // no choice to make: the whole hand (all the cards that match)
@@ -1511,7 +1513,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
       r.digTook = found.length > 0;
-      if (e.into === "hand") r.dugToHand = found.length;
+      if (e.into === "hand") {
+        r.dugToHand = found.length;
+        r.dugToHandCards = [...found];
+      }
       enterTogether(s, () => {
         for (const id of found) {
           if (e.into === "hand") moveObject(s, id, "hand");
@@ -1717,6 +1722,8 @@ export function searchBarred(s: GameState, pid: PlayerId): boolean {
 
 /** Stranglehold: an opponent's permanent keeps this player from searching any library; Mindlock Orb, anyone's. */
 export function cantSearch(s: GameState, pid: PlayerId): boolean {
+  // Shadow of Doubt: "Players can't search libraries this turn."
+  if (s.noSearchTurn === s.turn) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);

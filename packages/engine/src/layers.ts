@@ -621,6 +621,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   switch (cond.kind) {
     case "selfInExile": // Senu's intervening if (CR 603.4): the same object, face up in its owner's exile
       return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
+    case "selfStill":
+      return src.zone === cond.zone && (cond.zone === "battlefield" || src.owner === you) && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
     case "selfInCommand":
@@ -1075,6 +1077,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       };
       return cond.opponent ? s.turnOrder.some((p) => p !== you && drew(p)) : drew(you);
     }
+    case "cycled":
+      return (s.turnLog?.cycled?.[you] ?? 0) >= cond.n;
     case "descended":
       return (s.descendedThisTurn ?? []).includes(you);
     case "revolt":
@@ -1260,6 +1264,12 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   if (a.kind === "paired") {
     const other = pairedWith(s, s.objects[e.sourceId!]!);
     return other && chars.has(other.id) ? [e.sourceId!, other.id] : [];
+  }
+  if (a.kind === "inCombatWithSelf") {
+    // Blocking it, or attacking and blocked by it, while both are in combat (CR 509.1h, 506.4).
+    const me = s.objects[e.sourceId!];
+    if (!me || me.zone !== "battlefield") return [];
+    return s.battlefield.filter((id) => chars.has(id) && ((s.objects[id]!.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(id) && s.objects[id]!.attacking !== undefined)));
   }
   const you = controllerOfInst(e, chars);
   const out: ObjectId[] = [];

@@ -145,6 +145,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const selfIf = pickFilter(c[2]!);
       if (!filter || !selfIf) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });
+    } else if ((c = /^Sacrifice an? (artifact|enchantment|land) or another (creature)$/.exec(part))) {
+      // Malevolent Noble: "Sacrifice an artifact or another creature": the same the other way round, this permanent only
+      // if it's an artifact.
+      const filter = pickFilter(`${c[1]} or ${c[2]}`);
+      const selfIf = pickFilter(c[1]!);
+      if (!filter || !selfIf) return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or another ${c[2]}` }, n: 1, other: true, selfIf });
     } else if ((c = new RegExp(`^Sacrifice ${NUM} (.+) with different names$`).exec(part)) && num(c[1]!) > 1) {
       // Transmutation Font: "three artifact tokens with different names", each name once (a face-down permanent has none,
       // CR 708.2, so it shares none).
@@ -269,6 +276,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let effectText = tapAttached ? m[2]!.replace(/\bother than the creature tapped this way\b/, "other than enchanted creature") : m[2]!;
   // Painbringer: the X its cost announced (see above).
   if (/(?:^|, )Exile any number of cards from your graveyard(?=, |$)/.test(costs) && extra.some((c) => c.kind === "exileFromGraveyard" && c.x)) effectText = effectText.replace(/, where X is the number of cards exiled this way\.$/, ".");
+  // Relic Amulet: "Remove all charge counters from ~: It deals that much damage to target creature": as many as were
+  // removed, none if there were none (see StackItem.countersRemoved).
+  if (removeCounters?.all) effectText = effectText.replace(/^It deals that much damage to (target [a-z ]+)\.$/, "~ deals X damage to $1, where X is the number of counters removed this way.");
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast" || keyword === "Forecast";
   let maxPerTurn: number | undefined;

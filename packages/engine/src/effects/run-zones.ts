@@ -1934,7 +1934,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileHand": {
-      const p = player(s, ctx.controller);
+      const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (whose === undefined) return;
+      const p = player(s, whose);
       const ids = [...p.hand];
       for (const id of ids) {
         moveObject(s, id, "exile");
@@ -2090,7 +2092,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : e.flipped && s.cards[o.cardId]?.layout === "flip" && s.cards[o.cardId]!.faces?.length === 2 ? 1 : undefined);
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
       // Unfinished Business: the creature the instruction before returned, while it's still on the battlefield.
-      const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : undefined;
+      const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : e.attachToSource ? ((me) => (me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && objIsType(s, me, "Creature") ? me : undefined))(ctx.sourceId ? s.objects[ctx.sourceId] : undefined) : undefined;
       // "Put it onto the battlefield attacking" (Senu): only during combat, attacking what its controller chooses as it
       // enters (CR 508.4, rulings); outside combat it just enters (CR 506.3d).
       // Shark Shredder: "attacking that player", the trigger's player, if they're still in the game.
@@ -2102,7 +2104,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -2148,7 +2150,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host!.id });
             continue;
           }
-          if (e.attachToCreated) {
+          if (e.attachToCreated || e.attachToSource) {
             // An Aura only onto a creature it could enchant (CR 303.4d, 303.4f), otherwise it stays in the graveyard; an
             // Equipment that can't be attached to it (or with no creature returned) enters unattached (rulings, CR 301.5c).
             const aura = d.subtypes.includes("Aura");
@@ -2485,7 +2487,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // black Zombies ...". They are already that as they enter, before their enters abilities trigger (rulings on Chainer,
       // Dementia Master's like ability).
       enterTogether(s, () => {
-        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) }));
+        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id), ...(e.counters ? { counters: e.counters } : {}) }));
         const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.alsoMods && entered.length) {
           s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });
@@ -2833,6 +2835,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "exileDyingThisTurn":
       s.exileDyingTurn = s.turn;
       return;
+    case "noSearchThisTurn":
+      s.noSearchTurn = s.turn;
+      log(s, "Players can't search libraries this turn.");
+      return;
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield" && (!e.ifCreature || objIsType(s, o, "Creature"))) o.exileIfDiesTurn = s.turn;
       return;
@@ -2937,14 +2943,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // they controlled (CR 608.2h). A destroyed one counts even if it went somewhere other than a graveyard (rulings).
       const counts = new Map<PlayerId, number>();
       for (const x of s.resolving?.[e.which] ?? [])
-        if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + 1);
+        if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + (e.manaValue ? (x.o.faceDown ? 0 : defMv(defOf(s, x.o))) : 1));
       // A search pauses for its player's choice (Winds of Abandon): the players done so far are kept.
       const done = (s.resolving!.scratch ??= {}).forEachDone ?? [];
       s.resolving!.scratch.forEachDone = done;
       for (const pid of apnap(s, [...counts.keys()])) {
         if (player(s, pid).lost || done.includes(pid)) continue;
         const n = counts.get(pid)! * (e.times ?? 1);
-        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" || inner.type === "loseLife" ? { ...inner, n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
+        if (!n) continue;
+        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" || inner.type === "loseLife" || inner.type === "gainLife" ? { ...inner, n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
         done.push(pid);
         // The next player's search starts afresh (its queue, count and found cards are in the scratch).
         s.resolving!.scratch = { forEachDone: done };

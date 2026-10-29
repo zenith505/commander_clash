@@ -223,7 +223,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Sacrifice an artifact, a creature, and a land" (Tomb of Annihilation's Oubliette), "target player sacrifices an
   // artifact and a land of their choice": a different permanent for each (see the sacrificeEach effect).
-  if ((m = /^(?:(.+?) )?[Ss]acrifices? (an? \w+(?:, an? \w+)*,? and an? \w+)(?: of (?:their|his or her) choice)?$/.exec(s))) {
+  // Perilous Predicament: "an artifact creature and a nonartifact creature of their choice".
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? (an? \w+(?: creature)?(?:, an? \w+(?: creature)?)*,? and an? \w+(?: creature)?)(?: of (?:their|his or her) choice)?$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filters = m[2]!.split(/,? and |, /).map((x) => pickFilter(x.replace(/^an? /, "")));
     return who && filters.every(Boolean) ? [{ type: "sacrificeEach", who, filters: filters as TargetSpec[] }] : null;
@@ -676,6 +677,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // all graveyards under their owners' control.
   // "Each player returns all creature cards from their graveyard to the battlefield" (Twilight's Call), "... all creature
   // cards of a type chosen this way ..." (Patriarch's Bidding) likewise.
+  // Pyrrhic Revival: "... to the battlefield with an additional -1/-1 counter on it": each enters with one (CR 614.1c).
+  const withCounter = /^(Each player returns each creature card from their graveyard to the battlefield) with an additional (-1\/-1|\+1\/\+1) counter on it$/.exec(s);
+  if (withCounter) {
+    const fx = parseZonesSentence(withCounter[1]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "returnAllFromGraveyard") return null;
+    return [{ ...fx[0]!, counters: { [withCounter[2]!]: 1 } }];
+  }
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
   // Balthor the Defiled: "all black and all red creature cards": each card that is either.
   if (eachReturns) s = `Return all ${eachReturns[1]!.replace(/^(white|blue|black|red|green) and all (white|blue|black|red|green) creature$/, "$1 or $2 creature")} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
@@ -939,7 +947,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -957,6 +965,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Unfinished Business: "then return up to two target Aura and/or Equipment cards from your graveyard to the
     // battlefield attached to that creature": the creature card the instruction before returned (CR 400.7).
     const toThat = m[8] === " attached to that creature";
+    // Magnetic Snuffler: "return target Equipment card from your graveyard to the battlefield attached to ~": attached to
+    // the creature if it's still on the battlefield and could be equipped, else unattached (rulings).
+    const toSelf = m[8] === " attached to ~";
+    if (toSelf && !(spec?.subtypes?.length === 1 && spec.subtypes[0] === "Equipment" && !spec.types?.length && what?.ref === "target" && !what.n && ctx.selfIt)) return null;
     const before = ctx.targets[i - 1];
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
@@ -975,7 +987,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // "Tapped and attacking" (Alesha, Yore-Tiller Nephilim): attacking what its controller chooses (CR 508.4, rulings).
     const attacking = / and attacking$/.test(m[3] ?? "");
     if (attacking && (m[4] || attach)) return null;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toSelf ? { attachToSource: true as const } : toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it
@@ -1135,6 +1147,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
   if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
+  // Hypnox: "exile all cards from target opponent's hand": the same for that player's hand, face up (CR 406.3).
+  if ((m = /^[Ee]xile all cards from (target opponent|target player)'s hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileHand", who }] : null;
+  }
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one

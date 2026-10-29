@@ -167,6 +167,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (life) return { ref: "playersWithLife", n: Number(life[1]) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
+  if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
+  // Death by Dragons: "Each player other than target player creates ...".
+  if (x === "each player other than target player") {
+    const index = addTarget(ctx, { kind: "player", text: "target player" });
+    ctx.lastPlayerTarget = index;
+    return { ref: "otherThanTarget", index };
+  }
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
   // Bonder's Ornament: "Each player who controls a permanent named ~".
@@ -381,6 +388,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.tappedThisWay && /^each permanent tapped this way$/i.test(x)) return { ref: "tappedThisWay" };
   // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."
   if (/^each of those creatures you don't control$/i.test(x) && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, notYours: true };
+  // Winter Blast: "Tap X target creatures. ~ deals 2 damage to each of those creatures with flying."
+  const withKw = /^each of those creatures with (flying|reach|trample|haste)$/i.exec(x);
+  if (withKw && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: ["Creature"], keywords: [withKw[1]!.charAt(0).toUpperCase() + withKw[1]!.slice(1).toLowerCase()], text: `creature with ${withKw[1]!.toLowerCase()}` } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -1558,9 +1568,11 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if (inGraveyard && (m = /(?:^| )with (cycling(?= abilities$|$)|awaken$|foretell$|mutate$|flashback$|madness$)(?: abilities$)?/.exec(p))) {
+  } else if (inGraveyard && (m = /(?:^| )with (cycling(?: abilities)?|awaken|foretell|mutate|flashback|madness|disturb|a cycling ability)$/.exec(p))) {
     // Sacred Excavation: "cards with cycling from your graveyard": a card's printed keyword abilities, typecycling being
-    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Herald of the Forgotten: "with cycling abilities".
+    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Spellpyre Phoenix: "with a cycling ability", Herald
+    // of the Forgotten: "with cycling abilities", the same.
+    if (/cycling/.test(m[1]!)) m[1] = "cycling";
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
   } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {

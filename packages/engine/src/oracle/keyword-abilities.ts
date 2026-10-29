@@ -1145,6 +1145,21 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discard: n }, ward: true }], text: `Ward—Discard ${m[1]} card${n === 1 ? "" : "s"}: counter that spell or ability unless its controller discards ${m[1]} card${n === 1 ? "" : "s"}.` },
       });
+    } else if ((m = /^ward—discard (a|two) cards? at random\.?$/i.exec(p))) {
+      // "Ward—Discard a card at random" (Alpharael, Stonechosen): the cards are chosen at random as they pay (CR 701.9c).
+      const n = m[1] === "a" ? 1 : 2;
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discardRandom: n }, ward: true }], text: `Ward—Discard ${m[1]} card${n === 1 ? "" : "s"} at random: counter that spell or ability unless its controller discards ${m[1]} card${n === 1 ? "" : "s"} at random.` },
+      });
+    } else if ((m = new RegExp(`^ward—get ${NUM} poison counters?\\.?$`, "i").exec(p))) {
+      // "Ward—Get five poison counters" (The Serpent Society): any player can get poison counters, so they can always pay
+      // (CR 118.3, 122.1f).
+      const n = num(m[1]!.toLowerCase());
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", poison: n }, ward: true }], text: `Ward—Get ${m[1]} poison counter${n === 1 ? "" : "s"}: counter that spell or ability unless its controller gets ${m[1]} poison counter${n === 1 ? "" : "s"}.` },
+      });
     } else if ((m = /^ward—waterbend \{(\d+)\}\.?$/i.exec(p))) {
       // "Ward—Waterbend {4}" (The Unagi of Kyoshi Island): counter it unless that player pays {4}, tapping their
       // artifacts and creatures for {1} each of it if they like (CR 702.21a, 701.67a).

@@ -1031,7 +1031,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
 export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: UnlessPays, by: string, what: string, otherwise?: string): boolean | "paused" {
   const sc = (s.resolving!.scratch ??= {});
   // "Ward—Discard a card": the cards they chose to discard (see payUnless).
-  if (sc.paid === undefined && (unless.discard || unless.discardHand) && sc.chosen?.[payer]) {
+  if (sc.paid === undefined && (unless.discard || unless.discardHand || unless.discardRandom) && sc.chosen?.[payer]) {
     discardCards(s, payer, sc.chosen[payer]!);
     sc.paid = true;
   }
@@ -1054,13 +1054,13 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
     // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
     // (CR 118.3), so they can't pay that.
-    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n)) sc.paid = false;
-    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand) {
+    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n)) sc.paid = false;
+    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.discardRandom && !unless.poison) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
       return "paused";
     }
   }

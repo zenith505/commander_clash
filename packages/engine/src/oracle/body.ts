@@ -1842,6 +1842,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Fall of the First Civilization: "Each player chooses three nonland permanents they control. Destroy all other nonland
   // permanents." The same: every nonland permanent is controlled by one of them.
   text = text.replace(/(^|\. |— )(Each player chooses (?:two|three) nonland permanents they control)\. Destroy all other nonland permanents\./g, "$1$2 and the rest are destroyed.");
+  // The Last Ronin's Technique: "Create three ... tokens. If ~'s sneak cost was paid, they enter tapped and attacking": how
+  // they enter, chosen by whether the sneak cost was paid (CR 702.190a).
+  text = text.replace(/^Create (\w+ [^.]+? tokens)\. If ~'s sneak cost was paid, they enter tapped and attacking\.$/, "Create $1. If ~'s sneak cost was paid, instead create $1 that are tapped and attacking.");
+  // Rhystic Tutor: "Unless any player pays {2}, search your library for a card, ...": each player in turn order may pay,
+  // the caster too; the search only if no one does (CR 101.4), the same as "Any player may pay {2}. If no one does, ...".
+  text = text.replace(/^Unless any player pays ((?:\{[^}]+\})+), (search your library [^.]+\.)$/, (_, cost: string, rest: string) => `Any player may pay ${cost}. If no one does, ${rest}`);
+  // Ghired, Conclave Exile: "populate. The token enters tapped and attacking." One instruction: how the copy enters.
+  text = text.replace(/(^|\. )([Pp])opulate\. The token enters tapped and attacking\./, "$1$2opulate, the token entering tapped and attacking.");
   // Duneblast: "Choose up to one creature. Destroy the rest." The same as Mount Doom's "..., then destroy the rest".
   text = text.replace(/(^|\. )(Choose up to (?:one|two|three) (?:creatures?|permanents?|nonland permanents?|artifacts?))\. Destroy the rest\./g, (_, lead: string, c: string) => `${lead}${c.replace(/(creature|permanent|artifact)$/, "$1s")}, then destroy the rest.`);
   // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
@@ -2143,7 +2151,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|destroy all other creatures and planeswalkers\.?$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -5496,14 +5504,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // moves, and the rest happens after.
     // Zephyr Sentinel: "Return up to one other target creature you control to its owner's hand. If it was a Soldier, ...":
     // its creature types the same way (none chosen: false).
-    const bounceWas = /^[Rr]eturn (?:up to one (?:other )?)?target [^.]+ to its owner's hand$/.test(s) ? /^If (?:its mana value was (\d+) or less|that permanent had mana value (\d+) or less|it was (tapped|attacking|an? [A-Z][a-z]+)), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
-    const bounceType = bounceWas?.[3] && /^an? /.test(bounceWas[3]) ? bounceWas[3].replace(/^an? /, "") : undefined;
+    // Sunpearl Kirin: "If it was a token, draw a card": the same, whether it was a token.
+    const bounceWas = /^[Rr]eturn (?:up to one (?:other )?)?target [^.]+ to its owner's hand$/.test(s) ? /^If (?:its mana value was (\d+) or less|that permanent had mana value (\d+) or less|it was (tapped|attacking|a token|an? [A-Z][a-z]+)), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    const bounceType = bounceWas?.[3] && /^an? /.test(bounceWas[3]) && bounceWas[3] !== "a token" ? bounceWas[3].replace(/^an? /, "") : undefined;
     if (bounceWas && (!bounceType || CREATURE_TYPES.has(bounceType)) && !/\b(?:it|its|that permanent|that creature)\b/.test(bounceWas[4]!.replace(/"[^"]*"/g, ""))) {
       const before = ctx.targets.length;
       const fx = parseOne(s, ctx);
       if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "bounce" || ctx.targets[before]!.kind !== "object") return null;
       const mv = bounceWas[1] ?? bounceWas[2];
-      const filter: TargetSpec = mv ? { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(mv) }, text: `mana value ${mv} or less` } : bounceType ? { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [bounceType], text: `a ${bounceType}` } : bounceWas[3] === "tapped" ? { kind: "object", types: [], notTypes: [], notColors: [], tapped: true, text: "tapped" } : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
+      const filter: TargetSpec = mv ? { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(mv) }, text: `mana value ${mv} or less` } : bounceType ? { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [bounceType], text: `a ${bounceType}` } : bounceWas[3] === "a token" ? { kind: "object", types: [], notTypes: [], notColors: [], token: true, text: "a token" } : bounceWas[3] === "tapped" ? { kind: "object", types: [], notTypes: [], notColors: [], tapped: true, text: "tapped" } : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
       const then = parseOne(capital(bounceWas[4]!), ctx);
       if (!then || ctx.targets.length !== before + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
@@ -6583,12 +6592,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
     // Madame Null, Power Broker: "you may pay life equal to its power. If you do, put that many +1/+1 counters on it": the
     // same, "that many" being the life paid (its power as it resolves, or as it last existed, rulings).
+    // Niv-Mizzet, Ghost Counsel: "Whenever you gain life, you may pay that much life. If you do, draw that many cards": the
+    // trigger has made both of them X (the life gained, triggers.ts), so the life paid is the cards drawn.
+    const payTriggerX = !ctx.spell && /^[Yy]ou may pay X life$/.test(s) && /^If you do, [^.]*\bX\b/.test(sentences[si + 1] ?? "");
     const payLifeEq = /^[Yy]ou may pay life equal to (its power)$/.exec(s);
-    const payLifeX = payLifeEq ?? /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
+    const payLifeX = payLifeEq ?? /^[Yy]ou may pay X life, where X is (.+)$/.exec(s) ?? (payTriggerX ? /^[Yy]ou may pay (X) life$/.exec(s) : null);
     if (payLifeX) {
-      const n = parseCount(payLifeX[1]!, ctx);
+      const n = payTriggerX ? { count: { kind: "x" as const } } : parseCount(payLifeX[1]!, ctx);
       if (!n || typeof n !== "object" || !("count" in n)) return null;
-      payFirst = { pay: {}, payLife: n, text: payLifeEq ? `pay life equal to ${payLifeX[1]}` : `pay X life, where X is ${payLifeX[1]}`, ...(payLifeEq ? { thatMany: true } : {}) };
+      payFirst = { pay: {}, payLife: n, text: payTriggerX ? "pay X life" : payLifeEq ? `pay life equal to ${payLifeX[1]}` : `pay X life, where X is ${payLifeX[1]}`, ...(payLifeEq ? { thatMany: true } : {}) };
       continue;
     }
     // Killer Service: "you may pay {2} and sacrifice a token. If you do, ...", Conspiracy Theorist's "pay {1} and discard
@@ -10140,6 +10152,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "the sacrificed creature was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  { re: "~'s sneak cost was paid", cond: { kind: "altPaid", alt: "sneak" }, spellOnly: true },
   // "As an additional cost to cast this spell, you may waterbend {2}" is paid like kicker (CompiledCard.kicker.waterbend).
   { re: "~'s waterbend cost was paid", cond: { kind: "kicked" } },
   // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).

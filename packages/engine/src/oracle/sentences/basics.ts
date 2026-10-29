@@ -1310,8 +1310,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         continue;
       }
       // "Target opponent and each creature they control" (The Great Work): that player's creatures.
-      const theirs = /^each creature they control$/i.test(part) && tos.length === 1 && tos[0]!.ref === "target" && ctx.lastPlayerTarget === tos[0]!.index;
-      const to = parseDamageRecipient(theirs ? "each creature that player controls" : part, ctx);
+      // Chandra, Bold Pyromancer: "target player and each creature and planeswalker they control" the same.
+      const their = /^each (creature|creature and planeswalker) they control$/i.exec(part);
+      const theirs = !!their && tos.length === 1 && tos[0]!.ref === "target" && ctx.lastPlayerTarget === tos[0]!.index;
+      const to = parseDamageRecipient(theirs ? `each ${their![1]} that player controls` : part, ctx);
       if (!to) return null;
       tos.push(to);
     }

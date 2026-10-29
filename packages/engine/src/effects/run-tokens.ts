@@ -17,6 +17,11 @@ import { compileCard } from "../oracle";
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
  * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
  */
+/** How many token copies of `base` one copy becomes for `pid` (token doublers, CR 614.1a), the first batch. */
+export function tokenCopyBatch(s: GameState, pid: PlayerId, base: CardDef): number {
+  return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1).same;
+}
+
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
@@ -555,13 +560,13 @@ const ALL_ATTACK = "all:";
  * The options of the question what a token entering attacking attacks (CR 508.4): each player or planeswalker, and with
  * `left` tokens still to ask about, the same once more for all of them.
  */
-function attackWhomOptions(choices: { key: string; label: string }[], left: number): { options: string[]; labels: string[] } {
+export function attackWhomOptions(choices: { key: string; label: string }[], left: number): { options: string[]; labels: string[] } {
   const all = left > 1 ? choices : [];
   return { options: [...choices.map((a) => a.key), ...all.map((a) => `${ALL_ATTACK}${a.key}`)], labels: [...choices.map((a) => a.label), ...all.map((a) => `All ${left} attack ${a.label}`)] };
 }
 
 /** Record the answer to that question in `picks`, for every token left (up to `n`) if it was an "All attack" one. */
-function takeAttackWhom(sc: NonNullable<NonNullable<GameState["resolving"]>["scratch"]>, picks: string[], n: number): void {
+export function takeAttackWhom(sc: NonNullable<NonNullable<GameState["resolving"]>["scratch"]>, picks: string[], n: number): void {
   const a = sc.attackWhom!;
   sc.attackWhom = undefined;
   if (!a.startsWith(ALL_ATTACK)) {

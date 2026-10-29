@@ -377,6 +377,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // On a spell with {X} in its cost ("Proliferate X times.", Expansion Algorithm), the X announced (CR 107.3a).
   if (/^Proliferate X times$/.test(s) && (ctx.whereX || ctx.spell)) return [{ type: "proliferate", n: amt("X") }];
   // Populate (CR 701.36): copy a creature token you control, not targeted; with none, nothing happens.
+  // Ghired, Conclave Exile: "populate. The token enters tapped and attacking." (joined in body.ts).
+  if (/^Populate, the token entering tapped and attacking$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate", attacking: true }];
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   // Full Flowering: "Populate X times": one populate after another, each able to copy a token an earlier one made.
   if (/^Populate X times$/i.test(s) && ctx.spell) return [{ type: "repeat", n: X, effects: [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }] }];

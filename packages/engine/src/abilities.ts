@@ -68,6 +68,10 @@ export interface UnlessPays {
   waterbend?: number;
   /** "Unless its controller discards their hand" (Perplex): all of it, even with no cards in hand (rulings). */
   discardHand?: true;
+  /** "Ward—Discard a card at random" (Alpharael): this many cards chosen at random as the payment (CR 701.9c). */
+  discardRandom?: number;
+  /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
+  poison?: number;
 }
 
 /**
@@ -2235,7 +2239,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true; /** "On each of up to two Soldiers you control" (SOLDIER Military Program): up to `n`, none too. */ upTo?: true; /** With "choose" and `least`, before "Destroy that creature" (Drop of Honey): not one with indestructible while another tied one can be destroyed (rulings, CR 702.12b). */ destroyable?: true }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** Ghired, Conclave Exile: "populate. The token enters tapped and attacking." */ attacking?: true; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true; /** "On each of up to two Soldiers you control" (SOLDIER Military Program): up to `n`, none too. */ upTo?: true; /** With "choose" and `least`, before "Destroy that creature" (Drop of Honey): not one with indestructible while another tied one can be destroyed (rulings, CR 702.12b). */ destroyable?: true }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -2267,7 +2271,7 @@ export type Effect =
       payLife?: Amount;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
-  | { type: "keepDestroyRest"; filter: TargetSpec; n: number; /** Last One Standing: "Choose a creature at random, then destroy the rest": the one kept at random, not targeted (rulings). */ random?: true }
+  | { type: "keepDestroyRest"; filter: TargetSpec; n: number; /** Last One Standing: "Choose a creature at random, then destroy the rest": the one kept at random, not targeted (rulings). */ random?: true; /** Deadly Vanity: "Choose a creature or planeswalker": exactly `n` while there are that many (rulings), not up to. */ exactly?: true }
   /** Return to owner's hand (from the battlefield or a graveyard). `hidden`: a face-down card, named only to its owner. */
   | { type: "bounce"; what: ObjRef; hidden?: true; /** "Return it to its owner's hand. If you do, ..." (Cartographer's Hawk): whether it was returned is what "if you do" asks. */ setsDid?: true }
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
@@ -2355,7 +2359,7 @@ export type Effect =
    */
   /** Primal Surge: "Exile the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you do, repeat this process." */
   | { type: "surge" }
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand. */ n?: number; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand; Reap the Past's X. */ n?: Amount; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
@@ -3883,7 +3887,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" | /** The Last Ronin's Technique (CR 702.190a). */ "sneak" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition; /** "If you control a white permanent other than that creature or ~" (Sorin, Ravenous Neonate): the condition's subject (`otherThanSubject`) is this object, not the trigger's. */ subject?: ObjRef }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
@@ -6108,6 +6112,12 @@ export interface CompiledCard {
   ninjutsuLess?: number;
   /** "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): these abilities for its controller's cards in hand that match (CR 113.6, 702.49a). */
   handGrants?: { filter: TargetSpec; activated: ActivatedAbility[]; /** "In each player's hand" (Homing Sliver): every player's cards, not only its controller's. */ everyHand?: true }[];
+  /**
+   * "Each creature card in your graveyard has unearth {2}{B}" (Sedris): this ability for its controller's graveyard cards
+   * that match, an ability of each card (CR 113.6, rulings). `manaValueCost`: "encore {X}, where X is its mana value"
+   * (Graywater's Fixer): each card's mana value is the ability's mana cost.
+   */
+  yardGrants?: { filter: TargetSpec; activated: ActivatedAbility; manaValueCost?: true }[];
   /** The Master, Multiplied: "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control." */
   ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */

@@ -383,6 +383,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Full Flowering: "Populate X times": one populate after another, each able to copy a token an earlier one made.
   if (/^Populate X times$/i.test(s) && ctx.spell) return [{ type: "repeat", n: X, effects: [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }] }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
+  // Azog, Moria's Ruin: "Destroy up to one other target creature. Its controller amasses Goblins X": that player amasses
+  // (CR 701.47a); with no target chosen, no one does (rulings).
+  if ((m = new RegExp(`^Its controller amasses ([A-Z][a-z]+) ${NUMX}$`).exec(s)) && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && !ctx.targets[0]!.many) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!), who: { ref: "targetController", index: 0 } }];
   // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
   // "Exile ~, then return it to the battlefield transformed under your control" (a Saga's last chapter): with its back
   // face up if it's a double-faced card (CR 712.14a).

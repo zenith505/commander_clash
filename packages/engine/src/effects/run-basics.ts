@@ -753,6 +753,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${player(s, pid).name} loses ${n} life.`);
         }
       });
+      if (s.resolving) s.resolving.lifeLost = (s.resolving.lifeLost ?? 0) + total;
       if (e.drain && total > 0) {
         gainLife(s, ctx.controller, total);
         log(s, `${player(s, ctx.controller).name} gains ${total} life.`);

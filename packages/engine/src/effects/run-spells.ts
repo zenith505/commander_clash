@@ -125,7 +125,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const impulsed = (s.resolving?.impulsed ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
       // Mechtitan Core: the permanents its cost exiled.
       const costExiled = s.resolving?.item.costExiled ?? [];
-      const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x.type === "returnExiled" && x.fromCost ? { ...x, cards: costExiled } : x));
+      const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x.type === "returnExiled" && x.fromCost ? { ...x, cards: costExiled } : x.type === "exileRemembered" ? { ...x, cards: (s.resolving?.created ?? []).map((c) => ({ id: c, zc: s.objects[c]?.zoneChanges ?? 0 })) } : x));
       // Dragonhawk: "for each of those cards that are still exiled", the cards this ability exiled.
       for (const x of effects) if (x.type === "damage" && typeof x.amount === "object" && x.amount.count.kind === "stillExiled") Object.assign(x, { amount: { ...x.amount, count: { kind: "stillExiled", cards: impulsed } } });
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
@@ -173,7 +173,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (e.of && e.each !== "selfCard") {
         // About each of those permanents as it is now (CR 603.7c, 400.7).
-        for (const o of objects(s, e.of, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+        for (const o of objects(s, e.of, ctx))
+          if (o.zone === "battlefield") {
+            addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+            // Mysterio, Master of Illusion: "when ~ leaves the battlefield", for whatever zone it goes to (CR 603.6c).
+            if (e.when === "leaves") s.delayed![s.delayed!.length - 1]!.to = ["graveyard", "exile", "hand", "library", "command"];
+          }
         return;
       }
       if (e.each === "created") {
@@ -581,13 +586,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
-        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land"));
+        // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
+        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv);
         const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;
@@ -599,7 +605,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.resolving!.revealedUntil = seen;
           return;
         }
-        if (e.reveal) {
+        if (e.reveal && e.inPlace) {
+          // Treasure Keeper: they stay in the library, revealed, while the found card may be cast from there.
+        } else if (e.reveal) {
           // "Exile that card and put the rest on the bottom of your library in a random order" (Creative Technique).
           if (hit) moveObject(s, hit, "exile");
           const rest = seen.filter((id) => id !== hit);
@@ -611,8 +619,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             closeZoneBatch(s); // exiled one at a time (rulings on Laelia)
           }
         const caster = e.ownerCasts ? pid : ctx.controller;
-        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom ? { seen } : {}) };
-        if (!hit) return bottomRest(s, sc.untilNonland.seen);
+        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen } : {}) };
+        if (!hit) return e.inPlace ? revealedToBottom(s, seen) : bottomRest(s, sc.untilNonland.seen);
         if (e.then === "suspend") {
           suspendExiled(s, obj(s, hit), e.suspend ?? 0);
           return;
@@ -635,7 +643,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         moveObject(s, left, "hand");
         log(s, `${player(s, obj(s, left).owner).name} puts ${defOf(s, obj(s, left)).name} into their hand.`);
       }
-      return bottomRest(s, sc.untilNonland.seen);
+      return e.inPlace ? revealedToBottom(s, sc.untilNonland.seen ?? []) : bottomRest(s, sc.untilNonland.seen);
     }
     case "discover": {
       // CR 701.57a: the mana value of the spell it would be is checked too (701.57a), the card's own for the cards we have.
@@ -767,7 +775,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         o.sunburstGained = (o.sunburstGained ?? 0) + 1;
         log(s, `${defOf(s, o).name} gains sunburst.`);
       }
-      const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst";
+      // Bloodthirst likewise as it enters (Bloodlord of Vaasgoth, CR 702.54a, 614.12).
+      for (const x of e.mods) {
+        if (x.kind !== "addKeywords") continue;
+        for (const k of x.keywords) {
+          const bt = /^Bloodthirst (\d+)$/.exec(k);
+          if (!bt) continue;
+          o.bloodthirstGained = (o.bloodthirstGained ?? 0) + Number(bt[1]);
+          log(s, `${defOf(s, o).name} gains bloodthirst ${bt[1]}.`);
+        }
+      }
+      const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst" || /^Bloodthirst \d+$/.test(k);
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
       return;
@@ -890,6 +908,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
  * goes to its owner's graveyard, or where "instead" says (CR 701.6a).
  */
 /** "Then they put the exiled cards on the bottom of their library in a random order": those still in exile. */
+/** Treasure Keeper: "Put all revealed cards not cast this way on the bottom of your library in a random order." */
+function revealedToBottom(s: GameState, seen: ObjectId[]): void {
+  const rest = seen.filter((id) => s.objects[id]?.zone === "library");
+  if (!rest.length) return;
+  const p = player(s, s.objects[rest[0]!]!.owner);
+  shuffle(s, rest);
+  for (const id of rest) {
+    p.library.splice(p.library.indexOf(id), 1);
+    p.library.push(id);
+  }
+  log(s, `${p.name} puts ${rest.length} revealed card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+}
+
 function bottomRest(s: GameState, seen: ObjectId[] | undefined): void {
   const rest = (seen ?? []).filter((id) => s.objects[id]?.zone === "exile");
   if (!rest.length) return;

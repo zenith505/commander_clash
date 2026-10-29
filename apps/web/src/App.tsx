@@ -353,6 +353,8 @@ type CastDraft = {
   tap?: string[];
   /** Counters removed for Quilled Greatwurm's "removing six counters from among creatures you control". */
   counters?: { id: string; kind: string }[];
+  /** The creature blighted for "blight 1 or pay {3}" (Bogslither's Embrace) or "you may blight 1" (Cinder Strike). */
+  counterOn?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -777,7 +779,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "putCounter") {
         // "Put a -1/-1 counter on a creature you control" (Hatchet Bully): click the creature (CR 602.2b).
         if (d.counterOn !== undefined) continue;
-        return setCostPick({ activate: d, kind: "counterOn", label: cardOf(s, d.objectId).name, what: `put a ${c.counter} counter on ${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`, n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
+        return setCostPick({ activate: d, kind: "counterOn", label: cardOf(s, d.objectId).name, what: counterOnWhat(c), n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
       }
       if (c.kind === "returnToHand") {
         // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
@@ -1002,7 +1004,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
-      if (c.kind === "craft" || c.kind === "putCounter") continue; // an ability's cost only (CR 702.167a)
+      if (c.kind === "craft") continue; // an ability's cost only (CR 702.167a)
+      // Blight N (CR 701.68a): the one creature you control to put the counters on.
+      if (c.kind === "putCounter") {
+        if (d.counterOn !== undefined) continue;
+        return setCostPick({ draft: d, kind: "counterOn", label: card.name, what: counterOnWhat(c), n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
+      }
       // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
       if (c.kind === "removeCounters") {
         if (d.counters !== undefined) continue;
@@ -1082,6 +1089,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}),
       ...(d.tap?.length ? { tap: d.tap } : {}),
       ...(d.counters?.length ? { counters: d.counters } : {}),
+      ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -1148,8 +1156,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1], ...f });
         // "If this spell was kicked, choose any number instead": kicker is announced first, then the modes.
         if (modal.both === "kicked") return continueCast({ objectId: id, convoke, teamwork, ...f });
-        // "If you control a commander as you cast this spell, you may choose both instead."
-        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork, ...f });
+        // "If you control a commander as you cast this spell, you may choose both instead"; "choose one or more instead"
+        // (Let's Play a Game).
+        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: modal.bothAny ? modal.modes.length : 2 } } : body, convoke, teamwork, ...f });
       }
     }
     return continueCast({ objectId: id, convoke, teamwork, ...f });
@@ -2037,6 +2046,12 @@ const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback
 /** "creature" to "creatures"; a text that is plural already ("other artifact creatures and/or Vehicles") stays. */
 const plural = (what: string) => (/s$/.test(what) ? what : `${what}s`);
 
+/** "put a -1/-1 counter on a creature you control", "blight 2 (put two -1/-1 counters on a creature you control)". */
+function counterOnWhat(c: Extract<AdditionalCost, { kind: "putCounter" }>): string {
+  const put = `put ${c.n === 1 ? `a ${c.counter} counter` : `${c.n} ${c.counter} counters`} on ${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+  return c.blight ? `blight ${c.n} (${put})` : put;
+}
+
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${plural(what)}`);
@@ -2051,6 +2066,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
+  if (c.kind === "putCounter") return counterOnWhat(c);
   if (c.kind === "mill") return c.exile ? `exile the top ${c.n === 1 ? "card" : `${c.n} cards`} of your library` : `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
@@ -2318,6 +2334,20 @@ function KickPickBar({
       </div>
     );
   }
+  // "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon": pay it or not.
+  if (pick.name === "additional cost" && pick.text)
+    return (
+      <div className="targeting">
+        <span>
+          <strong>{pick.label}</strong>: as an additional cost, you may {pick.text}
+        </span>
+        <button disabled={!can([0])} onClick={() => onDone([0])}>
+          {pick.text.charAt(0).toUpperCase() + pick.text.slice(1)}
+        </button>
+        <button onClick={() => onDone([])}>Don't</button>
+        {cancel}
+      </div>
+    );
   if (pick.costs.length === 1)
     return (
       <div className="targeting">
@@ -2356,7 +2386,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? "Put the counter and activate" : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -3882,6 +3912,8 @@ function LibrarySearch({
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
+              : pending.behold
+                ? `${pending.source}: you may behold ${pending.what} (reveal one from your hand or choose one you control)`
               : pending.reveal
                 ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand`
                 : pending.bottom
@@ -3917,7 +3949,7 @@ function LibrarySearch({
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
-              ? `The rest go ${dig.rest}.${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}`
+              ? `The rest go ${dig.rest}.${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}`
               : pending.firstTo
                 ? pending.firstN ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal
@@ -3938,7 +3970,7 @@ function LibrarySearch({
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
@@ -3978,7 +4010,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
@@ -4925,6 +4957,8 @@ function Controls({
                 ? `separate all permanents ${theirs ?? "you"} control${theirs ? "s" : ""} into two piles: click the ones for the first pile (the rest form the second). ${theirs ?? "You"} sacrifice${theirs ? "s" : ""} all permanents in the pile of ${theirs ? "their" : "your"} choice.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
+                : pending.action === "keep" && pending.payLife !== undefined
+                ? `click the creatures of yours to keep, paying ${pending.payLife} life for each (up to ${pending.count}). The rest are sacrificed.`
                 : pending.action === "keep" && pending.maxTotalPower !== undefined
                 ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
                 : pending.action === "keep"

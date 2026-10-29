@@ -176,6 +176,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (sr?.type !== "search" || sr.n !== 1 || sr.dest.zone !== "battlefield") return null;
     return [sr, { type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" } }];
   }
+  // Yavimaya Dryad: "Search your library for a Forest card, put it onto the battlefield tapped under target player's
+  // control, then shuffle": you own it, that player controls it (CR 108.3, 110.2); you may target yourself (rulings).
+  const under = /^(Search your library for an? [^,]+ card, put it onto the battlefield(?: tapped)?) under (target player|target opponent)'s control(, then shuffle)$/.exec(s);
+  if (under) {
+    const fx = parseSearch(under[1]! + under[3]!);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    if (sr?.type !== "search" || sr.n !== 1 || sr.upTo || sr.dest.zone !== "battlefield" || sr.others || sr.landTo || sr.cardTo) return null;
+    const who = parsePlayer(under[2]!, ctx);
+    return who ? [{ ...sr, dest: { ...sr.dest, under: who } }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx), (ref) => sameNameRef(ref, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
@@ -352,6 +362,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!what || what.ref !== (target ? "target" : "subject")) return null;
     return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx }];
   }
+  // Combustion Man: "destroy target permanent unless its controller has ~ deal damage to them equal to ~'s power": that
+  // permanent's controller decides as it resolves (CR 608.2d), and ~ deals the damage.
+  if ((m = /^([Dd]estroy target (?:nonland )?permanent) unless its controller (has ~ deal damage to them equal to ~'s power)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(capital(m[1]!), ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "destroy" || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: "Let ~ destroy it" }];
+  }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
   if ((m = /^(.+?) unless any player (pays (?:\{[^}]+\})+)$/.exec(s)) && /\bgets? an additional [+-]\d+\/[+-]\d+ until end of turn$/.test(m[1]!)) {
@@ -451,7 +470,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Invincible Hymn: "Your life total becomes the number of cards in your library" (CR 119.5).
   // Touch of the Eternal: "the number of permanents you control".
-  if ((m = /^Your life total becomes (the number of (?:cards in your library|permanents you control))$/.exec(s))) {
+  // Eternity Vessel: "you may have your life total become the number of charge counters on ~": you gain or lose the
+  // difference (rulings).
+  if ((m = /^Your life total becomes (the number of (?:cards in your library|permanents you control|[a-z]+ counters on ~))$/.exec(s))) {
     const amount = parseCount(m[1]!, ctx);
     return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "you" }, n: 0, amount }] : null;
   }
@@ -530,6 +551,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "shuffleZones", who, graveyard: true, bottom: true }] : null;
   }
+  // Mordenkainen: "Exchange your hand and library, then shuffle": the cards that go into the hand aren't drawn (rulings).
+  if (/^Exchange your hand and library, then shuffle$/.test(s)) {
+    return [{ type: "shuffleZones", who: { ref: "you" }, hand: true, exchange: true }, { type: "shuffle", who: { ref: "you" } }];
+  }
   // Morality Shift: "Exchange your graveyard and library. Then shuffle your library."
   if (/^Exchange your graveyard and library$/.test(s)) {
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];
@@ -596,7 +621,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const inner: Effect[] | null = sac ? (sacWhat ? [{ type: "sacrifice", what: sacWhat, ...(/controller/.test(sac[1]!) ? { byController: true as const } : {}) }] : null) : withSelfIt(() => parseSentence(m![1]!.replace(/^./, (c) => c.toUpperCase()), ctx));
     // Silent Assassin: "{3}{B}: Destroy target blocking creature at end of combat": the target chosen now, destroyed by the
     // delayed trigger (CR 603.7); made during the end of combat step, it waits for the next one (rulings).
-    const ownTarget = inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before });
+    // Vronos, Masked Inquisitor: "Up to two other target planeswalkers you control phase out at the beginning of the next
+    // end step": the same, the targets chosen as it's activated, each phasing out then if it's still the same object.
+    const ownTarget =
+      (inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before })) ||
+      (inner?.length === 1 && inner[0]!.type === "phaseOut" && inner[0]!.what.ref === "target" && inner[0]!.what.index === before && ctx.targets.length > before && /^the beginning of the next end step$/.test(m[2]!));
     if (!inner || (ctx.targets.length !== before && !ownTarget)) return null;
     const refs = new Set<string>();
     const whats = new Set<string>();
@@ -1433,6 +1462,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     }
     // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
+    // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
+    // existed (CR 608.2h).
+    else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

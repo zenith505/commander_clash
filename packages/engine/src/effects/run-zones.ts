@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf } from "../cards";
 import { nameLandBan } from "../names";
-import { graveyardWays, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { graveyardWays, payableLife, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -436,6 +436,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   // "Equal to the number of lands controlled by the player who controls the fewest": counted once, before anyone
   // chooses (Restore Balance rulings).
   if (e.keep.some((k) => k.fewest)) kr.fewest ??= Math.min(...who.map((pid) => among(pid).length));
+  // Killing Wave: the life for each one kept, as it starts.
+  if (e.payLife !== undefined) kr.lifeEach ??= Math.max(0, amountNow(s, e.payLife, ctx));
+  const lifeEach = kr.lifeEach ?? 0;
   while (kr.queue.length) {
     const pid = kr.queue[0]!;
     const chooser = e.youChoose ? ctx.controller : pid;
@@ -449,7 +452,8 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
     while (kr.slot < e.keep.length) {
       const k0 = e.keep[kr.slot]!;
       const options0 = among(pid).filter((id) => objectMatches(s, { ...k0.filter, controller: "you" }, obj(s, id), pid, false));
-      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : k0;
+      // "Unless they pay X life": as many as they can pay for, any number with X 0 (CR 119.4).
+      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : e.payLife !== undefined ? { ...k0, n: lifeEach > 0 ? Math.floor(payableLife(s, pid) / lifeEach) : options0.length } : k0;
       const options = options0;
       const max = Math.min(k.n, options.length);
       // Nothing to choose between: all of them are kept.
@@ -465,7 +469,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -484,7 +488,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
         log(s, `${player(s, pid).name} puts ${put === 1 ? "a" : put} ${e.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
       }
       invalidateCharacteristics(s);
-    } else if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+    } else if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}${e.payLife !== undefined ? ` and pays ${lifeEach * kept.size} life` : ""}.`);
+    // Killing Wave: the life is paid as the creatures are sacrificed, all at once (rulings).
+    if (e.payLife !== undefined && kept.size && lifeEach > 0) loseLife(s, pid, lifeEach * kept.size);
     keptAll.push(...kept);
     gone.push(...among(pid).filter((id) => !kept.has(id)));
   }
@@ -1746,6 +1752,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Mount Doom: chosen as it resolves (CR 608.2d), then the rest destroyed at once.
       const sc = (s.resolving!.scratch ??= {});
       const all = () => s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      if (e.random) {
+        // Last One Standing: one at random, then the rest at once, with nothing in between (rulings).
+        const options = all();
+        if (!options.length) return;
+        const keep = options[Math.floor(nextRandom(s) * options.length)]!;
+        log(s, `${src} chooses ${nameOf(s, keep)} at random.`);
+        for (const id of options.filter((x) => x !== keep)) destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+        return;
+      }
       if (!sc.chosen?.[ctx.controller]) {
         const options = all();
         if (!options.length) return;
@@ -1796,16 +1811,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.found) {
         const filter = e.filter && bindChosen(e.filter, ctx.chosen);
         const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        // Behold: or choose a permanent you control with that quality (CR 701.4a).
+        if (e.orControl && filter) cards.push(...s.battlefield.filter((id) => objectMatches(s, { ...filter, kind: "object", controller: "you" }, obj(s, id), p.id, false)));
         s.resolving!.revealedFromHand = 0;
         if (!cards.length) {
           log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }) };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
         return "paused";
       }
+      const chosen = sc.found.filter((id) => e.orControl && s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === p.id);
       const shown = sc.found.filter((id) => p.hand.includes(id));
       sc.found = undefined;
+      if (chosen.length) {
+        s.resolving!.revealedFromHand = chosen.length;
+        log(s, `${p.name} beholds ${chosen.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+        return;
+      }
       s.resolving!.revealedFromHand = shown.length;
       if (!e.bottom) s.resolving!.revealedFromHandIds = shown;
       if (e.bottom) {
@@ -1814,7 +1837,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${p.name} puts ${shown.length === 1 ? "a card" : `${shown.length} cards`} from their hand on the bottom of their library.`);
         return;
       }
-      log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
+      log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
     case "castNow": {
@@ -1981,8 +2004,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.atNextEndStep) {
         // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step" (CR 603.7),
         // if it's still that card then.
-        const { atNextEndStep: _, ...later } = e;
-        for (const o of list) addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [{ ...later, what: { ref: "subjectCard" }, ...(watched ? { sacrificeOnLostControl: watched } : { sacrificeOnLostControl: undefined }) }], text: `Put ${defOf(s, o).name} onto the battlefield under your control.` }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+        const { atNextEndStep: _, ifSourceHere, mayThen, ...later } = e;
+        // Shirei: "you may return that card ... if ~ is still on the battlefield": the source as the object it was when this
+        // ability triggered (CR 400.7, rulings), and the choice made as the delayed trigger resolves.
+        const here = ifSourceHere && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        for (const o of list) {
+          const put: Effect = { ...later, what: { ref: "subjectCard" }, ...(watched ? { sacrificeOnLostControl: watched } : { sacrificeOnLostControl: undefined }) };
+          const text = `${mayThen ? "you may put" : "Put"} ${defOf(s, o).name} onto the battlefield under your control`;
+          const may: Effect = mayThen ? { type: "may", effects: [put], text: `put ${defOf(s, o).name} onto the battlefield` } : put;
+          addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [ifSourceHere ? { type: "if", cond: { kind: "selfHere" }, effects: [may] } : may], text: `${ifSourceHere ? `If ${here ? defOf(s, here).name : "its source"} is still on the battlefield, ` : ""}${text}.`.replace(/^./, (c) => c.toUpperCase()) }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+          if (ifSourceHere) s.delayed![s.delayed!.length - 1]!.source = here ? { id: here.id, zc: ctx.sourceZc ?? here.zoneChanges ?? 0 } : { id: "none", zc: 0 };
+        }
         return;
       }
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);

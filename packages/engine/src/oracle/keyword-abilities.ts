@@ -609,8 +609,12 @@ function altCondition(text: string): StaticCondition | null {
   return conds.length > 1 && conds.every((c) => c) ? { kind: "allOf", conds: conds as StaticCondition[] } : null;
 }
 
+/** Blight N as a cost (CR 701.68a): N -1/-1 counters, all on one creature you control (rulings), ~ included. */
+export const blightCost = (n: number): AdditionalCost => ({ kind: "putCounter", counter: "-1/-1", n, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, blight: true });
+
 export function parseAdditionalCost(text: string, allowX = false): AdditionalCost | null {
   let m: RegExpExecArray | null;
+  if ((m = /^blight (\d+)$/i.exec(text)) && Number(m[1]) > 0) return blightCost(Number(m[1]));
   const isX = (w: string) => allowX && w === "X";
   const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
   if (/^forage$/i.test(text)) return { kind: "forage" }; // CR 701.61a
@@ -690,10 +694,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 1 };
   }
   // Behold (CR 701.4a): "behold an Elf", "behold a Kithkin and exile it" (exile an Elf you control or an Elf card from your
-  // hand). A subtype only, as yet.
-  if ((m = /^behold an? ([A-Z][a-z]+)( and exile it)?$/.exec(text)) && subtypeSet(m[1]!)) {
+  // hand), "behold a Gamma creature" (Hulk's Thunderclap: a Gamma creature card or a Gamma creature you control). A
+  // subtype only, as yet.
+  if ((m = /^behold an? ([A-Z][a-z]+)( creature)?( and exile it)?$/.exec(text)) && subtypeSet(m[1]!)) {
     const st = m[1]!;
-    return { kind: "reveal", filter: { kind: "card", subtypes: [st], text: `${st} card` }, n: 1, orControl: { kind: "object", subtypes: [st], controller: "you", text: `${st} you control` }, ...(m[2] ? { exile: true as const } : {}) };
+    const creature = m[2] ? { types: ["Creature"] } : {};
+    return { kind: "reveal", filter: { kind: "card", subtypes: [st], ...creature, text: `${st}${m[2] ?? ""} card` }, n: 1, orControl: { kind: "object", subtypes: [st], ...creature, controller: "you", text: `${st}${m[2] ?? ""} you control` }, ...(m[3] ? { exile: true as const } : {}) };
   }
   if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {
     const filter = parseSearchFilter(m[1]!);

@@ -976,8 +976,12 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     const times = e.times === undefined ? 1 : amountNow(s, e.times, ctx);
     const picks = e.picks === undefined ? 1 : amountNow(s, e.picks, ctx);
     if (times <= 0 || picks <= 0) return;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options: e.options, ...punisherHarm(e), ...(e.mode ? { mode: e.mode } : {}) };
+    // "Equal to ~'s power" (Combustion Man): the amount as the choices start, the same for everyone.
+    const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : o));
+    const doomed = e.effects.length === 1 && e.effects[0]!.type === "destroy" ? objects(s, e.effects[0]!.what, ctx)[0]?.id : undefined;
+    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
+  if (e.options.some((o) => "damage" in o && typeof o.damage !== "number")) e = { ...e, options: e.options.map((o, i) => ("damage" in o ? sc.punish!.options[i]! : o)) };
   // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.
   if (e.options.some((o) => "sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed)) {
     const types = [...new Set((s.resolving!.sacrificedThisWay ?? []).flatMap((k) => k.types ?? []))];
@@ -1075,7 +1079,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       // "Have it deal 4 damage to them": the source deals it, to each who chose to, all at once.
       const hurt = who.flatMap((pid) => pu.made[pid]!.flatMap((m) => {
         const o = e.options[Number(m)];
-        return o && "damage" in o ? [{ pid, n: o.damage }] : [];
+        return o && "damage" in o && typeof o.damage === "number" ? [{ pid, n: o.damage }] : [];
       }));
       if (hurt.length) {
         const from = ctxSource(s, ctx);

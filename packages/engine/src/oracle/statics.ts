@@ -140,6 +140,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
     return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
   }
+  // Thieves' Tools: "Equipped creature can't be blocked as long as its power is 3 or less": its power as blockers are
+  // declared (rulings; CR 509.1b), the rules effect applied after power and toughness (CR 613.11).
+  if ((m = /^(Equipped|Enchanted) creature can't be blocked as long as its power is (\d+) or less$/.exec(text))) {
+    const st = parseStatic(`${m[1]} creature can't be blocked.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], power: { max: Number(m[2]) }, text: `creature with power ${m[2]} or less` } } };
+  }
   // Heroic Defiance: "Enchanted creature gets +3/+3 unless it shares a color with the most common color among all
   // permanents or a color tied for most common".
   if ((m = /^(Enchanted creature gets [+-]\d+\/[+-]\d+) unless it shares a color with the most common color among all permanents or a color tied for most common$/.exec(text))) {
@@ -201,8 +208,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // Akki War Paint: "As long as enchanted permanent is a creature, it gets +2/+1" (an Aura that can enchant an artifact
   // or land that may become a creature): only while it's a creature (CR 611.3a).
+  // Born to Drive: "... it gets +1/+1 for each creature and/or Vehicle you control": as "Enchanted permanent gets ...".
   if ((m = /^As long as (enchanted|equipped) permanent is a creature, it (gets .+|has .+)$/.exec(text))) {
-    const mods = parseStaticMods(m[2]!);
+    const whole = / for each /.test(m[2]!) ? parseStatic(`${capital(m[1]!)} permanent ${m[2]}.`) : null;
+    const mods = whole ? (whole.affects.kind === "attached" && !whole.condition ? whole.mods : null) : parseStaticMods(m[2]!);
     return mods ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } } : null;
   }
   // Essence Leak: "As long as enchanted permanent is red or green, it has "At the beginning of your upkeep, sacrifice ~
@@ -336,6 +345,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2".
   const itsA = /^it's (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types)(?: and it (has .+))?$/.exec(statement);
   if (itsA) statement = `~ is ${itsA[1]}${itsA[2] ? ` and ${itsA[2]}` : ""}`;
+  // Weatherlight Compleated: "it's a Phyrexian creature in addition to its other types": a Vehicle, so with its printed
+  // power and toughness (CR 301.7c), keeping its other types (CR 205.1b).
+  const itsCreature = /^it's an? (?:([A-Z][a-z]+) )?creature in addition to its other types$/.exec(statement);
+  if (itsCreature && (!itsCreature[1] || CREATURE_TYPES.has(itsCreature[1])) && /^~ has [a-z]+ or more [a-z]+ counters on it$/.test(cond)) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: itsCreature[1] ? [itsCreature[1]] : [], supertypes: [] }], text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
@@ -357,7 +374,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -402,6 +419,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // their turn (CR 601.2f).
   if ((m = /^Each spell costs \{(\d+)\} more to cast except during its controller's turn$/.exec(text))) return { costMod: { who: "all", filter: { kind: "spell", text: "spells" }, n: Number(m[1]), turn: "notCasters", text: line } };
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
+  // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast"; Infectious Curse: "Spells you cast that
+  // target enchanted player cost {1} less to cast": Aura spells and spells with other targets too, not abilities (rulings).
+  if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscount: Number(m[1]) };
+  if ((m = /^Spells you cast that target enchanted player cost \{(\d+)\} less to cast$/.exec(text))) return { castTargetEnchantedPlayerLess: Number(m[1]) };
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
   if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {
     const filter = parseTargetPhrase(m[1]!);
@@ -417,6 +438,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if ((m = /^(Spells your opponents cast|Abilities your opponents activate) that target an? ([A-Za-z]+(?: or [a-z]+)?) you control cost \{(\d+)\} more to (cast|activate)$/.exec(text)) && (m[1]!.startsWith("Spells") === (m[4] === "cast"))) {
     const filter = parseTargetPhrase(m[2]!);
     return filter?.kind === "object" && !filter.controller ? { opponentsTargetTax: { n: Number(m[3]), filter: { ...filter, text: m[2]! }, ...(m[4] === "activate" ? { abilities: true as const } : {}) } } : "fail";
+  }
+  // Valiant Changeling: "This effect can't reduce the amount of mana this spell costs by more than {5}": the reduction is
+  // at most that much (CR 601.2f).
+  if ((m = /^(~ costs \{\d+\} less to cast for each .+)\. This effect can't reduce the amount of mana ~ costs by more than \{(\d+)\}$/.exec(text))) {
+    const base = parseCostChange(m[1]!);
+    return base && base !== "fail" && "less" in base && typeof base.less !== "number" ? { less: { ...base.less, max: Number(m[2]) } } : "fail";
   }
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);
@@ -723,6 +750,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const a = parseStaticCondition(`you control a ${m[1]} creature`, st);
     const b = parseStaticCondition(`you control a non-${m[1]} creature`, st);
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
+  // ED-E, Lonesome Eyebot: "if the number of attacking creatures is greater than the number of quest counters on ~".
+  if ((m = /^the number of (.+) is greater than the number of (.+)$/.exec(text))) {
+    const a = parseCount(`the number of ${m[1]}`, null);
+    const b = parseCount(`the number of ${m[2]}`, null);
+    return a && typeof a === "object" && b && typeof b === "object" ? { kind: "amount", amount: a, moreThan: b } : null;
   }
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
@@ -1047,6 +1080,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
+  // Dose of Dawnglow: "if it isn't your main phase": not your turn, or your turn but not a main phase.
+  if (text === "it isn't your main phase") return { kind: "phase", phase: "main", yours: true, not: true };
   if (text === "it's your end step") return { kind: "phase", phase: "end", yours: true };
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
@@ -1297,6 +1332,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const b = parseStaticCondition(`you control a ${m[2]}`, st);
     return a && b ? { kind: "anyOf", conds: [a, b] } : null;
   }
+  // Doctor Doom: "as long as you control an artifact creature or a Plan": either one.
+  if ((m = /^you control (an? [a-z]+ [a-z]+) or (an? [A-Z][a-z]+)$/.exec(text))) {
+    const a = parseStaticCondition(`you control ${m[1]}`, st);
+    const b = parseStaticCondition(`you control ${m[2]}`, st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
+  }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
@@ -1389,6 +1430,21 @@ export function parseAffected(subject: string): Affects | null {
   if (thatsA) {
     const subs = [thatsA[1]!, thatsA[2]!, thatsA[3]!];
     return subs.every((t) => CREATURE_TYPES.has(t)) ? { kind: "filter", types: ["Creature"], spec: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: subs, text: `creature that's a ${subs.join(", a ")}` } } : null;
+  }
+  // Brenard, Ginger Sculptor: "Each creature you control that's a Food or a Golem": your creatures with either subtype
+  // (Food is an artifact type, rulings), counted once.
+  const yoursEither = /^Each creature you control that's an? ([A-Z][a-z]+) or an? ([A-Z][a-z]+)$/.exec(x);
+  // Creature types alone are read the general way below (Howlpack Resurgence).
+  if (yoursEither && !(CREATURE_TYPES.has(yoursEither[1]!) && CREATURE_TYPES.has(yoursEither[2]!))) {
+    const subs = [yoursEither[1]!, yoursEither[2]!];
+    return subs.every((t) => CREATURE_TYPES.has(t) || t === "Food") ? { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: subs, text: `creature that's a ${subs.join(" or a ")}` } } : null;
+  }
+  // Shield of Kaldra: "Equipment named Sword of Kaldra, ~, and Helm of Kaldra": anyone's Equipment with any of those names.
+  const namedEquipment = /^Equipment named ([^,]+), ([^,]+), and ([^,]+)$/.exec(x);
+  if (namedEquipment) {
+    const names = namedEquipment.slice(1) as string[];
+    const anyOf: TargetSpec[] = names.map((n) => ({ kind: "object", named: n, text: `named ${n}` }));
+    return { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], anyOf, text: `Equipment named ${names.join(", ")}` } };
   }
   // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
   const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
@@ -1549,6 +1605,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const t = m[3] ?? (m[4] && singular(m[4]));
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
+  }
+  // Archon of the Wild Rose: "have base power and toughness 4/4 and have flying" (layers 6 and 7b).
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+) and ((?:has|have) [a-z ,]+)$/.exec(rest))) {
+    const more = parseStaticMods(m[3]!);
+    return more?.length && more.every((x) => x.kind === "addKeywords") ? [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more] : null;
   }
   // Sigarda's Summons: "have base power and toughness 4/4, have flying, and are Angels in addition to their other types"
   // (layers 4, 6 and 7b).

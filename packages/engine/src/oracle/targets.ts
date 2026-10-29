@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
@@ -595,7 +595,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "target", index: addTarget(ctx, { ...spec, controlledByTarget: ctx.lastPlayerTarget, text: `target ${m[1]!}` }) };
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
-  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true });
+  // "Target creature card of the chosen type" (From the Rubble, Dawn-Blessed Pennant): the creature type chosen as its
+  // source entered, filled in on its abilities (cards.ts abilitiesOf); compile checks the source makes that choice.
+  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true, chosen: true });
+  if (spec?.chosen && (spec.chosen !== "type" || ctx.spell)) return null;
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
@@ -677,7 +680,7 @@ function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
 }
 
-const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of|one or more) (other )?)target (.+)$/i;
+const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X|twice X) (other )?|(another) |(one or two|one, two, or three|any number of|one or more) (other )?)target (.+)$/i;
 
 /**
  * "Up to two target creatures", "two target artifacts", "one or two target creatures", "another target
@@ -687,7 +690,11 @@ const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|s
  * than the ability's source.
  */
 function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjRef | null {
-  const [, upTo, count, other0, another, range0, other1, phrase] = m;
+  const [, upTo, count0, other0, another, range0, other1, phrase] = m;
+  // "Up to twice X target cards" (Erebos's Intervention): up to X, doubled (TargetSpec.manyTimes).
+  const twice = /^twice X$/i.test(count0 ?? "");
+  if (twice && (!upTo || ctx.whereX)) return null;
+  const count = twice ? "X" : count0;
   const range = range0?.toLowerCase();
   const other = other0 ?? other1;
   // "Any number of target creatures" (CR 601.2c, 115.6), "up to X target artifacts" with the spell's X (107.3a): how
@@ -766,7 +773,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (many) {
     // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
     if ((single && many !== "exactX") || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(twice ? { manyTimes: 2 as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
@@ -864,6 +871,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = p.replace(/^((?:all |each )?)(creatures|creature tokens) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
   p = p.replace(/^((?:all |each )?)(creatures?) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2");
+  // Archon of the Wild Rose: "other creatures you control that are enchanted by Auras you control": yours, with an Aura of
+  // yours on it.
+  p = p.replace(/^((?:all |each )?(?:other )?)(creatures) (you control) that are enchanted by Auras you control$/i, "$1aura-yours-enchanted $2 $3");
   // "Each permanent you control that's a creature or Vehicle" (Ao, the Dawn Sky): each creature or Vehicle you control.
   p = p.replace(/^((?:all |each )?)permanents? you control that(?:'s| is| are|'re) (?:an? )?creatures? or (?:an? )?Vehicles?$/i, "$1creature or Vehicle you control");
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
@@ -1009,6 +1019,12 @@ export function parseTargetPhrase(
   if (drafted) {
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
+  }
+  // "Permanent you control but don't own" (Staff of Eden): another player's that you control (CR 108.3).
+  const notOwned = /^(.+ you control) but don't own$/.exec(phrase.trim());
+  if (notOwned) {
+    const head = parseTargetPhrase(notOwned[1]!, opts);
+    return head?.kind === "object" && head.controller === "you" && !head.owner ? { ...head, owner: "opponent", text: `${head.text} but don't own` } : null;
   }
   // "Enchanted creature or enchantment creature" (Karametra's Blessing, Nyx Herald, Feast of Dreams): a creature that's
   // enchanted or is an enchantment, either one (TargetSpec.anyOf).
@@ -1197,6 +1213,12 @@ export function parseTargetPhrase(
   // only cards with the basic supertype (CR 205.4c). Only for a card in a graveyard.
   const otherThanBasic = / other than a basic land card\b/.test(p);
   if (otherThanBasic) p = p.replace(/ other than a basic land card\b/, "");
+  // "Target legendary permanent card not named ~ from a graveyard" (Staff of Eden): any other name; compile fills in
+  // this card's name. Only for a card target.
+  if (opts.target && /^[a-z ]+ card not named ~ from /.test(p)) {
+    extra.notNamed = "~";
+    p = p.replace(/ not named ~(?= from )/, "");
+  }
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:(?:the chosen|that) (creature type|type|color)|(a type chosen this way))/.exec(p);
   if (chosen) {
@@ -1251,6 +1273,12 @@ export function parseTargetPhrase(
   if (entered) {
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
+  }
+  // Let the Galaxy Burn: "each creature that didn't enter this turn".
+  const notEntered = / that didn't enter (?:the battlefield )?this turn$/.exec(p);
+  if (notEntered) {
+    extra.notEnteredThisTurn = true;
+    p = p.slice(0, notEntered.index);
   }
   // The Gitrog, Ravenous Ride: "a creature that saddled it this turn" (CR 702.171c), "it" the source; only in a choice
   // made as the source's ability resolves (see pickOptions).

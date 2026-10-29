@@ -6644,6 +6644,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (host.tapped) return `${nameOf(s, host.id)} is tapped`;
   }
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
+  if (ab.maxPerTurnCount && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= evalAmount(s, ab.maxPerTurnCount, { controller: pid, sourceId: id })) return `${d.name}'s ability can't be activated more times this turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
     if (!loyaltyAtInstantSpeed(s, pid, o) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
@@ -8047,6 +8048,13 @@ export function amplifyOptions(s: GameState, o: GameObject): ObjectId[] {
   return player(s, controllerOf(s, o)).hand.filter((id) => shareCreatureType(mine, creatureTypesOf(s, obj(s, id))));
 }
 
+/** Dragon's Disciple: does its controller control a Dragon (other than it) as it would enter? */
+function amplifyOneControls(s: GameState, o: GameObject): boolean {
+  const one = compileCard(defOf(s, o)).amplifyOne;
+  const you = controllerOf(s, o);
+  return !!one && s.battlefield.some((id) => id !== o.id && objectMatches(s, one.orControl, obj(s, id), you, false));
+}
+
 /**
  * Amplify N (CR 702.38a): "As this object enters, reveal any number of cards from your hand that share a creature type
  * with it. This permanent enters with N +1/+1 counters on it for each card revealed this way." Then it has entered.
@@ -8055,8 +8063,13 @@ function amplifyChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { 
   const d = defOf(s, o);
   const n = compileCard(d).amplify ?? 0;
   const shown = ids.filter((id) => s.objects[id]?.zone === "hand");
-  if (shown.length && n) {
-    const put = putCounters(s, o, "+1/+1", n * shown.length, true);
+  // Dragon's Disciple: one counter if a card was revealed or you control a Dragon (CompiledCard.amplifyOne).
+  const one = compileCard(d).amplifyOne;
+  if (one && !shown.length && amplifyOneControls(s, o)) {
+    const put = putCounters(s, o, "+1/+1", 1, true);
+    log(s, `${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"} (its controller controls ${one.orControl.text.replace(/ you control$/, "")}).`);
+  } else if (shown.length && n) {
+    const put = putCounters(s, o, "+1/+1", one ? 1 : n * shown.length, true);
     log(s, `${player(s, controllerOf(s, o)).name} reveals ${shown.map((id) => nameOf(s, id)).join(", ")}: ${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}${compileCard(d).amplifyFilter ? "" : " (amplify)"}.`);
   }
   invalidateCharacteristics(s);
@@ -8116,13 +8129,14 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "amplify") {
       // The card itself isn't in the hand, nor is anything entering with it (CR 702.38a).
       const options = amplifyOptions(s, o);
-      if (!options.length) {
+      const one = compileCard(defOf(s, o)).amplifyOne;
+      if (!options.length || (one && amplifyOneControls(s, o))) {
         q.shift();
         amplifyChosen(s, o, [], c.enters);
         continue;
       }
       const own = compileCard(defOf(s, o)).amplifyFilter;
-      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: own ? own.text : "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id, ...(own ? { prompt: `reveal any number of other ${own.text}s from your hand (a +1/+1 counter for each): click them, then reveal.` } : {}) };
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: own ? own.text : "card that shares a creature type with it", options, count: one ? 1 : options.length, min: 0, objectId: o.id, ...(one ? { prompt: `you may reveal ${/^[AEIOU]/.test(own!.text) ? "an" : "a"} ${own!.text} from your hand (a +1/+1 counter): click it, then reveal.` } : own ? { prompt: `reveal any number of other ${own.text}s from your hand (a +1/+1 counter for each): click them, then reveal.` } : {}) };
       return true;
     }
     if (c.what === "controlOpponent") {

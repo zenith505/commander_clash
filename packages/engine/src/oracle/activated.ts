@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type Effect, type TargetSpec } from "../abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type AmountExpr, type Effect, type TargetSpec } from "../abilities";
 import { NUM, num, X, sacrificeSelf, counterKind, singular } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
@@ -269,6 +269,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast" || keyword === "Forecast";
   let maxPerTurn: number | undefined;
+  let maxPerTurnCount: AmountExpr | undefined;
   let xMin: number | undefined;
   let xIs: ActivatedAbility["xIs"];
   let uncopyable = false;
@@ -394,6 +395,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (most && !maxPerTurn) {
       maxPerTurn = most[1] === "twice" ? 2 : 3;
       effectText = effectText.slice(0, most.index);
+      found = true;
+    }
+    // Withering Wisps: "Activate no more times each turn than the number of snow Swamps you control." (CR 602.5b): both
+    // counted each time it's activated (rulings).
+    const mostCount = / Activate no more times each turn than (the number of [^.]+)\.$/.exec(effectText);
+    const mostN = mostCount && !maxPerTurn && !maxPerTurnCount ? parseCount(mostCount[1]!, null) : null;
+    if (mostCount && mostN) {
+      maxPerTurnCount = mostN;
+      effectText = effectText.slice(0, mostCount.index);
       found = true;
     }
     // "You can't activate this ability during combat." (Djinn of Infinite Deceits, CR 602.5b): any time but then.
@@ -530,6 +540,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(onceEver ? { onceEver: true as const } : {}),
     ...(keyword ? { keyword } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
+    ...(maxPerTurnCount ? { maxPerTurnCount } : {}),
     ...(xMin ? { xMin } : {}),
     ...(xIs ? { xIs } : {}),
     ...(costLess ? { costLess } : {}),

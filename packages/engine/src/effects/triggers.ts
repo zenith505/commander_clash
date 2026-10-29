@@ -328,6 +328,7 @@ function diesMatches(
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
 function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>, o: GameObject, entering: GameObject, you: PlayerId): boolean {
   if (en.ifCast && !entering.wasCast) return false;
+  if (en.notFromHand && entering.castFromHand) return false;
   if (o.id === entering.id) {
     if (en.orSelf) return true;
     if (en.other) return false;
@@ -1507,7 +1508,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const info = { player: ev.player, amount: ev.amount };
     if (o?.zone === "battlefield") {
       const you = controllerOf(s, o);
-      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
     }
     // "Whenever a source you control deals noncombat damage to an opponent" (Niv-Mizzet, Visionary): the source's

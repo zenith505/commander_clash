@@ -539,6 +539,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
   }
+  // Enslaved Horror: "each other player may return a creature card from their graveyard to the battlefield": each
+  // opponent (every other player is one here) chooses one of their own or none as it resolves, all entering together.
+  if ((m = /^[Ee]ach (?:other player|opponent) may return an? (creature card) from their graveyard to the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", filter, who: { ref: "eachOpponent" } }] : null;
+  }
   // Fall of the Thran: "Each player returns two land cards from their graveyard to the battlefield": each chooses their own
   // as it resolves, all at the same time, the one card if they have only one (rulings).
   if ((m = /^[Ee]ach player returns (an?|two|three) land cards? from their graveyard to the battlefield$/.exec(s)))

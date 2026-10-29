@@ -2666,19 +2666,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B37: Inquisitor's Snare (its prevention must keep working after the creature leaves the battlefield,
   rulings), Arashin Sovereign ("your choice of the top or bottom", the dying creature's controller choosing, not its
   owner).
-- Next for Lane B, least played first: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics).
-  Then up from about 21,900 (rounds B8 and B35 took the easier ones; these are left): Wall of Shadows, Fickle Efreet,
-  Bill Ferny, Enkira, Bullseye, Rayami, Library of Lat-Nam, Resolute Strike, Boom Scholar, Splitting the Powerstone,
-  Storm the Citadel, Undergrowth, Time to Feed, Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss,
-  Boros Battleshaper, Aura Graft, Alex Wilder, Treva, Vivien's Invocation, Withering Wisps, Dralnu's
-  Crusade.
-  Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
-  Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
-  before the end step), Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Dragon's Disciple,
-  Obscura Interceptor, Rewrite History, Wight, Mondo Gecko, Cloaked Cadet, Tokka & Rahzar, Serene Master, Ruin
-  Processor, Enslaved Horror, Lo and Li, Chisei, Withercrown, Throne of Makindi, Stormwild Capridor, Mindlock Orb,
-  Lamplight Phoenix, Awesome Presence, and in the 18,000s Kav Landseeker, Mind Bomb and Tragic Lesson (round B36 did
-  the rest of this list).
+- Round B38 (harder skipped cards, least played first): "Activate no more times each turn than the number of snow
+  Swamps you control" (Withering Wisps), "All Goblins are black and are Zombies in addition to their other creature
+  types" (Dralnu's Crusade, layers 4 and 5), battalion-like "~ and at least two Zombies attack" (Enkira), "If the
+  sacrificed artifact was legendary" (Splitting the Powerstone), "That player reveals cards ... until a creature card is
+  revealed. The player puts that card onto the battlefield" (Blessed Reincarnation), "you may pay {1}. If you do,
+  reveal cards ... until you reveal a creature card" (Foster), "if this card is in your graveyard, you may discard a
+  card. If you do, return" (Gigapede), "choose a color, then you gain 1 life for each permanent of that color"
+  (Treva), "if you cast it from anywhere other than your hand" (Alex Wilder), a granted "combat damage to a player or
+  planeswalker" trigger with "defending player controls" (Storm the Citadel), "you may pay {2}{R}" as an optional
+  additional cost (Undergrowth: red creatures' combat damage isn't prevented), "When a creature is put onto the
+  battlefield this way, it deals damage equal to its power" (Vivien's Invocation; its power as it last existed,
+  rulings), "for each spell you've cast this turn other than the first" (Outlaw Stitcher), "can't become untapped for
+  as long as you control ~" (Spider-Woman), "deals 6 or more damage to an opponent" (Deus of Calamity), "you may reveal
+  a Dragon card from your hand. If you do or if you control a Dragon" (Dragon's Disciple; browser test), "When it
+  connives this way" (Obscura Interceptor, Psychic Pickpocket; it always connives, rulings), "one or more Humans you
+  control" once each turn (Cloaked Cadet), "each other player may return a creature card from their graveyard"
+  (Enslaved Horror), "an opponent discards a card or mills one or more cards" (Lo and Li), "sacrifice ~ unless you
+  remove a counter from a permanent you control" (Chisei), "less than its mana value" without a difference (Tokka &
+  Rahzar), "Players can't search libraries" (Mindlock Orb). +24 (27,620 of 31,936 with B35 to B37 and rounds 202 to
+  207).
+- Out after round B38: Wall of Shadows (whether a spell or ability "can target only Walls" needs its whole target
+  specs), Library of Lat-Nam (an opponent chooses the mode), Serene Master (exchanging power with values locked in, as
+  for "exchange life totals"), Kav Landseeker ("at the beginning of the end step on your next turn": there is only
+  "your next end step", which can be this turn's).
+- Next for Lane B, least played first (up from about 21,900): Fickle Efreet, Bill Ferny, Bullseye, Rayami, Boom
+  Scholar, Hypnox, Hankyu, The Abyss, Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
+  Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Ruin Processor, Throne of Makindi,
+  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
+  (each player discards up to three). Then the unsupported ones above that, least played first
+  (`npm run popular -- --least`).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

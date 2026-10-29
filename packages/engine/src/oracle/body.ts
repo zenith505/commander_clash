@@ -1216,6 +1216,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
   // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the chosen one.
   text = text.replace(/^(Choose a color\. (?:Target player|Target opponent) reveals their hand and discards all cards of) that color\.$/, "$1 the chosen color.");
+  // Undergrowth: "Prevent all combat damage that would be dealt this turn. If this spell's additional cost was paid (read as
+  // kicked), this effect doesn't affect combat damage that would be dealt by red creatures": all of it but red creatures'
+  // then, which is all combat damage nonred creatures would deal (only creatures deal combat damage, CR 510.1).
+  text = text.replace(/^(Prevent all combat damage that would be dealt this turn\. If ~ was kicked, )this effect doesn't affect combat damage that would be dealt by (white|blue|black|red|green) creatures\.$/, "$1prevent all combat damage that would be dealt this turn by non$2 creatures instead.");
+  // Treva, the Renewer: "If you do, choose a color, then you gain 1 life for each permanent of that color": the chosen one.
+  text = text.replace(/\b(choose a color, then you gain 1 life for each permanent of) that color\.$/, "$1 the chosen color.");
   // Traitor's Clutch: "Target creature gets +1/+0, becomes black, and gains shadow until end of turn.": all three to it,
   // until end of turn.
   text = text.replace(/^Target creature gets ([+-]\d+\/[+-]\d+), becomes (white|blue|black|red|green), and gains ([a-z]+) until end of turn\./, "Target creature gets $1 and gains $3 until end of turn. That creature becomes $2 until end of turn.");
@@ -6358,6 +6364,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "reflexive", putThisWay: true, body: { targets: [], effects: [{ type: "attachToChosen", source: { ref: "putThisWay" }, filter: { ...host, types: host.types?.length || host.subtypes?.length ? host.types : ["Creature"], text: attachOne[1]! }, may: true, equipmentOnly: true, pickOne: true }], text: `you may attach one of them to ${attachOne[1]!}.` } });
       continue;
     }
+    // Obscura Interceptor: "When this creature enters, it connives. When it connives this way, return up to one target
+    // spell to its owner's hand.": a reflexive trigger (CR 603.12), which triggers even if it left before conniving
+    // (rulings: it still connives).
+    const connived = /^When (?:it|~) connives this way, (.+)$/.exec(s);
+    if (connived && effects.length === 1 && effects[0]!.type === "connive" && effects[0]!.what.ref === "self" && (effects[0]!.n ?? 1) === 1) {
+      const reflexive = reflexiveBody(connived[1]!, ctx);
+      if (!reflexive) return null;
+      effects.push({ type: "reflexive", body: reflexive });
+      continue;
+    }
+    // Vivien's Invocation: "You may put a creature card from among them onto the battlefield. ... When a creature is put
+    // onto the battlefield this way, it deals damage equal to its power to target creature an opponent controls": a
+    // reflexive trigger (CR 603.12) only if one was put there, about that creature.
+    const whenPut = !dig && lastDig?.type === "dig" && lastDig.into === "battlefield" && (lastDig.count ?? 1) === 1 && lastDig.filter?.types?.length === 1 && lastDig.filter.types[0] === "Creature" ? /^When a creature is put onto the battlefield this way, (it deals damage equal to its power to .+)$/.exec(s) : null;
+    if (whenPut) {
+      const reflexive = reflexiveBody(whenPut[1]!, ctx, false, true);
+      if (!reflexive) return null;
+      // Gone by then: its power as it last existed (rulings, CR 608.2h), so damage from it rather than a bite (CR 701.14b).
+      const bite = reflexive.effects[0];
+      if (reflexive.effects.length !== 1 || bite?.type !== "bite" || bite.a.ref !== "subject" || bite.b.ref !== "target" || bite.times || bite.self) return null;
+      reflexive.effects = [{ type: "damage", amount: { count: { kind: "power", of: { ref: "subject" } } }, to: bite.b, by: "subject" }];
+      effects.push({ type: "reflexive", body: reflexive, about: "created" });
+      continue;
+    }
     // Winota: "It gains indestructible until end of turn": the one card put onto the battlefield, the permanent it became
     // (CR 400.7).
     const digGains = dig?.into === "battlefield" && dig.count === 1 && !afterDig.length ? /^It gains (indestructible|haste) until end of turn$/.exec(s) : null;
@@ -6473,6 +6503,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const revealed = parseBody(`${[cap(then[1]!), ...sentences.slice(si + 1)].join(". ")}.`);
         if (!revealed || revealed.targets.length || revealed.effects[0]?.type !== "revealTop") return null;
         effects.push({ type: "may", effects: [], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` }, { type: "if", cond: { kind: "youDid" }, effects: revealed.effects });
+        payFirst = null;
+        si = sentences.length;
+        continue;
+      }
+      // Foster: "you may pay {1}. If you do, reveal cards from the top of your library until you reveal a creature card. Put
+      // that card into your hand and the rest into your graveyard.": the whole reveal, only if paid.
+      if (!payFirst.payX && /^reveal cards from the top of your library until you reveal /.test(then[1]!) && /^Put that card /.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
+        const revealed = parseBody(`${[cap(then[1]!), sentences[si + 1]!.replace(/\.$/, "")].join(". ")}.`);
+        if (!revealed || revealed.targets.length || revealed.effects.length !== 1 || revealed.effects[0]!.type !== "revealUntil") return null;
+        effects.push({ type: "may", effects: revealed.effects, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
         si = sentences.length;
         continue;
@@ -9542,10 +9582,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const theirs = /^(Its controller|That creature's controller|That permanent's controller) reveals cards from the top of their library until they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?$/.exec(s);
+    // Blessed Reincarnation: "Exile target creature an opponent controls. That player reveals cards from the top of their
+    // library until a creature card is revealed": the same, "that player" being the target's controller.
+    const theirs = /^(Its controller|That creature's controller|That permanent's controller|That player) reveals cards from the top of their library until (?:they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?|a (creature card) is revealed)$/.exec(s);
+    if (theirs?.[4]) theirs[2] = theirs[4];
     const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|They put that card onto the battlefield and (the rest on the bottom of their library in a random order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-    if (theirs && theirPut) {
-      const who = parsePlayer(theirs[1]!.toLowerCase(), ctx);
+    const thatPlayerOf = theirs?.[1] === "That player" ? ctx.targets.length === 1 && /^target (?:creature|permanent) an opponent controls$/.test(ctx.targets[0]!.text ?? "") : true;
+    if (theirs && theirPut && thatPlayerOf) {
+      const who = parsePlayer(theirs[1] === "That player" ? "its controller" : theirs[1]!.toLowerCase(), ctx);
       const filter = parseSearchFilter(theirs[2]!);
       if (who?.ref !== "targetController" || ctx.targets[who.index]?.many || !filter || filter.kind !== "card") return null;
       // Onto the battlefield: creature cards, or (sharing a type) any permanent card, an Aura enchanting what its new
@@ -10150,7 +10194,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // The creature a sacrifice cost sacrificed (compile checks there is one). Costs are paid after targets are chosen
   // (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
-  { re: "the sacrificed creature was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
+  { re: "the sacrificed (?:creature|artifact) was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
   { re: "~'s sneak cost was paid", cond: { kind: "altPaid", alt: "sneak" }, spellOnly: true },
   // "As an additional cost to cast this spell, you may waterbend {2}" is paid like kicker (CompiledCard.kicker.waterbend).

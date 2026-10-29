@@ -165,6 +165,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
+  if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
+  // Death by Dragons: "Each player other than target player creates ...".
+  if (x === "each player other than target player") {
+    const index = addTarget(ctx, { kind: "player", text: "target player" });
+    ctx.lastPlayerTarget = index;
+    return { ref: "otherThanTarget", index };
+  }
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
   // Bonder's Ornament: "Each player who controls a permanent named ~".

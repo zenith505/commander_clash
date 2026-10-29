@@ -1353,6 +1353,13 @@ export function compile(d: CardDef): CompiledCard {
       (out.activationTaxes ??= []).push({ ...(tax[1] ? { filter: { kind: "card", chosen: "name", text: "sources with the chosen name" } } : {}), n: Number(tax[2]), text: line });
       continue;
     }
+    // Eidolon of Obstruction: "Loyalty abilities of planeswalkers your opponents control cost {1} more to activate": a mana
+    // part added to their cost, whatever loyalty they cost (rulings).
+    const loyaltyTax = /^Loyalty abilities of planeswalkers your opponents control cost \{(\d+)\} more to activate\.$/.exec(line);
+    if (loyaltyTax) {
+      (out.activationTaxes ??= []).push({ n: Number(loyaltyTax[1]), opponents: true, loyalty: true, text: line });
+      continue;
+    }
     // Tithe Taker (the second half of its line, split above).
     const theirs = /^During your turn, abilities your opponents activate cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
     if (theirs) {
@@ -2507,6 +2514,13 @@ export function compile(d: CardDef): CompiledCard {
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ninjutsuLess) {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
+      continue;
+    }
+    // Boom Scholar: "Exhaust abilities of other permanents you control cost {2} less to activate": generic mana only, down to
+    // {0} (rulings).
+    const exhaustLess = /^Exhaust abilities of other permanents you control cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (exhaustLess) {
+      out.exhaustLess = (out.exhaustLess ?? 0) + Number(exhaustLess[1]);
       continue;
     }
     const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);

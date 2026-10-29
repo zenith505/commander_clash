@@ -1226,8 +1226,10 @@ export type PlayerRef =
   | { ref: "subjectControllerOpponents" }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
-  /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. */
-  | { ref: "mostCreatures" }
+  /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. `lands`: "the most lands" (Tectonic Hellion). */
+  | { ref: "mostCreatures"; lands?: true }
+  /** "Each player other than target player" (Death by Dragons): every player but the target, if it's still legal (CR 608.2b). */
+  | { ref: "otherThanTarget"; index: number }
   /** "The player who controls the most Wizards" (Thoughtbound Primoc): the one player with the most, none if two or more tie (rulings on Sokenzan Renegade). */
   | { ref: "uniqueMost"; stat: MostStat }
   /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
@@ -2062,7 +2064,8 @@ export type Effect =
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
       /** `castSpell`: "that spell deals ..." in a cast trigger (Sorcerer Class): the spell, as it last existed if it has left the stack (rulings, CR 608.2h). */
       /** `created`: "That creature deals ..." after putting a card onto the battlefield (Too Greedily, Too Deep): the one permanent this resolution put there, if it's still there. */
-      by?: "subject" | "attached" | "castSpell" | "created" | { target: number };
+      /** `lastKnown`: "Destroy target artifact. That artifact deals damage ..." (Goblin Tinkerer): the target as it last existed on the battlefield once this has moved it (CR 608.2h). */
+      by?: "subject" | "attached" | "castSpell" | "created" | { target: number; lastKnown?: true };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
       /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
@@ -4502,7 +4505,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -4615,8 +4618,8 @@ export interface TriggeredAbility {
    * Not a sacrifice, nor lethal damage destroyed by a state-based action (rulings on Karmic Justice).
    */
   destroyed?: { filter: TargetSpec; by: "opponent" };
-  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
-  ifNoCounter?: "+1/+1" | "-1/-1" | "any";
+  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher); "time" (Deadly Grub). */
+  ifNoCounter?: string;
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
   ifHadCounter?: string;
   /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
@@ -4858,6 +4861,8 @@ export interface ActivatedAbility {
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
   keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft" | "Forecast";
+  /** An outlast ability (CR 702.107a), for "whenever you activate ~'s outlast ability" (Herald of Anafenza). */
+  outlast?: true;
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "Activate no more times each turn than the number of snow Swamps you control" (Withering Wisps, CR 602.5b). */
@@ -5822,7 +5827,7 @@ export interface CompiledCard {
    * of sources with the chosen name cost {2} more ..." (Anointed Peacekeeper): generic mana added to the ability's cost
    * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
    */
-  activationTaxes?: { filter?: TargetSpec; n: number; text: string; /** Only abilities its controller's opponents activate (Tithe Taker). */ opponents?: true; /** Only during its controller's turn. */ yourTurn?: true }[];
+  activationTaxes?: { filter?: TargetSpec; n: number; text: string; /** Only abilities its controller's opponents activate (Tithe Taker). */ opponents?: true; /** Only during its controller's turn. */ yourTurn?: true; /** Only loyalty abilities of planeswalkers (Eidolon of Obstruction). */ loyalty?: true }[];
   /**
    * The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). Gemstone
    * Caverns: only if you're not the starting player, with a counter on it, and "if you do, exile a card from your hand".
@@ -6163,6 +6168,8 @@ export interface CompiledCard {
   extraSpellCopy?: true;
   /** "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath; CR 702.193) */
   powerUpLess?: number;
+  /** "Exhaust abilities of other permanents you control cost {2} less to activate" (Boom Scholar): generic mana only. */
+  exhaustLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
   /**

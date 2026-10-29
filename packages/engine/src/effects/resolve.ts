@@ -588,6 +588,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
     case "otherPlayers":
       return livingPlayers(s).filter((p) => p !== ctx.event?.player);
+    case "otherThanTarget": {
+      // Nothing happens if the target player is no longer legal: the spell does nothing (CR 608.2b).
+      const t = ctx.targets[ref.index];
+      return ctx.legal[ref.index] && t?.kind === "player" ? livingPlayers(s).filter((p) => p !== t.id) : [];
+    }
     case "otherThanTargetController": {
       // The target as it last existed if it has left (CR 608.2h); none if it's illegal, as nothing of the spell happens then.
       const them = players(s, { ref: "targetController", index: ref.index }, ctx);
@@ -652,7 +657,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
     }
     case "mostCreatures": {
-      const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), "Creature")).length;
+      const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), ref.lands ? "Land" : "Creature")).length;
       const most = Math.max(0, ...livingPlayers(s).map(n));
       return apnap(s, livingPlayers(s).filter((p) => n(p) === most));
     }

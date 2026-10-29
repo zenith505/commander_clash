@@ -2729,11 +2729,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),
   Fickle Efreet ("an opponent gains control of ~" after a lost coin flip), The Abyss (the active player chooses the
   target), Retribution, Barrin's Spite, Vicious Betrayal, Sacred Guide, Scrounge.
-- Next for Lane B, least played first (up from about 21,900): Bill Ferny, Bullseye, Rayami, Boom Scholar, Hankyu,
-  Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
+- Round B41 (harder skipped cards, least played first): "Whenever you activate an exhaust ability" (Afterburner
+  Expert, Adrenaline Jockey, Rangers' Aetherhive, Rangers' Refueler), "Exhaust abilities you activate cost {1} less"
+  (Boom Scholar), "Whenever you activate ~'s outlast ability" (Herald of Anafenza), "if it had no time counters on it"
+  as it dies (Deadly Grub, Chronozoa, Lost Auramancers), "each player who controls the most lands" (Tectonic Hellion),
+  "each player other than target player" (Death by Dragons), "Loyalty abilities ... cost {1} more" (Eidolon of
+  Obstruction), graveyard triggers "if ~ is in your graveyard, you may (pay ...) return it / put it on top of your
+  library" (Pyrewild Shaman, Moss-Pit Skeleton, Dungeon Crawler, Auntie's Snitch, Blood Operative), "you may have her
+  deal 2 damage to you. When you do" (Elektra), "That artifact deals damage equal to its mana value to ~" as it last
+  existed (Goblin Tinkerer), "During your turn, ~ is a Bear with base power and toughness 4/2" (Circle of the Moon
+  Druid), "can't attack if there's another creature on the battlefield" (Shauku), "put that permanent on the
+  bottom of its owner's library instead" after kicker (Rona's Vortex), "If that permanent is black, exile it instead"
+  of phasing out (Divine Smite), Heated Argument, Monoist Circuit-Feeder, "return it ... and it loses all abilities"
+  (Retched Wretch), Sudden Reclamation, Mind Bomb (each player discards up to three), Renounce ("sacrifice any number
+  of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,699 of 31,936).
+- Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
+  Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst, Sivvi's Valor, Treacherous Link,
+  Kitesail Skirmisher, Bill Ferny, Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
+- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
-  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
-  (each player discards up to three). Then the unsupported ones above that, least played first
+  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,

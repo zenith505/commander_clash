@@ -46,6 +46,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
+  // Treva, the Renewer: "you gain 1 life for each permanent of the chosen color", the color chosen as it resolves.
+  if ((m = each ? /^(permanent|creature) of the chosen color$/.exec(p) : /^the number of (permanent|creature)s of the chosen color$/.exec(p)))
+    return { count: { kind: "permanents", filter: { kind: "object", types: m[1] === "creature" ? ["Creature"] : [], notTypes: [], notColors: [], chosen: "color", text: `${m[1]} of the chosen color` } } };
   // Curse of Thirst: "the number of Curses attached to them", them being the enchanted player whose upkeep it is.
   if (ctx?.eventPlayer && /^the number of Curses attached to (?:them|that player)$/.test(p))
     return { count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Curse"], text: "Curse" }, attachedToPlayer: { ref: "eventPlayer" } } };
@@ -604,6 +607,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Outlaw Stitcher: "for each spell you've cast this turn other than the first": all of them but one.
+  if (each && /^spell you've cast this turn other than the first$/i.test(p)) return count({ kind: "spellsCastThisTurn", beyondFirst: true });
   // Storm Entity: "for each other spell cast this turn", every player's, not its own cast (rulings: counted as it enters,
   // spells cast while it was on the stack too; copies weren't cast, CR 707.10).
   if (each && (ctx === null || ctx.spell) && /^other spells? cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", anyone: true, notSource: true });

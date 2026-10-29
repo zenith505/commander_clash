@@ -683,6 +683,13 @@ function parseWhileTapped(inner: string, controlled: boolean | "controlled", ctx
     const what = parseObject(m[1]!, ctx);
     return what ? lasting([{ type: "continuous", what, mods: [{ kind: "doesntUntap" }], duration: "game" }]) : null;
   }
+  // Spider-Woman, Secret Agent: "That creature can't become untapped for as long as you control ~": nothing untaps it
+  // (see untapPermanent) while it lasts.
+  const cantUntap = /^(.+?) can't become untapped$/i.exec(inner);
+  if (cantUntap) {
+    const what = parseObject(cantUntap[1]!, ctx);
+    return what ? lasting([{ type: "continuous", what, mods: [{ kind: "cantBecomeUntapped" }], duration: "game" }]) : null;
+  }
   if (/^Gain control of /i.test(inner)) {
     const fx = parseSentence(inner, ctx);
     return fx?.[0]?.type === "continuous" && fx[0].duration === "game" ? lasting(fx) : null;

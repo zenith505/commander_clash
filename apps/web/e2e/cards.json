@@ -4890,6 +4890,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e5d3574-cc92-434a-a210-fcda906391c8",
+  "name": "Dragon's Disciple",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Monk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Monk"
+  ],
+  "oracleText": "As this creature enters, you may reveal a Dragon card from your hand. If you do or if you control a Dragon, this creature enters with a +1/+1 counter on it.\nDragons you control have ward {1}. (Whenever a Dragon you control becomes the target of a spell or ability an opponent controls, counter it unless that player pays {1}.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "81338d64-8fc3-41ac-afc8-e2a79df1159b",
   "name": "Dream Cache",
   "manaCost": "{2}{U}",

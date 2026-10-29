@@ -639,9 +639,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "counterSpell", index: i, bounce: true, librarySecond: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "second" }];
   }
   // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
-  if ((m = /^Return target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {
-    const spec = parseTargetPhrase(m[1]!);
-    return spec?.kind === "spell" && !spec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, spec), bounce: true }] : null;
+  // Obscura Interceptor: "return up to one target spell to its owner's hand": the same, or nothing.
+  if ((m = /^Return (up to one )?target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[2]!);
+    return spec?.kind === "spell" && !spec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true } : spec), bounce: true }] : null;
   }
   // "Counter target spell that targets a permanent you control" (Rebuff the Wicked), "... that targets you".
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana

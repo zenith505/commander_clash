@@ -2287,6 +2287,13 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (!CREATURE_TYPES.has(type)) return null;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], owner: "opponent", text: "creature you control but don't own" } }, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
   }
+  // Dralnu's Crusade: "All Goblins are black and are Zombies in addition to their other creature types": the creature
+  // type in layer 4 and that color instead of their others in layer 5 (CR 105.3, 205.1b, 613.1d-e; rulings), for the
+  // same group in both (CR 613.6).
+  const colorAndType = /^(All [A-Z][a-z]+s) are (white|blue|black|red|green) and are ([A-Z][a-z]+)s in addition to their other creature types$/.exec(text);
+  const colorAndTypeAffects = colorAndType && parseAffected(colorAndType[1]!);
+  if (colorAndType && colorAndTypeAffects?.kind === "filter" && CREATURE_TYPES.has(colorAndType[3]!))
+    return { affects: colorAndTypeAffects, mods: [{ kind: "addTypes", types: [], subtypes: [colorAndType[3]!] }, { kind: "setColors", colors: [COLOR_WORDS[colorAndType[2]!]!] }], text: line };
   // Hivestone: "Creatures you control are Slivers in addition to their other creature types"; Earl of Squirrel: "Creature
   // tokens you control are Squirrels ...": a creature type added in layer 4 (CR 205.1b, 613.1d), to whichever creatures
   // are in the group then.

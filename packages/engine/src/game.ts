@@ -1311,7 +1311,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -2926,6 +2926,7 @@ function startNextTurn(s: GameState, skipping = false) {
       p.lifeCantChange = undefined;
       p.noMaxHandSizeUntilNextTurn = undefined;
       p.attackTaxUntil = undefined;
+      p.unattackableUntil = undefined;
       p.attackBansUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
@@ -4815,15 +4816,22 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
   }
   // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).
   // "Spells your opponents cast" (Elspeth Conquers Death): the opponents of who it's from.
-  for (const { player: who, mod: m } of s.costModsThisTurn ?? []) {
-    if (m.who === "opponents" ? who === pid || !opponents(s, who).includes(pid) : who !== pid) continue;
-    const { manaValue: range, ...rest } = m.filter;
-    if (!printedMatches(rest, d)) continue;
-    if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+  for (const c of s.costModsThisTurn ?? []) {
+    const m = c.mod;
+    if (!costModThisTurnApplies(s, c, pid, d, mv)) continue;
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
   return { more, less, moreColored, lessColored, lessColoredOrGeneric, lifeOffers };
+}
+
+/** Does a cost change from a resolved spell or ability (GameState.costModsThisTurn) apply to `d` as `pid` casts it? */
+function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costModsThisTurn"]>[number], pid: PlayerId, d: CardDef, mv: number): boolean {
+  const m = c.mod;
+  if (m.who === "opponents" ? c.player === pid || !opponents(s, c.player).includes(pid) : c.player !== pid) return false;
+  const { manaValue: range, ...rest } = m.filter;
+  if (!printedMatches(rest, d)) return false;
+  return !range || ((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max));
 }
 
 /**
@@ -5470,6 +5478,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.spellsCastThisTurn = item.castNth + 1;
   p.nextSpellImprovise = undefined; // it was the next spell cast (Archway of Innovation)
   p.nextSpellConvoke = undefined; // and Wand of the Worldsoul's
+  // "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): this was that spell, so the
+  // reduction is used up as it becomes cast (CR 601.2i), each such one that applied to it.
+  if (s.costModsThisTurn?.some((c) => c.next)) {
+    const mvNow = defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost));
+    s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow));
+  }
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
@@ -6955,6 +6969,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
+  // "Whenever you activate an ability of a card in your graveyard" (Neerdiv): where it was as it was activated (CR 602.2),
+  // even if a cost moves it (unearth's doesn't, embalm's does).
+  const fromOwnGraveyard = o.zone === "graveyard" && o.owner === p.id ? (true as const) : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
@@ -7095,7 +7112,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -7629,7 +7646,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
-    if (pend.what === "counterChoice") {
+    if (pend.what === "form") {
+      // "It becomes your choice of a 3/3 creature with flying, ...": those values are part of its copiable values (CR
+      // 208.2b, 707.2), a copy effect over what it is now (a copy of Primal Clay adds its own choice to the copied one's,
+      // rulings), from the moment it enters.
+      const form = compileCard(defOf(s, o)).entersForms?.[Number(choice)];
+      if (!form || !pend.options.includes(choice)) throw new RulesError("choose one of the offered forms");
+      addCopyEffect(s, o, copyKey(s, copiableDef(s, o), form.except));
+      log(s, `${pend.source} enters as a ${form.text}.`);
+    } else if (pend.what === "counterChoice") {
       // "Enters with your choice of a reach counter or a vigilance counter on it" (CR 614.1c, 614.12).
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
       const put = putCounters(s, o, choice, 1, true);
@@ -7656,7 +7681,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -8207,6 +8232,12 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
+    if (c.what === "form") {
+      // "As ~ enters, it becomes your choice of ..." (CR 614.12): its controller picks one of them.
+      const forms = compileCard(defOf(s, o)).entersForms ?? [];
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "form", options: forms.map((_, i) => String(i)), labels: forms.map((f) => `A ${f.text}`), objectId: o.id, prompt: `choose what ${defOf(s, o).name} becomes as it enters` };
+      return true;
+    }
     if (c.what === "counterChoice") {
       const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.map((k) => `a ${k} counter`).join(" or ")}` };
@@ -8568,6 +8599,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   // The Second Doctor: during the attacker's next turn, not the player or a permanent they control.
   const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
+  // Chronomantic Escape: that player, not their planeswalkers or battles.
+  if (player(s, defender).unattackableUntil && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name} until their next turn`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   if (c.cantAttackPlayersOnly.includes(defender) && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name}`;

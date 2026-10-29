@@ -278,7 +278,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -1757,7 +1757,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;
         if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
-        if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length < 2) return false;
+        if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length < 2) return false;
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).
         if (t.cast.firstOfKinds) {
@@ -1958,7 +1958,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu)) return false;
+        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
         if (a.equipped) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;

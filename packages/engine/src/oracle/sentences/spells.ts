@@ -45,6 +45,19 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` } }];
   }
+  // "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker), "the next instant or sorcery spell
+  // you cast this turn costs {X} less to cast, where X is ~'s power as this ability resolves" (Maelstrom Muse), "... for
+  // each counter removed this way" (Mutated Cultist): a reduction to only the next such spell its controller casts this
+  // turn, generic mana only (CR 601.2f, 118.7a; rulings), counted as it resolves.
+  if ((m = /^[Tt]he next ((?:instant or sorcery |noncreature |creature |artifact )?spell) you cast this turn costs \{(\d+|X)\} less to cast(?:, where X is (.+?)| for each (.+))?$/.exec(s)) && (m[2] === "X") === !!(m[3] || ctx.whereX)) {
+    const what = m[1] === "spell" ? "Spells" : `${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1).replace(/ or /, " and ")}s`;
+    const change = parseCostChange(`${what} you cast cost {${m[2] === "X" ? 1 : m[2]}} less to cast`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard || change.costMod.times || change.costMod.nth) return null;
+    // With the X defined after the sentence (ctx.whereX), the X is filled in afterwards (replaceX).
+    const times = m[3] ? parseCount(m[3].replace(/ as this ability resolves$/, ""), ctx) : m[4] ? parseCount(m[4], ctx, true) : m[2] === "X" ? X : undefined;
+    if ((m[3] || m[4]) && !times) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true, ...(times ? { times } : {}) }];
+  }
   // Ral, Leyline Prodigy: "Until your next turn, instant and sorcery spells you cast cost {1} less to cast": the same,
   // until its controller's next turn begins (CR 611.2b).
   if ((m = /^Until your next turn, (.+? spells) you cast cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {

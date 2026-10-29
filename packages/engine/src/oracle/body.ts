@@ -1123,6 +1123,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Mill (a card|two cards|three cards), then return an? ([a-z]+ card) of an opponent's choice from your graveyard to your hand\.$/, "Mill $1. Choose an opponent. That player chooses a $2 in your graveyard. Return that card to your hand.");
   // Tevesh Szat: "If you do, draw two cards, then draw another card if the sacrificed permanent was a commander."
   text = text.replace(/(^|\. )(If you do, draw (?:a card|two cards)), then draw another card if the sacrificed permanent was a commander\./, "$1$2. If the sacrificed permanent was a commander, draw a card.");
+  // Enchanted River's Grasp: "tap enchanted creature and remove all counters from it": two instructions about it.
+  text = text.replace(/(^|\. )([Tt])ap enchanted creature and remove all counters from it\./, "$1$2ap enchanted creature. Remove all counters from enchanted creature.");
   // Mystic Reflection: "Choose target nonlegendary creature. The next time ..., they enter as copies of the chosen creature."
   text = text.replace(/(^|\. )Choose (target [^.]+?)\. (The next time one or more creatures or planeswalkers enter this turn, they enter as copies of) the chosen creature\./, "$1$3 $2.");
   // Nibelheim Aflame: "Choose target creature you control. It deals damage equal to its power to each other creature.": the
@@ -1927,6 +1929,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/([Pp]ut a creature card exiled with ~ onto the battlefield under your control with a finality counter on it)\. It gains haste\. Sacrifice it at the beginning of the next end step\./, "$1, and it gains haste until it is sacrificed when the next end step begins.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
+  // Mass Diminish: "Until your next turn, creatures target player controls have base power and toughness 1/1": the
+  // same as "... until your next turn" (the creatures there as it resolves, CR 611.2c).
+  text = text.replace(/(^|\. )Until your next turn, (creatures target (?:player|opponent) controls (?:have|get) [^.]+)\./, (_, pre: string, rest: string) => `${pre}${rest.charAt(0).toUpperCase()}${rest.slice(1)} until your next turn.`);
   // Sylvan Awakening: "Until your next turn, all lands you control become 2/2 Elemental creatures with reach,
   // indestructible, and haste." The same as with the duration last; the lands it affects are those there as it resolves
   // (rulings, CR 611.2c).
@@ -6810,6 +6815,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     const where = /^(.+), where X is ([^"]+)$/.exec(s);
     if (where) s = where[1]!;
+    // "Where X is ~'s power as this ability resolves" (Maelstrom Muse): when an X is counted anyway (CR 608.2h).
+    if (where) where[2] = where[2]!.replace(/ as this ability resolves$/, "");
     ctx.whereX = !!where;
     const before = effects.length;
     const targetsBefore = ctx.targets.length;

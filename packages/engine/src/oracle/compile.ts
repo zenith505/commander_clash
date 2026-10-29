@@ -231,7 +231,8 @@ export function isFullySupported(d: CardDef): boolean {
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).
   const defined = c.statics.flatMap((st) => st.mods).find((x) => x.kind === "definePT");
   // A printed negative number is a number (Char-Rumbler's -1, Spinal Parasite's -1/-1).
-  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^-?\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined);
+  // Primal Clay's "*/*": 0/0 off the battlefield, the chosen values on it (CR 208.2b).
+  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^-?\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined) || (v === "*" && !!c.entersForms);
   if ((d.types.includes("Creature") || d.subtypes.includes("Vehicle")) && (!ptOk(d.power, "power") || !ptOk(d.toughness, "toughness"))) return false;
   if (c.unsupported.length) return false;
   if ((d.types.includes("Instant") || d.types.includes("Sorcery")) && !c.spell) return false;
@@ -1173,6 +1174,21 @@ export function compile(d: CardDef): CompiledCard {
     if (counterChoice) {
       if (out.entersCounterChoice || counterChoice[2] === counterChoice[3]) out.unsupported.push(raw);
       else out.entersCounterChoice = { counters: [counterKind(counterChoice[2]!), counterKind(counterChoice[3]!)], ...(counterChoice[1] === "escapes" ? { escaped: true as const } : {}) };
+      continue;
+    }
+    // Corrupted Shapeshifter, Primal Plasma, Primal Clay: "As ~ enters, it becomes your choice of a 3/3 creature with
+    // flying, a 2/5 creature with vigilance, or a 0/12 creature with defender": set power and toughness and maybe a
+    // keyword or a creature type, as it enters (CR 208.2b, 614.12). Primal Clay's "artifact creature" is what it is anyway.
+    const forms = /^As ~ enters, it becomes your choice of (.+?)( in addition to its other types)?\.$/.exec(line);
+    if (forms) {
+      const isArtifact = d.types.includes("Artifact");
+      const parsed = forms[1]!.split(/, (?:or )?/).map((t) => /^an? (\d+)\/(\d+) (?:([A-Z][a-z]+) )?(artifact )?creature(?: with (flying|vigilance|defender|reach|trample|haste|deathtouch|lifelink))?$/.exec(t));
+      if (out.entersForms || parsed.length < 2 || parsed.some((f) => !f || (f[4] && !isArtifact) || (f[3] && !forms[2]))) out.unsupported.push(raw);
+      else
+        out.entersForms = parsed.map((f) => ({
+          except: { pt: [Number(f![1]), Number(f![2])] as [number, number], ...(f![5] ? { keywords: [capital(f![5])] } : {}), ...(f![3] ? { addSubtypes: [f![3]] } : {}) },
+          text: f![0].replace(/^an? /, ""),
+        }));
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
@@ -3835,6 +3851,12 @@ export function compile(d: CardDef): CompiledCard {
       // Trouble in Pairs: "Whenever an opponent attacks you with two or more creatures, draws their second card each
       // turn, or casts their second spell each turn, you draw a card": three triggers (rulings: each can trigger).
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line) ??
+      // Curse of Shaken Faith: "Whenever enchanted player casts a spell other than the first spell they cast each turn or
+      // copies a spell, ...": a cast and a copy are never one event (CR 707.10).
+      /^Whenever (enchanted player) (casts a spell other than the first spell they cast each turn) or (copies a spell), (.+)$/.exec(line) ??
+      // Neerdiv, Devious Diver: "Whenever you cast a spell from your graveyard or activate an ability of a card in your
+      // graveyard, ...": a cast and an activation are never one event.
+      /^Whenever you (cast a spell from your graveyard) or (activate an ability of a card in your graveyard), (.+)$/.exec(line) ??
       // Norin the Wary: "When a player casts a spell or a creature attacks, ...": a cast and an attack are never one event.
       /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line) ??
       // Powerstone Minefield: "Whenever a creature attacks or blocks, ~ deals 2 damage to it.": each creature as it's
@@ -3881,6 +3903,10 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
+            : /^Whenever enchanted player casts a spell other than the first /.test(line)
+              ? [`Whenever enchanted player ${twice[2]}, ${effect}`, `Whenever enchanted player ${twice[3]}, ${effect}`]
+            : /^Whenever you cast a spell from your graveyard or activate /.test(line)
+              ? [`Whenever you ${twice[1]}, ${effect}`, `Whenever you ${twice[2]}, ${effect}`]
             : /^When a player casts a spell or a creature attacks, /.test(line)
               ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
             : /^Whenever you cast an? [^,]+? spell and whenever you draw /.test(line)

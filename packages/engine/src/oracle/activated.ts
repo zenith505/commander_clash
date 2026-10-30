@@ -466,7 +466,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
-  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature)?)|Put ~ from your graveyard into your library third from the top|Put ~ from your graveyard on top of your library)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature)?)|Put ~ from your graveyard into your library third from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).

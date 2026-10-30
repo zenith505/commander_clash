@@ -1,5 +1,5 @@
 import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
+import { characteristics, controllerOf, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
@@ -283,6 +283,15 @@ export function basePowerNow(s: GameState, o: GameObject): number {
   return set ? set.power : c.printedPower;
 }
 export const toughness = (s: GameState, o: GameObject) => characteristics(s, o).toughness;
+/**
+ * The damage it takes to destroy creature `o` now (CR 120.6, 704.5g): its toughness less the damage marked on it, or with
+ * Zilortha, Strength Incarnate its power instead, at least 1 (rulings: a creature with 0 power needs 1 damage).
+ */
+export function lethalLeft(s: GameState, o: GameObject): number {
+  const c = controllerOf(s, o);
+  const byPower = s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).lethalByPower && controllerOf(s, s.objects[id]!) === c);
+  return Math.max(0, (byPower ? Math.max(1, power(s, o)) : toughness(s, o)) - o.damage);
+}
 
 /** Is this object of card type `t` right now (after type-changing effects)? */
 export const objIsType = (s: GameState, o: GameObject, t: string) => characteristics(s, o).types.includes(t);

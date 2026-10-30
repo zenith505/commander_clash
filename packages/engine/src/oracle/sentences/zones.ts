@@ -423,6 +423,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[3] && !m[2]) return null;
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { [m[6]!]: num(m[5]!) } } : {}) }];
   }
+  // Startled Awake: "{3}{U}{U}: Put ~ from your graveyard onto the battlefield transformed": its back face up (CR 712.14a),
+  // under your control (CR 110.2a).
+  if (ctx.selfCard && ctx.activated && /^Put ~ from your graveyard onto the battlefield transformed$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, transformed: true }];
   // Sandman, Shifting Scoundrel: "{3}{G}{G}: Return ~ and target land card from your graveyard to the battlefield tapped":
   // the card and the target enter at the same time (CR 608.2c); with the target illegal the ability doesn't resolve, so
   // the card stays too (CR 608.2b).
@@ -569,6 +572,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ee]ach (?:other player|opponent) may return an? (creature card) from their graveyard to the battlefield$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     return filter ? [{ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", filter, who: { ref: "eachOpponent" } }] : null;
+  }
+  // Ill-Gotten Gains: "Each player ... returns up to three cards from their graveyard to their hand": each chooses their own
+  // as it resolves (fewer if they want, rulings), in APNAP order, all returned together.
+  if ((m = /^[Ee]ach player returns up to (one|two|three) cards from their graveyard to their hand$/.exec(s))) return [{ type: "chooseFromGraveyard", n: num(m[1]!), upTo: true, who: { ref: "eachPlayer" } }];
+  // Virtus's Maneuver: "Each friend returns a creature card from their graveyard to their hand": each chooses one of their
+  // own as it resolves, in APNAP order, all returned together.
+  if ((m = /^[Ee]ach player who chose ([a-z]+) returns an? ([a-z]+ card) from their graveyard to their hand$/.exec(s)) && ctx.chooseWords?.includes(m[1]!)) {
+    const filter = parseSearchFilter(m[2]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, filter, who: { ref: "choseWord", option: m[1]! } }] : null;
   }
   // Fall of the Thran: "Each player returns two land cards from their graveyard to the battlefield": each chooses their own
   // as it resolves, all at the same time, the one card if they have only one (rulings).
@@ -876,9 +888,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const lesser = / with lesser power$/.exec(m[3]!);
     if (lesser && (ctx.spell || !(ctx.selfIt || ctx.activated))) return null;
     // "A permanent card with equal or lesser mana value" (Kodama of the East Tree): than the permanent that entered.
-    const equal = / with equal or lesser mana value$/.exec(m[3]!);
+    // Bane, Lord of Darkness: "a creature card with equal or lesser toughness": than the creature that died, as it last
+    // existed (rulings: not Bane's).
+    const equal = / with equal or lesser (mana value|toughness)$/.exec(m[3]!);
     if (equal && !ctx.subjectIt) return null;
-    const phrase = lesser ? m[3]!.slice(0, lesser.index) : equal ? `${m[3]!.slice(0, equal.index)} with mana value less than or equal to that permanent's mana value` : m[3]!;
+    const phrase = lesser ? m[3]!.slice(0, lesser.index) : equal ? `${m[3]!.slice(0, equal.index)} with ${equal[1]} less than or equal to that ${equal[1] === "toughness" ? "creature" : "permanent"}'s ${equal[1]}` : m[3]!;
     // "A permanent card with mana value less than or equal to that damage" (Covert Technician): counted as it resolves.
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;

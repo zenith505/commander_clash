@@ -174,6 +174,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
   if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
+  if (x === "each player who controls the fewest creatures") return { ref: "mostCreatures", fewest: true };
   // Death by Dragons: "Each player other than target player creates ...".
   if (x === "each player other than target player") {
     const index = addTarget(ctx, { kind: "player", text: "target player" });
@@ -884,7 +885,11 @@ function singularPhrase(p: string): string {
     const land = j < 0 ? words.findIndex((w) => /^(?:Forests|Islands|Mountains|Swamps)$/.test(w)) : -1;
     if (land >= 0) words[land] = words[land]!.slice(0, -1);
     else if (j < 0) return p;
-    else words[j] = singular(words[j]!);
+    else {
+      words[j] = singular(words[j]!);
+      // Lagorin, Soul of Alacria: "up to two target Mounts and/or Vehicles": each one or the other.
+      if (words[j + 1] === "or" && words[j + 2] === "Vehicles" && j + 3 === words.length) words[j + 2] = "Vehicle";
+    }
   }
   return words.join(" ").replace(/ your opponents control$/, " an opponent controls").replace(/ from graveyards$/, " from a graveyard");
 }

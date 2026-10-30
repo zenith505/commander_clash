@@ -494,6 +494,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44e02e70-07ab-4795-8037-55185bd11d54",
+  "name": "Aluren",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -4583,6 +4609,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ba477a45-84cc-4a85-98e4-50dca3e58788",
+  "name": "Denry Klin, Editor in Chief",
+  "manaCost": "{2}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Cat Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Advisor"
+  ],
+  "oracleText": "Denry Klin enters with your choice of a +1/+1, first strike, or vigilance counter on it.\nWhenever a nontoken creature you control enters, if Denry Klin has counters on it, put the same number of each kind of counter on that creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "afa49a09-146f-4439-850e-dd1938c93cef",
   "name": "Derevi, Empyrial Tactician",
   "manaCost": "{G}{W}{U}",
@@ -8646,6 +8707,32 @@
   "commanderLegal": "legal",
   "set": "rex",
   "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c88eff74-def5-42ea-873c-b3b479f6fe18",
+  "name": "Ill-Gotten Gains",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile Ill-Gotten Gains. Each player discards their hand, then returns up to three cards from their graveyard to their hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20258,6 +20345,32 @@
   "commanderLegal": "legal",
   "set": "ktk",
   "releasedAt": "2014-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1c2d6b55-653a-41fd-8a5e-6463a992640b",
+  "name": "Virtus's Maneuver",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each player, choose friend or foe. Each friend returns a creature card from their graveyard to their hand. Each foe sacrifices a creature of their choice.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

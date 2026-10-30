@@ -1,7 +1,7 @@
 # Roadmap
 
-28,054 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,148 of
+28,107 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,149 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3094,6 +3094,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B47 (looked at, not done): Aggression and Insubordination (the creature is locked in as the trigger
   goes on the stack, rulings, but "enchanted creature" is read as it resolves), Sea Troll ("blocked or was blocked by a
   blue creature this turn": the other creature's color when it blocked or now is unclear).
+- Round B48 (harder skipped cards, least played first): "Look at the top five cards of target player's library. You
+  may then have that player shuffle that library" (Visions: looked at only, a new "look" prompt with no arrows), "sacrifice
+  it unless you return an enchantment to its owner's hand" (Drake Familiar: anyone's enchantment, not targeted),
+  "you may return target Equipment card ... If you do, you may attach it to ~" (Auriok Survivors), "Destroy it and ~ at
+  end of combat" (Goblin Sappers), "exile it if it had a death counter on it. Otherwise, return it" (Bogardan Phoenix),
+  threshold "choose a color ... protection from the chosen color" (Aven Warcraft) and a granted "put another +1/+1
+  counter" upkeep trigger (Chlorophant), "When you sacrifice a Clue" from the graveyard or on the battlefield (Curious
+  Cadaver, Daring Sleuth), "Until end of turn, whenever a creature an opponent controls blocks" ending with its paragraph
+  (Benefactor's Draught), blockers with "power or toughness 1 or less" an opponent controls (Tetsuko Umezawa, Pursuer),
+  "damage ... by colorless sources" prevention (Lithomancer's Focus), "If that player discards an artifact card this
+  way" (Lumengrid Augur), "If you don't, sacrifice ~ and it deals damage equal to the number of +1/+1 counters on it"
+  (Magmasaur), "just beneath the top X cards ..., where X is the number of Plains you control" (Quarry Colossus), "costs
+  {1} less to activate if it targets a creature with power 3 or less" (Raft Security Officer), "exile all other cards
+  revealed this way" (Sacred Guide), "Return all Auras attached to target permanent you own" (Scarab of the Unseen),
+  "sacrifice any number of creatures" as X (Vicious Betrayal), "the damage already dealt to it this turn" (Whipkeeper),
+  "Target player dealt damage by ~ this turn" (Wicked Akuba), "discards a card with that name. If they can't, you draw
+  a card" (Brain Pry), "choose two cards from it. Put them on top of that player's library in any order" (Agonizing
+  Memories), and "You may put one of those cards on top of your library" (Voda Sea Scavenger). +24 (28,107 of 31,936).
+- Out after round B48 (looked at, not done): Dwarven Sea Clan (a target "whose controller controls an Island", damage
+  at end of combat, "before the end of combat step"), Feint (tap the target's blockers, prevent its and their combat
+  damage), Blood Oath ("Choose a card type" as a spell instruction), Specter's Shriek (exile a chosen card, then a
+  rider about its color), Noggin Whack (reveal three, you choose two), Hiveheart Shaman (a basic land card that doesn't
+  share a land type), Song of Blood (a delayed attack trigger counting milled creature cards), Kemba's Legion, Taunt,
+  Battlefield Scrounger, Slayer's Cleaver ("blocked by an Eldrazi if able"), Illuminated Folio (reveal two cards that
+  share a color), Nim Devourer, Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze, Fathom
+  Trawl, Thirsting Axe, Sewer Crocodile, Flying Drone.
 - Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
   --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported

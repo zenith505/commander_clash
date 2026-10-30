@@ -9258,6 +9258,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.otherwise = inner;
       continue;
     }
+    // Etrata, the Silencer: "exile target creature that player controls and put a hit counter on that card": the card in
+    // exile gets the counter (a token ceases to exist, rulings).
+    const exileMark = ctx.eventPlayer ? new RegExp(`^[Ee]xile (target creature that player controls) and put an? ${COUNTER} counter on that card$`).exec(s) : null;
+    if (exileMark) {
+      const fx = parseOne(`Exile ${exileMark[1]}`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "exile" || fx[0]!.counters) return null;
+      effects.push({ ...fx[0]!, counters: { [counterKind(exileMark[2]!)]: 1 } });
+      continue;
+    }
+    // Its "That player loses the game if they own three or more exiled cards with hit counters on them": counted as it
+    // resolves, face-up cards with that counter they own in exile.
+    const loseIfOwn = ctx.eventPlayer ? new RegExp(`^That player loses the game if they own ${NUM} or more exiled cards with ${COUNTER} counters on them$`).exec(s) : null;
+    if (loseIfOwn) {
+      const count: AmountExpr = { count: { kind: "cardsInExile", who: { ref: "eventPlayer" }, counter: counterKind(loseIfOwn[2]!) } };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: count, min: num(loseIfOwn[1]!) }, effects: [{ type: "loseGame", who: { ref: "eventPlayer" } }] });
+      continue;
+    }
     // Kain, Traitorous Dragoon: "that player gains control of ~. If they do, you draw that many cards, create that many
     // tapped Treasure tokens, then lose that much life": only if that player now controls ~ (not if it left the
     // battlefield first); "that many" is the damage dealt.

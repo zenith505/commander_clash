@@ -348,7 +348,7 @@ export type Count =
   /** "The greatest mana value among cards in exile" (Ulamog, the Defiler): every player's exiled cards, a face-down one 0 (CR 708.2). */
   | { kind: "greatestMvInExile" }
   /** "There are seven or more cards in exile" (Ketramose): every player's exiled cards, face-down ones too (rulings). */
-  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true }
+  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind }
   | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
@@ -2611,7 +2611,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "Put the same number of each kind of counter on that creature" as ~ has (Denry Klin, Editor in Chief): each kind `copyFrom` has as it resolves, that many; `counter` and `n` are ignored. */ copyFrom?: ObjRef; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -5685,7 +5685,7 @@ export interface CompiledCard {
    * choice of a +1/+1 counter or a flying counter on it" (Tizerus Charger, only when it escaped, CR 702.138c): chosen as it
    * enters (CR 614.1c, 614.12), part of how it enters.
    */
-  entersCounterChoice?: { counters: [CounterKind, CounterKind]; escaped?: true };
+  entersCounterChoice?: { counters: CounterKind[]; escaped?: true };
   /**
    * "As ~ enters, it becomes your choice of a 3/3 creature with flying, a 2/5 creature with vigilance, or a 0/12 creature
    * with defender" (Corrupted Shapeshifter, Primal Clay): chosen as it enters (CR 614.12), part of its copiable values

@@ -1250,6 +1250,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersCounterChoice = { counters: [counterKind(counterChoice[2]!), counterKind(counterChoice[3]!)], ...(counterChoice[1] === "escapes" ? { escaped: true as const } : {}) };
       continue;
     }
+    // Denry Klin, Editor in Chief: "~ enters with your choice of a +1/+1, first strike, or vigilance counter on it": one of
+    // three, the same way.
+    const counterChoice3 = new RegExp(`^~ enters with your choice of an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on it\\.$`).exec(line);
+    if (counterChoice3) {
+      const kinds = counterChoice3.slice(1, 4).map((k) => counterKind(k!));
+      if (out.entersCounterChoice || new Set(kinds).size !== 3) out.unsupported.push(raw);
+      else out.entersCounterChoice = { counters: kinds };
+      continue;
+    }
     // Corrupted Shapeshifter, Primal Plasma, Primal Clay: "As ~ enters, it becomes your choice of a 3/3 creature with
     // flying, a 2/5 creature with vigilance, or a 0/12 creature with defender": set power and toughness and maybe a
     // keyword or a creature type, as it enters (CR 208.2b, 614.12). Primal Clay's "artifact creature" is what it is anyway.

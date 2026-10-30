@@ -679,6 +679,19 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src, ...(e.thisTurn ? { thisTurn: true as const } : {}) });
       return;
     case "counters": {
+      if (e.copyFrom) {
+        const from = objects(s, e.copyFrom, ctx)[0];
+        const kinds = from ? Object.entries(from.counters).filter(([, n]) => (n ?? 0) > 0) : [];
+        for (const o of objects(s, e.what, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          for (const [kind, n] of kinds) {
+            invalidateCharacteristics(s);
+            const put = putCounters(s, o, kind, n!);
+            if (put) log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
+          }
+        }
+        return;
+      }
       // Distributed (CR 601.2d): each target gets its part; a part for an illegal target isn't put anywhere (CR 608.2b).
       if (e.divided && e.what.ref === "target") {
         for (let k = 0; k < (e.what.n ?? 1); k++) {

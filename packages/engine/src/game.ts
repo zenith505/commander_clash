@@ -8517,7 +8517,7 @@ function askEntersChoice(s: GameState): boolean {
     }
     if (c.what === "counterChoice") {
       const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.map((k) => `a ${k} counter`).join(" or ")}` };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.length > 2 ? `a ${counters.slice(0, -1).join(", ")}, or ${counters.at(-1)} counter` : counters.map((k) => `a ${k} counter`).join(" or ")}` };
       return true;
     }
     if (c.what === "lifeAsEnters") {

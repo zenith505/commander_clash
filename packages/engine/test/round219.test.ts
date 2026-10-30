@@ -77,10 +77,12 @@ const ralZarekGuestL = card("Ral Zarek, Guest Lecturer", "Legendary Planeswalker
 const aluren = card("Aluren", "Enchantment", "{2}{G}{G}", {"cmc":4,"oracleText":"Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash.","keywords":[],"layout":"normal"});
 const kainTraitorous = card("Kain, Traitorous Dragoon", "Legendary Creature — Human Knight", "{2}{B}", {"cmc":3,"oracleText":"Jump — During your turn, Kain has flying.\nWhenever Kain deals combat damage to a player, that player gains control of Kain. If they do, you draw that many cards, create that many tapped Treasure tokens, then lose that much life.","power":"2","toughness":"4","keywords":["Jump","Treasure"],"layout":"normal"});
 const galactusDevour = card("Galactus, Devourer of Worlds", "Legendary Creature — Elder Alien", "{10}", {"cmc":10,"oracleText":"Flying, trample, indestructible\nWhen Galactus enters, exile target permanent.\nInsatiable Hunger — Galactus attacks an opponent with the most life among your opponents each combat if able unless you control a creature named Silver Surfer, Galactus's Herald.","power":"12","toughness":"12","keywords":["Flying","Indestructible","Insatiable Hunger","Trample"],"layout":"normal"});
+const denryKlinEdito = card("Denry Klin, Editor in Chief", "Legendary Creature — Cat Advisor", "{2}{W}{U}", {"cmc":4,"oracleText":"Denry Klin enters with your choice of a +1/+1, first strike, or vigilance counter on it.\nWhenever a nontoken creature you control enters, if Denry Klin has counters on it, put the same number of each kind of counter on that creature.","power":"2","toughness":"2","keywords":[],"layout":"normal"});
+const etrataTheSilen = card("Etrata, the Silencer", "Legendary Creature — Vampire Assassin", "{2}{U}{B}", {"cmc":4,"oracleText":"Etrata can't be blocked.\nWhenever Etrata deals combat damage to a player, exile target creature that player controls and put a hit counter on that card. That player loses the game if they own three or more exiled cards with hit counters on them. Etrata's owner shuffles Etrata into their library.","power":"3","toughness":"5","keywords":[],"layout":"normal"});
 
 describe("round 219 cards", () => {
   it("compile", () => supported(pathOfTheEnigm, pathOfTheAnimi, pathOfTheGhost, pathOfThePyrom, pathOfTheSchem, maralenOfTheMo, mornsongAria));
-  it("compile (2)", () => supported(zilorthaStreng, ralZarekGuestL, aluren, kainTraitorous, galactusDevour));
+  it("compile (2)", () => supported(zilorthaStreng, ralZarekGuestL, aluren, kainTraitorous, galactusDevour, denryKlinEdito, etrataTheSilen));
 });
 
 describe("Will of the Planeswalkers", () => {
@@ -320,5 +322,65 @@ describe("Galactus, Devourer of Worlds", () => {
     putOnBattlefield(s2, ap, bear({ name: "Silver Surfer, Galactus's Herald", supertypes: ["Legendary"] } as Partial<CardDef>));
     s = passUntil(s2, "declareAttackers", ap);
     expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [] })).not.toThrow();
+  });
+});
+
+describe("Denry Klin, Editor in Chief", () => {
+  it("enters with your choice of three counters, and copies its counters onto each nontoken creature of yours that enters", () => {
+    const { s: s0, ap, ids } = setup([denryKlinEdito, bear({ name: "New Bear" })]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settle(s, { me: ap });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "counterChoice", options: ["+1/+1", "first strike", "vigilance"] });
+    expect(s.pending?.kind === "chooseOption" && s.pending.prompt).toBe("enter with your choice of a +1/+1, first strike, or vigilance counter");
+    s = act(s, { type: "chooseOption", player: ap, choice: "first strike" });
+    s = settle(s, { me: ap });
+    // It's a nontoken creature that entered under your control too (CR 603.6a), with a counter by then: it doubles its own.
+    expect(s.objects[ids[0]!]!.counters["first strike"]).toBe(2);
+    s.objects[ids[0]!]!.counters["+1/+1"] = 1;
+    s = run(s, planCast(s, ap, ids[1]!));
+    s = settle(s, { me: ap });
+    expect(s.objects[ids[1]!]!.counters).toMatchObject({ "first strike": 2, "+1/+1": 1 });
+    expect(objHasKeyword(s, s.objects[ids[1]!]!, "First strike")).toBe(true);
+  });
+});
+
+describe("Etrata, the Silencer", () => {
+  it("exiles a creature of the damaged player's with a hit counter, then shuffles into its owner's library; three hit cards lose the game", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const e = putOnBattlefield(s0, ap, etrataTheSilen);
+    const victim = putOnBattlefield(s0, opp, bear({ name: "Victim Bear" }));
+    // Two of theirs already in exile with hit counters (one is a token: tokens don't stay, rulings).
+    for (const n of ["Old Hit A", "Old Hit B"]) s0.objects[into(s0, opp, bear({ name: n }), "exile")]!.counters.hit = 1;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: e, defender: opp }] });
+    for (let i = 0; i < 80 && s.step !== "endCombat"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p?.kind === "chooseTargets" && p.player === ap) s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(victim)] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(zone(s, victim)).toBe("exile");
+    expect(s.objects[victim]!.counters.hit).toBe(1);
+    expect(s.players[opp]!.lost).toBe(true);
+    expect(zone(s, e)).toBe("library");
+  });
+
+  it("with fewer than three, the player stays in", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const e = putOnBattlefield(s0, ap, etrataTheSilen);
+    const victim = putOnBattlefield(s0, opp, bear({ name: "Victim Bear" }));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: e, defender: opp }] });
+    for (let i = 0; i < 80 && s.step !== "endCombat"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p?.kind === "chooseTargets" && p.player === ap) s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(victim)] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(zone(s, victim)).toBe("exile");
+    expect(s.players[opp]!.lost).toBeFalsy();
+    expect(zone(s, e)).toBe("library");
   });
 });

@@ -117,7 +117,7 @@ export interface SourceQuality {
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */
-function creatureTypeOfPlural(w: string): string | undefined {
+export function creatureTypeOfPlural(w: string): string | undefined {
   const cap = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
   for (const c of [cap, cap.replace(/ves$/, "f"), cap.replace(/es$/, ""), cap.replace(/s$/, ""), cap.replace(/ies$/, "y"), cap === "Dwarves" ? "Dwarf" : ""])
     if (c && CREATURE_TYPES.has(c)) return c;

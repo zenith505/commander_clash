@@ -84,6 +84,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you investigate, (.+)$/, "youInvestigate"],
+  [/^Whenever you give a gift, (.+)$/, "youGiveGift"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
@@ -1021,10 +1022,19 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
   // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
   // Deathknell Berserker: "When ~ dies, if its power was 3 or greater, ...": the same, its power as it last existed.
+  // Gunner Conscript: "When ~ dies, if it was enchanted, ..." likewise, what was attached to it as it last existed.
   // Syr Vondam, Sunstar Exemplar: "When ~ dies or is put into exile while its power is 4 or greater, ...": the same, to
   // either zone, its power as it last existed on the battlefield (CR 603.10a).
   const whilePower = /^When ~ dies or is put into exile while its power is (\d+) or greater, (.+)$/.exec(line);
-  const selfHad = whilePower ? ["", `if its power was ${whilePower[1]} or greater, ${whilePower[2]}`] : /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+)$/.exec(line);
+  const selfHad = whilePower ? ["", `if its power was ${whilePower[1]} or greater, ${whilePower[2]}`] : /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+|if it was (?:enchanted or equipped|enchanted|equipped), .+)$/.exec(line);
+  // Infernal Vessel: "When ~ dies, if it wasn't a Demon, ...": the same, its creature types as it last existed.
+  const selfWasnt = /^When ~ dies, if it wasn't an? ([A-Z][a-z]+), (.+)$/.exec(line);
+  if (selfWasnt && CREATURE_TYPES.has(selfWasnt[1]!)) {
+    const t = parseDiesTrigger(`When ~ or another non-${selfWasnt[1]} creature dies, ${selfWasnt[2]}`);
+    if (!t || t === "fail" || !t.dies?.orSelf || !t.dies.filter.notSubtypes?.includes(selfWasnt[1]!)) return "fail";
+    const { orSelf: _, ...dies } = t.dies;
+    return { ...t, dies: { ...dies, self: true } };
+  }
   if (selfHad) {
     const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]}`);
     if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
@@ -2180,6 +2190,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Sawblade Skinripper: "if you sacrificed one or more permanents this turn, ~ deals that much damage": as many as you
+    // sacrificed, counted as it resolves.
+    .replace(/^(At the beginning of your end step), if you sacrificed one or more permanents this turn, ~ deals that much damage to any target\.$/, "$1, if you sacrificed a permanent this turn, ~ deals damage equal to the number of permanents you sacrificed this turn to any target.")
+    // HYDRA Assault Robot: "Whenever another Villain and/or artifact you control enters": one permanent that's either or
+    // both, as "Villain or artifact".
+    .replace(/^(Whenever another [A-Z][a-z]+) and\/or (artifact|creature|enchantment) you control enters, /, "$1 or $2 you control enters, ")
     // Pollywog Symbiote: "Whenever you cast a creature spell, if it has mutate, ...": it triggers for a creature spell with
     // mutate, cast for its mutate cost or not, and resolves even if that spell is countered (rulings).
     .replace(/^Whenever you cast a creature spell, if it has mutate, /, "Whenever you cast a creature spell with mutate, ")

@@ -4957,7 +4957,8 @@ function giftOf(what: string): NonNullable<CompiledCard["gift"]> {
           : what === "an Octopus"
             ? [{ type: "createToken", who, n: 1, token: { name: "Octopus", power: 8, toughness: 8, colors: ["U"], types: ["Creature"], subtypes: ["Octopus"], keywords: [] } }]
             : [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS[what === "a Food" ? "Food" : "Treasure"]! }];
-  return { what, effects };
+  // Its controller gives a gift as it resolves (CR 702.174c).
+  return { what, effects: [...effects, { type: "gaveGift" }] };
 }
 
 const giftText = (what: string) =>

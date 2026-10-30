@@ -406,6 +406,13 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only on costs that contain {X}.") return { xCosts: true, text: sentence };
   // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
+  // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.
+  if (sentence === "Spend this mana only to cast an instant or sorcery spell or a kicked spell.") return { kickedSpells: true, spells: spellFilter("instant or sorcery")!, text: sentence };
+  // Chandra's Embercat: "only to cast an Elemental spell or a Chandra planeswalker spell": a spell with that creature type
+  // (a kindred spell too), or a planeswalker spell with that planeswalker type (CR 205.3j).
+  const orWalker = /^Spend this mana only to cast an? ([A-Z][a-z]+) spell or an? ([A-Z][a-z]+) planeswalker spell\.$/.exec(sentence);
+  if (orWalker && CREATURE_TYPES.has(orWalker[1]!))
+    return { text: sentence, spells: { kind: "spell", anyOf: [{ kind: "spell", subtypes: [orWalker[1]!], text: `${orWalker[1]} spell` }, { kind: "spell", types: ["Planeswalker"], subtypes: [orWalker[2]!], text: `${orWalker[2]} planeswalker spell` }], text: `${orWalker[1]} spells or ${orWalker[2]} planeswalker spells` } };
   // Unblinking Observer: "only to pay a disturb cost or cast an instant or sorcery spell": a spell cast for its disturb cost
   // (CR 702.146a), or an instant or sorcery spell.
   if (sentence === "Spend this mana only to pay a disturb cost or cast an instant or sorcery spell.") return { disturb: true, spells: spellFilter("instant or sorcery")!, text: sentence };

@@ -80,7 +80,8 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand" (CR 106.6).
   if ("spell" in use && only.notFromHand && use.fromHand) return false;
   // Throne of Makindi: "to cast kicked spells": a spell whose kicker cost is paid as it's cast (CR 702.33d, 601.2b).
-  if ("spell" in use && only.kickedSpells) return !!use.kicked;
+  // Volshe Tideturner: "or a kicked spell" beside other spells.
+  if ("spell" in use && only.kickedSpells && (use.kicked || !only.spells)) return !!use.kicked;
   if ("spell" in use) return !!only.spells && printedMatches(only.spells, use.spell);
   if (only.classLevel && use.classLevel) return true;
   if (only.equipAbilities && use.equip) return true;

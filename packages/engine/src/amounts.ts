@@ -357,6 +357,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
+    case "sacrificedThisWayTotalPower":
+      return (s.resolving?.sacrificedThisWay ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "putThisWay":
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
     case "blockingIt":
@@ -976,6 +978,8 @@ function describeCount(c: Count): string {
       return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
+    case "sacrificedThisWayTotalPower":
+      return "the total power sacrificed";
     case "putThisWay":
       return "#put onto the battlefield";
     case "blockingIt":

@@ -173,6 +173,8 @@ export type Count =
   | { kind: "preventedByRule"; rule: string }
   /** "The greatest power among creatures sacrificed this way" (Shadowgrange Archfiend): of what this resolution sacrificed, as each last existed (CR 608.2h); 0 if none. */
   | { kind: "sacrificedThisWayGreatestPower" }
+  /** "The total power of the creatures sacrificed this way" (Reign of the Pit): as each last existed, negative powers included (rulings). */
+  | { kind: "sacrificedThisWayTotalPower" }
   /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
   | { kind: "putThisWay" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
@@ -1902,6 +1904,8 @@ export type StaticCondition =
   | { kind: "opponentGainedLife" }
   /** "If you put a counter on a creature this turn" (Lasting Tarfire): of any kind, as it entered too (CR 122.6). */
   | { kind: "youPutCounterOnCreature" }
+  /** "If one or more cards were put into exile this turn" (Ennis, Debate Moderator): from anywhere, anyone's; not tokens or spell copies, which aren't cards (rulings). */
+  | { kind: "cardExiledThisTurn" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
   /**
@@ -2671,7 +2675,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -3523,6 +3527,8 @@ export type Effect =
   | { type: "becomeSaddled"; what: ObjRef }
   /** The end of every crew ability (CR 702.122a): it "becomes crewed" as the ability resolves (CR 702.122e). */
   | { type: "becameCrewed" }
+  /** The end of every gift's effect (CR 702.174c): its controller "gives a gift" as the spell or the gift trigger resolves. */
+  | { type: "gaveGift" }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
   | { type: "classLevel"; n: number }
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
@@ -4324,6 +4330,8 @@ export type TriggerEvent =
   | "youCollectEvidence"
   /** "Whenever you investigate" (CR 701.16a), once for each time; `firstEachTurn`: only your first time each turn. */
   | "youInvestigate"
+  /** "Whenever you give a gift" (Jolly Gerbils): a spell of yours whose gift was promised, or a gift trigger of yours, resolved (CR 702.174c). */
+  | "youGiveGift"
   /** "Whenever you foretell a card" (Dream Devourer): exiling one from your hand with foretell, not casting it later (rulings, CR 702.143a). */
   | "youForetell"
   | "youFinalChapterResolves" // Narci, Fable Singer: the final chapter ability of a Saga you control finished resolving; the event's amount is the Saga's mana value

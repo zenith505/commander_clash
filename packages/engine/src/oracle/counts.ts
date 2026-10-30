@@ -132,6 +132,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
   // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
+  // Reign of the Pit: "the total power of the creatures sacrificed this way".
+  if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
   if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
@@ -519,6 +521,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^nontoken creatures you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Creature"], nontoken: true });
   // The Balrog, Durin's Bane: "for each permanent sacrificed this turn": by any player (rulings).
   if (each && /^permanent sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn", anyPlayer: true });
+  // Sawblade Skinripper: "the number of permanents you sacrificed this turn".
+  if (/^(?:the number of )?permanents you(?:'ve)? sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
   // Jeska, Thrice Reborn: "each time you've cast a commander from the command zone": only your own are cast from there (CR 903.8).
   if (/^times? you've cast (?:your|a) commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });

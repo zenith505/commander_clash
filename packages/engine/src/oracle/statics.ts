@@ -233,9 +233,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // The Kaldheim Runes: "As long as enchanted permanent is an Equipment, it has "Equipped creature has flying."" (Rune of
   // Flight): while it's an Equipment, it has that static ability, which then applies to the creature it's attached to.
-  if ((m = /^As long as enchanted permanent is an Equipment, it (has ".+")$/.exec(text))) {
-    const mods = parseStaticMods(m[1]!);
-    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" } } } : null;
+  // Nature's Embrace: "As long as enchanted permanent is a land, it has "{T}: Add two mana of any one color."" likewise.
+  if ((m = /^As long as enchanted permanent is (an Equipment|a land), it (has ".+")$/.exec(text))) {
+    const mods = parseStaticMods(m[2]!);
+    const filter = m[1] === "a land" ? { kind: "object" as const, types: ["Land" as const], text: "land" } : { kind: "object" as const, types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" };
+    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter } } : null;
   }
   // Luxior, Giada's Gift: "Equipped permanent isn't a planeswalker and is a creature in addition to its other types": one
   // type-changing effect (layer 4, CR 613.1d); losing the planeswalker type, it loses its planeswalker subtypes (CR
@@ -1226,6 +1228,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
+  if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spell this turn$/.exec(text)))
@@ -1692,6 +1695,8 @@ export function parseAffected(subject: string): Affects | null {
   if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
   // Barbara Wright: "Sagas you control have read ahead" (an enchantment subtype, CR 205.3h).
   if (x === "Sagas you control") return { kind: "filter", types: ["Enchantment"], subtypes: ["Saga"], controller: "you" };
+  // Forgotten Monument: "Other Caves you control have "..."" (a land subtype, CR 205.3i).
+  if ((m = /^(Other )?(Caves|Deserts|Gates) you control$/.exec(x))) return { kind: "filter", types: ["Land"], subtypes: [m[2]!.slice(0, -1)], controller: "you", other: !!m[1] };
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;

@@ -1015,6 +1015,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.damageDealtTo?.[`${subjectId}@${subjectZc}`] ?? []).some((d) => d.controller === you && ((cond.spell && !!d.spell) || d.subtypes.some((st) => cond.subtypes.includes(st))));
     case "opponentGainedLife":
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
+    case "cardExiledThisTurn":
+      return !!s.turnLog?.cardExiled;
     case "youPutCounterOnCreature":
       return (s.turnLog?.creatureCounterPutters ?? []).includes(you);
     case "opponentCardsToGraveyard":

@@ -984,6 +984,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "revealed" && !objects(s, e.what, ctx).length) return false;
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
+    if (e.type === "bounce" && e.what.ref === "target" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;
     // Collecting evidence takes enough mana value in your graveyard (CR 701.59b).
     if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined, selfCardExiled(s, effects, ctx))) return false;

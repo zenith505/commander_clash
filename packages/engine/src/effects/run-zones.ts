@@ -2049,6 +2049,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Deathrender: attached if it could be, otherwise it stays unattached (CR 701.3b; rulings).
           if (e.attachSelf && self) attachTo(s, self, o);
+          // The Invincible Iron Man: an Equipment attached to the source after it enters, if it could be (CR 701.3b).
+          if (e.equipToSelf && self && objIsType(s, o, "Artifact") && characteristics(s, o).subtypes.includes("Equipment")) attachTo(s, o, self);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {
             const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";

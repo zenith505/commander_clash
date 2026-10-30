@@ -436,6 +436,8 @@ export interface GameObject {
   becameBlockedTurn?: number;
   /** The turn it last dealt combat damage to a player, as this object (CR 400.7): "for the first time each turn" (Raphael, Tag Team Tough). */
   combatHitTurn?: number;
+  /** The turn this object last fought (CR 701.14), for "a creature that fought this turn" (Boxing Ring). */
+  foughtTurn?: number;
   attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active
@@ -1035,6 +1037,8 @@ export interface PendingTrigger {
   modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
   /** "If you control a commander, you may choose both instead" was true as it was put on the stack (AbilityBody.modal.bothIf). */
   both?: true;
+  /** "Choose up to X" (Bumi, King of Three Trials): X as it was put on the stack (AbilityBody.modal.maxCount). */
+  maxModes?: number;
   cause?: string; // the stack item that triggered it, see StackItem.cause
   /** Firebender Ascension: this trigger's tag, and the tag of the trigger whose stack item becomes `cause` once it's put on the stack. */
   tag?: string;
@@ -1362,7 +1366,7 @@ export type PendingDecision =
   | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
-  | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
+  | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number> }
   /**
    * "Add X mana in any combination of colors" from a spell or a non-mana ability (Klauth, Manamorphose): how much of each
    * color, `n` in all, chosen as it resolves (CR 106.1b, 608.2d). `colors`: only these.

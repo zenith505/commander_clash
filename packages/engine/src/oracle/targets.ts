@@ -1012,7 +1012,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const othersAll = other && /^creatures$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that fought this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   // "Each other creature you control that's a Cat, Elemental, Nightmare, Dinosaur, or Beast" (Kaheera, the Orphanguard):
@@ -1419,6 +1419,12 @@ export function parseTargetPhrase(
   if (attacked) {
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
+  }
+  // Boxing Ring: "a creature that fought this turn" (CR 701.14).
+  const fought = / that fought this turn$/.exec(p);
+  if (fought) {
+    extra.foughtThisTurn = true;
+    p = p.slice(0, fought.index);
   }
   // Sizzling Barrage: "target creature that blocked this turn".
   const blockedTurn = / that blocked this turn$/.exec(p);

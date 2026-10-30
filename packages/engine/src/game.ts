@@ -788,6 +788,7 @@ export function moveObject(
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
+  o.foughtTurn = undefined;
   o.combatHitTurn = undefined;
   o.blockedTurn = undefined;
   o.declaredInCombat = undefined;
@@ -7632,6 +7633,15 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   const given = Object.entries(parts).filter(([, n]) => n !== 0);
   if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
   const sum = given.reduce((a, [, n]) => a + n, 0);
+  // Sensational Spider-Man: up to that many, none from a permanent more than it has.
+  if (pend.remove) {
+    if (sum > pend.total || given.some(([id, n]) => n > (pend.has?.[id] ?? 0))) throw new RulesError(`remove at most ${pend.total} ${pend.counter} counters, no more from each than it has`);
+    r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
+    s.pending = null;
+    log(s, sum ? `${p.name} removes ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} from ${nameOf(s, id)}`).join(", ")}.` : `${p.name} removes no ${pend.counter} counters.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;

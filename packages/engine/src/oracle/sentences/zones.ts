@@ -460,6 +460,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // then the Equipment is attached if it can be (CR 701.3b); it stays unattached otherwise (rulings).
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield and then attach it to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }];
+  // Ratonhnhaké꞉ton: "return target Equipment card from your graveyard to the battlefield, then attach it to that token":
+  // it returns, then it's attached to the token the ability is about if it can be; otherwise it stays unattached (rulings).
+  if (ctx.subjectIt && /^Return target Equipment card from your graveyard to the battlefield and then attach it to that token$/.test(s)) {
+    const what = parseObject("target Equipment card from your graveyard", ctx, true);
+    return what?.ref === "target" ? [{ type: "putOntoBattlefield", what }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }] : null;
+  }
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
   // battlefield" (Corpse Dance), "put the top creature card of defending player's graveyard onto the battlefield under
   // your control" (Bone Dancer), "Put the top card of your graveyard on the bottom of your library" (Soldevi Digger),

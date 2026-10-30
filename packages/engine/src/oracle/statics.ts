@@ -2334,6 +2334,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const st = parseStaticLine(`Land creatures ${landSurge[1]}.`);
     return st && !st.condition ? { ...st, text: line } : null;
   }
+  // Depala, Pilot Exemplar: "Each Vehicle you control gets +1/+1 as long as it's a creature": Vehicle creatures (crewed,
+  // CR 301.7b), worked out as the bonus applies in layer 7c (CR 613.4c).
+  const vehicleSurge = /^Each Vehicle you control gets ([+-]\d+)\/([+-]\d+) as long as it's a creature$/.exec(text);
+  if (vehicleSurge)
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], subtypes: ["Vehicle"], text: "Vehicle creature you control" } }, mods: [{ kind: "modifyPT", power: Number(vehicleSurge[1]), toughness: Number(vehicleSurge[2]) }], text: line };
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the

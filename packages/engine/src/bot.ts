@@ -432,7 +432,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.dig?.lifeEach) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, 2, Math.floor((player(s, pid).life - 10) / pend.dig.lifeEach)))) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
@@ -3051,6 +3051,19 @@ function chooseCounterMove(s: GameState, pid: PlayerId, options: ObjectId[], tot
   });
   const best = evasive.sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0];
   return best ? { [best]: total } : {};
+}
+
+/** Sensational Spider-Man: as many as it may (each is a card drawn), off its own permanents first, then the least worthy. */
+function chooseCounterRemoval(s: GameState, pid: PlayerId, options: ObjectId[], total: number, has: Record<ObjectId, number>): Record<ObjectId, number> {
+  const order = [...options].sort((a, b) => Number(controllerOf(s, obj(s, b)) === pid) - Number(controllerOf(s, obj(s, a)) === pid) || worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+  const parts: Record<ObjectId, number> = {};
+  let left = total;
+  for (const id of order) {
+    const k = Math.min(left, has[id] ?? 0);
+    if (k > 0) parts[id] = k;
+    left -= k;
+  }
+  return parts;
 }
 
 function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {

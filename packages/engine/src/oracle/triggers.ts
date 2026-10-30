@@ -272,13 +272,14 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
     const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
     if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
-    // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm). Simian Sling:
+    // "~ or equipped creature": "it" could be either. Ogre-Head Helm: "you may sacrifice it. If you do, ...": whichever dealt
+    // the damage, the equipped creature and not the Helm if it did (rulings). Simian Sling:
     // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
     // (rulings), the subject either way.
     // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
     // whichever attacked, as the ability resolves or as it last existed (rulings). Chainflail Centipede: "it gets +2/+0
     // until end of turn": whichever attacked.
-    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)));
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)) || (event === "selfDealsCombatDamageToPlayer" && /^you may sacrifice it\. If you do, (?:(?!\b(?:it|its|that creature)\b)[^.])+\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
@@ -2506,6 +2507,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // does (rulings on Mr. House and Netherese Puzzle-Ward). Ignored rolls never happened (706.6).
   const rolls = /^Whenever you roll one or more dice, (.+)$/.exec(line);
   if (rolls) {
+    // Farideh, Devil's Chosen: "... If any of those results was 10 or higher, draw a card.": the highest die of that roll.
+    const anyOf = /^(.+?)\. If any of those results was (\d+) or higher, (.+)$/.exec(rolls[1]!);
+    if (anyOf) {
+      const first = parseBody(`${anyOf[1]}.`, {});
+      const then = parseBody(anyOf[3]!, {});
+      if (!first || !then || first.targets.length || then.targets.length) return "fail";
+      return { event: "youRollDice", body: { targets: [], effects: [...first.effects, { type: "if", cond: { kind: "rollIn", min: Number(anyOf[2]), eventMax: true }, effects: then.effects }], text: rolls[1]! } };
+    }
     const body = parseBody(rolls[1]!, {});
     return body ? { event: "youRollDice", body } : "fail";
   }

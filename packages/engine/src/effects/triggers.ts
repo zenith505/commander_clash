@@ -964,7 +964,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
     const watch = (o: GameObject) => {
-      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result });
+      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result, rollMax: Math.max(...ev.dice.map((d) => d.result)) });
       for (const d of ev.dice)
         add(o, ev.player, (e, t) => e === "youRollDie" && (t.rolls?.min === undefined || d.result >= t.rolls.min) && (t.rolls?.natural === undefined || d.natural === (t.rolls.natural === "max" ? ev.sides : t.rolls.natural)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: d.result });
     };
@@ -1711,7 +1711,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
     // Cartographer's Hawk: "to a player who controls more lands than you", as the damage is dealt.
     const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.firstHit && !ev.first) && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o))), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    const selfHit = (t: TriggeredAbility) => !(t.firstHit && !ev.first) && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o)));
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && t.host !== "orSelf" && selfHit(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // "Whenever ~ or equipped creature deals combat damage to a player, you may sacrifice it" (Ogre-Head Helm): ~ itself is
+    // the subject when it dealt the damage.
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && t.host === "orSelf" && selfHit(t), undefined, undefined, o, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);

@@ -623,7 +623,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "rollIn"
             ? e.cond.aboveEvent
               ? ((r) => r !== undefined && (r > (ctx.event?.amount ?? 0) || r >= ((e.cond as { min?: number }).min ?? Infinity)))(s.resolving!.rolled?.result)
-              : rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
+              : rollIn(e.cond, e.cond.eventMax ? ctx.event?.rollMax : e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"
@@ -712,6 +712,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.spellCountered
             : e.cond.kind === "targetPlayerIsYou"
             ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && t.id === ctx.controller)(ctx.targets[e.cond.index])
+            : e.cond.kind === "targetWarped"
+            ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "object" && ["warp", "grantedWarp"].includes(s.objects[t.id]?.castAlt ?? ""))(ctx.targets[e.cond.index])
+            : e.cond.kind === "targetPlayerLostLife"
+            ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && (s.lostLifeThisTurn ?? []).includes(t.id))(ctx.targets[e.cond.index])
             : e.cond.kind === "targetWasYours"
             ? targetWasYours(s, ctx, e.cond.index)
             : e.cond.kind === "teamwork"

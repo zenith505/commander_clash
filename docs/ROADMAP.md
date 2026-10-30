@@ -1,6 +1,6 @@
 # Roadmap
 
-28,054 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,104 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,148 of
 9,979 (91%).
 
@@ -1081,6 +1081,32 @@ line blocks.
    defending player differs per attacker); Surestrike Trident (a granted ability that names its source); Tamiyo,
    Inquisitive Student; Demilich (casting from the graveyard by exiling four instants and sorceries). Next fresh
    candidates are still the ones listed after round 215.
+   Round 217 took the fresh candidates listed after round 215: "If you didn't put a card into your hand this way,
+   proliferate" (Contagious Vorrac); "Discard your hand, then draw cards equal to the number of cards discarded this way"
+   (Borrowed Knowledge); "Each of your opponents discards" (Everything Pizza); "Put that card onto the battlefield tapped
+   if you control a Dragon. Otherwise, put that card on top" (Embermouth Sentinel); "If they lost life this turn, they
+   reveal their hand, you choose a nonland card" (Thought-Stalker Warlock, SpellCondition targetPlayerLostLife); "the
+   chosen creature you control ... Then the chosen creatures fight" (Duel for Dominance); "you may pay {X} ... X can't be
+   greater than the amount of life you lost this turn" (Mortarion, Daemon Primarch); "~ deals 10 damage to an opponent
+   chosen at random" (Zaffai, Thunder Conductor); "You and permanents you control have protection from Salamanders" and
+   "each player who controls the fewest creatures" (Gor Muldrak, CompiledCard.youProtectionFrom); "Descend 8 — If there
+   are eight or more permanent cards in your graveyard as you cast this spell, choose one or more instead" (Wail of the
+   Forgotten); "each player discards their hand, then returns up to three cards from their graveyard to their hand"
+   (Ill-Gotten Gains, a new "return up to N cards to your hand" picker, e2e round217.spec.ts); "Mounts and/or Vehicles"
+   (Lagorin, Soul of Alacria); "Whenever ~ or equipped creature deals combat damage to a player, you may sacrifice it"
+   with "it" the creature that dealt the damage (Ogre-Head Helm); "If any of those results was 10 or higher" (Farideh,
+   rollIn eventMax); "If that creature was cast for its warp cost, it also gains" (Full Bore, SpellCondition
+   targetWarped); "the number of lands you control in excess of the number of lands target opponent controls" (Waking
+   the Trolls); "choose one and ~ gets +1/+1 until end of turn" (Glorfindel, Dauntless Rescuer); "Equip costs you pay
+   cost {1} less" (Auriok Steelshaper); "Put a +1/+1 counter on it" for a Vehicle that crewed (Voyager Glidecar); "up to
+   one target" exile-and-copy (Renegade Bull); "Put ~ from your graveyard onto the battlefield transformed" (Startled
+   Awake). +21 (28,104 of 31,936 with B46 and B47).
+   Out after round 217 (looked at, not done): Barbed Wire (needs a "prevent the next damage dealt by a source"
+   shield); Decoy Gambit (a per-target "unless its controller has you draw a card"); Multiple Choice; Laboratory Drudge
+   (needs tracking of cards cast and abilities activated from graveyards); Kraven the Hunter (greatest power as it
+   died); Rites of Spring (Lane B's range); The Eighth Doctor; Arcade Gannon. Next fresh candidates, not looked at
+   closely: Seize the Storm, Aberrant Mind Sorcerer, Key to the Side-Door, Prized Amalgam, Kathril, Aspect Warper,
+   Super-Adaptoid, Zimone's Experiment, Bane, Lord of Darkness, Weftwalking, Last Laugh, Sanctuary Blade.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

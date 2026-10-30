@@ -2519,6 +2519,11 @@ export function compile(d: CardDef): CompiledCard {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
       continue;
     }
+    // Weftwalking: the same alternative cost of nothing (CR 118.9), for every player's first spell during their own turn.
+    if (line === "The first spell each player casts during each of their turns may be cast without paying its mana cost.") {
+      out.payZero = { eachPlayerFirst: true };
+      continue;
+    }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
       continue;

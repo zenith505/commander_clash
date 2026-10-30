@@ -1784,13 +1784,50 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   // Odric, Lunarch Marshal: each keyword creatures you control share, as it resolves (Modification sharedAmongYours).
-  const odric = /^[Cc]reatures you control gain ([a-z ]+) until end of turn if a creature you control has \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
+  // Bleeding Effect: "if a creature card in your graveyard has flying", the cards there as it resolves (rulings).
+  const odric = /^[Cc]reatures you control gain ([a-z ]+) until end of turn if a creature (you control|card in your graveyard) has \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
   if (odric && !opts.spell) {
-    const keywords = [odric[1]!, ...odric[2]!.split(", "), odric[3]!].map((k) => canonicalKeyword(k));
+    const keywords = [odric[1]!, ...odric[3]!.split(", "), odric[4]!].map((k) => canonicalKeyword(k));
     if (keywords.some((k) => !k || /^(Protection|Hexproof from|Toxic)/.test(k) || k.includes("("))) return null;
     const yours: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" };
-    return { targets: [], effects: [{ type: "continuous", what: { ref: "each", filter: yours }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: true }], duration: "endOfTurn" }], text };
+    return { targets: [], effects: [{ type: "continuous", what: { ref: "each", filter: yours }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: odric[2] === "you control" ? true : "graveyard" }], duration: "endOfTurn" }], text };
   }
+  // Super-Adaptoid: "choose another target creature. If that creature has haste and ~ doesn't, put a haste counter on ~.
+  // Do the same for flying, ...": each keyword checked in turn as it resolves (keyword counters, CR 122.1b).
+  const adaptoid = /^[Cc]hoose another target creature\. If that creature has ([a-z ]+) and ~ doesn't, put an? \1 counter on ~\. Do the same for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
+  if (adaptoid && !opts.spell) {
+    const kinds = [adaptoid[1]!, ...adaptoid[2]!.split(", "), adaptoid[3]!];
+    const keywords = kinds.map((k) => canonicalKeyword(k));
+    if (keywords.some((k, i) => !k || k.toLowerCase() !== kinds[i])) return null;
+    const kw = (k: string, not = false): TargetSpec => ({ kind: "object", ...(not ? { notKeywords: [k] } : { keywords: [k] }), text: k.toLowerCase() });
+    return {
+      targets: [{ kind: "object", types: ["Creature"], text: "target creature", notSource: true }],
+      effects: keywords.map((k, i): Effect => ({
+        type: "if",
+        cond: { kind: "targetIs", index: 0, filter: kw(k!) },
+        effects: [{ type: "if", cond: { kind: "state", cond: { kind: "selfIs", filter: kw(k!, true) } }, effects: [{ type: "counters", what: { ref: "self" }, counter: kinds[i]! as CounterKind, n: 1 }] }],
+      })),
+      text,
+    };
+  }
+  // Aberrant Mind Sorcerer: "choose target instant or sorcery card in your graveyard, then roll a d20. 1—9 | You may put
+  // that card on top of your library. 10—20 | Return that card to your hand." The target is chosen before the roll.
+  if (/^[Cc]hoose target instant or sorcery card in your graveyard, then roll a d20\.\s+1—9 \| You may put that card on top of your library\.\s+10—20 \| Return that card to your hand\.$/.test(text.trim()) && !opts.spell) {
+    const that: ObjRef = { ref: "target", index: 0 };
+    return {
+      targets: [{ kind: "card", types: ["Instant", "Sorcery"], owner: "you", text: "target instant or sorcery card in your graveyard" }],
+      effects: [
+        { type: "roll", sides: 20 },
+        { type: "if", cond: { kind: "rollIn", min: 1, max: 9 }, effects: [{ type: "may", effects: [{ type: "putInLibrary", what: that, position: "top" }], text: "put that card on top of your library" }] },
+        { type: "if", cond: { kind: "rollIn", min: 10, max: 20 }, effects: [{ type: "bounce", what: that }] },
+      ],
+      text,
+    };
+  }
+  // Zimone's Experiment: the revealed land cards onto the battlefield tapped, the creature cards into your hand (Effect
+  // dig landsOnto); a land creature card is a land card, so it goes onto the battlefield.
+  if (/^Look at the top five cards of your library\. You may reveal up to two creature and\/or land cards from among them, then put the rest on the bottom of your library in a random order\. Put all land cards revealed this way onto the battlefield tapped and put all creature cards revealed this way into your hand\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "dig", n: 5, count: 2, upTo: true, filter: { kind: "card", types: ["Creature", "Land"], notTypes: [], notColors: [], text: "creature or land card" }, into: "hand", landsOnto: true, rest: "bottom", random: true, reveal: false }], text };
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };

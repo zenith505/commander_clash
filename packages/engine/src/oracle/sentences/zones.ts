@@ -882,9 +882,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const lesser = / with lesser power$/.exec(m[3]!);
     if (lesser && (ctx.spell || !(ctx.selfIt || ctx.activated))) return null;
     // "A permanent card with equal or lesser mana value" (Kodama of the East Tree): than the permanent that entered.
-    const equal = / with equal or lesser mana value$/.exec(m[3]!);
+    // Bane, Lord of Darkness: "a creature card with equal or lesser toughness": than the creature that died, as it last
+    // existed (rulings: not Bane's).
+    const equal = / with equal or lesser (mana value|toughness)$/.exec(m[3]!);
     if (equal && !ctx.subjectIt) return null;
-    const phrase = lesser ? m[3]!.slice(0, lesser.index) : equal ? `${m[3]!.slice(0, equal.index)} with mana value less than or equal to that permanent's mana value` : m[3]!;
+    const phrase = lesser ? m[3]!.slice(0, lesser.index) : equal ? `${m[3]!.slice(0, equal.index)} with ${equal[1]} less than or equal to that ${equal[1] === "toughness" ? "creature" : "permanent"}'s ${equal[1]}` : m[3]!;
     // "A permanent card with mana value less than or equal to that damage" (Covert Technician): counted as it resolves.
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;

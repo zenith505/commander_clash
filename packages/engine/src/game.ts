@@ -5086,7 +5086,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
   }
   // As Foretold, Rooftop Storm: {0}, while one of `pid`'s permanents lets them (castProblem checks it's for this spell).
-  if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
+  if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => (controllerOf(s, obj(s, id)) === pid || compileCard(defOf(s, obj(s, id))).payZero?.eachPlayerFirst) && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
   // Demon of Fate's Design: life equal to the spell's mana value, X at 0 (rulings); castProblem checks it covers this spell.
   if (alt === "lifeForMv") {
     if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.life && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
@@ -5156,7 +5156,8 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
 
 /**
  * The permanent of `pid`'s whose "you may pay {0} rather than pay the mana cost" covers this spell now (As Foretold, Rooftop
- * Storm, Darksteel Monolith), X counted as 0 (rulings): one with no once-each-turn limit first, then the first unused one.
+ * Storm, Darksteel Monolith), or any player's Weftwalking, X counted as 0 (rulings): one with no once-each-turn limit
+ * first, then the first unused one.
  */
 export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life = false): GameObject | undefined {
   const d = defOf(s, o);
@@ -5164,7 +5165,9 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life =
   const used = s.turnLog?.payZeroUsed ?? [];
   const ok = s.battlefield.map((id) => obj(s, id)).filter((p) => {
     const z = compileCard(defOf(s, p)).payZero;
-    if (!z || !!z.life !== life || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
+    if (!z || !!z.life !== life || (controllerOf(s, p) !== pid && !z.eachPlayerFirst) || !characteristics(s, p).hasPrintedAbilities) return false;
+    // Weftwalking: during `pid`'s own turn, before they've cast a spell this turn.
+    if (z.eachPlayerFirst && (s.activePlayer !== pid || (s.castThisTurn ?? []).some((c) => c.player === pid))) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
     if (z.fromExile && o.zone !== "exile") return false;

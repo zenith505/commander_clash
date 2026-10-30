@@ -1470,7 +1470,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
+          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : to, rest, ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
@@ -1519,8 +1519,15 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.play ? " and may play it this turn" : ""}.`);
       else if (found.length && e.into === "graveyard") log(s, `${p.name} puts ${names(found)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
-      else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
-      if (e.into === "battlefield" || faceDown) r.created = [];
+      else if (found.length && !e.landsOnto) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
+      // Zimone's Experiment: the land cards taken go onto the battlefield tapped, the others into the hand.
+      const ontoField = (id: ObjectId) => e.into === "battlefield" || (!!e.landsOnto && isType(defOf(s, obj(s, id)), "Land"));
+      if (e.landsOnto) {
+        const lands = found.filter(ontoField);
+        if (lands.length) log(s, `${p.name} puts ${names(lands)} onto the battlefield tapped.`);
+        if (found.length > lands.length) log(s, `${p.name} puts ${names(found.filter((id) => !ontoField(id)))} into their hand.`);
+      }
+      if (e.into === "battlefield" || faceDown || e.landsOnto) r.created = [];
       r.digTook = found.length > 0;
       if (e.into === "hand") {
         r.dugToHand = found.length;
@@ -1528,7 +1535,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       }
       enterTogether(s, () => {
         for (const id of found) {
-          if (e.into === "hand") moveObject(s, id, "hand");
+          if (e.landsOnto && ontoField(id)) {
+            moveObject(s, id, "battlefield", { controller: p.id, tapped: true });
+            if (obj(s, id).zone === "battlefield") r.created!.push(id);
+          } else if (e.into === "hand") moveObject(s, id, "hand");
           else if (e.into === "graveyard") moveObject(s, id, "graveyard");
           else if (e.into === "exile") {
             // Face up (CR 406.3); "you may play the exiled card this turn" is that object's only (CR 400.7).

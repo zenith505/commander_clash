@@ -3249,6 +3249,13 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // Eternity Vessel: "you may have your life total become the number of charge counters on ~": when that's more life.
   const set = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "setLife" && e.effects[0]!.who.ref === "you" ? e.effects[0]! : undefined;
   if (r && set?.type === "setLife" && set.amount) return evalAmount(s, set.amount, { controller: pid, sourceId: r.item.sourceId }) > player(s, pid).life;
+  // Wicked Guardian: "you may have it deal 2 damage to another creature you control. If you do, draw a card": only with a
+  // creature that survives it.
+  const [chosen, hurt] = e?.type === "may" && e.effects.length === 2 ? e.effects : [];
+  if (r && chosen?.type === "pick" && chosen.action === "choose" && hurt?.type === "damage" && "ref" in hurt.to && hurt.to.ref === "created" && typeof hurt.amount === "number") {
+    const n = hurt.amount;
+    return pickOptions(s, chosen, pid, r.item.sourceId).some((id) => toughness(s, obj(s, id)) - (obj(s, id).damage ?? 0) > n);
+  }
   // "You may get two rad counters" (Tato Farmer): milling ourselves, while the library and life can take it.
   if (e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "getRad" && x.who.ref === "you")) return player(s, pid).library.length >= 20 && player(s, pid).life >= 12;
   // Descendants' Fury: "you may sacrifice one of them. If you do, reveal cards ... until you reveal a creature card that
@@ -3842,6 +3849,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         // "Each creature deals 1 damage to its controller": life off each player, by how many of them they control.
         if (e.what.ref !== "each" || e.to) break;
         const f = e.what.filter;
+        // Sarkhan the Mad: each one's power to the target, worth it at an opponent.
+        if (e.recipient) {
+          const t = "index" in e.recipient ? targets[e.recipient.index] : undefined;
+          const hurtsFoe = t?.kind === "player" ? t.id !== pid : t?.kind === "object" ? controllerOf(s, obj(s, t.id)) !== pid : false;
+          for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (hurtsFoe ? 1 : -1) * power(s, obj(s, id));
+          break;
+        }
         for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (controllerOf(s, obj(s, id)) === pid ? -1 : 1) * estimate(e.amount);
         break;
       }

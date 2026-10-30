@@ -30,6 +30,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Lingering Death: "that player sacrifices enchanted creature" ("that creature", the enchanted creature, in a trigger at
   // the beginning of a step of its controller's): that player, if they still control it (CR 701.21a).
   if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }];
+  // Soul Tithe: "that player sacrifices it unless they pay {X}, where X is its mana value" (rewritten in compile.ts): that
+  // player decides as it resolves (CR 608.2d); its mana value then, a token's 0 unless it copies a mana cost, an {X} in it
+  // 0 (rulings).
+  if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted permanent unless they pay mana equal to its mana value$/.test(s))
+    return [{ type: "punisher", who: { ref: "eventPlayer" }, options: [{ pay: { cost: "", generic: { count: { kind: "manaValue", of: { ref: "attached" } } } } }], effects: [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }], penalty: "Sacrifice it" }];
   // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
   // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
   if ((m = /^([Ss]acrifice|[Ee]ach player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && /^sacrifice$/i.test(m[1]!) === (m[3] === "you")) {
@@ -284,6 +289,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
+  }
+  // Rag Man: "Target opponent reveals their hand and discards a creature card at random": one of the creature cards in it,
+  // chosen at random (none if there are none).
+  if ((m = /^(.+?) reveals their hand and discards an? ((?:(?!\bcards?\b).)+ card) at random$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(m[2]!);
+    return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 1, random: true, filter }] : null;
   }
   // Flipping a coin (CR 705): see "If you win the flip, ..." in body.ts.
   if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];

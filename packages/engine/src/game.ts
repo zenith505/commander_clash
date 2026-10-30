@@ -1079,7 +1079,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
-  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice ? undefined : printedCounters;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice || printedCounters?.afterPlayer ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -1443,7 +1443,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
     moveObject(s, o.id, "exile");
     return;
   }
-  const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
+  const ewc = printed.entersWithCounters?.afterChoice || printed.entersWithCounters?.afterPlayer ? undefined : printed.entersWithCounters;
   const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
   const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
@@ -7845,6 +7845,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.pair) o.chosen = { ...o.chosen, players: [...(o.chosen?.players ?? []), pid] };
       else o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
       log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
+      // Canker Abomination: "enters with a -1/-1 counter on it for each creature that player controls", counted with the
+      // player chosen, as part of how it enters (CR 614.12), if it still has that ability as it is.
+      const ewc = compileCard(defOf(s, o)).entersWithCounters;
+      if (ewc?.afterPlayer && !entry?.pair && characteristics(s, o).hasPrintedAbilities) {
+        const n = Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, chosen: o.chosen }));
+        if (n) log(s, `${pend.source} enters with ${putCounters(s, o, ewc.counter, n, true)} ${ewc.counter} counter${n === 1 ? "" : "s"}.`);
+      }
       if (entry?.lookHand) {
         log(s, `${p.name} looks at ${player(s, pid).name}'s hand.`);
         log(s, `${player(s, pid).name}'s hand: ${player(s, pid).hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards"}.`, p.id);
@@ -9116,7 +9123,12 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
-  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };
+  const kinds = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.kinds : {}) };
+  for (const a of attacks) {
+    const c = characteristics(s, obj(s, a.attacker));
+    kinds[`${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
+  }
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };
@@ -9380,6 +9392,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
     bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}` });
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -9394,6 +9407,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
       m.becameBlockedTurn = s.turn;
+      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}` });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }

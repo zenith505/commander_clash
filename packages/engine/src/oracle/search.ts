@@ -180,6 +180,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const head = parseSearchFilter(p.slice(0, twoMv.index));
     return head === null || head?.manaValue ? null : { ...(head ?? { kind: "card" }), manaValue: { min: Number(twoMv[1]), max: Number(twoMv[2]) }, text: p };
   }
+  // Meek Attack: "a creature card with total power and toughness 5 or less": the two printed numbers added up (an * is 0).
+  const totalPT = / with total power and toughness (\d+) or (less|greater)$/.exec(p);
+  if (totalPT) {
+    const head = parseSearchFilter(p.slice(0, totalPT.index));
+    return !head || !head.types?.includes("Creature") || head.totalPT ? null : { ...head, totalPT: totalPT[2] === "less" ? { max: Number(totalPT[1]) } : { min: Number(totalPT[1]) }, text: p };
+  }
   // "A creature card with an even mana value" (Gyruda, Doom of Depths; zero is even, X counts 0 off the stack, CR 202.3e).
   const parity = / with an? (even|odd) mana value$/.exec(p);
   if (parity) {

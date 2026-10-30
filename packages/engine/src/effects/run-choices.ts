@@ -17,7 +17,7 @@ import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
-import { defMv } from "../faces";
+import { defMv, sameName } from "../faces";
 import { putCounters } from "../counters";
 import { CREATURE_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
@@ -654,6 +654,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !s.resolving!.created?.length
             : e.cond.kind === "putThisWayIs"
             ? (s.resolving!.created ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
+            : e.cond.kind === "revealedNameInYard"
+            ? ((rv) => !!rv && !!s.objects[rv.id] && (s.objects[rv.id]!.zoneChanges ?? 0) === rv.zc && player(s, ctx.controller).graveyard.some((id) => id !== rv.id && sameName(defOf(s, obj(s, id)).name, defOf(s, s.objects[rv.id]!).name)))(s.resolving!.revealed)
+            : e.cond.kind === "yardChosenIs"
+            ? (s.resolving!.yardChosen ?? []).some((id) => !!s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "putIntoHandIs"
             ? (s.resolving!.putIntoHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "returnedToHandIs"
@@ -1002,7 +1006,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
 /** What a punisher's option reads as on its button: "Discard a card", "Sacrifice a nonland permanent", "Pay {2}". */
 export function punisherLabel(o: PunisherOption): string {
   if ("discard" in o) return o.filter ? `Discard ${o.discard === 1 ? (/^[aeiou]/i.test(o.filter.text) ? "an" : "a") : o.discard} ${o.filter.text}` : o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
-  if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${/^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
+  if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${o.sacrifice.sourceHost ? "the" : /^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;

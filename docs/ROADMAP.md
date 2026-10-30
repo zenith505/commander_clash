@@ -1,7 +1,7 @@
 # Roadmap
 
-28,047 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
+28,104 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,148 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1100,7 +1100,7 @@ line blocks.
    the Trolls); "choose one and ~ gets +1/+1 until end of turn" (Glorfindel, Dauntless Rescuer); "Equip costs you pay
    cost {1} less" (Auriok Steelshaper); "Put a +1/+1 counter on it" for a Vehicle that crewed (Voyager Glidecar); "up to
    one target" exile-and-copy (Renegade Bull); "Put ~ from your graveyard onto the battlefield transformed" (Startled
-   Awake). +21 (28,047 of 31,936).
+   Awake). +21 (28,104 of 31,936 with B46 and B47).
    Out after round 217 (looked at, not done): Barbed Wire (needs a "prevent the next damage dealt by a source"
    shield); Decoy Gambit (a per-target "unless its controller has you draw a card"); Multiple Choice; Laboratory Drudge
    (needs tracking of cards cast and abilities activated from graveyards); Kraven the Hunter (greatest power as it
@@ -3071,9 +3071,57 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rivals' Duel (two targets that share no creature type), Culling Scales (a target with the lowest mana value), Loyal
   Sentry ("destroy that creature and ~" at once), Gladewalker Ritualist ("another creature you control named ~"),
   Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (each needs a new mechanic).
-- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Colfenor's Plans, Wight, Nivix, Szadek,
-  Rain of Gore, Infernal Darkness, Pako, Goddric. Then the unsupported ones above that, least played first
-  (`npm run popular -- --least`).
+- Round B46 (harder skipped cards, least played first): "a creature dealt damage by ~ / equipped creature this turn
+  dies" (Wight, Unscythe, Scythe of the Wretched, which returns it with the Scythe attached) and "if ~ dealt damage to it
+  this turn" (Hawkeye), "When target creature dies this turn, return that card" (Graceful Reprieve), "Move a +1/+1
+  counter from target creature onto ~" (Cytoplast Root-Kin, Arcbound Fiend), "Exile ~ and all cards from all
+  graveyards" (Silent Gravestone), "whose power and toughness aren't equal" (Gilt-Leaf Winnower), "that player
+  sacrifices it unless they pay {X}, where X is its mana value" (Soul Tithe), "Whenever a Sliver / Beast becomes
+  blocked" (Spined Sliver, Berserk Murlodont), "reveal the top card ... put it into your hand. If you do, you lose life
+  equal to its mana value" (Stronghold Arena), keywords counted once among your creatures (Odric, Blood-Cursed), Sarkhan
+  the Mad (damage to himself; "sacrifices it, then that player creates"; each Dragon deals damage equal to its power),
+  "and each Aura attached to it" (Portal of Sanctuary), "create a token and attach ~ to it" (Auxiliary Boosters), "at
+  the beginning of the end step on your next turn" (Kav Landseeker), "Whenever you attack with your commander"
+  (W'Kabi), "protection from instant spells and from sorcery spells" (Devoted Caretaker), "if you control exactly
+  thirteen permanents, you may sacrifice ~. When you do" (Stensia Uprising), "creatures you control with flying attack"
+  (Teo), "put a +1/+1 counter on each of those creatures" after combat damage (Vulture, Heroes in a Half Shell), "total
+  power and toughness 5 or less" (Meek Attack), "That permanent's controller gains control of ~" (Starke of Rath),
+  "attacked with three or more Merfolk this turn" (Deepway Navigator, attackers' creature types are now remembered),
+  "creature with the greatest power ... You gain life equal to its power" (Consecrate // Consume). Fix: the card data
+  lists keywords that the text only names (Odric's list, Angelic Skirmisher's "choose first strike, vigilance, or
+  lifelink", Zur's "have deathtouch, lifelink"); a card now has such a keyword only from a line of keywords (21 cards).
+  +28 (28,054 of 31,936 with rounds 215 and 216).
+- Out after round B46 (looked at, not done): Sacred Ground (what caused a land to go to the graveyard), Colfenor's Plans
+  (playing cards exiled with it), Nivix ("until your next turn, you may cast it if it's an instant or sorcery"), Szadek
+  (combat damage replaced by counters and milling), Rain of Gore (life gain from spells and abilities turned into loss),
+  Infernal Darkness (mana from lands changed to {B}), Pako (fetch counters on exiled cards), Goddric (celebration makes
+  it a Dragon with a granted ability), Bend or Break (piles chosen by an opponent), Meandering Towershell (returns
+  attacking on your next turn), Diaochan (a target chosen by an opponent), Triton Tactics (creatures blocked by those
+  creatures), Blood Spatter Analysis ("Then sacrifice it if ... When you do").
+- Round B47 (harder skipped cards, least played first): "becomes a blue Dragon Illusion ..., loses all abilities, and
+  gains flying" (Dance of the Skywise, and Dragonshift with it), "If that creature is black or red, destroy it"
+  (Inquisitor's Snare), "Target player exiles a card from their graveyard. If it's a creature card" (Graveyard Shovel),
+  "and all white Auras you own attached to it" (Word of Undoing), "reveals their hand and discards a creature card at
+  random" (Rag Man), spell mastery flash counting cards in your graveyard (Swift Reckoning, and Serpent of the Pass),
+  "When a creature dealt damage this way dies this turn" (Skeletonize), "you may have it deal 2 damage to another
+  creature you control. If you do" (Wicked Guardian; the bot only says yes with a creature that survives it), "Whenever
+  an Aura becomes attached to ~" (Brood Keeper, Bramble Elemental: an Aura entering attached or moved onto it), "tap ~
+  unless you pay {E}" (Electrozoa), "enters with a -1/-1 counter for each creature that player controls" after choosing
+  an opponent (Canker Abomination), "the greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang,
+  and Wick's Patrol), "gain control of all Equipment that were attached to it" (Murderous Spoils), "the creature card in
+  your graveyard with the greatest power" (Desecrator Hag), "you may tap or untap target permanent" (Telekinetic
+  Bonds), "enters or leaves the battlefield" artifacts (Sludge Strider), "If it has the same name as a card in your
+  graveyard" (Candles of Leng), "you may sacrifice ~. If you do, return the discarded card" (Pitchstone Wall), the
+  enchanted permanent's controller's upkeep punishers "unless that player pays {1} or 1 life" (Erosion) and "unless
+  they sacrifice that artifact" (Curse Artifact), "gain control of all creatures blocking ~" (The Wretched), and
+  blocks remembered for the turn (TurnLog.blocks): "tap all creatures that blocked ~ this turn" (Joven's Ferrets),
+  "At this turn's next end of combat, destroy all creatures that blocked or were blocked by it this turn" (Venomous
+  Breath, Glyph of Doom), "unless it attacked or blocked this turn" (Lurker). +29 (28,083 of 31,936 with rounds 215 and 216).
+- Out after round B47 (looked at, not done): Aggression and Insubordination (the creature is locked in as the trigger
+  goes on the stack, rulings, but "enchanted creature" is read as it resolves), Sea Troll ("blocked or was blocked by a
+  blue creature this turn": the other creature's color when it blocked or now is unclear).
+- Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
+  --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

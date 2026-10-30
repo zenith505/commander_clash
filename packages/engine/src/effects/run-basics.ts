@@ -217,9 +217,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const n = amountNow(s, e.amount, ctx);
       const victim = e.to ? objects(s, e.to, ctx).find((o) => o.zone === "battlefield") : undefined;
       if (e.to && !victim) return;
+      // A target player or planeswalker: none if it's no longer a legal target (CR 608.2b).
+      const rec = e.recipient ? damageRecipients(s, e.recipient, ctx) : undefined;
+      const recTo = rec ? (rec.objs[0] ? { object: rec.objs[0].id } : rec.pids[0] !== undefined ? { player: rec.pids[0] } : undefined) : undefined;
+      if (e.recipient && !recTo) return;
       const events: DamageEvent[] = objects(s, e.what, ctx)
         .filter((o) => o.zone === "battlefield")
-        .map((o) => ({ src: objectSource(s, o), to: victim ? { object: victim.id } : { player: controllerOf(s, o) }, n }));
+        .map((o) => ({ src: objectSource(s, o), to: recTo ?? (victim ? { object: victim.id } : { player: controllerOf(s, o) }), n: e.ownPower ? power(s, o) : n }));
       const gains = new Map<PlayerId, { n: number }>();
       const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
       for (const [pid, g] of gains) gainLife(s, pid, g.n);
@@ -383,6 +387,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${src}: ${e.mod.text.replace(/\.$/, "")}.`);
       return;
     }
+    case "rememberGroup":
+      if (s.resolving) s.resolving.created = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
+      return;
     case "pumpPerBlocker":
       for (const o of objects(s, e.what, ctx)) {
         // Counted as it resolves (CR 702.23b).

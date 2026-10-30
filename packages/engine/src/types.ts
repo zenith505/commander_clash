@@ -817,7 +817,7 @@ export interface Player {
    * The creatures this player declared as attackers this turn ("id@zoneChanges"): one declared in two combats counts once,
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).
    */
-  attackedWith?: { turn: number; keys: string[] };
+  attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all"> };
   /**
    * The total power of the creatures this player declared as attackers in the latest combat, as they were declared, and its
    * turn (pack tactics: a later change of power, or an attacker leaving, doesn't matter; AFR release notes).
@@ -975,7 +975,7 @@ export interface DelayedTrigger {
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
+  when: "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -1407,6 +1407,11 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /**
+   * Blocks declared this turn (CR 509.1), banding's included (CR 702.22h): each blocker and the attacker it blocked as
+   * `id@zoneChanges` (Venomous Breath's "creatures that blocked or were blocked by it this turn").
+   */
+  blocks?: { blocker: string; attacker: string }[];
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
   /** Times each player investigated this turn (Erdwal Illuminator's "for the first time each turn"). */
@@ -2082,6 +2087,8 @@ export interface Resolving {
   exiledTop?: { id: ObjectId; zc: number };
   /** The card a chooseFromGraveyard with a `chooser` moved, for "that card's mana value" (O-Kagachi Made Manifest). */
   chosenFromYard?: { id: ObjectId; zc: number };
+  /** The cards a chooseFromGraveyard moved, for "if it's a creature card" (SpellCondition yardChosenIs). */
+  yardChosen?: ObjectId[];
   /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
   impulsed?: ObjectId[];
   /** "You may put a land card from among them into your hand" after a mill (Town Greeter): the cards it put there. */

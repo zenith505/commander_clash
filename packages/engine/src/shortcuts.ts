@@ -404,6 +404,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     sourceDamage: Object.fromEntries(Object.entries(t.sourceDamage ?? {}).map(([k, v]) => [k, Math.min(Math.max(0, ...Object.values(v)), 5)])),
     toOwnGraveyardTypes: t.toOwnGraveyardTypes,
     damageSources: capped(Object.fromEntries(Object.entries(t.damageSources ?? {}).map(([k, v]) => [k, v.length]))),
+    blocks: [...new Set((t.blocks ?? []).map((b) => `${b.blocker}>${b.attacker}`))].sort(),
     energyLost: Object.fromEntries(Object.entries(t.energyLost ?? {}).map(([k, v]) => [k, Math.min(v, 10)])),
     lifeGained: Object.fromEntries(Object.entries(t.lifeGained ?? {}).map(([k, v]) => [k, Math.min(v, LIFE_CAP)])),
     // Counted with no cap (Neheb, the Eternal's mana), like the life totals themselves.

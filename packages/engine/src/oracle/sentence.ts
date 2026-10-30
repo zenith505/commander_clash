@@ -446,8 +446,9 @@ function basePT(p: string, t: string): [Amount, Amount] | null {
  */
 export function parseChanges(text: string): Modification[] | null {
   // "Becomes black, gets +1/-1, and gains "..."" (Defiling Tears), "becomes an Angel, gets +3/+3, and gains flying and
-  // lifelink" (Paragon of the Amesha): a list of changes.
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns? |can attack |gets? [+-]|gains? ))/i);
+  // lifelink" (Paragon of the Amesha): a list of changes. Dance of the Skywise: "becomes a blue Dragon Illusion with base
+  // power and toughness 4/4, loses all abilities, and gains flying": in that order, so it has flying (rulings).
+  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();

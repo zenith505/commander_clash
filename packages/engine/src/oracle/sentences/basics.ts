@@ -374,6 +374,25 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx }];
   }
+  // Venomous Breath, Glyph of Doom (as parseBody joins them): a delayed trigger at this turn's next end of combat (CR
+  // 603.7, 511.2), destroying the creatures that blocked the target or that it blocked this turn, even if they're no longer
+  // blocking (rulings), the target as it is as this resolves.
+  if ((m = /^At this turn's next end of combat, destroy all creatures that (blocked or were blocked by|were blocked by) (target (?:Wall )?creature) this turn$/.exec(s)) && ctx.spell) {
+    const before = ctx.targets.length;
+    const of = parseObject(m[2]!, ctx);
+    if (of?.ref !== "target" || isGroup(of) || ("n" in of && of.n) || ctx.targets.length !== before + 1) return null;
+    const what = { ref: "blockHistory" as const, of, blocked: true as const, ...(m[1] === "blocked or were blocked by" ? { blockers: true as const } : {}) };
+    return [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what }], text: `destroy all creatures that ${m[1]} it this turn` }];
+  }
+  // Erosion (as the host-controller trigger reads it): "destroy enchanted land unless that player pays {1} or 1 life": that
+  // player decides as it resolves (CR 608.2d); the land as the Aura last existed if it has left (CR 608.2h).
+  if ((m = /^[Dd]estroy (enchanted (?:land|artifact|creature)) unless that player (pays .+)$/.exec(s))) {
+    const fx = parseSentence(`Destroy ${m[1]}`, ctx);
+    const who = parsePlayer("that player", ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "destroy" || !who || !options) return null;
+    return [{ type: "punisher", who, options, effects: fx }];
+  }
   // Essence Vortex: "Destroy target creature unless its controller pays life equal to its toughness": its toughness as the
   // choice is offered (CR 608.2h); only with that much life (CR 119.4).
   if ((m = /^(Destroy target creature) unless its controller pays life equal to its toughness$/.exec(s))) {
@@ -819,10 +838,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Vaporous Djinn: "~ phases out unless you pay {U}{U}"; Force of Nature: "~ deals 8 damage to you unless you pay
   // {G}{G}{G}{G}"; Heavyweight Demolisher: "tap ~ unless you pay {3}": chosen as it resolves (rulings on Hasran Ogress).
-  if ((m = /^(~ phases out|~ deals \w+ damage to you|[Tt]ap ~) unless you pay ((?:\{(?:\d+|[WUBRGC])\})+)$/.exec(s)) && (!/^~ deals/.test(m[1]!) || /^~ deals (?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage/.test(m[1]!))) {
+  // Electrozoa: "tap ~ unless you pay {E}": energy instead (CR 107.14).
+  if ((m = /^(~ phases out|~ deals \w+ damage to you|[Tt]ap ~) unless you pay ((?:\{(?:\d+|[WUBRGC])\})+|(?:\{E\})+)$/.exec(s)) && (!/^~ deals/.test(m[1]!) || /^~ deals (?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage/.test(m[1]!))) {
     const otherwise = parseSentence(m[1]!.replace(/^tap/, "Tap"), ctx);
     const pay = parsePayCost(m[2]!);
-    if (!otherwise || otherwise.length !== 1 || !pay?.mana || !plainMana(pay.mana)) return null;
+    if (!otherwise || otherwise.length !== 1 || !pay || (pay.mana ? !plainMana(pay.mana) || pay.energy : !pay.energy) || pay.life) return null;
     return [{ type: "may", effects: [], pay, otherwise, keep: true, text: `Pay ${m[2]}${/phases/.test(m[1]!) ? " to keep ~ phased in" : /^~ deals/.test(m[1]!) ? " to prevent ~'s damage" : " to keep ~ untapped"}` }];
   }
   // Rush of Inspiration: "discard a card at random unless you pay {E}{E}": the choice is made on resolution, after the
@@ -1254,6 +1274,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = parseObject(m[3]!, ctx);
     return what && isGroup(what) && to?.ref === "subject" ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), to }] : null;
   }
+  // Sarkhan the Mad: "Each Dragon creature you control deals damage equal to its power to target player or planeswalker":
+  // each one its own source, all at once, to the one target (rulings).
+  if ((m = /^[Ee]ach ([A-Z][a-z]+ creature you control) deals damage equal to its power to (target player or planeswalker)$/.exec(s))) {
+    const what = parseObject(`each ${m[1]}`, ctx);
+    const recipient = what && isGroup(what) ? parseDamageRecipient(m[2]!, ctx) : null;
+    return recipient ? [{ type: "eachDealsDamage", what: what!, amount: 0, ownPower: true, recipient }] : null;
+  }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
   if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
     const what = parseObject(m[1]!.toLowerCase(), ctx);
@@ -1560,6 +1587,20 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
     // existed (CR 608.2h).
     else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });
+    // Curse Artifact: "unless they sacrifice that artifact" (the enchanted one, as the trigger reads it): only that one, the
+    // permanent the source is attached to.
+    else if ((m = /^sacrifices? enchanted (artifact|land|creature)$/.exec(part))) {
+      const filter = pickFilter(m[1]!);
+      if (filter?.kind !== "object") return null;
+      out.push({ sacrifice: { ...filter, sourceHost: true, text: `enchanted ${m[1]}` } });
+    }
+    // Erosion: "unless that player pays {1} or 1 life": either payment.
+    else if ((m = /^pays? ((?:\{\d+\})+) or (\d+) life$/.exec(part))) {
+      const mana = parseUnlessPays(m[1]!, ctx);
+      const life = parseUnlessPays(`${m[2]} life`, ctx);
+      if (!mana || !life) return null;
+      out.push({ pay: mana }, { pay: life });
+    }
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

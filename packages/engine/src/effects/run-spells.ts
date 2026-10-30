@@ -7,7 +7,7 @@ import { castProblem, destroyPermanent, freeCastable, describeTargets, log, mill
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
-import { ResolveCtx, objects, amountNow, players } from "./resolve";
+import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 import { suspendExiled } from "./run-zones";
@@ -128,6 +128,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Mechtitan Core: the permanents its cost exiled.
       const costExiled = s.resolving?.item.costExiled ?? [];
       const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x.type === "returnExiled" && x.fromCost ? { ...x, cards: costExiled } : x.type === "exileRemembered" ? { ...x, cards: (s.resolving?.created ?? []).map((c) => ({ id: c, zc: s.objects[c]?.zoneChanges ?? 0 })) } : x));
+      // Venomous Breath: "destroy all creatures that blocked or were blocked by it this turn": the target as it is now.
+      for (const [i, x] of effects.entries())
+        if ("what" in x && x.what && typeof x.what === "object" && "ref" in x.what && x.what.ref === "blockHistory" && !x.what.at) {
+          const at = blockHistoryAt(s, x.what, ctx);
+          if (at) effects[i] = { ...x, what: { ...x.what, at } } as Effect;
+        }
       // Dragonhawk: "for each of those cards that are still exiled", the cards this ability exiled.
       for (const x of effects) if (x.type === "damage" && typeof x.amount === "object" && x.amount.count.kind === "stillExiled") Object.assign(x, { amount: { ...x.amount, count: { kind: "stillExiled", cards: impulsed } } });
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
@@ -231,6 +237,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      // "At this turn's next end of combat" (Venomous Breath): never on a later turn.
+      if (o && e.thisTurn && e.when === "endOfCombat") s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
       // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
       if (o && e.event) {
         const who = e.event.player ? players(s, e.event.player, ctx)[0] : undefined;

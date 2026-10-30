@@ -1774,6 +1774,7 @@ export function attachTo(s: GameState, me: GameObject, host: GameObject, asCreat
   if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
   invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)
   log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+  fireEvent(s, { type: "attached", id: me.id, host: host.id });
 }
 
 /** The locked doors of Rooms `pid` controls (CR 709.5c), of `among` only if given: what "unlock a locked door" can unlock. */

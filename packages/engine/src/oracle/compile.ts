@@ -531,6 +531,11 @@ export function compile(d: CardDef): CompiledCard {
       // Guan Yu, Sainted Warrior: "When ~ is put into your graveyard from the battlefield, you may shuffle ~ into your
       // library": a card goes to its owner's graveyard (CR 400.3), so "your" library is its owner's.
       .replace(/^(When ~ is put into your graveyard from the battlefield, you may shuffle ~ into) your library\.$/m, "$1 its owner's library.")
+      // Soul Tithe: "that player sacrifices it unless they pay {X}, where X is its mana value": "it" is the enchanted permanent.
+      .replace(/^(At the beginning of the upkeep of enchanted permanent's controller, that player sacrifices) it unless they pay \{X\}, where X is its mana value\.$/m, "$1 enchanted permanent unless they pay mana equal to its mana value.")
+      // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
+      // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
+      .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
@@ -571,6 +576,12 @@ export function compile(d: CardDef): CompiledCard {
       // Call Damage Control: "Choose up to two. Return those cards from your graveyard to your hand." then "• Target
       // artifact card." and so on: each mode returns its one target.
       .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
+      // Canker Abomination: "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that
+      // player controls.": the chosen player, counted once chosen (EntersWithCounters.afterPlayer).
+      .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
+      // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
+      // (CR 603.1), an ability for each.
+      .replace(/^Whenever another artifact you control enters or leaves the battlefield, ([^\n]+)$/m, "Whenever another artifact you control enters, $1\nWhenever another artifact you control leaves the battlefield, $1")
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
@@ -3629,7 +3640,9 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(flashIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
       // "This spell has flash" is only while it's a spell; "Colossal Rattlewurm has flash" is on the battlefield too.
       const permanentHas = /^~ has flash/.test(line) && !/(^|\n)This spell has flash /.test(d.oracleText ?? "") && !d.types.includes("Instant") && !d.types.includes("Sorcery");
-      const aboutPlayer = !!cond && FLASH_IF.includes(cond.kind) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
+      // Swift Reckoning: "two or more instant and/or sorcery cards in your graveyard", a count of your graveyard's cards.
+      const yardCount = cond?.kind === "amount" && typeof cond.amount === "object" && "count" in cond.amount && cond.amount.count.kind === "cardsInGraveyard" && cond.amount.count.who?.ref === "you" && cond.max === undefined;
+      const aboutPlayer = !!cond && (FLASH_IF.includes(cond.kind) || yardCount) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
       if (!aboutPlayer || permanentHas || out.flashIf) out.unsupported.push(raw);
       else out.flashIf = cond!;
       continue;
@@ -4178,7 +4191,7 @@ export function compile(d: CardDef): CompiledCard {
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^When target creature dies this turn, /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }
@@ -4975,6 +4988,11 @@ function checkCastingLinks(out: CompiledCard) {
   visit(out.entersWithCounters);
   if (needs.size === 1 && out.entersWithCounters && out.entersChoose?.length === 1 && needs.has(out.entersChoose[0]!.what)) out.entersWithCounters.afterChoice = out.entersChoose[0]!.what;
   else if (needs.size) bad = true;
+  // Canker Abomination: a count about "the chosen player", once its "as ~ enters, choose an opponent" is answered.
+  if (out.entersWithCounters && JSON.stringify(out.entersWithCounters.n).includes('"selfChosenPlayer"')) {
+    if (out.entersChoosePlayer && !out.entersWithCounters.afterChoice && !out.entersChooseTwoPlayers) out.entersWithCounters.afterPlayer = true;
+    else bad = true;
+  }
   if (bad) out.unsupported.push("(text about how it was cast that this card's costs don't explain)");
 }
 

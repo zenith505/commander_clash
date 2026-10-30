@@ -275,6 +275,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
+  // Telekinetic Bonds: "If you do, you may tap or untap target permanent": tap, untap or neither, as one question.
+  if ((m = /^You may tap or untap (target permanent)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "tapOrUntap", what, may: true }] : null;
+  }
   // Misleading Signpost, Portal Mage: "reselect which player or permanent target attacking creature is attacking".
   if ((m = /^[Rr]eselect which player or permanent (target attacking creature) is attacking$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -403,6 +408,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, ...(m[2] ? { tapped: true } : {}) }], text: `return that card to the battlefield${m[2] ?? ""} under your control`, thisTurn: true }] : null;
   }
+  // Graceful Reprieve: "When target creature dies this turn, return that card to the battlefield under its owner's
+  // control": the same, for its owner (CR 110.2); once only, a token doesn't return (rulings).
+  if (/^When target creature dies this turn, return that card to the battlefield under its owner's control$/.test(s)) {
+    const what = parseObject("target creature", ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, owner: true }], text: "return that card to the battlefield under its owner's control", thisTurn: true }] : null;
+  }
   // Saffi Eriksdotter: "Sacrifice ~: When target creature is put into your graveyard this turn, return that card to the
   // battlefield": the same, only if it goes to your graveyard, so only one you own (CR 404.1, 400.3). Returned under your
   // control, the player putting it there, who owns it (CR 110.2). Once: back on the battlefield it's a new object (rulings).
@@ -410,6 +421,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("target creature", ctx);
     return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield", thisTurn: true, intoYourGraveyard: true }] : null;
   }
+  // Wight: "Whenever a creature dealt damage by ~ this turn dies, create a ... token and exile that card": the card it
+  // became in the graveyard (CR 400.7), the trigger's subject.
+  if (/^[Ee]xile that card$/.test(s) && ctx.subjectLeft && ctx.lastObjectTarget === undefined) return [{ type: "exile", what: { ref: "subjectCard" } }];
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|up to (?:seven|eight|nine|ten) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|that artifact|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
@@ -421,7 +435,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       what = { ...rest, notCreated: true };
     }
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
-    if ((type === "tap" || type === "untap") && what.ref === "each") ctx.lastGroup = what;
+    if ((type === "tap" || type === "untap") && (what.ref === "each" || what.ref === "blockHistory")) ctx.lastGroup = what;
     return [{ type, what }];
   }
   // Connive (CR 701.50): "~ connives", "it connives", "target creature you control connives", "connives X".
@@ -804,6 +818,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
+  // Cytoplast Root-Kin: "Move a +1/+1 counter from target creature you control onto ~" (with none on it, none moves; ~
+  // itself as the target moves nothing, CR 122.5).
+  if ((m = new RegExp(`^Move (?:a|one) ${COUNTER} counter from (target [^,]+?) onto ~$`, "i").exec(s))) {
+    const from = parseObject(m[2]!, ctx);
+    return from?.ref === "target" && !from.n ? [{ type: "moveCounter", counter: counterKind(m[1]!), from, to: { ref: "self" } }] : null;
+  }
   // Gatewatch Beacon: "you may move a loyalty counter from ~ onto that planeswalker": the one that entered (CR 122.5: none
   // moves if ~ has none).
   if ((m = new RegExp(`^Move (?:a|one) ${COUNTER} counter from ~ onto (it|that (?:planeswalker|creature|permanent))$`, "i").exec(s))) {
@@ -1039,6 +1059,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // The Wretched: "gain control of all creatures blocking ~" (with "for as long as you control ~"): those blocking it as this
+  // resolves (CR 509.1h; none once it has left combat, CR 506.4), the set locked in then (CR 611.2c). Layer 2.
+  if (/^Gain control of all creatures blocking ~$/.test(s) && !ctx.spell) return [{ type: "continuous", what: { ref: "blockingIt" }, mods: [{ kind: "control" }], duration: "game" }];
   // Captivating Glance: "If you win, gain control of enchanted creature. Otherwise, that player gains control of enchanted
   // creature.": the creature it's attached to as this resolves, for the rest of the game, even once the Aura is gone
   // (rulings). Layer 2.
@@ -1055,6 +1078,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
+  // Starke of Rath: "Destroy target artifact or creature. That permanent's controller gains control of ~": whoever
+  // controlled it as it last existed (CR 608.2h), destroyed or not; nobody if it's an illegal target (CR 608.2b). For the
+  // rest of the game, layer 2.
+  if (/^That permanent's controller gains control of ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 && !ctx.targets[0]!.many && !ctx.targets[0]!.optional)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "targetController", index: ctx.lastObjectTarget } }];
   // Aisling Leprechaun: "Whenever ~ blocks or becomes blocked by a creature, that creature becomes green": its color for
   // the rest of the game (layer 5, CR 105.3; "This effect lasts indefinitely").
   if ((m = /^[Tt]hat creature becomes (white|blue|black|red|green)$/.exec(s))) {

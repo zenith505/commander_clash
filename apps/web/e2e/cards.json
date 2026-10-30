@@ -20231,6 +20231,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1c2d6b55-653a-41fd-8a5e-6463a992640b",
+  "name": "Virtus's Maneuver",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each player, choose friend or foe. Each friend returns a creature card from their graveyard to their hand. Each foe sacrifices a creature of their choice.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0b12fee3-1ad1-4dc3-bd19-e9ccce5cb829",
   "name": "Visions of Dread",
   "manaCost": "{2}{B}",

@@ -1113,6 +1113,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Oriss, Samite Guardian: "Target player can't cast spells this turn, and creatures that player controls can't attack
   // this turn": two instructions.
   text = text.replace(/^(Target player can't cast spells this turn), and creatures that player controls can't attack this turn\.$/, "$1. Creatures that player controls can't attack this turn.");
+  // N'Yami-Class Mother Ship: "look at the top card of your library. If it's a permanent card, you may put it onto the
+  // battlefield. If you don't put it onto the battlefield, put it into your hand.": not a permanent card, or one you chose
+  // not to put there, goes to your hand (the "Otherwise" of the may and of the if).
+  text = text.replace(/^([Ll]ook at the top card of your library\. If it's a permanent card, you may put it onto the battlefield\.) If you don't put it onto the battlefield, put it into your hand\.$/, "$1 Otherwise, put it into your hand.");
+  // Pumpkin Bombs: "then put a fuse counter on ~. It deals damage equal to the number of fuse counters on it ...": "it" is ~.
+  text = text.replace(/(put an? ([a-z]+) counter on ~\.) It deals damage equal to the number of \2 counters on it to /, "$1 ~ deals damage equal to the number of $2 counters on it to ");
   const effects: Effect[] = [];
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
@@ -1828,6 +1834,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // dig landsOnto); a land creature card is a land card, so it goes onto the battlefield.
   if (/^Look at the top five cards of your library\. You may reveal up to two creature and\/or land cards from among them, then put the rest on the bottom of your library in a random order\. Put all land cards revealed this way onto the battlefield tapped and put all creature cards revealed this way into your hand\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "dig", n: 5, count: 2, upTo: true, filter: { kind: "card", types: ["Creature", "Land"], notTypes: [], notColors: [], text: "creature or land card" }, into: "hand", landsOnto: true, rest: "bottom", random: true, reveal: false }], text };
+  // Hide in Plain Sight: two of the five cloaked, not optional (as many as there are, CR 701.58a), the rest on the bottom.
+  if (/^Look at the top five cards of your library, cloak two of them, and put the rest on the bottom of your library in a random order\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "dig", n: 5, count: 2, upTo: false, required: true, into: "cloak", rest: "bottom", random: true, reveal: false }], text };
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };
@@ -5062,6 +5071,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "castFromHand") return null;
       effects.push({ ...fx[0]!, fromGraveyard: true });
       si++;
+      continue;
+    }
+    // Counterpoint: "Counter target spell. You may cast a creature, instant, sorcery, or planeswalker spell from your
+    // graveyard with mana value less than or equal to that spell's mana value without paying its mana cost": as it
+    // resolves (rulings), no more than the target's mana value as it last existed (with its X, rulings), and the spell cast
+    // goes back to the graveyard as usual.
+    const castYardLesser = /^[Yy]ou may cast (an? .+? spell) from your graveyard with mana value less than or equal to that spell's mana value without paying its mana cost$/.exec(s);
+    if (castYardLesser && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") {
+      const fx = parseOne(`You may cast ${castYardLesser[1]!} with equal or lesser mana value from your hand without paying its mana cost`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "castFromHand") return null;
+      effects.push({ ...fx[0]!, fromGraveyard: true, yardNoExile: true });
       continue;
     }
     // Wrexial, the Risen Deep: "from that player's graveyard", the player it dealt combat damage to; "If that spell would be
@@ -8419,6 +8439,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Each opponent chooses money, friends, or secrets" (Master of Ceremonies).
     // "Each opponent secretly chooses silence or snitch, then the choices are revealed" (Prisoner's Dilemma): all are
     // chosen before any is revealed.
+    // Friend or foe (Khorvath's Fury, Pir's Whim): you choose for each player, yourself too (rulings); "each friend" and
+    // "each foe" are the players chosen so, the friends' instructions done first, as written (rulings).
+    if (s === "For each player, choose friend or foe" && !ctx.chooseWords && !ctx.vote) {
+      effects.push({ type: "eachChooses", who: { ref: "eachPlayer" }, options: ["friend", "foe"], text: "choose friend or foe", byYou: true });
+      ctx.chooseWords = ["friend", "foe"];
+      ctx.chooseWho = "player";
+      for (let i = si + 1; i < sentences.length; i++) sentences[i] = sentences[i]!.replace(/\b([Ee])ach (friend|foe)\b/g, "$1ach player who chose $2");
+      continue;
+    }
     const choosesWord = /^[Ee]ach (opponent|player) (secretly )?chooses (?:([a-z]+), )?([a-z]+),? or ([a-z]+)(, then the choices are revealed)?$/.exec(s);
     if (choosesWord && !choosesWord[2] === !choosesWord[6]) {
       const options = choosesWord.slice(3, 6).filter((w): w is string => !!w);

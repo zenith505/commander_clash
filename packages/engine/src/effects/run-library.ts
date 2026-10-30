@@ -1019,7 +1019,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${single} named ${n}` })) : undefined;
       const oneOfEach = perName ?? e.oneOfEach;
       const filter = names ? { ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: names, ...(names.length === 1 && filter4 ? { text: filter4.text.replace(/ with the same name as .+$/, ` named ${names[0]}`) } : {}) } : filter4;
-      const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
+      // Pir's Whim: "each friend", every player chosen so.
+      const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || e.who.ref === "choseWord" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
       // "Search target opponent's library" (Bribery): you search it (CR 701.23a), and it's theirs that's shuffled.

@@ -576,6 +576,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Ill-Gotten Gains: "Each player ... returns up to three cards from their graveyard to their hand": each chooses their own
   // as it resolves (fewer if they want, rulings), in APNAP order, all returned together.
   if ((m = /^[Ee]ach player returns up to (one|two|three) cards from their graveyard to their hand$/.exec(s))) return [{ type: "chooseFromGraveyard", n: num(m[1]!), upTo: true, who: { ref: "eachPlayer" } }];
+  // Virtus's Maneuver: "Each friend returns a creature card from their graveyard to their hand": each chooses one of their
+  // own as it resolves, in APNAP order, all returned together.
+  if ((m = /^[Ee]ach player who chose ([a-z]+) returns an? ([a-z]+ card) from their graveyard to their hand$/.exec(s)) && ctx.chooseWords?.includes(m[1]!)) {
+    const filter = parseSearchFilter(m[2]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, filter, who: { ref: "choseWord", option: m[1]! } }] : null;
+  }
   // Fall of the Thran: "Each player returns two land cards from their graveyard to the battlefield": each chooses their own
   // as it resolves, all at the same time, the one card if they have only one (rulings).
   if ((m = /^[Ee]ach player returns (an?|two|three) land cards? from their graveyard to the battlefield$/.exec(s)))

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { nextRandom } from "../src/rng";
 import { moveObject } from "../src/game";
-import { altCostsFor, applyAction, botActions, castProblem, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, power, runStateBasedActions, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { altCostsFor, applyAction, characteristics, controllerOf, planActivate, botActions, castProblem, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, power, runStateBasedActions, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -65,9 +65,18 @@ const weftwalking = card("Weftwalking", "Enchantment", "{4}{U}{U}", {"cmc":6,"or
 const baneLordOfDark = card("Bane, Lord of Darkness", "Legendary Creature — God", "{1}{W}{U}{B}", {"cmc":4,"oracleText":"As long as your life total is less than or equal to half your starting life total, Bane has indestructible.\nWhenever another nontoken creature you control dies, target opponent may have you draw a card. If they don't, you may put a creature card with equal or lesser toughness from your hand onto the battlefield.","power":"5","toughness":"2","keywords":[],"layout":"normal"});
 const seizeTheStorm = card("Seize the Storm", "Sorcery", "{4}{R}", {"cmc":5,"oracleText":"Create a red Elemental creature token with trample and \"This token's power and toughness are each equal to the number of instant and sorcery cards in your graveyard plus the number of cards with flashback you own in exile.\"\nFlashback {6}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)","keywords":["Flashback"],"layout":"normal"});
 const prizedAmalgam = card("Prized Amalgam", "Creature — Zombie", "{1}{U}{B}", {"cmc":3,"oracleText":"Whenever a creature enters, if it entered from your graveyard or you cast it from your graveyard, return this card from your graveyard to the battlefield tapped at the beginning of the next end step.","power":"3","toughness":"3","keywords":[],"layout":"normal"});
+const nyamiclassMoth = card("N'Yami-Class Mother Ship", "Artifact — Vehicle", "{6}", {"cmc":6,"oracleText":"Flying, vigilance, haste\nWhenever this Vehicle deals combat damage to a player, look at the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you don't put it onto the battlefield, put it into your hand.\nCrew 3","power":"5","toughness":"7","keywords":["Flying","Vigilance","Haste","Crew"],"layout":"normal"});
+const zaffaiAndTheTe = card("Zaffai and the Tempests", "Legendary Creature — Human Bard Sorcerer", "{5}{U}{R}", {"cmc":7,"oracleText":"Once during each of your turns, you may cast an instant or sorcery spell from your hand without paying its mana cost.","power":"5","toughness":"7","keywords":[],"layout":"normal"});
+const hideInPlainSig = card("Hide in Plain Sight", "Sorcery", "{3}{G}", {"cmc":4,"oracleText":"Look at the top five cards of your library, cloak two of them, and put the rest on the bottom of your library in a random order. (To cloak a card, put it onto the battlefield face down as a 2/2 creature with ward {2}. Turn it face up any time for its mana cost if it's a creature card.)","keywords":["Cloak"],"layout":"normal"});
+const counterpoint = card("Counterpoint", "Instant", "{3}{U}{B}", {"cmc":5,"oracleText":"Counter target spell. You may cast a creature, instant, sorcery, or planeswalker spell from your graveyard with mana value less than or equal to that spell's mana value without paying its mana cost.","keywords":[],"layout":"normal"});
+const pumpkinBombs = card("Pumpkin Bombs", "Artifact", "{1}{R}", {"cmc":2,"oracleText":"{T}, Discard two cards: Draw three cards, then put a fuse counter on this artifact. It deals damage equal to the number of fuse counters on it to target opponent. They gain control of this artifact.","keywords":[],"layout":"normal"});
+const pirsWhim = card("Pir's Whim", "Sorcery", "{3}{G}", {"cmc":4,"oracleText":"For each player, choose friend or foe. Each friend searches their library for a land card, puts it onto the battlefield tapped, then shuffles. Each foe sacrifices an artifact or enchantment of their choice.","keywords":[],"layout":"normal"});
+const virtussManeuve = card("Virtus's Maneuver", "Sorcery", "{2}{B}", {"cmc":3,"oracleText":"For each player, choose friend or foe. Each friend returns a creature card from their graveyard to their hand. Each foe sacrifices a creature of their choice.","keywords":[],"layout":"normal"});
+const khorvathsFury = card("Khorvath's Fury", "Sorcery", "{4}{R}", {"cmc":5,"oracleText":"For each player, choose friend or foe. Each friend discards all cards from their hand, then draws that many cards plus one. Khorvath's Fury deals damage to each foe equal to the number of cards in their hand.","keywords":[],"layout":"normal"});
 
 describe("round 218 cards", () => {
   it("compile", () => supported(bleedingEffect, superadaptoid, aberrantMindSo, zimonesExperim, lastLaugh, weftwalking, baneLordOfDark, seizeTheStorm, prizedAmalgam));
+  it("compile (2)", () => supported(nyamiclassMoth, zaffaiAndTheTe, hideInPlainSig, counterpoint, pumpkinBombs, pirsWhim, virtussManeuve, khorvathsFury));
 });
 
 describe("Bleeding Effect", () => {
@@ -275,5 +284,190 @@ describe("Prized Amalgam", () => {
     s = passUntil(s, "end", ap);
     s = settle(s, { me: ap });
     expect(zone(s, amalgam)).toBe("graveyard");
+  });
+});
+
+describe("N'Yami-Class Mother Ship", () => {
+  for (const [what, top, may, where] of [
+    ["a permanent card you choose to put onto the battlefield", card("Top Forest", "Basic Land — Forest"), true, "battlefield"],
+    ["a permanent card you don't put onto the battlefield", card("Top Forest", "Basic Land — Forest"), false, "hand"],
+    ["a card that isn't a permanent card", card("Top Bolt", "Instant", "{R}", { oracleText: "Top Bolt deals 3 damage to any target." }), true, "hand"],
+  ] as const)
+    it(`puts ${what} into the right zone after combat damage to a player`, () => {
+      const { s: s0, ap, opp } = setup([]);
+      const ship = putOnBattlefield(s0, ap, nyamiclassMoth);
+      const crew = [0, 1].map((i) => putOnBattlefield(s0, ap, bear({ name: `Crew Bear ${i}` })));
+      const id = into(s0, ap, top, "library");
+      let s = settle(run(s0, planActivate(s0, ap, ship, 0, undefined, undefined, crew)), { me: ap });
+      expect(characteristics(s, s.objects[ship]!).types).toContain("Creature");
+      s = passUntil(s, "declareAttackers", ap);
+      s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ship, defender: opp }] });
+      s = passUntil(s, "combatDamage", ap);
+      s = settle(s, { me: ap, may });
+      expect(s.players[opp]!.life).toBe(35);
+      expect(zone(s, id)).toBe(where);
+    });
+});
+
+describe("Zaffai and the Tempests", () => {
+  it("lets you cast one instant or sorcery from your hand free during each of your turns, even after other spells", () => {
+    const bolt = (n: string) => card(n, "Instant", "{1}{R}", { oracleText: `${n} deals 3 damage to any target.` });
+    const { s: s0, ap, ids, opp } = setup([bolt("Paid Bolt"), bolt("Free Bolt"), bolt("Third Bolt"), bear({ name: "Free Bear?" })]);
+    putOnBattlefield(s0, ap, zaffaiAndTheTe);
+    const free = { alt: "payZero" as const };
+    expect(altCostsFor(s0, ap, s0.objects[ids[3]!]!).some((a) => a.kind === "payZero")).toBe(false);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [ply(opp)])), { me: ap });
+    expect(altCostsFor(s, ap, s.objects[ids[1]!]!).some((a) => a.kind === "payZero")).toBe(true);
+    const untapped = s.battlefield.filter((id) => !s.objects[id]!.tapped).length;
+    s = settle(run(s, planCast(s, ap, ids[1]!, [ply(opp)], undefined, "auto", undefined, free)), { me: ap });
+    expect(s.battlefield.filter((id) => !s.objects[id]!.tapped).length).toBe(untapped);
+    expect(s.players[opp]!.life).toBe(34);
+    // Once each turn.
+    expect(castProblem(s, ap, ids[2]!, [ply(opp)], undefined, undefined, undefined, undefined, free)).toMatch(/nothing lets you pay \{0\}/);
+  });
+});
+
+describe("Hide in Plain Sight", () => {
+  it("cloaks two of the top five cards and puts the rest on the bottom", () => {
+    const { s: s0, ap, ids } = setup([hideInPlainSig]);
+    const top = [0, 1, 2, 3, 4].map((i) => into(s0, ap, bear({ name: `Deep Bear ${i}` }), "library"));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    if (s.pending?.kind !== "searchLibrary") return;
+    expect(s.pending.min).toBe(2);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [top[0]!, top[4]!] }), { me: ap });
+    for (const id of [top[0]!, top[4]!]) {
+      expect(zone(s, id)).toBe("battlefield");
+      expect(s.objects[id]!.faceDown).toBe("cloak");
+      expect(pt(s, id)).toBe("2/2");
+      expect(objHasKeyword(s, s.objects[id]!, "Ward")).toBe(true);
+    }
+    const lib = s.players[ap]!.library;
+    for (const id of [top[1]!, top[2]!, top[3]!]) expect(lib.slice(-3)).toContain(id);
+  });
+});
+
+describe("Counterpoint", () => {
+  it("counters the spell, then you may cast a creature, instant, sorcery or planeswalker spell from your graveyard with no greater mana value free", () => {
+    const { s: s0, ap, ids, opp } = setup([bear({ name: "Countered Bear", manaCost: "{1}{G}" }), counterpoint]);
+    const cheap = into(s0, ap, card("Yard Shock", "Instant", "{R}", { oracleText: "Yard Shock deals 2 damage to any target." }), "graveyard");
+    const big = into(s0, ap, card("Yard Blast", "Sorcery", "{2}{R}", { oracleText: "Yard Blast deals 5 damage to any target." }), "graveyard");
+    const ench = into(s0, ap, card("Yard Charm", "Enchantment", "{W}", { oracleText: "" }), "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    const spell = s.stack[s.stack.length - 1]!.id;
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: spell }]));
+    s = settle(s, { me: ap });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromHand" });
+    if (s.pending?.kind !== "chooseOption") return;
+    expect(s.pending.options).toContain(cheap);
+    expect(s.pending.options).toContain(ids[0]);
+    expect(s.pending.options).not.toContain(big);
+    expect(s.pending.options).not.toContain(ench);
+    s = act(s, { type: "chooseOption", player: ap, choice: cheap });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: cheap });
+    s = settle(run(s, planCast(s, ap, cheap, [ply(opp)])), { me: ap });
+    expect(s.players[opp]!.life).toBe(38);
+    // Not exiled: it goes back to the graveyard.
+    expect(zone(s, cheap)).toBe("graveyard");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+});
+
+describe("Pumpkin Bombs", () => {
+  it("draws three, adds a fuse counter, deals that much damage to the target opponent and gives them control of it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    emptyHand(s0, ap);
+    const discards = [0, 1].map((i) => into(s0, ap, bear({ name: `Spare Bear ${i}` }), "hand"));
+    const bombs = putOnBattlefield(s0, ap, pumpkinBombs);
+    s0.objects[bombs]!.counters.fuse = 2;
+    const s = settle(run(s0, planActivate(s0, ap, bombs, 0, [ply(opp)], undefined, undefined, undefined, { discard: discards })), { me: ap });
+    expect(discards.every((id) => zone(s, id) === "graveyard")).toBe(true);
+    expect(s.players[ap]!.hand.length).toBe(3);
+    expect(s.objects[bombs]!.counters.fuse).toBe(3);
+    expect(s.players[opp]!.life).toBe(37);
+    expect(controllerOf(s, s.objects[bombs]!)).toBe(opp);
+  });
+});
+
+/** Answers this one's "choose friend or foe" questions: `foes` are foes, everyone else a friend. */
+const friendOrFoe = (s: GameState, me: PlayerId, foes: PlayerId[]) => {
+  const asked: PlayerId[] = [];
+  while (s.pending?.kind === "chooseOption" && s.pending.what === "word" && s.pending.player === me) {
+    const of = s.pending.of!;
+    asked.push(of);
+    s = act(s, { type: "chooseOption", player: me, choice: foes.includes(of) ? "foe" : "friend" });
+  }
+  return { s, asked };
+};
+
+describe("friend or foe", () => {
+  it("Pir's Whim: you choose for each player; friends get a tapped land, foes sacrifice an artifact or enchantment", () => {
+    const { s: s0, ap, ids, opp } = setup([pirsWhim]);
+    const [friend, foe2] = s0.turnOrder.filter((p) => p !== opp && p !== ap);
+    const charm = (n: string) => card(n, "Enchantment", "{W}", { oracleText: "" });
+    const oppCharm = putOnBattlefield(s0, opp, charm("Foe Charm"));
+    const foe2Charm = putOnBattlefield(s0, foe2!, charm("Foe Two Charm"));
+    const friendCharm = putOnBattlefield(s0, friend!, charm("Friend Charm"));
+    const myCharm = putOnBattlefield(s0, ap, charm("My Charm"));
+    const lands = (pid: PlayerId) => s0.battlefield.filter((id) => controllerOf(s0, s0.objects[id]!) === pid && s0.cards[s0.objects[id]!.cardId]!.typeLine.includes("Land")).length;
+    const before = { ap: lands(ap), friend: lands(friend!), opp: lands(opp) };
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    const r = friendOrFoe(s, ap, [opp, foe2!]);
+    s = r.s;
+    expect(r.asked.sort()).toEqual([...s0.turnOrder].sort());
+    s = settle(s, { me: ap });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    if (s.pending?.kind !== "searchLibrary") return;
+    const land = s.pending.cards.find((id) => s.cards[s.objects[id]!.cardId]!.typeLine.includes("Land"))!;
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [land] }), { me: ap });
+    expect(zone(s, land)).toBe("battlefield");
+    expect(s.objects[land]!.tapped).toBe(true);
+    const now = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && s.cards[s.objects[id]!.cardId]!.typeLine.includes("Land")).length;
+    expect(now(ap)).toBe(before.ap + 1);
+    expect(now(friend!)).toBe(before.friend + 1);
+    expect(now(opp)).toBe(before.opp);
+    expect(zone(s, oppCharm)).toBe("graveyard");
+    expect(zone(s, foe2Charm)).toBe("graveyard");
+    expect(zone(s, friendCharm)).toBe("battlefield");
+    expect(zone(s, myCharm)).toBe("battlefield");
+  });
+
+  it("Virtus's Maneuver: friends return a creature card from their graveyard, foes sacrifice a creature", () => {
+    const { s: s0, ap, ids, opp } = setup([virtussManeuve]);
+    const back = into(s0, ap, bear({ name: "Back Bear" }), "graveyard");
+    const theirBack = into(s0, opp, bear({ name: "Their Back Bear" }), "graveyard");
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    s = friendOrFoe(s, ap, [opp]).s;
+    s = settle(s, { me: ap });
+    // Your only creature card in the graveyard is returned without asking.
+    expect(s.pending).toBeFalsy();
+    expect(zone(s, back)).toBe("hand");
+    expect(zone(s, theirBack)).toBe("graveyard");
+    expect(zone(s, mine)).toBe("battlefield");
+    expect(zone(s, theirs)).toBe("graveyard");
+  });
+
+  it("Khorvath's Fury: friends discard their hands and draw one more; foes take damage equal to their hand size", () => {
+    const { s: s0, ap, ids, opp } = setup([khorvathsFury]);
+    const others = s0.turnOrder.filter((p) => p !== ap && p !== opp);
+    for (const p of [ap, opp, ...others]) emptyHand(s0, p);
+    s0.players[ap]!.hand.push(ids[0]!);
+    s0.objects[ids[0]!]!.zone = "hand";
+    const mine = [0, 1].map((i) => into(s0, ap, bear({ name: `My Bear ${i}` }), "hand"));
+    [0, 1, 2, 3].forEach((i) => into(s0, opp, bear({ name: `Their Bear ${i}` }), "hand"));
+    into(s0, others[1]!, bear({ name: "Foe Bear" }), "hand");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    s = friendOrFoe(s, ap, [opp, others[1]!]).s;
+    s = settle(s, { me: ap });
+    expect(mine.every((id) => zone(s, id) === "graveyard")).toBe(true);
+    expect(s.players[ap]!.hand.length).toBe(3);
+    // A friend with no cards draws one (rulings).
+    expect(s.players[others[0]!]!.hand.length).toBe(1);
+    expect(s.players[opp]!.life).toBe(36);
+    expect(s.players[opp]!.hand.length).toBe(4);
+    expect(s.players[others[1]!]!.life).toBe(39);
+    expect(s.players[ap]!.life).toBe(40);
   });
 });

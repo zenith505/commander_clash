@@ -100,12 +100,13 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           st.queue.shift();
           continue;
         }
+        // "For each player, choose friend or foe": this one's controller chooses for each of them, themselves too.
         if (st.pick === undefined) {
-          s.pending = { kind: "chooseOption", player: pid, source: src, what: "word", options: e.options, labels: e.options.map((w) => w.charAt(0).toUpperCase() + w.slice(1)), prompt: e.text };
+          s.pending = { kind: "chooseOption", player: e.byYou ? ctx.controller : pid, source: src, what: "word", options: e.options, labels: e.options.map((w) => w.charAt(0).toUpperCase() + w.slice(1)), prompt: e.byYou ? `${e.text} for ${pid === ctx.controller ? "yourself" : player(s, pid).name}` : e.text, ...(e.byYou ? { of: pid } : {}) };
           return "paused";
         }
         r.chose[pid] = st.pick;
-        log(s, e.secret ? `${player(s, pid).name} secretly chooses (${src}).` : `${player(s, pid).name} chooses ${st.pick} (${src}).`);
+        log(s, e.byYou ? `${player(s, ctx.controller).name} chooses ${st.pick} for ${pid === ctx.controller ? "themselves" : player(s, pid).name} (${src}).` : e.secret ? `${player(s, pid).name} secretly chooses (${src}).` : `${player(s, pid).name} chooses ${st.pick} (${src}).`);
         st.pick = undefined;
         st.queue.shift();
       }

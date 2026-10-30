@@ -2683,7 +2683,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -3102,7 +3102,7 @@ export type Effect =
    * "Each opponent chooses fame or fortune" (Seize the Spotlight): each of `who`, in APNAP order and knowing the earlier
    * answers (CR 101.4), chooses one of the words; what they chose is kept for "for each player who chose ...". Not a vote.
    */
-  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string; /** "Secretly chooses ..., then the choices are revealed": none sees another's word until all have chosen. */ secret?: true }
+  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string; /** "Secretly chooses ..., then the choices are revealed": none sees another's word until all have chosen. */ secret?: true; /** "For each player, choose friend or foe" (Pir's Whim): its controller chooses the word for each of them. */ byYou?: true }
   /**
    * "Each opponent faces a villainous choice — A, or B" (CR 701.55): each of `who` in APNAP order chooses one of the two
    * options, then all of it is done, that player being the event player in it, before the next one chooses (701.55d).

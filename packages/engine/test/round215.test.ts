@@ -260,13 +260,8 @@ describe("Reign of the Pit", () => {
   it("each player sacrifices a creature; the Demon's power and toughness are the total power sacrificed", () => {
     const { s: s0, ap, ids } = setup([reign]);
     for (const p of s0.turnOrder) putOnBattlefield(s0, p, card("Ogre", "Creature — Ogre", "{2}", { power: p === ap ? "3" : "2", toughness: "2" }));
-    let s = run(s0, planCast(s0, ap, ids[0]!));
-    for (let i = 0; i < 20 && (s.stack.length || s.pending); i++) {
-      const p = s.pending;
-      if (p?.kind === "pickPermanents" || p?.kind === "choosePermanents") s = act(s, { type: "pick", player: p.player, ids: [(p as { options: ObjectId[] }).options[0]!] } as unknown as Action);
-      else if (p) break;
-      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
-    }
+    // One creature each: no choice to make.
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
     const demon = s.battlefield.find((id) => nameOf(s, id) === "Demon Token");
     expect(s.pending).toBeNull();
     expect(demon).toBeDefined();

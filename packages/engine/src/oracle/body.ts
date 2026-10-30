@@ -1114,6 +1114,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
   // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
   text = text.replace(/^([Tt]ap (?:up to one )?target creature) and goad it\./, "$1. Goad it.");
+  // Tamiyo's Compleation: "tap enchanted permanent. If it's an Equipment, unattach it.": "it" is the enchanted permanent.
+  text = text.replace(/^tap enchanted permanent\. If it's an Equipment, unattach it\.$/, "Tap enchanted permanent. Unattach enchanted permanent if it's an Equipment.");
+  // Bhaal, Lord of Murder: "put a +1/+1 counter on target creature and goad it": the same, counter first.
+  text = text.replace(/^([Pp]ut a \+1\/\+1 counter on target creature) and goad it\./, "$1. Goad it.");
   // Sauron, Lord of the Rings: "amass Orcs 5, mill five cards, then return a creature card from your graveyard to the
   // battlefield": one instruction after another; the creature card may be one that was there before the mill (rulings).
   text = text.replace(/^amass ([A-Z][a-z]+) (\d+), mill (\w+) cards, then /, "amass $1 $2. Mill $3 cards, then ");
@@ -3660,6 +3664,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (pick?.type !== "chooseFromGraveyard" || pick.n !== 1 || pick.upTo || pick.who || pick.dest || !pick.filter || Object.keys(pick).length !== 3 || !inner || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: pick.filter } }, min: 1 }, effects: [pick], otherwise: inner });
       si++;
+      continue;
+    }
+    // Patient Naturalist: "Put a land card from among the milled cards into your hand. If you can't, create a Treasure
+    // token.": one must be put there if one was milled, so the rest happens only when none was.
+    const milledPick = effects[effects.length - 1];
+    const milledCant = milledPick?.type === "chooseFromGraveyard" && milledPick.milled && milledPick.n === 1 && !milledPick.upTo && !milledPick.dest ? /^If you can't, (.+?)$/.exec(s) : null;
+    if (milledCant) {
+      const inner = parseOne(capital(milledCant[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       continue;
     }
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
@@ -11581,6 +11595,10 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
     const filter = parseSearchFilter(costExiled[1]!.endsWith(" card") ? costExiled[1]! : `${costExiled[1]} card`);
     return filter ? { cond: { kind: "costExiledIs", filter }, not: false, text: costExiled[2]!, noTargets: true } : null;
   }
+  // Lethal Throwdown: "If the modified creature was sacrificed, draw a card" after "sacrifice a creature or sacrifice a
+  // modified creature": whether the second way was chosen (CR 601.2b); compile finds which one that is.
+  const modSac = ctx.spell && !ctx.targets.some((t) => t.kind === "spell") ? /^If the modified creature was sacrificed, (.+)$/.exec(s) : null;
+  if (modSac) return { cond: { kind: "costOrPaid", index: -1 }, not: false, text: modSac[1]!, noTargets: true };
   // "If the sacrificed creature's toughness was 4 or greater, create two Food tokens instead" (Witch's Oven): as it last
   // existed (CR 608.2h); costs are paid after targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   const sacPT = /^If the sacrificed creature's (power|toughness|mana value) was (\d+) or greater, (.+)$/.exec(s);
@@ -11605,6 +11623,10 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   // Thallid Omnivore: "If a Saproling was sacrificed this way, ..." after a "Sacrifice another creature" cost: the same.
   const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s) ?? (ctx.activated && !ctx.spell ? /^If an? ([A-Z][a-z]+) was sacrificed this way, (.+)$/.exec(s) : null);
   if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
+  // Boneyard Desecrator: "If an outlaw was sacrificed this way": an Assassin, Mercenary, Pirate, Rogue or Warlock as it
+  // last existed (CR 700.12).
+  const sacOutlaw = ctx.activated && !ctx.spell ? /^If an outlaw was sacrificed this way, (.+)$/.exec(s) : null;
+  if (sacOutlaw) return { cond: { kind: "sacrificedSubtype", subtype: "Assassin", orSubtypes: ["Mercenary", "Pirate", "Rogue", "Warlock"] }, not: false, text: sacOutlaw[1]!, noTargets: true };
   // Evereth, Viceroy of Plunder: "If the sacrificed permanent was a Treasure": an artifact subtype it had as it last existed.
   const sacArtifact = /^If the sacrificed permanent was an? (Treasure|Food|Clue|Blood|Map|Powerstone|Equipment|Vehicle), (.+)$/.exec(s);
   if (sacArtifact) return { cond: { kind: "sacrificedSubtype", subtype: sacArtifact[1]! }, not: false, text: sacArtifact[2]!, noTargets: true };

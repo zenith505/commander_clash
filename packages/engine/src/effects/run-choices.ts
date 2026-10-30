@@ -638,6 +638,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !s.resolving!.item.copy && ((from) => (e.cond.kind === "castFromGraveyard" && e.cond.notHand ? !!from && from !== "hand" : from === (e.cond.kind === "castFromGraveyard" && e.cond.hand ? "hand" : e.cond.kind === "castFromGraveyard" && e.cond.exile ? "exile" : "graveyard")))(s.objects[s.resolving!.item.objectId ?? ""]?.castFrom)
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
+            : e.cond.kind === "costOrPaid"
+            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.costOrPaid === e.cond.index
             : e.cond.kind === "evidence"
             ? evidenceCollected(s, ctx)
             : e.cond.kind === "treasure"
@@ -735,7 +737,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "sacrificedColor"
             ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
             : e.cond.kind === "sacrificedSubtype"
-            ? ((k) => !!k && (!!k.allCreatureTypes || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))(ctx.sacrificed?.[0])
+            ? ((k, c) => !!k && (!!k.allCreatureTypes || [c.subtype, ...(c.orSubtypes ?? [])].some((t) => !!k.subtypes?.includes(t))))(ctx.sacrificed?.[0], e.cond)
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "activatedTimes"

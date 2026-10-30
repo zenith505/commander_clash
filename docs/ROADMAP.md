@@ -1,7 +1,7 @@
 # Roadmap
 
-28,153 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,172 of
+28,181 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,173 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1180,6 +1180,38 @@ line blocks.
    Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
    creature); Yidris, Maelstrom Wielder (cascade on spells cast from hand for the turn); Animal Friend (a quoted
    ability that refers to its source); Hive Mind.
+   Round 221: "put a +1/+1 counter on target creature and goad it" (Bhaal, Lord of Murder); "the number of cards you
+   own in exile" (Cosmogoyf); "{C} for each artifact you control named ~" (Powerstone Shard); "enters or becomes the
+   target of a spell or ability an opponent controls" (Shield Mare); "counter that spell unless you sacrifice a
+   creature" (Blood Funnel); "are artifacts in addition to their other types" (The Flesh Is Weak); "creatures with no
+   +1/+1 counters on them" (Hindervines); "put its counters on this creature" (Buzzard-Wasp Colony, and with it Host
+   of the Hereafter); hellbent "skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10);
+   cards a search exiled "with ~" (Endless Horizons, CR 607.2a); cast from your graveyard for {1} more per other
+   creature card (Risen Executioner, CR 601.2f); hexproof from card types (Nevinyrral, Urborg Tyrant, CR 702.11d);
+   "remove an eon counter ... and return it to its owner's hand" as costs (Magosi, the Waterveil: with both abilities
+   in one turn the skipped turn is the extra one, rulings); "one mana of any color among cards in your graveyard"
+   (Corrupted Grafstone); "sacrifice a creature or sacrifice a modified creature ... If the modified creature was
+   sacrificed" (Lethal Throwdown: the way chosen to pay, SpellCondition costOrPaid); convoke or improvise for the next
+   spell or the first spell of a kind each turn (Flockchaser Phantom, Peri Brown, The Fifteenth Doctor); "put all cards
+   exiled with it onto the battlefield" (Underworld Sentinel); "spells that target ~ cost {2} less" (Spellwild Ouphe);
+   two "costs {1} less" conditions (Geistlight Snare); "power or toughness 6 or greater" (Rootless Yew); "it deals 2
+   damage to each creature without flying that player controls" (Siege Dragon); "If it's an Equipment, unattach it"
+   (Tamiyo's Compleation); "If an outlaw was sacrificed this way" (Boneyard Desecrator, CR 700.12); "sacrifice another
+   creature or token" (Ice Cream Kitty); "Put a land card from among the milled cards into your hand. If you can't,
+   create a Treasure token" (Patient Naturalist). +28 (28,181 of 31,936).
+   Smaller gaps from round 221: Endless Horizons' search is played by bots as an "away" search, so they may exile few
+   Plains; Peri Brown and The Fifteenth Doctor count spells of that kind cast this turn, so a spell cast before either
+   arrived uses up the turn's first one (as the rules say).
+   Out after round 221 (looked at, not done): New Perspectives ({0} instead of every cycling cost, non-mana ones
+   included); Clay Golem (a die roll as a cost); Ian the Reckless (damage to you and any target at once); Tesak,
+   Judith's Hellhound (granted unleash); Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
+   Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
+   suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
+   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles); Ib Halfheart, Goblin Tactician
+   ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
+   (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
+   Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
+   among cards).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

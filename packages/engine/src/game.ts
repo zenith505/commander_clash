@@ -943,6 +943,7 @@ export function moveObject(
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
+    o.costOrPaid = undefined; // and which of its either-or costs was paid
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.extraCounters = undefined; // and the counters a spell will enter with
@@ -3220,6 +3221,12 @@ function beginStep(s: GameState, step: Step): void {
       return untapStep(s, []);
     }
     case "upkeep": {
+      // "Skip your upkeep step if you have no cards in hand" (Gibbering Descent): checked as it would start (rulings); the
+      // whole step is replaced (CR 614.10), so "until your next upkeep" effects go on to the next one that happens.
+      if (!player(s, ap).hand.length && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).skipUpkeepIfHellbent)) {
+        log(s, `${player(s, ap).name} skips their upkeep step.`);
+        return advanceStep(s);
+      }
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
@@ -4711,6 +4718,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
     // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast".
     if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
+    // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
+    if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
   }
   // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
   const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
@@ -4802,6 +4811,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   if (way?.less !== undefined && wayMana !== undefined) less += Math.max(0, evalAmount(s, way.less, { controller: pid, sourceId: o.id }));
+  // Risen Executioner: more generic mana when cast this way (CR 601.2f).
+  const wayMore = way?.more !== undefined ? Math.max(0, evalAmount(s, way.more, { controller: pid, sourceId: o.id })) : 0;
   // Catalyst Stone: "Flashback costs you pay cost {2} less. Flashback costs your opponents pay cost {2} more.": the flashback
   // cost, a card's own or one an effect gave it (CR 702.34a, 601.2f).
   let flashbackMore = 0;
@@ -4837,7 +4848,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? []) if (targetsFor(c.filter)) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore - less) });
+  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less) });
 }
 
 /**
@@ -4974,8 +4985,17 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     // "From exile": where it's cast from, the zone it's still in while it's paid for (CR 601.2a, 601.2g-h).
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile") && (!g.firstEachTurn || firstOfKindThisTurn(s, pid, o, g.filter)));
   });
+}
+
+/**
+ * Peri Brown's "the first historic spell you cast each turn": no other spell `pid` cast this turn matched `filter`. `o`
+ * itself is in TurnLog's list once it has been cast (its castNth is set then, CR 601.2i).
+ */
+function firstOfKindThisTurn(s: GameState, pid: PlayerId, o: GameObject, filter: TargetSpec): boolean {
+  const n = (s.castThisTurn ?? []).filter((c) => c.player === pid && !!s.cards[c.card] && printedMatches(filter, s.cards[c.card]!)).length;
+  return n <= (o.zone === "stack" && o.castNth !== undefined ? 1 : 0);
 }
 
 /** Does `o`, cast by `pid`, have improvise (CR 702.126)? Its own, or from "nonartifact spells you cast have improvise". */
@@ -4985,7 +5005,7 @@ export function hasImprovise(s: GameState, pid: PlayerId, o: GameObject): boolea
   if (player(s, pid).nextSpellImprovise === s.turn) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d));
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d) && (!g.firstEachTurn || firstOfKindThisTurn(s, pid, o, g.filter)));
   });
 }
 
@@ -5583,6 +5603,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     item.casualty = true;
     closeZoneBatch(s);
   }
+  // Lethal Throwdown: which of its "sacrifice a creature or sacrifice a modified creature" was paid, for "if the modified
+  // creature was sacrificed" (CR 601.2b).
+  if (choices.costOr !== undefined && compileCard(defOf(s, o)).costOr) o.costOrPaid = choices.costOr;
   // Bargain: "you may sacrifice an artifact, enchantment, or token" (CR 702.166a).
   if (choices.bargain) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);

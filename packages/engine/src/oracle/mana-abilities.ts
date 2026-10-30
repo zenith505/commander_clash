@@ -48,6 +48,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     // Meteor Crater: "Choose a color of a permanent you control. Add one mana of that color.": one of the colors among
     // them, never colorless (rulings), as for Mox Amber.
     .replace(/: Choose a color of a permanent you control\. Add one mana of that color\.$/, ": Add one mana of any color among permanents you control.")
+    // Corrupted Grafstone: "Choose a color of a card in your graveyard. Add one mana of that color.": the same among the
+    // cards there (The Grey Havens' kind), none with only colorless cards.
+    .replace(/: Choose a color of a card in your graveyard\. Add one mana of that color\.$/, ": Add one mana of any color among cards in your graveyard.")
     // Doubling Cube: a mana ability (rulings), adding as much again of each type of mana in the pool.
     .replace(/: Double the amount of each type of unspent mana you have\.$/, ": Add as much again of each type of unspent mana you have.");
   const part = String.raw`\{[^}]+\}|Sacrifice ~|Return ~ to its owner's hand|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
@@ -377,8 +380,9 @@ function parseManaProduced(text: string): ManaProduce | null {
     return { kind: "colorsAmong", filter: { ...spec, ...(among[1] ? { supertypes: ["Legendary"] } : {}), text: `${among[1] ?? ""}${among[2]} you control` } };
   }
   // "One mana of any color among legendary creature cards in your graveyard" (The Grey Havens).
-  const yard = /^one mana of any color among (.+?) cards in your graveyard$/.exec(text);
+  const yard = /^one mana of any color among (?:(.+?) )?cards in your graveyard$/.exec(text);
   if (yard) {
+    if (!yard[1]) return { kind: "colorsAmong", filter: { kind: "card", text: "cards in your graveyard" }, inYard: true };
     const spec = parseTargetPhrase(`${yard[1]} card from a graveyard`);
     if (spec?.kind !== "card" || spec.chosen) return null;
     return { kind: "colorsAmong", filter: { ...spec, text: `${yard[1]} cards in your graveyard` }, inYard: true };
@@ -389,6 +393,13 @@ function parseManaProduced(text: string): ManaProduce | null {
   if (text === "an amount of mana of the chosen color equal to your devotion to that color") return { kind: "devotion" };
   if (text === "as much again of each type of unspent mana you have") return { kind: "doublePool" };
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);
+  // Powerstone Shard: "{C} for each artifact you control named ~": with this card's name, bound in compile (CR 201.5).
+  const named = /^(\{[WUBRGC]\}) for each (.+) you control named ~$/.exec(text);
+  if (named) {
+    const spec = parseTargetPhrase(named[2]!);
+    if (spec?.kind !== "object" || spec.named !== undefined) return null;
+    return { kind: "fixed", mana: [sym(named[1]!)!], count: { ...spec, controller: "you", named: "~", text: `${named[2]} you control named ~` } };
+  }
   if (each) {
     const spec = parseTargetPhrase(each[2]!);
     if (spec?.kind !== "object") return null;

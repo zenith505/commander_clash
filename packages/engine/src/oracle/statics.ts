@@ -315,7 +315,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Relic Golem's "unless an opponent has eight or more cards in their graveyard"): the restriction applies while the
   // condition is false (a "not" condition, see below).
   // Marauding Maulhorn: "~ attacks each combat if able unless you control a creature named Advocate of the Beast".
-  else if ((m = /^(~ attacks each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
+  // Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able unless
+  // you control a creature named Silver Surfer, ~'s Herald" (that name kept as written by normalizeSelf).
+  else if ((m = /^(~ attacks (?:an opponent with the most life among your opponents )?each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
@@ -2119,6 +2121,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   if (/^can block only creatures with flying$/.test(rest)) return [{ kind: "blocksOnlyFlyers" }];
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
+  if (/^attacks? an opponent with the most life among your opponents each combat if able$/.test(rest)) return [{ kind: "mustAttackMostLife" }];
   // "Blocks each combat if able" (CR 509.1c): the same requirement as "blocks this turn if able", every turn. "Attacks or
   // blocks each combat if able" is both: one that changes sides after attacking must block too (Relentless Raptor rulings).
   if (/^blocks? each combat if able$/.test(rest)) return [{ kind: "mustBlock" }];
@@ -2674,7 +2677,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

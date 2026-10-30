@@ -825,7 +825,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const filter = c.filter && { ...named(c.filter), ...(c.filter.anyOf ? { anyOf: c.filter.anyOf.map(named) } : {}) };
       // With no filter (Dreadlight Monstrosity: "if you own a card in exile"), any card, face down or not.
       const fits = (id: ObjectId) => !filter || (!s.objects[id]!.faceDown && printedMatches(filter, defOf(s, s.objects[id]!)));
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
+      const marked = (id: ObjectId) => !c.counter || (s.objects[id]!.counters[c.counter] ?? 0) > 0;
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id) && marked(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
     }
     case "greatestMvInExile":
       return Math.max(0, ...s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => (s.objects[id]!.faceDown ? 0 : defMv(defOf(s, s.objects[id]!))))));

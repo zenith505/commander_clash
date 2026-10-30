@@ -1139,6 +1139,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
     return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host, eachKind: true }];
   }
+  // Denry Klin, Editor in Chief: "put the same number of each kind of counter on that creature" as ~ has, after "if ~ has
+  // counters on it": each kind ~ has as it resolves, that many (CR 122.1).
+  if (ctx.subject && /^[Pp]ut the same number of each kind of counter on that creature$/.test(s)) return [{ type: "counters", what: { ref: "subject" }, counter: "+1/+1", n: 0, copyFrom: { ref: "self" } }];
   if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;

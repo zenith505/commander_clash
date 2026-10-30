@@ -494,6 +494,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44e02e70-07ab-4795-8037-55185bd11d54",
+  "name": "Aluren",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -4579,6 +4605,41 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ba477a45-84cc-4a85-98e4-50dca3e58788",
+  "name": "Denry Klin, Editor in Chief",
+  "manaCost": "{2}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Cat Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Advisor"
+  ],
+  "oracleText": "Denry Klin enters with your choice of a +1/+1, first strike, or vigilance counter on it.\nWhenever a nontoken creature you control enters, if Denry Klin has counters on it, put the same number of each kind of counter on that creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

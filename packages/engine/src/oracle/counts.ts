@@ -22,6 +22,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
   // Collision Course: "the number of permanents you control that are creatures and/or Vehicles".
   p = p.replace(/^the number of permanents you control that are (creatures|artifacts) or (Vehicles)$/, "the number of $1 or $2 you control");
+  // Ral Zarek, Guest Lecturer: "where X is the number of coins that came up heads", after uncalled flips (see body.ts).
+  if (!each && /^the number of coins that came up heads$/i.test(p) && ctx?.uncalledFlips) return { count: { kind: "flipsWon", heads: true } };
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|that card|~)$/, "$2's $1");
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other

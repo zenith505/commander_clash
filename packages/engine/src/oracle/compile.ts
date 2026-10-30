@@ -375,6 +375,9 @@ export function normalizeSelf(d: CardDef): string {
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
   const short = ofThe ?? first ?? regnal ?? comma;
+  // Galactus, Devourer of Worlds: "a creature named Silver Surfer, Galactus's Herald" is another card's name with the short
+  // name in it.
+  if (short && short !== full) t = t.replace(new RegExp(`(\\bnamed )([A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*, ${esc(short)}'s [A-Z][\\w'-]*)`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
@@ -465,7 +468,7 @@ function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
 
 /** The ability words (CR 207.2c), before a line of an instant or sorcery. */
 const SPELL_ABILITY_WORD = new RegExp(
-  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
+  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council", "Will of the Planeswalkers"].join("|")}) — `,
 );
 
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
@@ -1256,6 +1259,15 @@ export function compile(d: CardDef): CompiledCard {
     if (counterChoice) {
       if (out.entersCounterChoice || counterChoice[2] === counterChoice[3]) out.unsupported.push(raw);
       else out.entersCounterChoice = { counters: [counterKind(counterChoice[2]!), counterKind(counterChoice[3]!)], ...(counterChoice[1] === "escapes" ? { escaped: true as const } : {}) };
+      continue;
+    }
+    // Denry Klin, Editor in Chief: "~ enters with your choice of a +1/+1, first strike, or vigilance counter on it": one of
+    // three, the same way.
+    const counterChoice3 = new RegExp(`^~ enters with your choice of an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on it\\.$`).exec(line);
+    if (counterChoice3) {
+      const kinds = counterChoice3.slice(1, 4).map((k) => counterKind(k!));
+      if (out.entersCounterChoice || new Set(kinds).size !== 3) out.unsupported.push(raw);
+      else out.entersCounterChoice = { counters: kinds };
       continue;
     }
     // Corrupted Shapeshifter, Primal Plasma, Primal Clay: "As ~ enters, it becomes your choice of a 3/3 creature with
@@ -2209,6 +2221,17 @@ export function compile(d: CardDef): CompiledCard {
       out.skipsExtraTurns = skipExtra[1] === "a player" ? "all" : "opponents";
       continue;
     }
+    // Zilortha, Strength Incarnate: every check of lethal damage on your creatures uses power (CR 120.6, 704.5g, rulings).
+    if (line === "Lethal damage dealt to creatures you control is determined by their power rather than their toughness.") {
+      out.lethalByPower = true;
+      continue;
+    }
+    // Maralen of the Mornsong: no player draws, for any reason (rulings); Mornsong Aria: nor gains life (CR 119.7).
+    if (line === "Players can't draw cards." || line === "Players can't draw cards or gain life.") {
+      out.playersCantDraw = true;
+      if (line.endsWith("or gain life.")) out.cantGainLife = "all";
+      continue;
+    }
     const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
     if (noGain) {
       out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
@@ -2542,6 +2565,15 @@ export function compile(d: CardDef): CompiledCard {
     // Weftwalking: the same alternative cost of nothing (CR 118.9), for every player's first spell during their own turn.
     if (line === "The first spell each player casts during each of their turns may be cast without paying its mana cost.") {
       out.payZero = { eachPlayerFirst: true };
+      continue;
+    }
+    // Aluren: the same alternative cost of nothing for any player (CR 118.9), its creature spells matched by their printed
+    // mana value with X at 0 (rulings), and only a spell cast this way may be cast as though it had flash (rulings).
+    const aluren = /^Any player may cast creature spells with mana value (\d+) or less without paying their mana costs and as though they had flash\.$/.exec(line);
+    if (aluren) {
+      const spec = parseTargetPhrase(`creature card with mana value ${aluren[1]} or less from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `creature spell with mana value ${aluren[1]} or less` }))(spec), anyPlayer: true, flash: true };
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {

@@ -90,6 +90,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
   [/^Whenever an opponent becomes the monarch, (.+)$/, "opponentBecomesMonarch"],
   [/^Whenever another player loses the game, (.+)$/, "anotherPlayerLosesGame"],
+  // Blood Tyrant: "Whenever a player loses the game": the same, since a player who loses leaves the game with every object
+  // they own and control (CR 800.4a), so the permanent with this ability is never theirs by then.
+  [/^Whenever a player loses the game, (.+)$/, "anotherPlayerLosesGame"],
   // CR 731.1: the change from one to the other, not the first time it becomes day or night (rulings on The Celestus).
   [/^Whenever day becomes night or night becomes day, (.+)$/, "dayNightChanges"],
   // CR 701.30: "Whenever you clash" is any clash you take part in, started by you or an opponent (rulings).
@@ -2041,7 +2044,9 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "tappedForMana", manaTap: { by, ...(filter ? { filter } : {}) }, body };
 }
 
-function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
+function parseDrawTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // Sneaky Snacker: "When you draw your third card in a turn, ...": the same event as "each turn" (CR 121.2).
+  const line = line0.replace(/^When (you draw your|an opponent draws their|a player draws their) (first|second|third|fourth|fifth) card in a turn, /, "Whenever $1 $2 card each turn, ");
   // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own
   // turn count, the second of that turn.
   const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third|fourth|fifth) card (?:each|during their) turn), (.+)$/.exec(line);
@@ -3165,15 +3170,25 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(walkers[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     return body ? { event: "opponentAttacksYou", attacksYou: { min: 1, orPlaneswalkers: true, walkersOnly: true }, body: { ...body, text: walkers[1]! } } : "fail";
   }
+  // Oath of Kaya: "Whenever an opponent attacks a planeswalker you control with one or more creatures": once for each of
+  // your planeswalkers attacked (rulings); "that player" is the attacking opponent.
+  const aWalker = /^Whenever an opponent attacks a planeswalker you control with one or more creatures, (.+)$/.exec(line);
+  if (aWalker) {
+    const body = parseBody(aWalker[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    return body ? { event: "opponentAttacksYou", attacksYou: { min: 1, orPlaneswalkers: true, walkersOnly: true, perWalker: true }, body: { ...body, text: aWalker[1]! } } : "fail";
+  }
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
   // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one
   // who attacked, "that opponent" the one attacked.
   // Preacher of the Schism: "Whenever this creature attacks the player with the most life or tied for most life" (as
   // dethrone, CR 702.105a: a player, not a planeswalker or battle), "Whenever this creature attacks while you have the
   // most life or are tied for most life": as it attacks; what happens to life totals later doesn't matter (rulings).
-  const mostLife = /^Whenever ~ attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
-  if (mostLife) {
-    const t = parseTrigger(`Whenever ~ attacks, ${mostLife[2]!}`);
+  // Seraphic Greatsword: "Whenever equipped creature attacks the player with the most life or tied for most life": the same,
+  // about the creature it equips (rulings: not when it attacks a planeswalker).
+  const mostLife = /^Whenever (~|equipped creature) attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
+  if (mostLife && (mostLife[1] === "~" || mostLife[2]!.startsWith("the player"))) {
+    mostLife.splice(1, 1);
+    const t = parseTrigger(`Whenever ${/^Whenever equipped/.test(line) ? "equipped creature" : "~"} attacks, ${mostLife[2]!}`);
     if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.ifCond) return "fail";
     return mostLife[1]!.startsWith("the player") ? { ...t, attacksMostLife: true } : { ...t, activeIf: { kind: "youMostLife" } };
   }

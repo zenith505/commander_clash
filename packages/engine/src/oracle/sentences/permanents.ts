@@ -1074,6 +1074,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
   // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
   if (/^That player gains control of ~$/.test(s) && ctx.chosenOpponent && !ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
+  // Act of Authority: "you may exile target artifact or enchantment. If you do, its controller gains control of ~": who
+  // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).
+  if (/^[Ii]ts controller gains control of ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "targetController", index: ctx.lastObjectTarget } }];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
   // this resolves (CR 611.2c), until the cleanup step (514.2).

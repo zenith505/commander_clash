@@ -126,7 +126,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const blocking = /blocking that creature/.test(how) ? parseObject("that creature", ctx) : undefined;
     if (/blocking/.test(how) && !blocking) return null;
     // "That's tapped and attacking that player" (Soaring Lightbringer): the player "whenever you attack a player" is about.
-    if (/that player/.test(how) && !ctx.eventPlayer) return null;
+    // Seraphic Greatsword: "Whenever equipped creature attacks the player with the most life ..., create ... that's tapped and
+    // attacking that player": the player it attacked, the trigger's player.
+    if (/that player/.test(how) && !ctx.eventPlayer && !ctx.defending) return null;
     const state = { ...(/that player/.test(how) ? { attackingEvent: true as const } : {}), ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(/attacking/.test(how) && !/tapped/.test(how) ? { untapped: true as const } : {}), ...(blocking ? { blocking } : {}), ...(xx ? { pt: X } : {}), ...(xPower ? { ptPowerOnly: true as const } : {}) };
     const named = m[8] ? { name: m[8], named: true as const } : {};
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;

@@ -13,7 +13,7 @@ import { characteristics, controllerOf, staticConditionNow, type Characteristics
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
-import { creatureTypesOf, shareCreatureType } from "./game";
+import { creatureTypesOf, opponents, shareCreatureType } from "./game";
 import { CREATURE_TYPES } from "./keywords";
 
 export interface AmountCtx {
@@ -842,7 +842,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
-      const n = (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller)) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      const n = (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
       return c.beyondFirst ? Math.max(0, n - 1) : n;
     }
     case "manaValueCastThisTurn": {
@@ -1141,7 +1141,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}${c.beyondFirst ? " other than the first" : ""}`;
+      return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.opponents ? "your opponents have " : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}${c.beyondFirst ? " other than the first" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "graveyardManaValues":

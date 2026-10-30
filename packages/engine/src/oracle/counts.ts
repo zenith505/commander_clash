@@ -20,6 +20,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Katilda, Dawnhart Martyr: "the number of permanents you control that are Spirits and/or enchantments": each that's
   // one or the other, counted once, as "Spirits or enchantments you control" is.
   p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
+  // Collision Course: "the number of permanents you control that are creatures and/or Vehicles".
+  p = p.replace(/^the number of permanents you control that are (creatures|artifacts) or (Vehicles)$/, "the number of $1 or $2 you control");
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|that card|~)$/, "$2's $1");
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
@@ -665,6 +667,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Delightful Discovery: "for each spell your opponents have cast this turn" (CR 601.2f: counted as it's cast). A player
+  // who has left isn't an opponent any more (CR 800.4a).
+  if (/^spells? your opponents have cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", opponents: true });
   // Outlaw Stitcher: "for each spell you've cast this turn other than the first": all of them but one.
   if (each && /^spell you've cast this turn other than the first$/i.test(p)) return count({ kind: "spellsCastThisTurn", beyondFirst: true });
   // Storm Entity: "for each other spell cast this turn", every player's, not its own cast (rulings: counted as it enters,
@@ -710,6 +715,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });
+  // Blood Tyrant: "each player loses 1 life. Put a +1/+1 counter on ~ for each 1 life lost this way": what its loseLife
+  // took off life totals, every player's (rulings: yours too).
+  if (each && /^1 life lost this way$/i.test(p) && ctx !== null) return count({ kind: "lifeLostThisWay", byLoss: true });
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).

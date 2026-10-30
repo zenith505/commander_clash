@@ -418,7 +418,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
     return t?.ref === "target" && !t.n && !t.sameName && !t.sharesColor ? { ...t, andSelf: true } : null;
   }
-  const several = SEVERAL_TARGETS.exec(x);
+  const several = / and all (?:Auras|Equipment)(?: you control)? attached to it$/.test(x) && /^another /.test(x) ? null : SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
@@ -508,7 +508,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise; Soul Nova:
   // "target attacking creature and all Equipment attached to it".
   // Orzhov Charm: "target creature you control and all Auras you control attached to it": only the Auras you control.
-  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?| you control)?) and all (Auras|Equipment)( you control)? attached to (?:it|them|that creature)$/i.exec(x);
+  // Essence Reliquary: "another target permanent you control and all Auras you control attached to it".
+  const andAttached = /^(.*target (?:attacking )?(?:creatures?|permanent)(?: with [a-z ]+?| you control)?) and all (Auras|Equipment)( you control)? attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".

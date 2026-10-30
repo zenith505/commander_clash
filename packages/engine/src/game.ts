@@ -1178,6 +1178,8 @@ export function moveObject(
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
+  // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
+  if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});

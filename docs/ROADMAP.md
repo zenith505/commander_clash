@@ -1,6 +1,6 @@
 # Roadmap
 
-27,975 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,001 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
 9,979 (91%).
 
@@ -1025,7 +1025,35 @@ line blocks.
    [an opponent controls] is dealt damage, destroy it" (Green Dragon, Shriveling Rot). +29 (27,947 of 31,936 with
    rounds 211 to 213 and B40 to B44).
    Out after round 214: Scout's Warning doesn't yet let a creature card be suspended at instant speed (its rulings say
-   it does). Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
+   it does).
+   Round 215 took fresh cards from EDHREC rank 14,200 on: "Other Caves you control have "..."" (Forgotten Monument); "as
+   long as enchanted permanent is a land, it has "..."" (Nature's Embrace); "protection from God creatures" (Sigrid,
+   God-Favored); "destroy up to one other target creature. If that creature wasn't dealt damage this turn, its controller
+   draws two cards" (Faller's Faithful); "you may return another target creature you control to its owner's hand. If you
+   do, ..." (Niambi, Stockpiling Celebrant); "target creature you control and all Auras you control attached to it" and
+   "destroy target creature and you lose life equal to its toughness" (Orzhov Charm); "another Villain and/or artifact
+   you control enters" (HYDRA Assault Robot); "whenever you give a gift" (Jolly Gerbils, new effect gaveGift at the end of
+   every gift, CR 702.174c); "the total power of the creatures sacrificed this way" (Reign of the Pit); "if that
+   creature's power is 2 or less or if you control another Lizard, gain control of that creature until end of turn, untap
+   it, and it gains haste" (Reptilian Recruiter); spend restrictions "an Elemental spell or a Chandra planeswalker spell"
+   (Chandra's Embercat) and "an instant or sorcery spell or a kicked spell" (Volshe Tideturner); "when ~ dies, if it was
+   enchanted/equipped" (Gunner Conscript) and "if it wasn't a Demon, return it ... with two +1/+1 counters on it"
+   (Infernal Vessel); "if one or more cards were put into exile this turn" (Ennis, TurnLog.cardExiled); "If you didn't put
+   a card into your hand this way, draw a card" (Adventure Awaits); "exile the top thirteen cards ..., then search your
+   library for a card" (Demonic Bargain); "the number of permanents you sacrificed this turn" (Sawblade Skinripper,
+   Pyre-Sledge Arsonist); "If it was an artifact, ..." after returning it (Rescue, Pepper Potts); "you may exile N cards
+   from your graveyard. When you do, ..." (Kroxa and Kunoros, Young Necromancer, Kishla Trawlers); "target opponent mills
+   five cards. You may cast an instant or sorcery spell from among them" (Jace's Mindseeker, castFromHand milled);
+   "If you control a Nissa planeswalker, instead search ..." (Nissa's Triumph). +26 (28,001 of 31,936 with B45).
+   Out after round 215 (looked at, not done): Trusty Boomerang (an ability granted to the equipped creature that returns
+   the Equipment: granted abilities can't name their source yet); Curse of Chaos ("that attacking player may discard a
+   card"); Bebop & Rocksteady ("sacrifice a permanent unless you discard a card" as a trigger); Sarevok ("if no permanents
+   left the battlefield this turn"); Fight for the Throne (a delayed "when the creature an opponent controls dies this
+   turn" with a monarch condition); Battlefield Thaumaturge (cost cut per creature targeted); Bucolic Ranch; Rosheen,
+   Roaring Prophet; Aurification; Creeping Dread; Gavi, Nest Warden; Tezzeret, Agent of Bolas (−1 base 5/5); Jared
+   Carthalion; Frodo, Determined Hero; Syr Carah; Shadow Urchin; Head Games; Seeker of Slaanesh; Drizzt Do'Urden;
+   Soul-Shackled Zombie ("from a single graveyard ... if at least one creature card was exiled this way"); Ambitious
+   Augmenter; Isareth the Awakener; Maeve, Insidious Singer. Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
    Duel for Dominance, Startled Awake, Rites of Spring, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
    Contagious Vorrac, Zaffai, The Eighth Doctor, Arcade Gannon, Mortarion, Wail of the Forgotten, Multiple Choice, Gor
    Muldrak.

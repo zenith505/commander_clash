@@ -374,6 +374,9 @@ const checkableMay = (e: Effect): boolean =>
   // Wall of Resurgence: "You may put three +1/+1 counters on target land you control. If you do, ...": only on a target
   // still there.
   (e.type === "counters" && e.what.ref === "target" && !e.what.n && typeof e.n === "number" && e.n > 0) ||
+  // Niambi, Esteemed Speaker: "you may return another target creature you control to its owner's hand. If you do, ...":
+  // done if that target is still legal.
+  (e.type === "bounce" && e.what.ref === "target" && !e.what.n) ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
   // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
@@ -1379,6 +1382,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Death Watch: "its controller loses life equal to its power and you gain life equal to its toughness": two instructions,
   // both about the creature that died.
   text = text.replace(/^(its controller loses life equal to its power) and (you gain life equal to its toughness)\.$/, (_, a: string, b: string) => `${capital(a)}. ${capital(b)}.`);
+  // Nissa's Triumph: "Search your library for up to two basic Forest cards. If you control a Nissa planeswalker, instead
+  // search your library for up to three land cards. Reveal those cards, ...": one search or the other, checked as it
+  // resolves (rulings).
+  text = text.replace(/^Search your library for ([^.]+?)\. If you control (an? [A-Z][a-z]+ planeswalker), instead search your library for ([^.]+?)\. Reveal those cards, put them into your hand, then shuffle\.$/, "If you control $2, search your library for $3, reveal them, put them into your hand, then shuffle. Otherwise, search your library for $1, reveal them, put them into your hand, then shuffle.");
+  // Demonic Bargain: "then search your library for a card. Put that card into your hand, then shuffle.": one search.
+  text = text.replace(/(, then search your library for a card)\. Put that card into your hand, then shuffle\.$/, "$1, put that card into your hand, then shuffle.");
+  // Orzhov Charm: "Destroy target creature and you lose life equal to its toughness": two instructions; the toughness it
+  // had as it last existed on the battlefield, lost even if it wasn't destroyed (rulings).
+  text = text.replace(/^(Destroy target creature) and (you lose life equal to its toughness)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Lunar Force: "sacrifice ~ and counter that spell": two instructions; the spell is countered even if ~ is already gone
   // (rulings).
   text = text.replace(/^sacrifice ~ and counter that spell\.$/, "Sacrifice ~. Counter that spell.");
@@ -6052,6 +6064,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Faller's Faithful: "destroy up to one other target creature. If that creature wasn't dealt damage this turn, its
+    // controller draws two cards.": checked before it's destroyed, as Sold Out; "its controller" is who controlled it as it
+    // last existed on the battlefield.
+    const destroyUnhurt = /^[Dd]estroy (?:up to one )?(?:other )?target creature$/.test(s) ? /^If that creature wasn't dealt damage this turn, its controller (draws (?:a card|two cards|three cards))\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (destroyUnhurt) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy") return null;
+      const then = parseOne(`That creature's controller ${destroyUnhurt[1]}`, ctx);
+      if (!then || !then.length || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], dealtDamageThisTurn: true, text: "dealt damage this turn" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx, otherwise: [...structuredClone(fx), ...then] });
+      si++;
+      continue;
+    }
     // Grey Knight Paragon: "destroy target attacking creature. If that creature is a Demon, exile it instead.": what it is
     // as this resolves (CR 608.2c), one or the other.
     const exileInstead = /^[Dd]estroy target (?:attacking )?creature$/.test(s) ? /^If that creature is an? ([A-Z][a-z]+), exile it instead\.?$/.exec(sentences[si + 1] ?? "") : null;
@@ -6252,6 +6279,49 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const other = parseOne(capital(typeInstead[2]!), ctx);
       if (!other?.length || ctx.targets.length !== before || other.some((e) => e.type !== "continuous" || e.what.ref !== "target" || e.what.index !== index || e.duration !== "endOfTurn")) return null;
       effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [typeInstead[1]!], text: typeInstead[1]! } }, effects: other, otherwise: [last] };
+      continue;
+    }
+    // Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them without
+    // paying its mana cost.": one of those cards, not any card in that graveyard (rulings).
+    const millCast = effects[effects.length - 1]?.type === "mill" ? /^You may cast an? ([a-z ]+?) spell from among them without paying its mana cost$/.exec(s) : null;
+    const millCastFilter = millCast && parseTargetPhrase(`${millCast[1]} spell`);
+    if (millCastFilter?.kind === "spell" && !millCastFilter.controller) {
+      effects.push({ type: "castFromHand", filter: { ...millCastFilter, text: `${millCast![1]} spell` }, milled: true });
+      continue;
+    }
+    // Rescue, Pepper Potts: "return up to one other target artifact or creature you control to its owner's hand. If it was an
+    // artifact, put a +1/+1 counter on ~.": what it was as it last existed on the battlefield, so checked before it's
+    // returned.
+    const wasPerm = /^If it was an? (artifact|creature|enchantment|land), (.+)$/.exec(s);
+    const wasBounced = effects[effects.length - 1];
+    if (wasPerm && wasBounced?.type === "bounce" && wasBounced.what.ref === "target" && !wasBounced.what.n && ctx.targets[wasBounced.what.index]?.kind === "object" && wasBounced.what.index === ctx.targets.length - 1) {
+      const index = wasBounced.what.index;
+      const inner = parseOne(capital(wasPerm[2]!), ctx);
+      if (!inner?.length || ctx.targets.length !== index + 1 || inner.some((e) => pauses(e))) return null;
+      const type = ({ artifact: "Artifact", creature: "Creature", enchantment: "Enchantment", land: "Land" } as const)[wasPerm[1] as "artifact"];
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [type], text: wasPerm[1]! } }, effects: [wasBounced, ...inner], otherwise: [structuredClone(wasBounced)] };
+      continue;
+    }
+    // Adventure Awaits: "You may reveal a creature card from among them and put it into your hand. Put the rest on the
+    // bottom ... If you didn't put a card into your hand this way, draw a card.": whether the look took one.
+    const tookDig = effects[effects.length - 1];
+    if (/^If you didn't put a card into your hand this way, draw a card$/.test(s) && tookDig?.type === "dig" && tookDig.into === "hand" && tookDig.count === 1 && tookDig.upTo) {
+      effects.push({ type: "if", cond: { kind: "digTook" }, effects: [], otherwise: [{ type: "draw", who: { ref: "you" }, n: 1 }] });
+      continue;
+    }
+    // Reptilian Recruiter: "choose target creature. If that creature's power is 2 or less or if you control another Lizard,
+    // gain control of that creature until end of turn, untap it, and it gains haste until end of turn.": either holding as
+    // this resolves (rulings), the three instructions done only then.
+    const powerOr = /^If that creature's power is (\d+) or less or if (you control another [A-Z][a-z]+), gain control of that creature until end of turn, untap it, and it gains haste until end of turn$/.exec(s);
+    if (powerOr && ctx.lastObjectTarget !== undefined && ctx.lastObjectTarget === ctx.targets.length - 1 && ctx.targets[ctx.lastObjectTarget]?.kind === "object") {
+      const index = ctx.lastObjectTarget;
+      const before = ctx.targets.length;
+      const fx: (Effect[] | null)[] = [[{ type: "continuous", what: { ref: "target", index }, mods: [{ kind: "control" }], duration: "endOfTurn" }], ...["Untap that creature", "That creature gains haste until end of turn"].map((x) => parseOne(x, ctx))];
+      const cond = parseStaticCondition(powerOr[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || fx.some((f) => !f?.length) || ctx.targets.length !== before) return null;
+      const all = fx.flat() as Effect[];
+      if (!all.every((e) => mentionsTarget(e, index))) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(powerOr[1]) }, text: `power ${powerOr[1]} or less` } }, effects: all, otherwise: [{ type: "if", cond: { kind: "state", cond }, effects: structuredClone(all) }] });
       continue;
     }
     // Will of the All-Hunter: "Target creature gets +2/+2 until end of turn. If it's blocking, instead put two +1/+1 counters
@@ -10082,9 +10152,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
       const only = inner.length === 1 ? inner[0]! : undefined;
+      // Kroxa and Kunoros: "you may exile five cards from your graveyard. When you do, ...": a "may" whose doing triggers the
+      // reflexive ability (CR 603.12), not a pick of up to five.
       // "You may tap or untap target permanent": tap, untap or neither, as one question.
       // "You may tap any number of untapped creatures you control": tapping none is the "may".
-      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber" || only?.type === "attachAny") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber" || only?.type === "attachAny") && !/^If you do\b/.test(sentences[si + 1] ?? "") && !(only.type === "chooseFromGraveyard" && /^When you do\b/.test(sentences[si + 1] ?? ""))) {
         // castFromHand offers "Don't cast" itself; returning cards from the graveyard can take none.
         effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" || only.type === "attachAny" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
         if (!defineX()) return null;

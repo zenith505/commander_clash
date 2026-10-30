@@ -168,6 +168,7 @@ export type TriggerSourceEvent =
   | { type: "dayNightChanged" }
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
+  | { type: "gaveGift"; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -995,6 +996,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "gaveGift") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGiveGift", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "investigated") {
     for (const id of s.battlefield) {

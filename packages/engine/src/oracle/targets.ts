@@ -507,7 +507,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
   // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise; Soul Nova:
   // "target attacking creature and all Equipment attached to it".
-  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
+  // Orzhov Charm: "target creature you control and all Auras you control attached to it": only the Auras you control.
+  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?| you control)?) and all (Auras|Equipment)( you control)? attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
@@ -540,7 +541,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     }
     const t = parseObjectNow(andAttached![1]!, ctx, cards);
     if (t?.ref !== "target" || t.sameName || t.sharesColor) return null;
-    return { ...t, attachedToo: { filter } };
+    return { ...t, attachedToo: { filter: andAttached![3] ? { ...filter, controller: "you", text: `${filter.text} you control` } : filter } };
   }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).

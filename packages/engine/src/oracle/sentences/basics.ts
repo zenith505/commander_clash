@@ -1162,6 +1162,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   // Screaming Nemesis: each player the damage just before was dealt to (CR 119.7), for good.
   if (/^If a player is dealt damage this way, they can't gain life for the rest of the game$/.test(s)) return [{ type: "noLifeGainForGame", who: { ref: "damagedThisWay" } }];
+  // Sonic Shrieker: "it deals 2 damage to any target and you gain 2 life. If a player is dealt damage this way, they discard
+  // a card": the player it dealt damage to (none if it was prevented, or it hit a permanent).
+  if (/^If a player is dealt damage this way, they discard a card$/.test(s)) return [{ type: "discard", who: { ref: "damagedThisWay" }, n: 1 }];
   // Stigma Lasher: "Whenever ~ deals damage to a player, that player can't gain life for the rest of the game" (CR 119.7).
   if ((m = /^([Tt]hat player|[Tt]arget player|[Tt]arget opponent) can't gain life for the rest of the game$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

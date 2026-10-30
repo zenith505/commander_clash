@@ -1481,6 +1481,8 @@ export interface TurnLog {
    * artifact's, it's still the first. See CompiledCard.firstArtifactAbilityLess.
    */
   artifactAbility?: Record<number, "mana" | "used">;
+  /** A card was put into exile this turn, from anywhere (Ennis, Debate Moderator); tokens and copies of spells aren't cards. */
+  cardExiled?: true;
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
   /** Players who put a counter of any kind on a creature (Lasting Tarfire), as it entered too (CR 122.6). */

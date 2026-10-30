@@ -165,6 +165,10 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "legendary creatures") return `Protection from ${q}`;
   const nonType = /^non-([a-z]+) creatures$/.exec(q);
   if (nonType && CREATURE_TYPES.has(nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1))) return `Protection from non-${nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1)} creatures`;
+  // Sigrid, God-Favored: "protection from God creatures": a creature source of that type, as Riders of Gavony's chosen type
+  // (a God that isn't a creature isn't a God, CR 205.1b, rulings).
+  const typed = /^([a-z]+) creatures$/.exec(q);
+  if (typed && CREATURE_TYPES.has(typed[1]!.charAt(0).toUpperCase() + typed[1]!.slice(1))) return `Protection from creatures of type ${typed[1]!.charAt(0).toUpperCase() + typed[1]!.slice(1)}`;
   const st = creatureTypeOfPlural(q);
   return st ? `Protection from ${text.trim().slice(-q.length).replace(/^./, (c) => c.toUpperCase())}` : undefined;
 }

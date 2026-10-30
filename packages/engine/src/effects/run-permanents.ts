@@ -366,6 +366,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (o?.zone === "battlefield") fireEvent(s, { type: "crewed", id: o.id });
       return;
     }
+    case "gaveGift":
+      // A gift was given (CR 702.174c), whatever it gave.
+      fireEvent(s, { type: "gaveGift", player: ctx.controller });
+      return;
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

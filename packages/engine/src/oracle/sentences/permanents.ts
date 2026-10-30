@@ -627,6 +627,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" && what.ofOwner ? [{ type: "bounce", what }] : null;
   }
+  // Scarab of the Unseen: "Return all Auras attached to target permanent you own to their owners' hands": the Auras, not the
+  // permanent (as Street Sweeper's "destroy all Auras attached to target land").
+  if ((m = /^Return (all (?:Auras|Equipment) attached to target [a-z ]+) to their owners' hands$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && what.attachedToo?.only ? [{ type: "bounce", what }] : null;
+  }
   if ((m = /^Return ((?:all|each) .+?) to (?:their|its) owners?'s? hands?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;

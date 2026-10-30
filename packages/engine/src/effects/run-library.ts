@@ -723,7 +723,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const cards = lib.library.slice(0, n);
         // "Look at the top card of your library" (Brutal Deceiver): the player sees it; with more asked for, one card
         // has nothing to order.
-        const look = n === 1 && cards.length === 1;
+        const look = (n === 1 && cards.length === 1) || (!!e.lookOnly && cards.length > 0);
         if (cards.length < 2 && !look) return;
         s.pending = { kind: "arrangeTop", player: ctx.controller, how: e.mayBottom ? "scry" : look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
         return "paused";
@@ -738,6 +738,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const looked = new Set(arranged.top);
       lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
+      if (e.lookOnly && looked.size > 1) return void log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       if (looked.size === 1) return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;

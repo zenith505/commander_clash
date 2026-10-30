@@ -850,6 +850,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!src || src.zone === "battlefield") continue;
         consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
+      // Curious Cadaver: "When you sacrifice a Clue, return ~ from your graveyard to your hand": an ability of the card in
+      // its owner's graveyard (CR 113.6m), not of a card that left the battlefield in the same event.
+      fromGraveyards((src, owner) => {
+        if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner);
+      });
     }
   } else if (ev.type === "blocksDeclared") {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"

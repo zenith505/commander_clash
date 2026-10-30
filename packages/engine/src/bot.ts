@@ -3133,7 +3133,8 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   const theirs = options.some((id) => controllerOf(s, obj(s, id)) !== pid);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
-    if (theirs) return -worth(s, pid, o);
+    // Drake Familiar: anyone's enchantment: an opponent's worth the most first, else our least useful one.
+    if (theirs) return controllerOf(s, o) !== pid ? -1000 - worth(s, pid, o) : worth(s, pid, o);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
   };
   return [...options].sort((a, b) => cost(a) - cost(b)).slice(0, count);

@@ -7031,9 +7031,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !ab.costLessIfTarget && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
   let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
+  // Raft Security Officer: "if it targets a creature with power 3 or less", as that target is now.
+  const lessAim = ab.costLessIfTarget && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
+  if (lessAim && objectMatches(s, ab.costLessIfTarget!.filter, lessAim, pid, false)) less += ab.costLessIfTarget!.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
   const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
@@ -7625,6 +7628,8 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   if ((pend.how === "order" || pend.how === "bottom" || pend.how === "look") && away.length) throw new RulesError(pend.how === "bottom" ? "put them all on the bottom" : "put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
+  // Visions: "Look at the top five cards": only looked at, so they stay in the order they were in.
+  if (pend.how === "look" && top.some((id, i) => id !== pend.cards[i])) throw new RulesError("leave them in the order they were in");
   r.scratch = { ...r.scratch, arranged: { top, away } };
   s.pending = null;
   continueResolution(s);

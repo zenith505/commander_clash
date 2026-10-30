@@ -676,6 +676,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const lk = s.lastKnown?.[st.id];
       return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
+    case "damageDealtToThisTurn": {
+      // Whipkeeper: dealt to that object this turn, regenerated or not; prevented damage wasn't dealt (rulings).
+      const o = refObjects(s, c.of, ctx)[0];
+      return o ? (s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
+    }
     case "power":
     case "toughness":
     case "manaValue": {

@@ -1108,7 +1108,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
   // library": the X it was cast with.
-  if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
+  // Quarry Colossus: "..., where X is the number of Plains you control": X as the text defines it, counted as it resolves.
+  if ((m = /^[Pp]ut (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && (ctx.spell || ctx.whereX)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
   }
@@ -1273,6 +1274,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const source = parseObject("that Equipment", ctx);
     const what = parseObject(m[1]!, ctx);
     return source?.ref === "target" && what?.ref === "target" && source.index !== what.index ? [{ type: "attach", what, source }] : null;
+  }
+  // Auriok Survivors: "you may return target Equipment card from your graveyard to the battlefield. If you do, you may
+  // attach it to ~": the Equipment that card became (CR 400.7), onto ~ if it's still there and could be equipped (CR 701.3b).
+  if (/^Attach it to ~$/i.test(s) && !ctx.spell && ctx.selfIt && ctx.lastObjectTarget === undefined && ctx.targets.length === 1) {
+    const t = ctx.targets[0];
+    if (t?.kind !== "card" || t.owner !== "you" || t.many || t.subtypes?.length !== 1 || t.subtypes[0] !== "Equipment" || t.types?.length) return null;
+    return [{ type: "attach", what: { ref: "self" }, source: { ref: "created" } }];
   }
   // "Gain control of target Equipment an opponent controls until end of turn. Attach it to ~." (Ogre Geargrabber)
   if ((m = /^Attach (?:it|that Equipment) to (~|him|her)$/i.exec(s)) && !ctx.spell && ctx.lastObjectTarget !== undefined) {

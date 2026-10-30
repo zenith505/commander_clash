@@ -141,7 +141,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
   // Reign of the Pit: "the total power of the creatures sacrificed this way".
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
-  if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).
+  if (ctx && !(each && ctx.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
@@ -756,6 +757,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
     return of && count({ kind, of });
+  }
+  // Whipkeeper: "~ deals damage to target creature equal to the damage already dealt to it this turn".
+  if (/^the damage already dealt to it this turn$/.test(p)) {
+    const of = whoseObject("its", ctx);
+    return of?.ref === "target" ? count({ kind: "damageDealtToThisTurn", of }) : null;
   }
   // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
   // (rulings).

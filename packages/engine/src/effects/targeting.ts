@@ -812,6 +812,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
+  if (spec.damagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.damagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;
   if (spec.lostLifeThisTurn && (t.kind !== "player" || !s.lostLifeThisTurn?.includes(t.id))) return false;
   if (spec.comparedToYou && (t.kind !== "player" || !comparedToYouOk(s, spec.comparedToYou, t.id, controller))) return false;
@@ -1109,7 +1110,8 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
 export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
-  if (e.anyController && e.action === "counters") return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
+  // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
+  if (e.anyController && (e.action === "counters" || e.action === "bounce")) return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
   // Drop of Honey, Purging Scythe: "the creature with the least power" on the battlefield, anyone's, or tied for it; to be
   // destroyed, one that can be if any of those can (rulings, CR 702.12b).
   if (e.anyController && e.action === "choose" && e.least) {

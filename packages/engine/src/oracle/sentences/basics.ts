@@ -663,6 +663,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (it?.ref !== "subject") return null;
     return [{ type: "delayed", when: "endOfCombat", each: "subject", withSource: true, effects: [{ type: "bounce", what: { ref: "subject" } }, { type: "bounce", what: { ref: "self" } }], text: "return it and ~ to their owners' hands" }];
   }
+  // Goblin Sappers: "{R}{R}, {T}: Target creature you control can't be blocked this turn. Destroy it and ~ at end of
+  // combat": one delayed trigger about the target and ~, each as it is now (CR 603.7c, 400.7); ~ is destroyed even if the
+  // creature has left by then.
+  if (/^[Dd]estroy it and ~ at end of combat$/.test(s) && ctx.activated && !ctx.spell && ctx.targets.length === 1 && ctx.lastObjectTarget === 0 && ctx.targets[0]!.kind === "object") {
+    const it = parseObject("it", ctx);
+    if (it?.ref !== "target" || it.index !== 0) return null;
+    return [{ type: "delayed", when: "endOfCombat", of: it, withSource: true, effects: [{ type: "destroy", what: { ref: "subject" } }, { type: "destroy", what: { ref: "self" } }], text: "destroy it and ~" }];
+  }
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);
@@ -746,6 +754,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
     const effects = JSON.parse(JSON.stringify(inner).replace(/\{"ref":"self"\}/g, '{"ref":"subject"}')) as Effect[];
     return [{ type: "delayed", when, effects, text: m[1]! }];
+  }
+  // Magmasaur: "If you don't, sacrifice ~ and it deals damage equal to the number of +1/+1 counters on ~ to each creature
+  // without flying and each player": then ~ deals it as it last existed (CR 608.2h), its counters too.
+  if ((m = /^sacrifice ~ and it deals (.+)$/i.exec(s)) && !ctx.targets.length) {
+    const dealt = parseSentence(`~ deals ${m[1]!}`, ctx);
+    if (!dealt?.length || ctx.targets.length || dealt.some((e) => e.type !== "damage")) return null;
+    return [sacrificeSelf, ...dealt];
   }
   // Uro: "When ~ enters, sacrifice it unless it escaped" (CR 702.138b): whether it escaped can't change.
   if (/^[Ss]acrifice (?:~|it) unless (?:it|~) escaped$/.test(s) && ctx.selfIt && ctx.lastObjectTarget === undefined)
@@ -937,6 +952,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
+  }
+  // Drake Familiar: "sacrifice it unless you return an enchantment to its owner's hand": any enchantment on the
+  // battlefield, anyone's (not targeted); with none, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you return an? ([a-z]+) to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!);
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", anyController: true }], otherwise: [sacrificeSelf], keep: true, text: `Return ${/^[aeiou]/.test(m[2]!) ? "an" : "a"} ${m[2]} to its owner's hand to keep ~` }];
   }
   // Junk Golem: "sacrifice ~ unless you remove a +1/+1 counter from it": removing one keeps it; with none, or choosing not
   // to, it's sacrificed.

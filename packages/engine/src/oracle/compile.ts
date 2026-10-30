@@ -1698,10 +1698,12 @@ export function compile(d: CardDef): CompiledCard {
     // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
     // Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.": an additional cost with an X
     // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
-    const sacFor = /^As an additional cost to cast ~, you may sacrifice any number of ([A-Z][a-z]+)\.$/.exec(line);
-    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `))) {
+    // Vicious Betrayal: "sacrifice any number of creatures" (none too, CR 601.2b), then "Target creature gets +2/+2 until
+    // end of turn for each creature sacrificed this way."
+    const sacFor = /^As an additional cost to cast ~, (?:you may )?sacrifice any number of ([A-Z][a-z]+|creatures)\.$/.exec(line);
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `) || l.includes(` for each ${singularWord(sacFor[1]!)} sacrificed this way.`))) {
       const spec = parseTargetPhrase(singularWord(sacFor[1]!));
-      if (spec?.kind !== "object" || !spec.subtypes?.length) out.unsupported.push(raw);
+      if (spec?.kind !== "object" || (sacFor[1] === "creatures" ? spec.subtypes?.length || spec.types?.length !== 1 || spec.types[0] !== "Creature" : !spec.subtypes?.length) || spec.controller) out.unsupported.push(raw);
       else {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacFor[1]!) }, n: 0, x: true, optional: true });
         costSacrificedX = singularWord(sacFor[1]!);
@@ -4349,7 +4351,9 @@ export function compile(d: CardDef): CompiledCard {
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
     // First Day of Class: "Whenever a creature you control enters this turn, ..." then "Learn." in its own paragraph: the
     // delayed trigger's text ends with its paragraph (CR 603.7a); the next one is another instruction of the spell.
-    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
+    // Benefactor's Draught: "Untap all creatures. Until end of turn, whenever a creature an opponent controls blocks, draw a
+    // card." then "Draw a card.": the same, the delayed trigger after another instruction in its paragraph.
+    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /(?:^|\. )(?:Whenever [^,]+ this turn, |Until end of turn, whenever )/.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
     const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
     const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;

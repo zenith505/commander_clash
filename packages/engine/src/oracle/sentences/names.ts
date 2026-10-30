@@ -68,6 +68,10 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: CHOSEN_NAME }] : null;
   }
+  // Brain Pry: "Target player reveals their hand. That player discards a card with that name.": one card of the name
+  // chosen as it resolves (all such cards are alike, so which one is theirs to say), none if there is none.
+  if (/^That player discards a card with (?:that|the chosen) name$/.test(s) && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player")
+    return [{ type: "discard", who: { ref: "target", index: ctx.lastPlayerTarget }, n: 1, filter: CHOSEN_NAME }];
   // Hint of Insanity: "Target player reveals their hand. That player discards all nonland cards with the same name as
   // another card in their hand": every such card, no choice (CR 701.9b); two of a name both go.
   if ((m = /^That player discards all nonland cards with the same name as another card in their hand$/.exec(s)) && ctx.lastPlayerTarget !== undefined)

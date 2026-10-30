@@ -36,7 +36,8 @@ function sourceGroup(p: string): TargetSpec | null {
   // "Black and/or red sources" (Surge of Salvation): a source that's either color, or both.
   const either = /^(white|blue|black|red|green) and\/or (white|blue|black|red|green) sources$/i.exec(t);
   if (either) return { kind: "object", colors: [COLOR_WORDS[either[1]!.toLowerCase()]!, COLOR_WORDS[either[2]!.toLowerCase()]!], text: t.toLowerCase() };
-  const src = /^(?:(non-?)([A-Z]\w+|colorless|artifact|creature) )?sources( you don't control| your opponents control)?$/i.exec(t);
+  // Lithomancer's Focus: "colorless sources" (and "artifact sources", "creature sources") with no "non".
+  const src = /^(?:(non-?)?([A-Z]\w+|colorless|artifact|creature) )?sources( you don't control| your opponents control)?$/i.exec(t);
   if (src) {
     const spec: TargetSpec = { kind: "object", text: t.toLowerCase() };
     const w = src[2]?.toLowerCase();
@@ -178,7 +179,9 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!parts || (!parts[1] && !parts[2])) return undefined;
     // Avacyn, Guardian Angel: "to another target creature this turn by sources of the chosen color": a target, with the
     // sources a group.
-    const targetBy = !!parts[1] && /^(?:another )?target [a-z ]+$/i.test(parts[1]) && parts[2] === "sources of the chosen color";
+    // Lithomancer's Focus: "Target creature gets +2/+2 until end of turn. Prevent all damage that would be dealt to that
+    // creature this turn by colorless sources": the same, about the target before.
+    const targetBy = !!parts[1] && (/^(?:another )?target [a-z ]+$/i.test(parts[1]) || (parts[1] === "that creature" && ctx.lastObjectTarget !== undefined)) && (parts[2] === "sources of the chosen color" || (!!parts[2] && !!sourceGroup(parts[2]) && !/ you don't control| your opponents control/.test(parts[2])));
     if (parts[1] && !targetBy && /^(~|it|him|her|that creature|those creatures|(?:another )?target .+|up to .+|any target|enchanted .+|equipped .+)$/i.test(parts[1])) return undefined;
     if (parts[2] && /^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(parts[2])) return undefined;
     const to = targetBy ? ((r) => (r ? { target: r } : null))(parseDamageRecipient(parts[1]!, ctx)) : parts[1] ? protectedGroup(parts[1]) : undefined;

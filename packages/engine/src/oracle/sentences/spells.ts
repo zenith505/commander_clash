@@ -482,6 +482,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     // Consuming Ferocity: "it deals damage equal to its power to its controller", the enchanted creature, to whoever controls it.
     if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^its controller$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "hostController" }, by: "attached" }];
+    // Bind the Monster: "Enchanted creature deals damage equal to its power to you" (reworded from "It deals damage to you
+    // equal to its power"): from that creature, to the Aura's controller.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^you$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "you" }, by: "attached" }];
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     // "... to any other target" (Special Move): not that creature (CR 115.3).
     if (a?.ref === "target" && !a.n && /^any (?:other )?target$/i.test(m[2]!)) {

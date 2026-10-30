@@ -3990,6 +3990,18 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Mishra's Domination: "As long as you control enchanted creature, it gets +2/+2. Otherwise, it can't block.": who
+    // controls it now, checked continuously (CR 611.3a); in a free-for-all game every other player is an opponent.
+    const domination = /^As long as you control enchanted creature, it (gets [+-]\d+\/[+-]\d+)\. Otherwise, it (can't block|can't attack|can't attack or block)\.$/.exec(line);
+    if (domination) {
+      const [a, b] = [parseStatic(`Enchanted creature ${domination[1]}.`), parseStatic(`Enchanted creature ${domination[2]}.`)];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        const yours: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
+        const theirs: TargetSpec = { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yours }, text: line }, { ...b, condition: { kind: "attachedIs", filter: theirs }, text: line });
+        continue;
+      }
+    }
     // Varchild, Betrayer of Kjeldor: "Survivors your opponents control can't block, and they can't attack you or
     // planeswalkers you control": two restrictions on the same group, as two sentences.
     const cantBoth = /^([A-Z][a-z]+s your opponents control) can't block, and they (can't attack you or planeswalkers you control)\.$/.exec(line);
@@ -4086,6 +4098,14 @@ export function compile(d: CardDef): CompiledCard {
     const attachedStatics = attachedParts?.map((p, i) => (i === 0 ? parseStatic(p) : parseConditionalStatic(p.replace(/^As long as it's /, `As long as ${attachedParts[0]!.split(" ")[0]!.toLowerCase()} creature is `))));
     if (attachedStatics?.every((p) => p && p.affects.kind === "attached")) {
       for (const p of attachedStatics) out.statics.push({ ...p!, text: line });
+      continue;
+    }
+    // Bride's Gown: "Equipped creature gets +2/+0. It gets an additional +0/+2 and has first strike as long as an Equipment
+    // named Groom's Finery is attached to a creature you control.": two static abilities, the second with its condition.
+    const extraIf = /^(Equipped creature gets [^.]+)\. It gets an additional ([^.]+?) as long as ([^.]+)\.$/.exec(line);
+    const extraStatics = extraIf ? [parseStatic(`${extraIf[1]}.`), parseConditionalStatic(`As long as ${extraIf[3]}, equipped creature gets ${extraIf[2]}.`)] : null;
+    if (extraStatics?.every((p) => p?.affects.kind === "attached") && !extraStatics[0]!.condition && extraStatics[1]!.condition) {
+      for (const p of extraStatics) out.statics.push({ ...p!, text: line });
       continue;
     }
     // Radiant Destiny: "Creatures you control of the chosen type get +1/+1. As long as you have the city's blessing, they
@@ -5057,8 +5077,18 @@ function joinModes(lines: string[]): string[] {
     if (restriction) out[out.length - 1] = `${out[out.length - 1]} ${restriction}`;
     restriction = undefined;
   };
-  for (const line of lines) {
+  // Gnostro, Voice of the Crags: "{T}: Choose one. X is the number of spells you've cast this turn." then the modes: X
+  // defined for each mode (CR 107.3c), counted as it resolves (rulings).
+  let xIs: string | undefined;
+  for (const line0 of lines) {
     const before = out[out.length - 1];
+    if (!/^\s*•/.test(line0)) xIs = undefined;
+    const xHead = /^\s*•/.test(line0) && before !== undefined && !xIs ? /: Choose one\. X is ([^.]+)\.$/.exec(before) : null;
+    if (xHead) {
+      xIs = xHead[1]!;
+      out[out.length - 1] = `${before!.slice(0, xHead.index)}: Choose one —`;
+    }
+    const line = xIs ? line0.replace(/\.$/, `, where X is ${xIs}.`) : line0;
     const restricted = /^\s*•/.test(line) && !restriction && before !== undefined ? /: Choose one\.( Activate only [^.]+\.)+$/.exec(before) : null;
     if (restricted) {
       restriction = restricted[0].slice(": Choose one.".length).trim();

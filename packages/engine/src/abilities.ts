@@ -1743,6 +1743,8 @@ export type StaticCondition =
   | { kind: "selfInExile" }
   /** Firemane Angel's "if ~ is in your graveyard or on the battlefield", one ability for each zone: still there, the same object (CR 400.7, 603.4). */
   | { kind: "selfStill"; zone: "graveyard" | "battlefield" }
+  /** Codespell Cleric: "if it was the second spell you cast this turn": ~ entered this turn as that spell, cast (not a copy), the `n`th of its controller's this turn. */
+  | { kind: "selfCastNth"; n: number }
   /** Eminence's "if ~ is in the command zone or on the battlefield". */
   | { kind: "selfCommandOrBattlefield" }
   /** "If ~ is in the command zone" (Oloro, Ageless Ascetic): an ability that works only there (CR 113.6). */
@@ -1871,7 +1873,7 @@ export type StaticCondition =
   | { kind: "discardedThisTurn"; /** "If an opponent discarded a card this turn" (Tinybones, Trinket Thief): an opponent of `you`. */ opponent?: true; /** "If you've discarded a card this turn" (Recalibrate): `you`. */ yours?: true }
   | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true; /** "Noncombat damage" (Grim Repriser): with `damaged`, only damage that wasn't combat damage (CR 120.2b). */ noncombat?: true }
   /** "If you've scried or surveilled this turn" (Proctor of Potential): `you` scried or surveilled at least once this turn (CR 701.22, 701.25). */
-  | { kind: "scriedThisTurn" }
+  | { kind: "scriedThisTurn"; /** "As long as you've surveilled this turn" (Darkblade Agent): surveilling only. */ surveil?: true }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
@@ -4664,7 +4666,7 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
-  /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity). */
+  /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity); for "selfIsDealtDamage", "is dealt 3 or more damage" at once (Innocent Bystander). */
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;

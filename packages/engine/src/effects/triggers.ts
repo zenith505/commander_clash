@@ -923,7 +923,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const anyBlocker = (t: TriggeredAbility) => !t.blockFilter || o.blockedBy!.some((b) => !!s.objects[b] && objectMatches(s, t.blockFilter!, s.objects[b]!, you, false));
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
-        addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
+        // Hedron Blade: "Whenever equipped creature becomes blocked by one or more colorless creatures": the same check.
+        addHosted(o, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && anyBlocker(t), undefined, o, { player: o.attacking });
         // Barreling Attack: "When that creature becomes blocked this turn" (a delayed trigger, CR 603.7b).
         for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
         const bearer = isRingBearer(s, o);
@@ -1668,7 +1669,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage" || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {

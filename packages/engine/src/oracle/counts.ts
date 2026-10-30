@@ -575,6 +575,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     ctx.lastPlayerTarget = i;
     return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: i } });
   }
+  // Final Punishment: "Target player loses life equal to the damage already dealt to that player this turn": by any
+  // source, what was really dealt.
+  if (!each && ctx && /^the damage already dealt to that player this turn$/i.test(p) && ctx.lastPlayerTarget !== undefined) return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: ctx.lastPlayerTarget } });
   // Cryptborn Horror: "where X is the total life lost by your opponents this turn", the same total.
   if (each ? /^1 life your opponents have lost this turn$/i.test(p) : (/^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p) || /^the total life lost by your opponents this turn$/i.test(p))) return count({ kind: "opponentsLifeLost" });
   // Inquisition: "the number of white cards in their hand" (revealed just before).
@@ -680,6 +683,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
+  // Karn, Gilded Guardian: "for each color among other artifacts you control".
+  if ((m = /^colou?rs? among (other )?(artifacts|creatures|enchantments) you control$/i.exec(p)))
+    return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [capital(m[2]!.slice(0, -1)) as "Artifact"], notTypes: [], notColors: [], controller: "you", text: `${m[2]} you control` }, ...(m[1] ? { other: true as const } : {}) });
   // Earthen Ally: "for each color among Allies you control" (itself included).
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });

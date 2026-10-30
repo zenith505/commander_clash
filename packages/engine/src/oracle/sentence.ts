@@ -212,6 +212,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const b = a && parseSentence(`~ ${andNoUntap[2]}`, ctx);
     return a && b ? [...a, ...b] : null;
   }
+  // Tormented Thoughts: "Target player discards a number of cards equal to the sacrificed creature's power": as it last
+  // existed on the battlefield (rulings, CR 608.2h).
+  const discardsSac = /^(Target player|Target opponent) discards (?:a number of )?cards equal to (the sacrificed creature's (?:power|toughness))$/.exec(s);
+  if (discardsSac) {
+    const who = parsePlayer(discardsSac[1]!.toLowerCase(), ctx);
+    const n = who && parseCount(discardsSac[2]!, ctx);
+    return who && n ? [{ type: "discard", who, n }] : null;
+  }
   // "Target player untaps all basic lands they control" (Early Harvest): the same as "untap all basic lands target player
   // controls"; who untaps them changes nothing (CR 701.26b).
   const untapsAll = /^Target player untaps all ([a-z ]+?lands) they control$/.exec(s);

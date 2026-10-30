@@ -617,7 +617,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // you scry" triggers anyway (701.22d, 701.25d).
         if (!cards.length) {
           if (n > 0) {
-            noteScried(s, p.id);
+            noteScried(s, p.id, e.type);
             fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
           }
           return;
@@ -636,7 +636,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
-      noteScried(s, p.id);
+      noteScried(s, p.id, e.type);
       fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
       return;
     }
@@ -1831,8 +1831,13 @@ function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec
 }
 
 /** Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn". */
-function noteScried(s: GameState, player: PlayerId) {
+function noteScried(s: GameState, player: PlayerId, how: "scry" | "surveil") {
   const log = (s.turnLog ??= {});
+  // Darkblade Agent: "As long as you've surveilled this turn": surveilling only (CR 701.25).
+  if (how === "surveil" && !(log.surveilled ??= []).includes(player)) {
+    log.surveilled.push(player);
+    invalidateCharacteristics(s);
+  }
   if ((log.scried ??= []).includes(player)) return;
   log.scried.push(player);
   invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)

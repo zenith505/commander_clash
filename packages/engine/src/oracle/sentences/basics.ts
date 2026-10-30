@@ -409,8 +409,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Rhystic Deluge: "Tap target creature unless its controller pays {1}", Excise: "Exile target attacking creature unless its
   // controller pays {X}", Plague Fiend: "destroy that creature unless its controller pays {2}" (the creature it dealt combat
   // damage to): that creature's controller decides as it resolves (CR 608.2d), as it last existed if it has left.
-  // Crystal Shard: "Return target creature to its owner's hand unless its controller pays {1}".
-  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile|[Rr]eturn) (target (?:attacking )?creature|that creature)( to its owner's hand)? unless its controller (pays (?:\{[^}]+\})+)$/.exec(s)) && !m[3] === !/^[Rr]eturn$/.test(m[1]!)) {
+  // Crystal Shard: "Return target creature to its owner's hand unless its controller pays {1}"; Withdraw: "Then return
+  // another target creature to its owner's hand unless its controller pays {1}".
+  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile|[Rr]eturn) ((?:another )?target (?:attacking )?creature|that creature)( to its owner's hand)? unless its controller (pays (?:\{[^}]+\})+)$/.exec(s)) && !m[3] === !/^[Rr]eturn$/.test(m[1]!)) {
     const target = m[2] !== "that creature";
     if (!target && !ctx.subjectIt) return null;
     const before = ctx.targets.length;
@@ -419,7 +420,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || fx.length !== 1 || !options || ctx.targets.length !== before + (target ? 1 : 0)) return null;
     const what = "what" in fx[0]! ? fx[0]!.what : undefined;
     if (!what || what.ref !== (target ? "target" : "subject")) return null;
-    return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx }];
+    // The payer's prompt: "pay {1} or let Withdraw return it to its owner's hand".
+    const penalty = `Let ~ ${m[1]!.toLowerCase()} it${m[3] ?? ""}`;
+    return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx, penalty }];
   }
   // Combustion Man: "destroy target permanent unless its controller has ~ deal damage to them equal to ~'s power": that
   // permanent's controller decides as it resolves (CR 608.2d), and ~ deals the damage.

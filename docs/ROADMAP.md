@@ -1054,7 +1054,7 @@ line blocks.
    Carthalion; Frodo, Determined Hero; Syr Carah; Shadow Urchin; Head Games; Seeker of Slaanesh; Drizzt Do'Urden;
    Soul-Shackled Zombie ("from a single graveyard ... if at least one creature card was exiled this way"); Ambitious
    Augmenter; Isareth the Awakener; Maeve, Insidious Singer. Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
-   Duel for Dominance, Startled Awake, Rites of Spring, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
+   Duel for Dominance, Startled Awake, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
    Contagious Vorrac, Zaffai, The Eighth Doctor, Arcade Gannon, Mortarion, Wail of the Forgotten, Multiple Choice, Gor
    Muldrak.
    Round 216 took fresh cards from EDHREC rank 14,000 on: "costs {G} less to cast for each green creature you control"
@@ -1084,7 +1084,7 @@ line blocks.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
-   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
+   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Obosh, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
@@ -1672,7 +1672,7 @@ line blocks.
      of "it"; still out: "you may reveal ... If a X card is revealed this way" (Elven Farsight, Galadriel, Isolated
      Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
      "of the chosen type" (Bloodline Shaman), "it" meaning the source (Harsh Deceiver), amounts from the revealed card
-     (Nissa's Revelation, Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
+     (Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel).
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
      (Echoing Return, Rat King), "not named ~" (Detention Sphere), Legion's End's "exiles all cards with that name from
@@ -1930,7 +1930,7 @@ line blocks.
      (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
    Left from the for-each-opponent/commander/mana value X round:
    - "Choose up to one target" (Luminate
-     Primordial, Shellshock, Mega Flare); exchanges of control (Twist
+     Primordial, Shellshock); exchanges of control (Twist
      Allegiance, Reins of Power); "creatures and lands target opponent controls don't untap during their next
      untap step" (Exhaustion).
    - Bots choose X for "with mana value X" counterspells (Spell Blast) but cast Killing Glare-style "power X or less"
@@ -2244,8 +2244,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Sting (an additional cost that puts a -1/-1 counter); Heaven's Gate and Touch of Darkness ("one or more target
   creatures"); Urgoros ("discards a card at random. If the player can't"); Searing Blood, Burn Away and A Good Day to
   Die ("When that creature dies this turn" from a spell); Enslave (enchanted creature as the damage source); Rupture
-  (the sacrificed creature's power to each creature and player); Trade Route Envoy ("If you don't draw a card this
-  way"); Sanctuary Wall ("You may put a stun counter on it. If you do"); Gilt-Leaf Winnower ("whose power and toughness
+  (the sacrificed creature's power to each creature and player); Sanctuary Wall ("You may put a stun counter on it. If you do"); Gilt-Leaf Winnower ("whose power and toughness
   aren't equal"); Graceful Reprieve (a dies trigger from a spell); Firemane Angel (a trigger in the graveyard or on the
   battlefield); Deepway Navigator ("attacked with three or more Merfolk"); Patron of the Nezumi (a permanent put into
   an opponent's graveyard).
@@ -2415,7 +2414,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
   twice: no ruling); Gideon's Triumph and Inferno Hellion ("attacked or blocked this turn", and Gideon's "two of
-  those creatures instead"); Heat Stroke ("was blocked this turn"); Perilous Predicament (two sacrifices of different
+  those creatures instead"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
   Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
 - Round B17 (harder skipped cards, least played first): the Licids (Calming, Convulsing, Corrupting, Dominating,
@@ -3148,7 +3147,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
   (exile an instant or sorcery spell you control as a cost), Warbringer (equip costs less: Lane A round 217 does it),
   Nomad Mythmaker (attach to a creature you choose as it resolves).
-- Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
+- Round B50 (harder skipped cards, least played first): "unless its controller has ~ deal N damage to them" on a
+  land, a creature or a spell (Dwarven Driller, Dwarven Scorcher, Blazing Salvo, Molten Influence), "unless they have
+  exactly three or exactly four cards in hand" (Skullcage), "Exile all/each ... until ~ leaves the battlefield"
+  (Consulate Crackdown, Temporary Lockdown, Aligned Hedron Network), "You may cast that card for as long as it remains
+  exiled, and you may spend mana as though it were mana of any color" (Covetous Urge, Psychic Intrusion), "For each
+  opponent, choose up to one target creature that player controls ... to each of the chosen creatures" (Mega Flare),
+  "you draw cards equal to its power and you gain life equal to its toughness" (Nissa's Revelation), "destroy each
+  creature that blocked or was blocked this turn" (Heat Stroke), "Return up to X permanent cards", X by converge
+  (Uncle's Musings), "Discard any number of cards. Search your library for up to that many" (Rites of Spring),
+  "That player may put a permanent card from their hand onto the battlefield" after a spell's target (Divine Gambit),
+  "If you control an outlaw, exile the top card" (Outlaws' Fury), "skip your draw step this turn" after "If you do"
+  of a search (Elfhame Sanctuary), "Exile X cards from your graveyard" as a cost (Necropolis Fiend; Taigam, Sidisi's
+  Hand), "Remove any number of charge counters" (Geistflame Reservoir), "the greatest power or toughness among"
+  (Freelance Muscle), "plus an additional +1/+1 counter on it for each other creature you control" (Sheriff of Safe
+  Passage), "Put one into your hand and the other into your graveyard" (Codecracker Hound, Faerie Snoop), "if you
+  control no permanents other than ~ and have no cards in hand" (Barren Glory), "Tap three untapped Advisors,
+  Artificers, and/or Monks" (The Archimandrite), "Whenever a creature is put into your graveyard from the battlefield,
+  you may pay {1}{W}. If you do, return that card" (Sigil of the New Dawn), Clockwork Hydra, Grozoth, Tibalt, the
+  Fiend-Blooded, Trade Route Envoy and Witness the Future (rewordings). +33 (28,166 of 31,936).
+- Out after round B50 (looked at, not done): Decaying Soil (now unsupported on purpose: a threshold-granted "Whenever a
+  nontoken creature is put into your graveyard from the battlefield" must look back in time, CR 603.10a, so the
+  creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage
+  ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten and Swat Away (top or
+  bottom of the library, owner's choice), Case the Joint and Medomai's Prophecy (the top card of each player's
+  library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer,
+  Cathedral Membrane, Dimensional Infiltrator, Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
+  Portcullis.
+- Next for Lane B, least played first: the unsupported ones from about 17,100 up (`npm run popular --
   --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,

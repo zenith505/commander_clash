@@ -120,14 +120,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who?.ref === "target" ? [{ type: "controlPlayer", who, controller: { ref: "you" } }] : null;
   }
   // Skipping (CR 614.10): "Target player skips their next combat phase", "You skip your next two turns", "Skip your next
-  // turn", "... their next combat phase this turn" (Moment of Silence).
-  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) next (?:(two|three) )?(untap step|draw step|combat phase|turn)s?( this turn)?$/i.exec(s))) {
+  // turn", "... their next combat phase this turn" (Moment of Silence). Elfhame Sanctuary (at the beginning of your upkeep):
+  // "you skip your draw step this turn", the one still to come this turn (none once it's begun, or on another's turn).
+  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) (?:next (?:(two|three) )?(untap step|draw step|combat phase|turn)s?( this turn)?|(draw step)( this turn))$/i.exec(s))) {
+    if (m[6]) [m[4], m[5]] = [m[6], m[7]!];
     const self = !m[1] || /^you$/i.test(m[1]);
     if (!m[1] && m[2] !== "Skip") return null;
     const who = self ? { ref: "you" as const } : parsePlayer(m[1]!, ctx);
     const skips: Record<string, SkipWhat> = { "untap step": "untap", "draw step": "draw", "combat phase": "combat", turn: "turn" };
     const skip = skips[m[4]!.toLowerCase()]!;
-    if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat")) return null;
+    if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat" && !m[6])) return null;
     return [{ type: "skip", who, skip, n: m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
   }
   // False Peace, Empty City Ruse: "Target player skips all combat phases of their next turn" (CR 614.10).
@@ -740,6 +742,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Counter target ((?:white|blue|black|red|green) spell) unless that spell's controller pays ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);
     const options = parsePunisherOptions(`pays ${m[2]} or pays ${m[3]}`, ctx);
+    if (spec?.kind !== "spell" || !options) return null;
+    const index = addTarget(ctx, spec);
+    return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];
+  }
+  // Molten Influence: "Counter target instant or sorcery spell unless its controller has ~ deal 4 damage to them": that
+  // spell's controller decides as it resolves (CR 608.2d).
+  if ((m = /^Counter target (instant or sorcery spell|spell) unless its controller (has ~ deal \d+ damage to them)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    const options = parsePunisherOptions(m[2]!, ctx);
     if (spec?.kind !== "spell" || !options) return null;
     const index = addTarget(ctx, spec);
     return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];

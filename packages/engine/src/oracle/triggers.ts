@@ -2100,6 +2100,10 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
     : exileTheirs
       ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, counters: { [exileTheirs[1]!]: 1 } }
       : undefined;
+  // Pitchstone Wall: "you may sacrifice ~. If you do, return the discarded card from your graveyard to your hand": that
+  // card, if it's still there (CR 400.7).
+  if (m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" && /^you may sacrifice ~\. If you do, return the discarded card from your graveyard to your hand\.$/.test(m[5]!))
+    return { event: "playerDiscards", discards: { by: "you" }, body: { targets: [], effects: [{ type: "may", effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~" }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }] }], text: m[5]! } };
   // Hashaton: "create a tapped token that's a copy of that card": the discarded card, as it last existed in the
   // graveyard if it has left (CR 608.2h).
   const copyIt = /\bcopy of that card\b/.test(m[5]!) && !/\b(?:it|its)\b/.test(m[5]!.replace(/\bexcept it's\b/, ""));
@@ -2555,8 +2559,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Numbing Dose: "enchanted permanent's controller"; Feedback: "enchanted enchantment's controller": the same, whatever
   // the Aura enchants.
   const hostUpkeep = /^At the beginning of the (upkeep|draw step|end step) of (enchanted|equipped) (creature|permanent|enchantment|artifact|land)'s controller, (.+)$/.exec(line);
-  if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostUpkeep[4]!.replace(/\bthat player\b/g, ""))))) {
-    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostUpkeep[4]!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
+  // Erosion: "destroy that land unless that player pays {1} or 1 life"; Curse Artifact: "unless they sacrifice that
+  // artifact": that one is the enchanted one.
+  const hostWord = hostUpkeep?.[3];
+  const hostRest = hostUpkeep && hostWord !== "creature" && hostWord !== "permanent" ? hostUpkeep[4]!.replace(new RegExp(`\\bthat ${hostWord}\\b`, "g"), `${hostUpkeep[2]} ${hostWord}`) : hostUpkeep?.[4];
+  if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostRest!.replace(/\bthat player\b/g, ""))))) {
+    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostRest!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
@@ -2988,6 +2996,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (toOpp) {
     const t = parseTrigger(`Whenever ~ deals ${toOpp[1] ?? ""}damage to a player, ${otherOpponents(toOpp[2]!)}`);
     return t && t !== "fail" ? { ...t, body: withOtherOpponents(t.body), toOpponent: true } : "fail";
+  }
+  // Brood Keeper, Bramble Elemental: "Whenever an Aura becomes attached to ~, create ...".
+  const auraAttached = /^Whenever an Aura becomes attached to ~, (create [^"]+(?:"[^"]*")?[^"]*)$/.exec(line);
+  if (auraAttached) {
+    const body = parseBody(auraAttached[1]!);
+    return body && !body.targets.length ? { event: "auraAttachedToSelf", body } : "fail";
   }
   // "Whenever this Equipment becomes unattached from a permanent, sacrifice that permanent" (Grafted Wargear).
   const unattached = /^Whenever ~ becomes unattached from a permanent, (.+)$/.exec(line);

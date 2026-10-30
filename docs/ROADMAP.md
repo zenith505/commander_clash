@@ -3020,6 +3020,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it a Dragon with a granted ability), Bend or Break (piles chosen by an opponent), Meandering Towershell (returns
   attacking on your next turn), Diaochan (a target chosen by an opponent), Triton Tactics (creatures blocked by those
   creatures), Blood Spatter Analysis ("Then sacrifice it if ... When you do").
+- Round B47 (harder skipped cards, least played first): "becomes a blue Dragon Illusion ..., loses all abilities, and
+  gains flying" (Dance of the Skywise, and Dragonshift with it), "If that creature is black or red, destroy it"
+  (Inquisitor's Snare), "Target player exiles a card from their graveyard. If it's a creature card" (Graveyard Shovel),
+  "and all white Auras you own attached to it" (Word of Undoing), "reveals their hand and discards a creature card at
+  random" (Rag Man), spell mastery flash counting cards in your graveyard (Swift Reckoning, and Serpent of the Pass),
+  "When a creature dealt damage this way dies this turn" (Skeletonize), "you may have it deal 2 damage to another
+  creature you control. If you do" (Wicked Guardian; the bot only says yes with a creature that survives it), "Whenever
+  an Aura becomes attached to ~" (Brood Keeper, Bramble Elemental: an Aura entering attached or moved onto it), "tap ~
+  unless you pay {E}" (Electrozoa), "enters with a -1/-1 counter for each creature that player controls" after choosing
+  an opponent (Canker Abomination), "the greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang,
+  and Wick's Patrol), "gain control of all Equipment that were attached to it" (Murderous Spoils), "the creature card in
+  your graveyard with the greatest power" (Desecrator Hag), "you may tap or untap target permanent" (Telekinetic
+  Bonds), "enters or leaves the battlefield" artifacts (Sludge Strider), "If it has the same name as a card in your
+  graveyard" (Candles of Leng), "you may sacrifice ~. If you do, return the discarded card" (Pitchstone Wall), the
+  enchanted permanent's controller's upkeep punishers "unless that player pays {1} or 1 life" (Erosion) and "unless
+  they sacrifice that artifact" (Curse Artifact), "gain control of all creatures blocking ~" (The Wretched), and
+  blocks remembered for the turn (TurnLog.blocks): "tap all creatures that blocked ~ this turn" (Joven's Ferrets),
+  "At this turn's next end of combat, destroy all creatures that blocked or were blocked by it this turn" (Venomous
+  Breath, Glyph of Doom), "unless it attacked or blocked this turn" (Lurker). +29 (28,032 of 31,936).
+- Out after round B47 (looked at, not done): Aggression and Insubordination (the creature is locked in as the trigger
+  goes on the stack, rulings, but "enchanted creature" is read as it resolves), Sea Troll ("blocked or was blocked by a
+  blue creature this turn": the other creature's color when it blocked or now is unclear).
 - Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
   --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported

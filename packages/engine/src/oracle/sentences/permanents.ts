@@ -275,6 +275,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
+  // Telekinetic Bonds: "If you do, you may tap or untap target permanent": tap, untap or neither, as one question.
+  if ((m = /^You may tap or untap (target permanent)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "tapOrUntap", what, may: true }] : null;
+  }
   // Misleading Signpost, Portal Mage: "reselect which player or permanent target attacking creature is attacking".
   if ((m = /^[Rr]eselect which player or permanent (target attacking creature) is attacking$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -430,7 +435,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       what = { ...rest, notCreated: true };
     }
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
-    if ((type === "tap" || type === "untap") && what.ref === "each") ctx.lastGroup = what;
+    if ((type === "tap" || type === "untap") && (what.ref === "each" || what.ref === "blockHistory")) ctx.lastGroup = what;
     return [{ type, what }];
   }
   // Connive (CR 701.50): "~ connives", "it connives", "target creature you control connives", "connives X".
@@ -1054,6 +1059,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // The Wretched: "gain control of all creatures blocking ~" (with "for as long as you control ~"): those blocking it as this
+  // resolves (CR 509.1h; none once it has left combat, CR 506.4), the set locked in then (CR 611.2c). Layer 2.
+  if (/^Gain control of all creatures blocking ~$/.test(s) && !ctx.spell) return [{ type: "continuous", what: { ref: "blockingIt" }, mods: [{ kind: "control" }], duration: "game" }];
   // Captivating Glance: "If you win, gain control of enchanted creature. Otherwise, that player gains control of enchanted
   // creature.": the creature it's attached to as this resolves, for the rest of the game, even once the Aura is gone
   // (rulings). Layer 2.

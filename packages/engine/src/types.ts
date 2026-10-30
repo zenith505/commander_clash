@@ -1407,6 +1407,11 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /**
+   * Blocks declared this turn (CR 509.1), banding's included (CR 702.22h): each blocker and the attacker it blocked as
+   * `id@zoneChanges` (Venomous Breath's "creatures that blocked or were blocked by it this turn").
+   */
+  blocks?: { blocker: string; attacker: string }[];
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
   /** Times each player investigated this turn (Erdwal Illuminator's "for the first time each turn"). */
@@ -2078,6 +2083,8 @@ export interface Resolving {
   exiledTop?: { id: ObjectId; zc: number };
   /** The card a chooseFromGraveyard with a `chooser` moved, for "that card's mana value" (O-Kagachi Made Manifest). */
   chosenFromYard?: { id: ObjectId; zc: number };
+  /** The cards a chooseFromGraveyard moved, for "if it's a creature card" (SpellCondition yardChosenIs). */
+  yardChosen?: ObjectId[];
   /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
   impulsed?: ObjectId[];
   /** "You may put a land card from among them into your hand" after a mill (Town Greeter): the cards it put there. */

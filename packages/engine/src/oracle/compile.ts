@@ -567,6 +567,12 @@ export function compile(d: CardDef): CompiledCard {
       // Call Damage Control: "Choose up to two. Return those cards from your graveyard to your hand." then "• Target
       // artifact card." and so on: each mode returns its one target.
       .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
+      // Canker Abomination: "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that
+      // player controls.": the chosen player, counted once chosen (EntersWithCounters.afterPlayer).
+      .replace(/^As ~ enters, choose an opponent\. (~ enters with an? [-+\/\d]+ counter on it for each creature) that player controls\.$/m, "As ~ enters, choose an opponent.\n$1 the chosen player controls.")
+      // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
+      // (CR 603.1), an ability for each.
+      .replace(/^Whenever another artifact you control enters or leaves the battlefield, ([^\n]+)$/m, "Whenever another artifact you control enters, $1\nWhenever another artifact you control leaves the battlefield, $1")
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
@@ -3562,7 +3568,9 @@ export function compile(d: CardDef): CompiledCard {
       const cond = parseStaticCondition(flashIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
       // "This spell has flash" is only while it's a spell; "Colossal Rattlewurm has flash" is on the battlefield too.
       const permanentHas = /^~ has flash/.test(line) && !/(^|\n)This spell has flash /.test(d.oracleText ?? "") && !d.types.includes("Instant") && !d.types.includes("Sorcery");
-      const aboutPlayer = !!cond && FLASH_IF.includes(cond.kind) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
+      // Swift Reckoning: "two or more instant and/or sorcery cards in your graveyard", a count of your graveyard's cards.
+      const yardCount = cond?.kind === "amount" && typeof cond.amount === "object" && "count" in cond.amount && cond.amount.count.kind === "cardsInGraveyard" && cond.amount.count.who?.ref === "you" && cond.max === undefined;
+      const aboutPlayer = !!cond && (FLASH_IF.includes(cond.kind) || yardCount) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
       if (!aboutPlayer || permanentHas || out.flashIf) out.unsupported.push(raw);
       else out.flashIf = cond!;
       continue;
@@ -4907,6 +4915,11 @@ function checkCastingLinks(out: CompiledCard) {
   visit(out.entersWithCounters);
   if (needs.size === 1 && out.entersWithCounters && out.entersChoose?.length === 1 && needs.has(out.entersChoose[0]!.what)) out.entersWithCounters.afterChoice = out.entersChoose[0]!.what;
   else if (needs.size) bad = true;
+  // Canker Abomination: a count about "the chosen player", once its "as ~ enters, choose an opponent" is answered.
+  if (out.entersWithCounters && JSON.stringify(out.entersWithCounters.n).includes('"selfChosenPlayer"')) {
+    if (out.entersChoosePlayer && !out.entersWithCounters.afterChoice && !out.entersChooseTwoPlayers) out.entersWithCounters.afterPlayer = true;
+    else bad = true;
+  }
   if (bad) out.unsupported.push("(text about how it was cast that this card's costs don't explain)");
 }
 

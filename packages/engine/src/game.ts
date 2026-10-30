@@ -2994,6 +2994,18 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  // Wall of Dust: "can't attack during its controller's next turn": this is that turn, for the same object (CR 400.7).
+  if (s.cantAttackNextTurn) {
+    for (const b of s.cantAttackNextTurn) {
+      const o = s.objects[b.id];
+      if (b.player !== ap.id || s.turn <= b.since || o?.zone !== "battlefield" || (o.zoneChanges ?? 0) !== b.zc) continue;
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: b.player, sourceName: defOf(s, o).name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "cantAttack" }] });
+      invalidateCharacteristics(s);
+    }
+    // Done with, or about an object that has left (a new object, CR 400.7).
+    s.cantAttackNextTurn = s.cantAttackNextTurn.filter((b) => s.objects[b.id]?.zone === "battlefield" && (s.objects[b.id]!.zoneChanges ?? 0) === b.zc && !(b.player === ap.id && s.turn > b.since));
+    if (!s.cantAttackNextTurn.length) s.cantAttackNextTurn = undefined;
+  }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
   // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).

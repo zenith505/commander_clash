@@ -3120,6 +3120,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Battlefield Scrounger, Slayer's Cleaver ("blocked by an Eldrazi if able"), Illuminated Folio (reveal two cards that
   share a color), Nim Devourer, Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze, Fathom
   Trawl, Thirsting Axe, Sewer Crocodile, Flying Drone.
+- Round B49 (harder skipped cards, least played first): "You choose a nonland card from that player's graveyard or hand
+  and exile it" (Never Happened, Memory Leak: one picker for the revealed hand and the graveyard, each card marked with
+  its zone), "target nonland permanent with the lowest mana value" (Culling Scales), "two target creatures that share no
+  creature types" fighting (Rivals' Duel), "count the number of +1/+1 counters ... Creatures your opponents control with
+  power less than or equal to that number can't block this turn" (Rumbling Ruin: counted once, a rule for the turn),
+  "that creature can't attack during its controller's next turn" (Wall of Dust), "Hit deals damage to that player equal
+  to that permanent's mana value" (Hit // Run), "reveals two cards at random ..., then discards each nonland card
+  revealed this way" and two-target Rise (Rise // Fall), "all creatures blocking or blocked by target creature" (Trial //
+  Error), "a creature of their choice that they controlled since the beginning of the turn" (Keldon Twilight),
+  "Whenever a creature you control deals combat damage to a creature" (Quest for the Gemblades), "and this enchantment
+  isn't a creature, it becomes" (Emergent Haunting), "As ~ enters, if it was kicked, mill four cards" (Monstrous
+  War-Leech), "Put ~ and target creature on top of their owners' libraries, then those players shuffle" (Void Stalker),
+  "put target Aura card from a graveyard onto the battlefield ... attached to ~" (Iridescent Drake), "Target opponent
+  chooses an artifact card in their graveyard. Put that card onto the battlefield under your control" (Scrounge), a
+  created Equipment token then "Attach it to ~" (U.S.Agent, John Walker), "Except for creatures named ~ and artifact
+  creatures, creatures you control can't attack" (Akron Legionnaire), "can't attack alone unless he has a +1/+1 counter
+  on him" (Pipsqueak, Rebel Strongarm), "as long as you own a card in exile that has an Adventure" (Howling Galefang),
+  "Return this card from your graveyard to the battlefield attached to target creature you control with power 1 or
+  less" (Eagle's Rescue), kicked "that creature can't be regenerated this turn and if it would die this turn, exile it
+  instead" (Scorching Lava), "Return target card from an opponent's graveyard to their hand" (Forcemage Advocate,
+  Shieldmage Advocate), "Sacrifice a Room" (Intruding Soulrager), and "creatures that have -1/-1 counters on them"
+  (Grind // Dust). +26 (28,133 of 31,936).
+- Out after round B49 (looked at, not done): Anthropede ("discard a card or pay {2}" as one cost choice), Retribution
+  and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (a random target as it's
+  activated), Ley Line and Mausoleum Turnkey (another player chooses the target), Tamanoa and Molten Lavamancer
+  (noncombat or noncreature damage triggers), Venser's Diffusion (a target among suspended cards), Nivmagus Elemental
+  (exile an instant or sorcery spell you control as a cost), Warbringer (equip costs less: Lane A round 217 does it),
+  Nomad Mythmaker (attach to a creature you choose as it resolves).
 - Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
   --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported

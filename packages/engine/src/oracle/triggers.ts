@@ -1289,6 +1289,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [toCreature[1]!], text: toCreature[1]! }, anyone: true }, body };
   }
+  // Quest for the Gemblades: "Whenever a creature you control deals combat damage to a creature, you may put a quest counter
+  // on ~": once for each creature dealt it by each of yours (rulings), whatever the amount.
+  const yoursToCreature = /^Whenever a creature you control deals combat damage to a creature, (.+)$/.exec(line);
+  if (yoursToCreature) {
+    if (/\b(?:it|its|that creature|its controller|that player|defending player|that much|that many|X)\b/i.test(yoursToCreature[1]!.replace(/\bon ~/, ""))) return "fail";
+    const body = parseBody(yoursToCreature[1]!);
+    if (!body) return "fail";
+    return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, anyone: true }, body };
+  }
   // "Whenever a creature you control deals combat damage during your turn, put that many +1/+1 counters on it" (Quilled
   // Greatwurm): to anything, all its combat damage of the step at once (CR 510.2), "that many" being that total.
   const anyRecipient = /^Whenever (another|an?) (.+?) you control deals combat damage( during your turn)?, (.+)$/.exec(line);
@@ -2947,6 +2956,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it,
     // put a flying counter on it": ~, the only object named.
     if (/ and ~ doesn't have an? [a-z]+ counter on it$/.test(intervening[2]!) && /^At /.test(intervening[1]!)) rest = rest.replace(/^put an? ([a-z]+) counter on it\.$/, "put a $1 counter on ~.");
+    // Emergent Haunting: "... and ~ isn't a creature, it becomes a 3/3 Spirit creature ...": ~ again.
+    if (/ and ~ isn't a creature$/.test(intervening[2]!) && /^At /.test(intervening[1]!)) rest = rest.replace(/^it becomes /, "~ becomes ");
     if (typeIf && !/^(?:When|Whenever) ~ /.test(intervening[1]!)) rest = rest.replace(/^it becomes /, "~ becomes ");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     if (!t || t === "fail" || t.ifCond) return "fail";

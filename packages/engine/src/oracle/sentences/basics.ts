@@ -284,6 +284,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (p.options.some((o) => "pay" in o) || p.options.filter((o) => "sacrifice" in o).length > 1) return null;
     return [{ ...p, picks: { count: { kind: "counters", counter: m[1]!, of: { ref: "self" } } } }];
   }
+  // Keldon Twilight: "that player sacrifices a creature of their choice that they controlled since the beginning of the
+  // turn": only such a creature (none, nothing sacrificed).
+  if (/^[Tt]hat player sacrifices a creature of their choice that they controlled since the beginning of the turn$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    return who ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controlledSinceTurnBegan: true, text: "creature they controlled since the beginning of the turn" }, n: 1, action: "sacrifice" }] : null;
+  }
   // Martyr's Bond: "each opponent sacrifices a permanent of their choice that shares a card type with it": the permanent
   // the trigger is about, its card types as it last existed (one permanent of any of them, rulings).
   if (/^[Ee]ach opponent sacrifices a permanent of their choice that shares a card type with it$/.test(s) && (ctx.subject || ctx.subjectIt))
@@ -905,6 +911,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[3]!.replace(/^an? /, ""));
     if (!who || who.ref === "you" || !filter) return null;
     return [{ type: "punisher", who, options: [{ discard: 1, filter }], effects: [{ type: "discard", who: { ref: "punished" }, n: num(m[2]!) }] }];
+  }
+  // Fall: "Target player reveals two cards at random from their hand, then discards each nonland card revealed this way."
+  // (body.ts keeps it one sentence): those cards revealed, then only the nonland ones discarded.
+  if ((m = /^(Target player|Target opponent) reveals (two|three) cards at random from their hand and discards each (nonland|land|creature|noncreature) card revealed this way$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = parseSearchFilter(`${m[3]} card`);
+    return who && filter ? [{ type: "discard", who, n: num(m[2]!), random: true, ofRevealed: filter }] : null;
   }
   // Highway Robbery: "You may discard a card or sacrifice a land. If you do, ...": one or the other, as it resolves, only
   // one that can be done (rulings).

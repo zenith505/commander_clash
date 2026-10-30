@@ -107,7 +107,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.sharesCardTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
   });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -464,8 +464,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
       .filter((o): o is GameObject => !!o);
   if (ref.ref === "inCombatWithSelf") {
-    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
+    const me = ref.ofTarget !== undefined ? objects(s, { ref: "target", index: ref.ofTarget }, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || (ref.ofTarget === undefined && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
     // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
     const them = s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
     return ref.andSelf ? [me, ...them] : them;
@@ -1165,6 +1165,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exchangeControl":
     case "playerGains":
     case "attackBanNextTurn":
+    case "cantAttackNextTurn":
     case "attach":
     case "becomeLicid":
     case "attachAny":

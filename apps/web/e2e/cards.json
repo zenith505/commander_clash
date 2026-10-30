@@ -12635,6 +12635,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ec4a1a8d-4071-40e9-812e-42c746180d99",
+  "name": "Never Happened",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose a nonland card from that player's graveyard or hand and exile it.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "581eedc4-efe4-4ae4-baf2-88071e7e6f6d",
   "name": "Nicol Bolas, Dragon-God",
   "manaCost": "{U}{B}{B}{B}{R}",

@@ -837,12 +837,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greatestManaValue": {
       // From its mana cost (copy and face-down values included, CR 202.3, 708.2); X is 0 on the battlefield (CR 107.3).
       let best = 0;
+      let least: number | undefined;
       for (const id of s.battlefield) {
         if (c.other && id === ctx.sourceId) continue;
         const o = s.objects[id]!;
         const ch = view(o);
-        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = c.total ? best + defMv(defOf(s, o)) : Math.max(best, defMv(defOf(s, o)));
+        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) {
+          best = c.total ? best + defMv(defOf(s, o)) : Math.max(best, defMv(defOf(s, o)));
+          least = Math.min(least ?? Infinity, defMv(defOf(s, o)));
+        }
       }
+      // "The lowest mana value" (Culling Scales): the least among them, 0 with none.
+      if (c.least) return least ?? 0;
       return best;
     }
     case "spellsCastThisTurn": {
@@ -1171,7 +1177,7 @@ function describeCount(c: Count): string {
     case "cardsInExile":
       return c.filter ? `#${c.filter.text}s in exile${c.graveyardToo ? " and graveyard" : ""}` : "#cards in exile";
     case "greatestManaValue":
-      return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
+      return `the ${c.total ? "total mana value of" : c.least ? "lowest mana value among" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":
       return "times kicked";
     case "wasKicked":

@@ -358,6 +358,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Empower Jace (CR 701.71a)
   if ((m = new RegExp(`^Empower Jace ${NUMX}$`, "i").exec(s))) return [{ type: "empowerJace", n: amt(m[1]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"
+  // Rivals' Duel: "Choose two target creatures that share no creature types. Those creatures fight each other." (body.ts
+  // makes it one sentence): the two targets, neither dealing damage if either is illegal (CR 701.14b).
+  if (/^Two target creatures that share no creature types fight each other$/.test(s) && !ctx.targets.length) {
+    const what = parseObject("two target creatures that share no creature types", ctx);
+    return what?.ref === "target" && what.n === 2 ? [{ type: "fight", a: { ref: "target", index: what.index }, b: { ref: "target", index: what.index + 1 } }] : null;
+  }
   // "Choose target creature you control and target creature you don't control. ... Then those creatures fight each other"
   // (Tail Swipe): the two targets, neither dealing damage if either is illegal (CR 701.14b).
   if (/^(?:Then )?[Tt]hose creatures fight each other$/.test(s)) {

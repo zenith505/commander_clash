@@ -167,6 +167,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // Forcemage Advocate: "Return target card from an opponent's graveyard to their hand": that opponent owns it (a card
+  // is in its owner's graveyard, CR 404.2), so it's its owner's hand.
+  if ((m = /^(Return target [a-z ]*card from an opponent's graveyard) to their hand$/.exec(s))) return parseSentence(`${m[1]} to its owner's hand`, ctx);
   // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
   // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
   // every one that has none of those subtypes or card types.
@@ -446,9 +449,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Gryff's Boon: "{3}{W}: Return ~ from your graveyard to the battlefield attached to target creature": the target, which
   // the ability targets (the Aura isn't cast, so it targets nothing itself, CR 303.4f); with that creature an illegal
   // target, the ability doesn't resolve and the card stays (rulings).
-  if (ctx.selfCard && ctx.activated && /^Return ~ from your graveyard to the battlefield attached to target creature$/.test(s)) {
+  // Eagle's Rescue: "... attached to target creature you control with power 1 or less": that target.
+  if (ctx.selfCard && ctx.activated && (m = /^Return ~ from your graveyard to the battlefield attached to (target creature(?: you control(?: with power \d+ or less)?)?)$/.exec(s))) {
     const attachToTarget = ctx.targets.length;
-    const what = parseObject("target creature", ctx);
+    const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToTarget }] : null;
   }
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
@@ -584,7 +588,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Visions of Dread: "Target opponent puts a creature card of their choice from their graveyard onto the battlefield under
   // your control": that player chooses one of their own as it resolves, not targeted; it enters under your control.
-  if ((m = /^(Target opponent|Target player) puts an? (creature card) of their choice from their graveyard onto the battlefield under your control$/.exec(s))) {
+  // Scrounge (body.ts makes it this sentence): "an artifact card" the same way.
+  if ((m = /^(Target opponent|Target player) puts an? (creature card|artifact card) of their choice from their graveyard onto the battlefield under your control$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const filter = parseSearchFilter(m[2]!);
     if (!who || !filter) return null;
@@ -974,7 +979,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Magnetic Snuffler: "return target Equipment card from your graveyard to the battlefield attached to ~": attached to
     // the creature if it's still on the battlefield and could be equipped, else unattached (rulings).
     const toSelf = m[8] === " attached to ~";
-    if (toSelf && !(spec?.subtypes?.length === 1 && spec.subtypes[0] === "Equipment" && !spec.types?.length && what?.ref === "target" && !what.n && ctx.selfIt)) return null;
+    // Iridescent Drake: "put target Aura card from a graveyard onto the battlefield under your control attached to ~": any
+    // graveyard's Aura, which stays there if it can't enchant ~ (rulings, CR 303.4g).
+    if (toSelf && !(spec?.subtypes?.length === 1 && (spec.subtypes[0] === "Equipment" || spec.subtypes[0] === "Aura") && !spec.types?.length && what?.ref === "target" && !what.n && ctx.selfIt)) return null;
     const before = ctx.targets[i - 1];
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
@@ -988,7 +995,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const namedCard = !!spec?.named && !types.length && !spec.subtypes?.length;
     if (!what || !spec || (!artifactSub && !namedCard && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
-    if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
+    if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || (m[4] && !(toSelf && underYou && !owner)) || m[6])) return null;
     // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;
@@ -1282,6 +1289,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (t?.kind !== "card" || t.owner !== "you" || t.many || t.subtypes?.length !== 1 || t.subtypes[0] !== "Equipment" || t.types?.length) return null;
     return [{ type: "attach", what: { ref: "self" }, source: { ref: "created" } }];
   }
+  // U.S.Agent, John Walker: "create a colorless Equipment artifact token named Sturdy Shield ... Attach it to ~": that token,
+  // onto ~ if it's still there and could be equipped (CR 701.3b); otherwise it stays unattached.
+  if (/^Attach it to ~$/i.test(s) && !ctx.spell && ctx.selfIt && ctx.lastCreatedEquipment && ctx.lastObjectTarget === undefined) return [{ type: "attach", what: { ref: "self" }, source: { ref: "created" } }];
   // "Gain control of target Equipment an opponent controls until end of turn. Attach it to ~." (Ogre Geargrabber)
   if ((m = /^Attach (?:it|that Equipment) to (~|him|her)$/i.exec(s)) && !ctx.spell && ctx.lastObjectTarget !== undefined) {
     const t = ctx.targets[ctx.lastObjectTarget];
@@ -1324,6 +1334,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
     const of = parsePlayer("defending player", ctx);
     return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
+  }
+  // Rumbling Ruin (body.ts makes it one sentence): "creatures your opponents control with power less than or equal to the
+  // number of +1/+1 counters on creatures you control can't block this turn": the number counted once as it resolves
+  // (CR 608.2h), a rule for the turn for every creature in the group, its power as blockers are declared (CR 611.2c).
+  if ((m = /^[Cc]reatures your opponents control with power less than or equal to (the number of \+1\/\+1 counters on creatures you control) can't block this turn$/.exec(s))) {
+    const amount = parseCount(m[1]!, ctx);
+    return amount ? [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "opponent", bound: { key: "power", at: "most", amount }, text: `creatures your opponents control with power less than or equal to ${m[1]}` } }] : null;
   }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
   if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];

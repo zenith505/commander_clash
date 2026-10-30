@@ -1451,7 +1451,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked." Part of how it enters, not a trigger
     // (rulings, CR 614.1c), its kicker costs counted (CR 702.33d).
-    const millKicked = /^As ~ enters, mill (two|three|four) cards for each time it was kicked\.$/.exec(line);
+    // Monstrous War-Leech: "As ~ enters, if it was kicked, mill four cards": the same, with a kicker paid at most once (CR
+    // 702.33a), so mill four or none.
+    const millKicked = /^As ~ enters, mill (two|three|four) cards for each time it was kicked\.$/.exec(line) ?? (!d.keywords.includes("Multikicker") ? /^As ~ enters, if it was kicked, mill (two|three|four) cards\.$/.exec(line) : null);
     if (millKicked && d.keywords.includes("Kicker") && !isSpell) {
       out.entersMillPerKick = num(millKicked[1]!);
       continue;
@@ -4053,7 +4055,16 @@ export function compile(d: CardDef): CompiledCard {
     // (rulings); each such ability applies once.
     // Shield of Kaldra: "Equipment named Sword of Kaldra, ~, and Helm of Kaldra have indestructible": by its name too.
     const named = (/^Creatures named ~ /.test(line) || /^Equipment named [^.]*~/.test(line)) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
-    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(named) ?? parseConditionalStatic(named);
+    // Akron Legionnaire: "Except for creatures named ~ and artifact creatures, creatures you control can't attack": each
+    // creature you control that's neither (by its name, CR 201.2, so another one named ~ too).
+    if (line === "Except for creatures named ~ and artifact creatures, creatures you control can't attack.") {
+      out.statics.push({ affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], notTypes: ["Artifact"], notColors: [], notNamed: d.name, text: `nonartifact creature not named ${d.name}` } }, mods: [{ kind: "cantAttack" }], text: line });
+      continue;
+    }
+    // Pipsqueak, Rebel Strongarm: "~ can't attack alone unless ~ has a +1/+1 counter on ~" (the name standing in for "he"
+    // and "him"): as long as it has none.
+    const unlessCounter = /^~ can't attack alone unless ~ has an? (\+1\/\+1) counter on ~\.$/.exec(line);
+    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : unlessCounter ? parseConditionalStatic(`As long as ~ doesn't have a ${unlessCounter[1]} counter on it, it can't attack alone.`) : parseStatic(named) ?? parseConditionalStatic(named);
     if (st) {
       out.statics.push(st);
       continue;

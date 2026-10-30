@@ -4033,7 +4033,7 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
+              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand${pending.handYard ? " and graveyard" : ""}` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
               <div className="modal-cards">
                 {dig.looked
                   .filter((id) => !found.includes(id))
@@ -4051,6 +4051,8 @@ function LibrarySearch({
                     return (
                       <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)} title={pending.cards.includes(id) && clashes(id) && pending.oneOfEach ? "You already took a card of this kind" : undefined}>
                         <CardFace d={d} />
+                        {/* Never Happened: the graveyard's cards after the hand's. */}
+                        {pending.handYard && <span className="zone-label">{s.objects[id]!.zone === "graveyard" ? "graveyard" : "hand"}</span>}
                       </div>
                     );
                   })}

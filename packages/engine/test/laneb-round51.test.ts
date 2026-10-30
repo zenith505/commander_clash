@@ -1,4 +1,5 @@
-// Lane B, round 51: unsupported cards from about rank 17,100 up, least played first (`npm run popular -- --least`).
+// Lane B, round 51: unsupported cards no earlier round wrote down, EDHREC rank about 24,700 to 23,200, least played first
+// (`npm run popular -- --least`).
 
 import { describe, expect, it } from "vitest";
 import { act, card, putOnBattlefield, scry, setup } from "./helpers";

@@ -313,6 +313,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // Rix Maadi Guildmage: "target player who lost life this turn" (GameState.lostLifeThisTurn).
+  if (x === "target player who lost life this turn") {
+    const index = addTarget(ctx, { kind: "player", lostLifeThisTurn: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   // The Keepers: "target opponent who has more life than you do as you activate this ability" (TargetSpec.comparedToYou):
   // true as it's chosen, whatever happens before it resolves (rulings).
   const compared = ctx.activated ? /^target opponent who (has more life|controls more creatures|has at least two more cards in hand|has at least two fewer creature cards in their graveyard) than you do as you activate this ability$/.exec(x) : null;
@@ -584,6 +590,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const g = parseGroup(andTheirs[1]!);
     return g && !g.other && g.filter.kind === "object" && g.filter.controller === "opponent" ? { ref: "each", filter: g.filter, andSelf: true } : null;
   }
+  // Public Execution: "Destroy target creature an opponent controls. Each other creature that player controls gets -2/-0":
+  // the target's controller's creatures but that target (still there if it wasn't destroyed).
+  const thatPlayers = ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets[ctx.lastObjectTarget]!.controller === "opponent" ? /^each other creature that player controls$/i.exec(x) : null;
+  if (thatPlayers) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creature that player controls" }, of: { ref: "targetController", index: ctx.lastObjectTarget! }, otherThan: ctx.lastObjectTarget! };
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
   const group = parseGroup(x, false, (t) => parseBoundCount(t, ctx));
   if (group && group.other && ctx.spell) {
@@ -1143,6 +1153,13 @@ export function parseTargetPhrase(
     const anyOf = [`${landOr[2]} creature`, "nonbasic land"].map((w) => parseTargetPhrase(w, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase().replace(/^target /, "")}` };
   }
+  // Thraben Exorcism: "Spirit, creature with disturb, or enchantment": a permanent that's any of them; disturb as the
+  // permanent has it (a creature cast with disturb is its back face, which hasn't, CR 702.146b).
+  if (/^(target )?Spirit, creature with disturb, or enchantment$/.test(phrase.trim())) {
+    const anyOf = ["Spirit", "creature", "enchantment"].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf[1]?.kind === "object") anyOf[1] = { ...anyOf[1], keywords: ["Disturb"], text: "creature with disturb" };
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: "target Spirit, creature with disturb, or enchantment" };
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -1422,7 +1439,14 @@ export function parseTargetPhrase(
   }
   // "creature an opponent controls that was dealt damage this turn"; Giant Shark: "a creature that has been dealt damage this
   // turn", the same.
-  const hurt = / that (?:was|has been) dealt damage this turn$/.exec(p);
+  // Executioner's Swing: "target creature that dealt damage this turn": a source of damage this turn, as this object.
+  const hurter = / that dealt damage this turn$/.exec(p);
+  if (hurter) {
+    extra.dealtDamageAsSourceThisTurn = true;
+    p = p.slice(0, hurter.index);
+  }
+  // Inflame: "each creature dealt damage this turn", the same.
+  const hurt = hurter ? null : / (?:that (?:was|were|has been) )?dealt damage this turn$/.exec(p);
   if (hurt) {
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
@@ -1591,10 +1615,11 @@ export function parseTargetPhrase(
     if (/cycling/.test(m[1]!)) m[1] = "cycling";
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
-  } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {
+  } else if ((m = / with (modular|flanking|fading|level up)( you control)?$/.exec(p))) {
     // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
     // the battlefield's characteristics (lost with all abilities, layer 6). Telim'Tor: "attacking creatures with
     // flanking" (CR 702.25a), granted flanking too. Parallax Inhibitor: "each permanent with fading you control" (CR 702.32a).
+    // Venerated Teacher: "each creature you control with level up" (CR 702.87a; the card data says "Level Up").
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index) + (m[2] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {

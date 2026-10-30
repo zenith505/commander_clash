@@ -2099,7 +2099,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become untapped$/.test(rest)) return [{ kind: "cantBecomeUntapped" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Grounded: "Enchanted creature loses flying": in layer 6, by timestamp, so a later effect can give it back (CR 613.7).
-  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect)$/.exec(rest))) {
+  // Mystic Decree: "All creatures lose flying and islandwalk": both, the same way.
+  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk)$/.exec(rest))) {
     const k = parseKeywordList(m[1]!);
     return k ? [{ kind: "removeKeywords", keywords: k }] : null;
   }
@@ -2120,6 +2121,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can attack as though (?:it|they) had haste$/.test(rest)) return [{ kind: "attackAsThoughHaste" }];
   if (/^can block creatures with landwalk abilities as though they didn't have those abilities$/.test(rest)) return [{ kind: "blockAsThough", walk: true }];
   if (/^can block creatures with shadow as though (?:it|they) had shadow$/.test(rest)) return [{ kind: "blockAsThough", shadow: true }];
+  const reachVs = /^can block ([A-Z][a-z]+)s as though (?:it|they) had reach$/.exec(rest);
+  if (reachVs && CREATURE_TYPES.has(reachVs[1]!)) return [{ kind: "blockAsThough", reachVs: reachVs[1]! }];
   if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];
   // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
   // as though it didn't have defender" (Arcades).
@@ -2442,10 +2445,20 @@ function parseStaticLine(line: string): StaticAbility | null {
     const sub = which === "lands" ? undefined : which === "Plains" ? "Plains" : which.slice(0, -1);
     return mods ? { affects: { kind: "filter", types: ["Land"], ...(landsAre[2] ? { controller: "you" as const } : {}), ...(sub ? { spec: { kind: "object", types: ["Land"], subtypes: [sub], text: sub } } : {}) }, mods, text: line } : null;
   }
+  // Natural Emergence: "Lands you control are 2/2 creatures with first strike. They're still lands.": the same, with the
+  // keyword in layer 6.
+  const emergence = /^Lands you control are (\d+)\/(\d+) creatures with ([a-z ]+)\. They're still lands$/.exec(text);
+  if (emergence) {
+    const kws = parseKeywordList(emergence[3]!);
+    if (!kws) return null;
+    return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: Number(emergence[1]), toughness: Number(emergence[2]) }, { kind: "addKeywords", keywords: kws }], text: line };
+  }
   if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
   // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
   const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };
+  // Ghostflame Sliver: "All Slivers are colorless": every permanent with that creature type, in layer 5.
+  if (/^All Slivers are colorless$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Sliver"], text: "all slivers" } }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All cards that aren't on the battlefield, spells, and permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line, offFieldAll: true };
   // Melting: "All lands are no longer snow": the supertype goes in layer 4 (CR 205.4a), lands that become snow later too.
@@ -2631,7 +2644,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;
@@ -2802,6 +2815,9 @@ function parseLandTypeStatic(text: string, line: string): StaticAbility | null {
   // Stormtide Leviathan: "All lands are Islands in addition to their other types", the same.
   if ((m = /^Each land is an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other land types$/.exec(text)) || (m = /^All lands are (Plains|Island|Swamp|Mountain|Forest)s? in addition to their other types$/.exec(text)))
     return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "addTypes", types: [], subtypes: [m[1]!] }], text: line };
+  // Swampbenders: "Lands you control are Swamps in addition to their other types": yours only.
+  if ((m = /^Lands you control are (Plains|Island|Swamp|Mountain|Forest)s? in addition to their other types$/.exec(text)))
+    return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [m[1]!] }], text: line };
   if (/^Lands you control are every basic land type in addition to their other types$/.test(text))
     return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [...BASIC_TYPES] }], text: line };
   if ((m = /^(Plains|Islands|Swamps|Mountains|Forests) don't untap during their controllers' untap steps$/.exec(text)))

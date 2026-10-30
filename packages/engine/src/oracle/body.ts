@@ -6324,6 +6324,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(powerOr[1]) }, text: `power ${powerOr[1]} or less` } }, effects: all, otherwise: [{ type: "if", cond: { kind: "state", cond }, effects: structuredClone(all) }] });
       continue;
     }
+    // Will of the All-Hunter: "Target creature gets +2/+2 until end of turn. If it's blocking, instead put two +1/+1 counters
+    // on it.": one or the other, by whether it's blocking as this resolves (CR 608.2c).
+    const blockingInstead = /^If it's blocking, instead put (a|two|three) \+1\/\+1 counters? on it$/.exec(s);
+    if (blockingInstead) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "continuous" || last.what.ref !== "target" || last.what.n || last.duration !== "endOfTurn" || ctx.lastObjectTarget !== last.what.index || ctx.targets[last.what.index]?.optional) return null;
+      const index = last.what.index;
+      const n = { a: 1, two: 2, three: 3 }[blockingInstead[1] as "a" | "two" | "three"];
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], combat: "blocking", text: "blocking" } }, effects: [{ type: "counters", what: { ref: "target", index }, counter: "+1/+1", n }], otherwise: [last] };
+      continue;
+    }
     // Depressurize: "Target creature gets -3/-0 until end of turn. Then if that creature's power is 0 or less, destroy it.":
     // its power after the first instruction, as this resolves (CR 608.2c).
     const powerThen = /^(?:Then i|I)f that creature's power is (\d+) or less, destroy it$/.exec(s);
@@ -6445,8 +6456,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = ifIts[3]!.replace(/^it also /, "it ");
       if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && (["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) || (prev.type === "if" && prev.cond.kind === "targetIs" && prev.cond.index === i)) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
         const fx = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
-        // Thwip!: "If it's a Spider, you gain 2 life": about the target, an instruction that isn't (no "it" in it).
-        const aside = /^you gain \d+ life$/.test(then);
+        // Thwip!: "If it's a Spider, you gain 2 life": about the target, an instruction that isn't (no "it" in it). Stand
+        // United: "If it's an Ally, scry 2", the same (the scry pauses inside the "if", which keeps its answer).
+        const aside = /^(?:you gain \d+ life|scry \d+)$/.test(then);
         if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => aside || mentionsTarget(e, i))) return null;
         const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };
         effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });

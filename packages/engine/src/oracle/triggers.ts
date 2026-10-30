@@ -273,8 +273,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
     // (rulings), the subject either way.
     // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
-    // whichever attacked, as the ability resolves or as it last existed (rulings).
-    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)));
+    // whichever attacked, as the ability resolves or as it last existed (rulings). Chainflail Centipede: "it gets +2/+0
+    // until end of turn": whichever attacked.
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
@@ -574,7 +575,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     const what = m[1]!.replace(/^an? /, "");
     const filter = what === "creature" ? undefined : parseTargetPhrase(what);
     if (filter === null || (filter && filter.kind !== "object")) return "fail";
-    const body = parseBody(m[2]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { subject: true });
+    // Battering Ram: "Whenever ~ becomes blocked by a Wall, destroy that Wall at end of combat": "that Wall" is that creature.
+    const named = CREATURE_TYPES.has(what) ? m[2]!.replace(new RegExp(`\\bthat ${what}\\b`, "g"), "that creature") : m[2]!;
+    const body = parseBody(named.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { subject: true });
     if (!body) return "fail";
     return { event, body, ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) };
   }
@@ -725,6 +728,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // Hallar, the Firefletcher: "Whenever you cast a spell, if that spell was kicked, ...": how it was cast can't change
   // (CR 603.4), the same as "Whenever you cast a kicked spell".
   line = line.replace(/^Whenever you cast a spell, if that spell was kicked, /, "Whenever you cast a kicked spell, ");
+  // Saproling Infestation: "Whenever a player kicks a spell": casts it with its kicker cost paid (CR 702.33d; once however
+  // many times a multikicker was paid).
+  line = line.replace(/^Whenever a player kicks a spell, /, "Whenever a player casts a kicked spell, ");
   const m = CAST_TRIGGER.exec(line.replace(/ with (mana value|power) (\d+), (\d+), or (\d+),/, (all, key: string, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with ${key} ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
@@ -1257,9 +1263,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
+  // Cabal Slaver: "Whenever a Goblin deals combat damage to a player, that player discards a card": the player dealt it.
   const anySliver = /^Whenever a ([A-Z][a-z]+) deals combat damage to a player, (.+)$/.exec(line);
   if (anySliver && CREATURE_TYPES.has(anySliver[1]!)) {
-    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(anySliver[2]!)) return "fail";
+    if (/\b(?:defending player|that much|that many|you|your)\b/i.test(anySliver[2]!) || (/\bthat player\b/i.test(anySliver[2]!) && !/^that player discards a card\.?$/.test(anySliver[2]!))) return "fail";
     const body = parseBody(anySliver[2]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
@@ -2292,6 +2299,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (diesOnYourTurn) {
     const t = parseTrigger(`${diesOnYourTurn[1]}, ${diesOnYourTurn[2]}`);
     return t && t !== "fail" && t.event === "permanentDies" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
+  }
+  // Foe-liage: "Whenever a land enters during your turn, ...": only during its controller's turn, as it enters.
+  const entersOnYourTurn = /^(Whenever (?:an?|another) [^,]+? enters) during your turn, (.+)$/.exec(line);
+  if (entersOnYourTurn) {
+    const t = parseTrigger(`${entersOnYourTurn[1]}, ${entersOnYourTurn[2]}`);
+    return t && t !== "fail" && t.event === "permanentEnters" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
   }
   // Kefka, Ruler of Ruin: "Whenever an opponent loses life during your turn, you draw that many cards": it triggers only
   // during its controller's turn.

@@ -1911,12 +1911,13 @@ export function compile(d: CardDef): CompiledCard {
     // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
     // Zask, Skittering Swarmlord: "You may play lands and cast Insect spells from your graveyard": cards with that
     // creature type (a changeling's too, CR 702.73a).
-    const permYard = /^You may (play lands and )?cast (permanent|[A-Z][a-z]+) spells from your graveyard\.$/.exec(line);
-    const yardFilter = permYard && parseTargetPhrase(`${permYard[2]} card from a graveyard`);
-    if (permYard && yardFilter?.kind === "card" && (permYard[2] === "permanent" || CREATURE_TYPES.has(permYard[2]!))) {
+    // Yawgmoth's Agenda: "You may play lands and cast spells from your graveyard": any spell card, the same way.
+    const permYard = /^You may (play lands and )?cast (?:(permanent|[A-Z][a-z]+) )?spells from your graveyard\.$/.exec(line);
+    const yardFilter = permYard && parseTargetPhrase(`${permYard[2] ?? ""} card from a graveyard`.trim());
+    if (permYard && yardFilter?.kind === "card" && (!permYard[2] || permYard[2] === "permanent" || CREATURE_TYPES.has(permYard[2]!))) {
       if (permYard[1]) out.landsFromGraveyard = true;
       const { owner: _, ...f } = yardFilter;
-      (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${permYard[2]} cards` }, way: { kind: "permission", costs: [], exile: false } });
+      (out.graveyardGrants ??= []).push({ filter: { ...f, text: permYard[2] ? `${permYard[2]} cards` : "cards" }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
     // Jaya Ballard's emblem: "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be
@@ -4200,8 +4201,11 @@ export function compile(d: CardDef): CompiledCard {
       // The Shrines: "At the beginning of your upkeep and whenever you cast a black spell, put a charge counter on ~": a step
       // and a cast are never one event.
       /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line);
-    if (twice && !/\bonly once\b/.test(line)) {
-      const effect = twice[twice.length - 1]!;
+    // MACH-1, Swooping Scoundrel: "When ~ enters and whenever you gain life, surveil 1. This ability triggers only once each
+    // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
+    const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
+    if (twice && (!/\bonly once\b/.test(line) || onceBoth)) {
+      const effect = onceBoth ? twice[twice.length - 1]!.replace(/ This ability triggers only once each turn\.$/, "") : twice[twice.length - 1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
         ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
         : /^At the beginning of your upkeep and whenever /.test(line)
@@ -4260,8 +4264,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} is turned face up, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
-      if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
-      else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));
+      if (both.some((t) => !t || t === "fail" || (onceBoth && t.oncePerTurn))) out.unsupported.push(raw);
+      else for (const t of both) out.triggers.push(bindThisAbility(onceBoth ? { ...(t as TriggeredAbility), oncePerTurn: true } : (t as TriggeredAbility), line));
       continue;
     }
     // Battle Cry: "Untap all white creatures you control.\nWhenever a creature blocks this turn, ...": a delayed trigger

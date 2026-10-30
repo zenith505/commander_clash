@@ -290,10 +290,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
   // Firion: "Sacrifice that token at the beginning of the next upkeep": the next one to begin, whoever's turn (CR 603.7).
-  if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens) at (the beginning of (?:the|your) next end step|end of combat|the beginning of the next cleanup step|the beginning of the next upkeep|the beginning of your next upkeep)$/i.exec(s))) {
+  if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens) at (the beginning of (?:the|your) next end step|end of combat|the beginning of the next cleanup step|the beginning of the next upkeep|the beginning of your next upkeep|the beginning of the end step on your next turn)$/i.exec(s))) {
     const verb = m[1]!.toLowerCase();
     // Force of Rage: "Sacrifice those tokens at the beginning of your next upkeep": yours, in a later turn (CR 603.7).
-    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next upkeep/.test(m[2]!) ? "yourNextUpkeep" : /upkeep/.test(m[2]!) ? "nextTurnUpkeep" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
+    // Kav Landseeker: "at the beginning of the end step on your next turn": not this turn's (rulings).
+    const when = m[2] === "end of combat" ? "endOfCombat" : /on your next turn/.test(m[2]!) ? "yourNextTurnEndStep" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next upkeep/.test(m[2]!) ? "yourNextUpkeep" : /upkeep/.test(m[2]!) ? "nextTurnUpkeep" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
     return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
   // "Incubate 2 five times" (The Argent Etchings): one incubate after another (CR 701.53a).

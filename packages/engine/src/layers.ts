@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CREATURE_TYPES, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CREATURE_TYPES, IDENTITY_PROTECTION, stripReminder, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -262,6 +262,27 @@ export interface Characteristics {
   blockAny: boolean;
 }
 
+/** Keywords that rules text grants or names as well as prints (Zur: "Enchantment creatures you control have deathtouch"). */
+const MENTIONABLE = new Set(["flying", "first strike", "double strike", "deathtouch", "haste", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance", "defender", "shroud", "intimidate", "fear", "skulk", "shadow", "horsemanship", "infect", "wither", "flash"]);
+const ownKeywords = new WeakMap<CardDef, string[]>();
+const startsWithWord = (seg: string, k: string) => seg.toLowerCase() === k.toLowerCase() || seg.toLowerCase().startsWith(`${k.toLowerCase()} `);
+
+/**
+ * Whether the card has `k` itself: the card data also lists a keyword its text only mentions (Odric, Blood-Cursed's
+ * "abilities from among flying, first strike, ..."; Angelic Skirmisher's "choose first strike, vigilance, or lifelink").
+ * The card lists a keyword ability by name (CR 702.1): `k` in a list of the card's keywords that starts
+ * the line.
+ */
+function onKeywordLine(d: CardDef, k: string): boolean {
+  // A keyword the text doesn't name at all comes from elsewhere (a token's definition).
+  if (!new RegExp(`\\b${k}\\b`, "i").test(d.oracleText)) return true;
+  return d.oracleText.split("\n").some((line) => {
+    const segs = stripReminder(line).split(/[,;] /);
+    const at = segs.findIndex((g) => startsWithWord(g, k));
+    return at >= 0 && segs.slice(0, at).every((g) => d.keywords.some((x) => startsWithWord(g, x)));
+  });
+}
+
 /**
  * The card's keywords. The card data names some only generically ("Protection", "Toxic");
  * the text says which ("Protection from black", "Toxic 2"), so those come from the text.
@@ -273,7 +294,8 @@ export function printedKeywords(d: CardDef): string[] {
   const striated = new Set((c.striatedKeywords ?? []).map((k) => k.toLowerCase()));
   // Scryfall lists "Protection from X" as "Protection".
   const inStriation = (k: string) => [...striated].some((x) => x === k.toLowerCase() || x.startsWith(`${k.toLowerCase()} `));
-  const own = striated.size ? d.keywords.filter((k) => !inStriation(k)) : d.keywords;
+  let own = ownKeywords.get(d);
+  if (!own) ownKeywords.set(d, (own = (striated.size ? d.keywords.filter((k) => !inStriation(k)) : d.keywords).filter((k) => !MENTIONABLE.has(k.toLowerCase()) || onKeywordLine(d, k))));
   if (!fromText.length) return [...own];
   // And "Hexproof from blue" as "Hexproof from" and "Hexproof" (CR 702.11d: it isn't hexproof itself).
   const hexFrom = fromText.some((k) => /^hexproof from /i.test(k));
@@ -1033,6 +1055,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => (cond.you ? Number(p) === you : Number(p) !== you) && n >= cond.n);
     case "attackedWith": {
       const w = s.players[you]?.attackedWith;
+      if (cond.subtype) return w?.turn === s.turn && w.keys.filter((k) => w.kinds?.[k] === "all" || !!(w.kinds?.[k] as string[] | undefined)?.includes(cond.subtype!)).length >= cond.n;
       return w?.turn === s.turn && w.keys.length >= cond.n;
     }
     case "attackPower": {

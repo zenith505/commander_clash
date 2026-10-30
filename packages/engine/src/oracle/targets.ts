@@ -507,7 +507,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
   // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise; Soul Nova:
   // "target attacking creature and all Equipment attached to it".
-  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
+  // Portal of Sanctuary: "target creature you control and each Aura attached to it".
+  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?| you control)?) and (?:all (Auras|Equipment)|each (Aura)) attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
@@ -530,7 +531,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "attachedToSubject", filter: kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" } };
   }
   if ((andAttached || attachedThat) && !cards) {
-    const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
+    const kind = andAttached ? (andAttached[2] ?? `${andAttached[3]}s`) : attachedThat![1]!;
     const filter: TargetSpec = kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
     if (attachedThat) {
       const i = ctx.targets.length - 1;
@@ -1561,6 +1562,10 @@ export function parseTargetPhrase(
   // "Another creature you control with base power 1" (Rapid Augmenter).
   if ((m = / with base power (\d+)$/.exec(p))) {
     extra.basePower = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
+  if ((m = / whose power and toughness aren't equal$/.exec(p))) {
+    extra.ptUnequal = true;
     p = p.slice(0, m.index);
   }
   if ((m = / (?:with toughness greater than (?:its|their) power|that each have toughness greater than their power)$/.exec(p))) {

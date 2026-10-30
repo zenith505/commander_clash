@@ -2,7 +2,7 @@ import type { Amount, AmountExpr, Affects, Modification, MostStat, StaticAbility
 import { ANY_COUNTER } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
-import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
+import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -947,6 +947,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount("the number of permanents on the battlefield named ~", null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, max: 0 } : null;
   }
+  // Stensia Uprising: "if you control exactly thirteen permanents": that many and no more.
+  if ((m = new RegExp(`^you control exactly ${NUM} (permanents|creatures|lands|artifacts)$`).exec(text)) && num(m[1]!) > 1) {
+    const at = parseStaticCondition(`you control ${m[1]} or more ${m[2]}`, st);
+    return at?.kind === "control" && at.min === num(m[1]!) && at.max === undefined ? { ...at, max: at.min } : null;
+  }
   // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
   // Phoenix Fleet Airship: "if you control eight or more permanents named ~".
   if ((m = new RegExp(`^you control ${NUM} or more (creatures|permanents) named ~$`).exec(text))) {
@@ -1234,6 +1239,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you were dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!), you: true };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
+  // Deepway Navigator: "you attacked with three or more Merfolk this turn": of that type as they were declared.
+  if ((m = new RegExp(`^you attacked with ${NUM} or more ([A-Z][a-z]+) this turn$`).exec(text)) && CREATURE_TYPES.has(singularWord(m[2]!))) return { kind: "attackedWith", n: num(m[1]!), subtype: singularWord(m[2]!) };
   if ((m = new RegExp(`^you attacked with creatures with total power ${NUM} or greater this combat$`).exec(text))) return { kind: "attackPower", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.

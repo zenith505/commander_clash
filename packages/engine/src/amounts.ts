@@ -868,6 +868,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return types.size;
     }
+    case "keywordsAmong": {
+      const found = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Creature")) continue;
+        for (const k of c.keywords) if (ch.keywords.some((x) => x.toLowerCase() === k.toLowerCase() || (k === "Hexproof" && /^hexproof from /i.test(x)))) found.add(k);
+      }
+      return found.size;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
@@ -1134,6 +1143,8 @@ function describeCount(c: Count): string {
       return "#basic land types";
     case "creatureTypesAmong":
       return "#creature types among your creatures";
+    case "keywordsAmong":
+      return "#abilities among your creatures";
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":

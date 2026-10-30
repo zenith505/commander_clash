@@ -115,6 +115,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: m[2]!, text: `${c.count.filter.text} named ${m[2]}` } } };
   }
+  // Maraxus of Keld: "the number of untapped artifacts, creatures, and lands you control": each permanent that's any of
+  // them, once.
+  if ((m = /^the number of (untapped )?artifacts, creatures, and lands you control$/.exec(p))) {
+    return { count: { kind: "permanents", filter: { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], controller: "you", ...(m[1] ? { tapped: false } : {}), text: p.replace(/^the number of /, "") } } };
+  }
   // Road Rage: "the number of Mounts and Vehicles you control": each permanent that's either, once.
   if ((m = /^the number of ([A-Z][a-z]+s) and ([A-Z][a-z]+s) you control$/.exec(p))) {
     const [a, b] = [parseCount(`the number of ${m[1]} you control`, ctx), parseCount(`the number of ${m[2]} you control`, ctx)];
@@ -504,6 +509,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^artifacts that were put into graveyards from the battlefield this turn$/i.test(p)) return count({ kind: "artifactsToGraveyardThisTurn" });
   if ((m = /^(nontoken )?creatures? put into your graveyard from the battlefield this turn$/i.exec(p))) return count({ kind: "creaturesToYourGraveyard", ...(m[1] ? { nontoken: true as const } : {}) });
   if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
+  // Tobias, Doomed Conqueror: "for each nontoken creature you controlled that died this turn": died under your control.
+  if ((m = /^(nontoken )?creatures? you controlled that died this turn$/i.exec(p))) return count({ kind: "diedThisTurn", yours: true, ...(m[1] ? { nontoken: true as const } : {}) });
   // The Zubera: "for each Zubera that died this turn", any player's.
   if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });

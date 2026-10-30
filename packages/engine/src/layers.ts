@@ -255,6 +255,8 @@ export interface Characteristics {
   blocksLandwalkers: boolean;
   /** "Can block creatures with shadow as though it had shadow" (Heartwood Dryad). */
   blocksShadow: boolean;
+  /** Creature types it can block as though it had reach (Dragon Hunter). */
+  reachVs?: string[];
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -383,6 +385,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   ...(c.attackUnlessMore ? { attackUnlessMore: [...c.attackUnlessMore] } : {}),
   ...(c.attackOnlyWith ? { attackOnlyWith: [...c.attackOnlyWith] } : {}),
   ...(c.allMustBlockBy ? { allMustBlockBy: [...c.allMustBlockBy] } : {}),
+  ...(c.reachVs ? { reachVs: [...c.reachVs] } : {}),
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
 });
@@ -1680,6 +1683,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "blockAsThough":
       if (m.walk) c.blocksLandwalkers = true;
       if (m.shadow) c.blocksShadow = true;
+      if (m.reachVs) (c.reachVs ??= []).push(m.reachVs);
       return;
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;

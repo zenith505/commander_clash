@@ -9511,7 +9511,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (!b.types.includes("Creature") || b.types.includes("Battle") || blocker.tapped) return `${b.name} can't block`;
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (cantBeBlockedNow(s, attacker)) return `${a.name} can't be blocked`;
-  if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach")) return `${b.name} can't block a creature with flying`; // CR 702.9b
+  if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach") && !b.reachVs?.some((t) => a.allCreatureTypes || a.subtypes.includes(t))) return `${b.name} can't block a creature with flying`; // CR 702.9b
   if (has(a, "Shadow") !== has(b, "Shadow") && !(has(a, "Shadow") && b.blocksShadow)) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b
   if (has(a, "Intimidate") && !b.types.includes("Artifact") && !b.colors.some((c) => a.colors.includes(c))) return `${a.name} has intimidate`; // CR 702.13b

@@ -672,6 +672,8 @@ export interface TargetSpec {
   combatDamagedBySource?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
   attackedThisTurn?: true;
+  /** For players: "target player who lost life this turn" (Rix Maadi Guildmage): any life loss, damage or paid life too (CR 119.3). */
+  lostLifeThisTurn?: true;
   /**
    * For players: "target opponent who has more life than you do as you activate this ability", "who controls more
    * creatures", "who has at least two more cards in hand", "who has at least two fewer creature cards in their graveyard"
@@ -786,6 +788,8 @@ export interface TargetSpec {
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
   dealtDamageThisTurn?: true;
+  /** "Target creature that dealt damage this turn" (Executioner's Swing): it dealt damage as this object (CR 400.7). */
+  dealtDamageAsSourceThisTurn?: true;
   /** true: a token; false: "nontoken". */
   token?: boolean;
   /**
@@ -1592,7 +1596,7 @@ export type Modification =
    * "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy), "can block
    * creatures with shadow as though it had shadow" (Heartwood Dryad): evasion it ignores as it blocks (CR 509.1b).
    */
-  | { kind: "blockAsThough"; walk?: true; shadow?: true }
+  | { kind: "blockAsThough"; walk?: true; shadow?: true; /** "Can block Dragons as though it had reach" (Dragon Hunter, CR 702.17b): attackers of this creature type. */ reachVs?: string }
   /** "Enchanted creature can attack as though it had haste" (Instill Energy): it may attack while summoning sick (CR 302.6); its {T} abilities still can't be activated. */
   | { kind: "attackAsThoughHaste" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */

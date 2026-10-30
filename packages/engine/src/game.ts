@@ -2152,6 +2152,12 @@ export function removeFromCombat(s: GameState, o: GameObject) {
  * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
  */
 export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", made: number[] = [], resumed = false): boolean {
+  // Maralen of the Mornsong: the draws don't happen, so no replacement applies to them and an empty library loses nothing
+  // (rulings).
+  if (cantDraw(s, pid)) {
+    if (n > 0 || made.length) log(s, `${player(s, pid).name} can't draw cards (${nameOf(s, cantDraw(s, pid)!)}).`);
+    return true;
+  }
   // `made`: draws a replacement effect already made of an earlier one, which that effect doesn't replace again (CR
   // 614.5); each number is how many Alhammarret's Archives can still replace that draw.
   made = [...made];
@@ -2284,7 +2290,14 @@ function almsCollector(s: GameState, pid: PlayerId): GameObject | undefined {
 }
 
 /** One draw for `pid` that doesn't stop to offer dredge or Scion of Halaster's look (the card is just drawn). */
+/** A permanent that says players can't draw cards (Maralen of the Mornsong), if there is one. */
+export function cantDraw(s: GameState, pid: PlayerId): ObjectId | undefined {
+  void pid;
+  return s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).playersCantDraw);
+}
+
 function drawWithoutAsking(s: GameState, pid: PlayerId) {
+  if (cantDraw(s, pid)) return;
   const p = player(s, pid);
   const asks = dredgeOptions(s, pid).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook));
   if (!asks) draw(s, pid, 1, undefined, [], true);

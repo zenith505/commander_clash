@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
@@ -347,7 +347,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.mayQueue) {
         // Someone who can't do it isn't asked (CR 101.3): "put two +1/+1 counters on a creature they control" with none.
         const need = e.need;
+        // Maralen of the Mornsong: nobody can choose to draw or to have another player draw (rulings).
+        const onlyDraws = e.effects.length > 0 && e.effects.every((x) => x.type === "draw");
         const can = (pid: PlayerId) =>
+          !(onlyDraws && cantDraw(s, pid)) &&
           (!e.pay || canPayNow(s, pid, e.pay)) &&
           (!need ||
             (need.zone === "battlefield"
@@ -950,6 +953,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may discard two cards. If you do, ..." (Thrilling Discovery): discarding fewer isn't doing it (CR 609.3).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && typeof e.n === "number" && e.n > 1 && !e.upTo && player(s, ctx.controller).hand.length < e.n) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
+    if (e.type === "draw" && cantDraw(s, ctx.controller)) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
     // "You may mill three cards" (Druidic Ritual): not with fewer cards in your library (CR 701.17b, rulings).

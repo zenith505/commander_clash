@@ -2356,6 +2356,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
             moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
             if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
+            if (e.alsoMods && o.zone === "battlefield") {
+              s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+              invalidateCharacteristics(s);
+            }
             continue;
           }
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);

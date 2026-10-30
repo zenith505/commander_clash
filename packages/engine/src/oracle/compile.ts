@@ -465,7 +465,7 @@ function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
 
 /** The ability words (CR 207.2c), before a line of an instant or sorcery. */
 const SPELL_ABILITY_WORD = new RegExp(
-  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
+  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council", "Will of the Planeswalkers"].join("|")}) — `,
 );
 
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
@@ -2196,6 +2196,12 @@ export function compile(d: CardDef): CompiledCard {
     const skipExtra = /^If (a player|an opponent) would begin an extra turn, that player skips that turn instead\.$/.exec(line);
     if (skipExtra) {
       out.skipsExtraTurns = skipExtra[1] === "a player" ? "all" : "opponents";
+      continue;
+    }
+    // Maralen of the Mornsong: no player draws, for any reason (rulings); Mornsong Aria: nor gains life (CR 119.7).
+    if (line === "Players can't draw cards." || line === "Players can't draw cards or gain life.") {
+      out.playersCantDraw = true;
+      if (line.endsWith("or gain life.")) out.cantGainLife = "all";
       continue;
     }
     const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);

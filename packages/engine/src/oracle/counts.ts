@@ -314,6 +314,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { count: { kind: "cardsExiledThisWay", ...(filter ? { filter } : {}) } };
   }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
+  // Hapatra, the Desert Fang: "the greatest mana value among cards in your graveyard", 0 with none.
+  if (!each && /^the greatest mana value among cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, greatestMv: true } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   // Emissary Escort: "the greatest mana value among other artifacts you control", the source left out.
   if (!each && (m = /^the greatest mana value among (other )?(.+?) you control$/i.exec(p))) {

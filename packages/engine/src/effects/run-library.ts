@@ -358,7 +358,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const rp = (sc0.randomPicks ??= Object.fromEntries(
           apnap(s, who).map((pid) => {
             const picked: ObjectId[] = [];
-            const pool = [...player(s, pid).hand];
+            // Rag Man: "discards a creature card at random": among those cards only.
+            const pool = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
             const n = nFor[pid] ?? 0;
             for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
             return [pid, picked];

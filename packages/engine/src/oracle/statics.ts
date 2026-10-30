@@ -284,6 +284,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Medomai the Ageless: "~ can't attack during extra turns" (CR 500.7).
   else if ((m = /^(~ can't attack) during extra turns$/.exec(text))) [statement, cond] = [m[1], "it's an extra turn"];
+  // Lurker: "~ can't be the target of spells unless it attacked or blocked this turn".
+  else if ((m = /^(~ can't be the target of spells) unless it attacked or blocked this turn$/.exec(text))) [statement, cond] = [m[1], "~ didn't attack or block this turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
   // Topiary Stomper: "~ can't attack or block unless you control seven or more lands", Desperate Castaways "... unless you
@@ -1164,6 +1166,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
   if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };
+  // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
+  if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
   if (/^it attacked this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackedThisTurn" };
   // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it

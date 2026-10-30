@@ -416,6 +416,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
+      if (c.greatestMv) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => defMv(defOf(s, s.objects[id]!)))));
       // Revivify: only those put there from the battlefield this turn.
       return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn)).length, 0);
     }
@@ -1059,6 +1060,7 @@ function describeCount(c: Count): string {
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":
       if (c.greatestPower) return `the greatest power among ${c.filter ? c.filter.text.replace(/^target /, "") : "card"}s in graveyard`;
+      if (c.greatestMv) return "the greatest mana value among cards in graveyard";
       if (c.sameNameAsCast) return "#cards with that spell's name in all graveyards";
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":

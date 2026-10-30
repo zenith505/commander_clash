@@ -290,6 +290,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
   }
+  // Rag Man: "Target opponent reveals their hand and discards a creature card at random": one of the creature cards in it,
+  // chosen at random (none if there are none).
+  if ((m = /^(.+?) reveals their hand and discards an? ((?:(?!\bcards?\b).)+ card) at random$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(m[2]!);
+    return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 1, random: true, filter }] : null;
+  }
   // Flipping a coin (CR 705): see "If you win the flip, ..." in body.ts.
   if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];
   if (/^[Ff]lip a coin until you lose a flip$/.test(s)) return [{ type: "flipCoin", untilLose: true }];

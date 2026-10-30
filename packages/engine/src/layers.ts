@@ -1207,6 +1207,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "attackedOrBlockedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0);
+      if (cond.is === "attackedOrBlockedThisTurn") return src.declaredInCombat?.turn === s.turn;
       if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;

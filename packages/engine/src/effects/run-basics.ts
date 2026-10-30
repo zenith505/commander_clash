@@ -387,6 +387,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${src}: ${e.mod.text.replace(/\.$/, "")}.`);
       return;
     }
+    case "rememberGroup":
+      if (s.resolving) s.resolving.created = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
+      return;
     case "pumpPerBlocker":
       for (const o of objects(s, e.what, ctx)) {
         // Counted as it resolves (CR 702.23b).

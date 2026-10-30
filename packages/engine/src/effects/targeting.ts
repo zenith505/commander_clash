@@ -1120,6 +1120,15 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const can = e.destroyable ? tied.filter((id) => !objHasKeyword(s, obj(s, id), "Indestructible")) : tied;
     return can;
   }
+  // Curse Artifact: "unless they sacrifice that artifact": the one the source is attached to.
+  if (e.filter.sourceHost) {
+    const { sourceHost: _, ...filter } = e.filter;
+    // As the source last existed if it has left (CR 608.2h): the permanent it was attached to, if that one is still there.
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const was = me?.zone === "battlefield" ? (me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined) : sourceId ? s.lastKnown?.[sourceId]?.attachedTo : undefined;
+    const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? was.id : undefined;
+    return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => id === host);
+  }
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;

@@ -2375,8 +2375,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Starfall Invocation: a card that died to this destroy and hasn't moved since (CR 400.7).
           (!e.destroyedThisWay || !!s.resolving!.destroyed?.some((d) => d.died && d.o.id === id && (obj(s, id).zoneChanges ?? 0) === (d.o.zoneChanges ?? 0) + 1));
         const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
+        // Desecrator Hag: the greatest power among them, a characteristic-defining "*" counted there too (rulings).
+        const top = e.greatestPower ? Math.max(...all.map((id) => characteristics(s, obj(s, id)).power)) : 0;
+        const fit = e.greatestPower ? all.filter((id) => characteristics(s, obj(s, id)).power === top) : all;
         // "With different names": one card of each name is offered (cards of one name are alike).
-        const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
+        const cards = e.oneEach ? fit.filter((id, i) => fit.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : fit;
         // "Return that many creature cards" (Lich-Knights' Conquest): counted as it resolves.
         const count = e.nAmount !== undefined ? Math.max(0, amountNow(s, e.nAmount, ctx)) : e.n;
         const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(count, cards.length);
@@ -2432,6 +2435,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
       if (e.chooser && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
+      s.resolving!.yardChosen = found;
       if (e.milled) s.resolving!.did = found.length > 0;
       if (e.milled && (e.dest ?? "hand") === "hand") s.resolving!.putIntoHand = found;
       return;
@@ -2916,6 +2920,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       me.attachedTo = c.id;
       me.enchantsCard = undefined;
       invalidateCharacteristics(s);
+      fireEvent(s, { type: "attached", id: me.id, host: c.id });
       return;
     }
     case "sacrificeAnimated": {

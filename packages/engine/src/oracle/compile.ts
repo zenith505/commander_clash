@@ -506,6 +506,12 @@ export function compile(d: CardDef): CompiledCard {
       // Gargantuan Leech: "~ costs {1} less to cast for each Cave you control and each Cave card in your graveyard": the two
       // reductions together (CR 601.2f).
       .replace(/^(~ costs \{\d+\} less to cast for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
+      // Howl of the Hunt: "When ~ enters, if enchanted creature is a Wolf or Werewolf, untap that creature": the enchanted
+      // creature the condition is about.
+      .replace(/^(When ~ enters, if enchanted creature is an? [A-Z][a-z]+(?: or [A-Z][a-z]+)?), untap that creature\.$/m, "$1, untap enchanted creature.")
+      // Assassin's Ink: "~ costs {1} less to cast if you control an artifact and {1} less to cast if you control an
+      // enchantment": two reductions, each with its own condition.
+      .replace(/^~ costs (\{\d+\} less to cast if you control an? [a-z]+) and (\{\d+\} less to cast if you control an? [a-z]+)\.$/m, "~ costs $1.\n~ costs $2.")
       // "If this spell's additional cost was paid" with "you may waterbend", "you may blight 1" or "you may behold a Dragon"
       // as that cost: whether it was paid, like kicker. "If a Dragon was beheld" is the same: whether a Dragon card was
       // revealed or a Dragon chosen for that cost, whatever happens to it later (CR 701.4b, rulings).
@@ -1435,6 +1441,13 @@ export function compile(d: CardDef): CompiledCard {
       const fits = asSac[1] === "untapped Forests" ? !rider : asSac[1] === "permanents" ? rider === "counters" : rider === "total";
       if (out.devour || !fits) out.unsupported.push(raw);
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
+      continue;
+    }
+    // Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked." Part of how it enters, not a trigger
+    // (rulings, CR 614.1c), its kicker costs counted (CR 702.33d).
+    const millKicked = /^As ~ enters, mill (two|three|four) cards for each time it was kicked\.$/.exec(line);
+    if (millKicked && d.keywords.includes("Kicker") && !isSpell) {
+      out.entersMillPerKick = num(millKicked[1]!);
       continue;
     }
     // Heightened Awareness: "As ~ enters, discard your hand." (CR 614.1c).
@@ -3870,6 +3883,7 @@ export function compile(d: CardDef): CompiledCard {
       // "Spells you cast of the chosen type" after "choose artifact, creature, ..." (Cloud Key): the card type chosen.
       else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod.filter.chosen === "type" && out.entersChoose?.some((c) => c.what === "cardType") ? { ...cost.costMod, filter: { ...cost.costMod.filter, chosen: "cardType" } } : cost.costMod];
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
+      else if ("lessEachColored" in cost) out.costLessEachColored = [...(out.costLessEachColored ?? []), cost.lessEachColored];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
@@ -4966,7 +4980,8 @@ function giftOf(what: string): NonNullable<CompiledCard["gift"]> {
           : what === "an Octopus"
             ? [{ type: "createToken", who, n: 1, token: { name: "Octopus", power: 8, toughness: 8, colors: ["U"], types: ["Creature"], subtypes: ["Octopus"], keywords: [] } }]
             : [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS[what === "a Food" ? "Food" : "Treasure"]! }];
-  return { what, effects };
+  // Its controller gives a gift as it resolves (CR 702.174c).
+  return { what, effects: [...effects, { type: "gaveGift" }] };
 }
 
 const giftText = (what: string) =>

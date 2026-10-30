@@ -68,6 +68,8 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     else if (CREATURE_TYPES.has(w) || (BASIC_TYPES.includes(w) && /\bland\b/.test(desc))) subtypes.push(w);
     // "A 1/1 colorless Shrine enchantment creature token" (Go-Shintai of Life's Origin): an enchantment type (CR 205.3h).
     else if (w === "Shrine" && /\benchantment\b/.test(desc)) subtypes.push(w);
+    // Vraska, Soul of Stone: "a 1/1 colorless Sculpture Treasure artifact creature token": an artifact type too (rulings).
+    else if (w === "Treasure" && /\bartifact\b/.test(desc) && subtypes.length) subtypes.push(w);
     else return null;
   }
   // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3); 'with flying, haste, and "When this creature dies,

@@ -233,9 +233,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // The Kaldheim Runes: "As long as enchanted permanent is an Equipment, it has "Equipped creature has flying."" (Rune of
   // Flight): while it's an Equipment, it has that static ability, which then applies to the creature it's attached to.
-  if ((m = /^As long as enchanted permanent is an Equipment, it (has ".+")$/.exec(text))) {
-    const mods = parseStaticMods(m[1]!);
-    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" } } } : null;
+  // Nature's Embrace: "As long as enchanted permanent is a land, it has "{T}: Add two mana of any one color."" likewise.
+  if ((m = /^As long as enchanted permanent is (an Equipment|a land), it (has ".+")$/.exec(text))) {
+    const mods = parseStaticMods(m[2]!);
+    const filter = m[1] === "a land" ? { kind: "object" as const, types: ["Land" as const], text: "land" } : { kind: "object" as const, types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" };
+    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter } } : null;
   }
   // Luxior, Giada's Gift: "Equipped permanent isn't a planeswalker and is a creature in addition to its other types": one
   // type-changing effect (layer 4, CR 613.1d); losing the planeswalker type, it loses its planeswalker subtypes (CR
@@ -400,7 +402,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -475,6 +477,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const base = parseCostChange(m[1]!);
     return base && base !== "fail" && "less" in base && typeof base.less !== "number" ? { less: { ...base.less, max: Number(m[2]) } } : "fail";
   }
+  // Khalni Hydra: "~ costs {G} less to cast for each green creature you control": that colored mana off first, then
+  // generic mana for the rest (rulings, CR 601.2f).
+  if ((m = /^~ costs \{([WUBRG])\} less to cast for each (.+)$/.exec(text))) {
+    const c = parseCount(m[2]!, null, true);
+    return c ? { lessEachColored: { color: m[1] as Color, count: c } } : "fail";
+  }
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);
     return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";
@@ -520,6 +528,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets a spell or ability that targets (an? .+)$/.exec(text))) {
     const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
+  }
+  // Vanish into Eternity: "~ costs {3} more to cast if it targets a creature": an increase, with the targets chosen
+  // before the total cost is (CR 601.2c, 601.2f).
+  if ((m = /^~ costs \{(\d+)\} more to cast if it targets (an? [a-z]+)$/.exec(text))) {
+    const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+    return filter?.kind === "object" ? { lessIfTargets: { n: -Number(m[1]), filter } } : "fail";
   }
   // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": the {U} off its colored mana.
   if ((m = /^~ costs \{(\d+)\}((?:\{[WUBRG]\})*) less to cast if it targets (an? .+)$/.exec(text))) {
@@ -837,6 +851,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^the top card of your library is (white|blue|black|red|green)$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} card` } };
   if ((m = /^the top card of your library is an? (artifact|creature|enchantment|instant|land|planeswalker|sorcery) card$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", types: [capital(m[1]!)], text: `${m[1]} card` } };
   // Tainted Indulgence: "there are five or more mana values among cards in your graveyard".
+  // Path to the Festival: "if there are three or more basic land types among lands you control" (domain's count).
+  if ((m = new RegExp(`^there are ${NUM} or more basic land types among lands you control$`).exec(text))) return { kind: "amount", amount: { count: { kind: "basicLandTypes" } }, min: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more mana values among cards in your graveyard$`).exec(text))) return { kind: "amount", amount: { count: { kind: "graveyardManaValues", who: { ref: "you" } } }, min: num(m[1]!) };
   // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
   // enchantment, land and planeswalker (CR 110.4a).
@@ -1231,6 +1247,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
+  if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spell this turn$/.exec(text)))
@@ -1431,6 +1448,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
   if ((m = /^enchanted (creature|land) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
     return { kind: "attachedIs", filter: { kind: "object", types: [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
+  // Howl of the Hunt: "if enchanted creature is a Wolf or Werewolf": the creature it's attached to, as it is now.
+  if ((m = /^enchanted creature is an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && CREATURE_TYPES.has(m[1]!) && (!m[2] || CREATURE_TYPES.has(m[2]))) {
+    const kinds = [m[1]!, m[2]].filter((x): x is string => !!x);
+    return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(kinds.length > 1 ? { anyOf: kinds.map((k): TargetSpec => ({ kind: "object", subtypes: [k], text: k })) } : { subtypes: kinds }), text: `${kinds.join(" or ")} creature` } };
+  }
   // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).
   if ((m = /^enchanted land is a basic (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], subtypes: [m[1]!], text: `basic ${m[1]}` } };
   // Faerie Miscreant: "if you control another creature named ~": one other than it with its name (CR 201.2), as it is now.
@@ -1699,6 +1721,8 @@ export function parseAffected(subject: string): Affects | null {
   if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
   // Barbara Wright: "Sagas you control have read ahead" (an enchantment subtype, CR 205.3h).
   if (x === "Sagas you control") return { kind: "filter", types: ["Enchantment"], subtypes: ["Saga"], controller: "you" };
+  // Forgotten Monument: "Other Caves you control have "..."" (a land subtype, CR 205.3i).
+  if ((m = /^(Other )?(Caves|Deserts|Gates) you control$/.exec(x))) return { kind: "filter", types: ["Land"], subtypes: [m[2]!.slice(0, -1)], controller: "you", other: !!m[1] };
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;

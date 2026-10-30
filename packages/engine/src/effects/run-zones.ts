@@ -1025,7 +1025,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.castFromYard = undefined;
       }
       if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
-      const zone = e.fromGraveyard ? p.graveyard : p.hand;
+      // Jace's Mindseeker: the cards this resolution milled, still where they went.
+      const milled = e.milled ? [...(s.resolving!.milled ?? []), ...(s.resolving!.milledExiled ?? [])].filter((m) => s.objects[m.id] && (s.objects[m.id]!.zoneChanges ?? 0) === m.zc).map((m) => m.id) : undefined;
+      const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
       const castable = (id: ObjectId) => {
         s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
         const problem = castProblem(s, p.id, id);
@@ -1043,16 +1045,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (drawn?.length) log(s, `${p.name} reveals ${drawn.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
         const options = (drawn ?? zone).filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
         if (!options.length) {
-          log(s, drawn ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} ${e.fromGraveyard ? "in their graveyard" : "in hand"} to cast.`);
+          log(s, drawn || milled ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} ${e.fromGraveyard ? "in their graveyard" : "in hand"} to cast.`);
           return;
         }
         const text = filter.text.replace(/^(?!an? )/, /^[aeiou]/i.test(filter.text) ? "an " : "a ");
-        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : `cast ${text} from your ${e.fromGraveyard ? "graveyard" : "hand"} without paying its mana cost?` };
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : milled ? `cast ${text} from among the milled cards without paying its mana cost?` : `cast ${text} from your ${e.fromGraveyard ? "graveyard" : "hand"} without paying its mana cost?` };
         return "paused";
       }
       const id = sc.castFromHand;
       sc.castFromHand = "cast";
-      if (!s.objects[id] || obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand") || !castable(id)) return;
+      if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
       return "paused";

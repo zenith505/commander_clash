@@ -966,13 +966,14 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
-    if (e.type === "counters" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
+    if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
     // longer control ~ (CR 611.2b), so it can't be done.
     if (e.type === "continuous" && e.duration === "whileControlled" && !e.whileOnBattlefield && !(ctx.sourceId && whileControlledHolds(s, { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, controller: ctx.controller }))) return false;
     // "You may have it assign no combat damage this turn" (Cloak of Confusion): only a creature still on the battlefield.
     if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
+    if (e.type === "attach" && e.what.ref === "target" && !e.source && ((me) => !me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !characteristics(s, me).subtypes.includes("Equipment") || !objects(s, e.what, ctx).some((h) => h.zone === "battlefield" && h.id !== me.id))(ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
     if (e.type === "removeAnyCounters" && typeof e.n === "number" && !e.upTo && !objects(s, e.what, ctx).some((o) => Object.values(o.counters).reduce((a, b) => a + Math.max(0, b ?? 0), 0) >= (e.n as number))) return false;
     // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
@@ -984,6 +985,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "revealed" && !objects(s, e.what, ctx).length) return false;
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
+    if (e.type === "bounce" && e.what.ref === "target" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;
     // Collecting evidence takes enough mana value in your graveyard (CR 701.59b).
     if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined, selfCardExiled(s, effects, ctx))) return false;

@@ -1178,6 +1178,8 @@ export function moveObject(
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
+  // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
+  if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
@@ -1319,6 +1321,13 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersPrepared) becomePrepared(s, o);
   // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
   if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
+  // Urborg Lhurgoyf: "mill three cards for each time it was kicked", as it enters (rulings: it doesn't use the stack).
+  if (printed.entersMillPerKick && o.kicked?.length) {
+    const pid = controllerOf(s, o);
+    const n = millCount(s, pid, printed.entersMillPerKick * o.kicked.length);
+    for (const id of player(s, pid).library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
+    log(s, `${player(s, pid).name} mills ${n} card${n === 1 ? "" : "s"}.`);
+  }
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   // Read ahead granted by another permanent (Barbara Wright) applies as it enters too (CR 614.12).
@@ -4647,6 +4656,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const moreMana = mods.moreColored.map((c) => `{${c}}`).join("");
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
+  // Khalni Hydra: "{G} less for each ...", counted as it's cast (rulings): {G} off while there's {G} to take, then {1}.
+  for (const c of compileCard(d).costLessEachColored ?? []) for (let i = Math.max(0, evalAmount(s, c.count, { controller: pid, sourceId: o.id })); i > 0; i--) mods.lessColoredOrGeneric.push(c.color);
   const targetsFor = (filter: TargetSpec) =>
     !!how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, obj(s, t.id), pid, false)) || (t.kind === "object" && filter.kind === "card" && s.objects[t.id]?.zone === "graveyard" && printedMatches(filter, defOf(s, obj(s, t.id)))) || (t.kind === "stack" && filter.kind === "spell" && !!filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], filter.targetsWhat, pid)) || (t.kind === "stack" && filter.kind === "spell" && !filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, filter, x))(s.stack.find((x) => x.id === t.id))));
   // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": its colored part.

@@ -1096,6 +1096,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tapOrUntap":
     case "becomeSaddled":
     case "becameCrewed":
+    case "gaveGift":
     case "classLevel":
     case "solve":
     case "harness":

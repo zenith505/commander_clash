@@ -168,6 +168,7 @@ export type TriggerSourceEvent =
   | { type: "dayNightChanged" }
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
+  | { type: "gaveGift"; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -997,6 +998,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "gaveGift") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGiveGift", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "investigated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1310,7 +1316,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever ~ or equipped creature attacks" (Tanuki Transplanter): about ~ itself here, the subject.
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
-    addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
@@ -1425,6 +1431,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           // Mila, Crafty Companion: "attacks one or more planeswalkers you control": only those attacking a planeswalker.
           const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers) && (!t.attacksYou!.walkersOnly || !!obj(s, x).attackingPermanent));
           if (at.length < t.attacksYou.min) continue;
+          if (t.attacksYou.perWalker) {
+            for (const w of new Set(at.map((x) => obj(s, x).attackingPermanent!.id)))
+              add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.controller, group: at.filter((x) => obj(s, x).attackingPermanent!.id === w).map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 })) });
+            continue;
+          }
           const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
           const info = { player: ev.controller, group, amount: at.length, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
           add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);

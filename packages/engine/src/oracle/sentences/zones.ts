@@ -1044,11 +1044,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!inner || inner.length !== 1 || inner[0]!.type !== "putOntoBattlefield" || inner[0]!.what.ref !== "subjectCard") return null;
     return [{ type: "if", cond: { kind: "subjectCardIs", filter: { kind: "card", types: [], subtypes: [m[2]!], text: `${m[2]} card` } }, effects: inner }];
   }
-  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?( and attach ~ to it)?$`, "i").exec(s)) && ctx.subjectLeft && !(m[7] && ctx.spell)) {
+  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it| with (two|three) (\\+1\\/\\+1) counters on it)?( and attach ~ to it)?$`, "i").exec(s)) && ctx.subjectLeft && !(m[9] && ctx.spell)) {
     // Nim Deathmantle: "return that card to the battlefield and attach ~ to it": the permanent it became (CR 701.3).
+    // Infernal Vessel: "with two +1/+1 counters on it".
     const what = parseObject(m[1] ?? m[2]!, ctx);
-    const counter = m[5] ?? m[6];
-    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}), ...(m[7] ? { attachSelf: true as const } : {}) }] : null;
+    const counter = m[5] ?? m[6] ?? m[8];
+    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: m[7] ? num(m[7]) : 1 } } : {}), ...(m[9] ? { attachSelf: true as const } : {}) }] : null;
   }
   // Pre-War Formalwear: "return target creature card with mana value 3 or less from your graveyard to the battlefield and
   // attach ~ to it": the permanent it became, if ~ is still on the battlefield and can be attached to it; otherwise ~

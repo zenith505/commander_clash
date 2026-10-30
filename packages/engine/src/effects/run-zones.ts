@@ -1790,6 +1790,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return pickPermanents(s, e, ctx, src);
     case "sacrificeEach":
       return sacrificeEach(s, e, ctx, src);
+    case "sacrificeRandom":
+      for (const pid of apnap(s, players(s, e.who, ctx)))
+        for (;;) {
+          const own = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+          if (!own.length) break;
+          const id = own[Math.floor(nextRandom(s) * own.length)]!;
+          // One that can't be sacrificed is still chosen, then nothing more happens (rulings).
+          if (!canBeSacrificed(s, obj(s, id))) {
+            log(s, `${player(s, pid).name} chooses ${defOf(s, obj(s, id)).name} at random, which can't be sacrificed.`);
+            break;
+          }
+          const land = objIsType(s, obj(s, id), "Land");
+          log(s, `${player(s, pid).name} sacrifices ${defOf(s, obj(s, id)).name} (chosen at random).`);
+          moveObject(s, id, "graveyard", { sacrificed: true });
+          if (!e.repeatNonland || land) break;
+        }
+      return;
     case "keepRest":
       return keepRest(s, e, ctx, src);
     case "keepDestroyRest": {

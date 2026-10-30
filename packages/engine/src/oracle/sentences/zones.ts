@@ -979,7 +979,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
     // "Target Cave card" (Glimpse the Core): a land subtype (CR 205.3i).
-    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura"));
+    // "Target Vampire card" (Queen's Bay Paladin): a creature type; a Kindred card that isn't a permanent card stays where it
+    // is (CR 110.4b, putOntoBattlefield checks it as it resolves).
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura") || (!attach && CREATURE_TYPES.has(st)));
     // "Target artifact creature card" (Scarecrone): every one of its types (allTypes) is a permanent type.
     const types = spec?.types?.length ? spec.types : spec?.allTypes ?? [];
     // "Target card named Rekindling Phoenix" (its token's ability): the card that made the token, a permanent card.

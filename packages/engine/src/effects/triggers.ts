@@ -1393,6 +1393,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           for (const p of s.turnOrder)
             if (hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
               add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: p });
+          // Rigo: each planeswalker attacked too, its controller as "that player".
+          if (t.perWalker)
+            for (const w of [...new Set(hit.map(([x]) => obj(s, x).attackingPermanent?.id).filter((w): w is ObjectId => w !== undefined))])
+              if (s.objects[w] && objIsType(s, obj(s, w), "Planeswalker") && hit.filter(([x]) => obj(s, x).attackingPermanent?.id === w).length >= (t.minAttackers ?? 1))
+                add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: controllerOf(s, obj(s, w)) });
           continue;
         }
         add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), list, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
@@ -1644,6 +1649,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const wc = controllerOf(s, w);
         add(w, wc, (e, t) => e === "permanentIsDealtDamage" && !!t.dealtFilter && objectMatches(s, t.dealtFilter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       }
+      // "Until end of turn, whenever a creature an opponent controls is dealt damage, destroy it." (Green Dragon): a delayed
+      // trigger with a duration (CR 603.7b), that permanent the subject.
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentIsDealtDamage" && !!t.dealtFilter && objectMatches(s, t.dealtFilter, o, ctrl, false), triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }));
     }
   } else if (ev.type === "dealtDamageBySource") {
     const o = s.objects[ev.id];

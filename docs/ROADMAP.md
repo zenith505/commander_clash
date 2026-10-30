@@ -1,7 +1,7 @@
 # Roadmap
 
-27,918 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,145 of
+27,947 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1001,9 +1001,34 @@ line blocks.
    this creature's power" (Rootwire Amalgam); "when the tenth +1/+1 counter is put on" (Shang-Chi); "~ and target Frog
    you control" (Tatsunari); "permanent cards with cycling abilities" (Herald of the Forgotten). +26 (27,893 of 31,936
    with rounds 211 and 212 and B40-B43).
-   Out after round 213 (next fresh candidates, not looked at yet): Nurgle's Conscription, Dream Pillager, Mezzio Mugger,
-   Lidless Gaze, Shiko, Paragon of the Way, Tyrant of Discord. Aegis of the Legion still needs "whenever equipped
-   creature mentors a creature".
+   Out after round 213: Aegis of the Legion still needs "whenever equipped creature mentors a creature".
+   Round 214 took fresh cards from ranks 11,000 to 14,200: "exile the top card of each player's library. You may play
+   those cards" this turn or until the end of your next turn (Mezzio Mugger, Lidless Gaze); "exile that many cards from
+   the top of your library. Until end of turn, you may cast spells from among those exiled cards" (Dream Pillager);
+   "then exile that player's graveyard" for a card target (Nurgle's Conscription; Carrion Locust's "that player" too);
+   "chooses a permanent they control at random and sacrifices it. If a nonland permanent is sacrificed this way, repeat
+   this process" (Tyrant of Discord, new effect sacrificeRandom); "exile target ... from your graveyard. Copy it, then
+   you may cast the copy" (Shiko); the plural "Mice" (Flowerfoot Swordmaster); "whenever you attack a player or
+   planeswalker with one or more ...", once for each player and planeswalker attacked (Rigo); "put a +1/+1 counter on
+   each of them" after "whenever you attack with one or more Insects" (Vrestin); "the next creature card you play this
+   turn can be played as though it had flash" (Scout's Warning); "that player can't activate abilities that aren't mana
+   abilities" this turn (Abeyance, new turn rule noActivations); "cards in your graveyard [and you own in exile] that are
+   instant cards, sorcery cards, and/or have an Adventure" (Frantic Firebolt, Hearth Elemental, Candlekeep Inspiration,
+   Sailors' Bane); creature-type-only card targets returned to the battlefield and "its mana value" of that card (Queen's
+   Bay Paladin, Orah, Rot Hulk; Sister Hospitaller's life gain used its own mana value before); "target token you
+   control not named ~" in a reflexive trigger (Dutiful Replicator); "you may remove a counter from her. When you do"
+   (Leatherhead, Slumbering Walker); "choose a color, then that player reveals their hand and discards all cards of that
+   color" (Crosis, the Purger); "you may have Allies you control gain lifelink ..., and you may put a +1/+1 counter"
+   (Talus Paladin); "you may discard any number of land cards. Put that many +1/+1 counters on ~ and draw that many cards"
+   (Nantuko Cultivator); "that permanent's controller or that player creates" (Acorn Catapult); "you may exile it.
+   If you do, reveal cards ... until you reveal a creature card" (Gamekeeper); "until end of turn, whenever a creature
+   [an opponent controls] is dealt damage, destroy it" (Green Dragon, Shriveling Rot). +29 (27,947 of 31,936 with
+   rounds 211 to 213 and B40 to B44).
+   Out after round 214: Scout's Warning doesn't yet let a creature card be suspended at instant speed (its rulings say
+   it does). Next fresh candidates, looked at briefly or not at all: Renegade Bull ("up to one target" exile-and-copy),
+   Duel for Dominance, Startled Awake, Rites of Spring, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
+   Contagious Vorrac, Zaffai, The Eighth Doctor, Arcade Gannon, Mortarion, Wail of the Forgotten, Multiple Choice, Gor
+   Muldrak.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

@@ -974,6 +974,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
+    if (e.type === "removeAnyCounters" && typeof e.n === "number" && !e.upTo && !objects(s, e.what, ctx).some((o) => Object.values(o.counters).reduce((a, b) => a + Math.max(0, b ?? 0), 0) >= (e.n as number))) return false;
     // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
     if (e.type === "processExile" && processCandidates(s, ctx.controller).length < e.n) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;

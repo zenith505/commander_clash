@@ -6784,6 +6784,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else {
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
+    // Abeyance: this turn, in any zone (rulings).
+    if (turnRule(s, pid, "noActivations")) return "you can't activate abilities that aren't mana abilities this turn";
   }
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;

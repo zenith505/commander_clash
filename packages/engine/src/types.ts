@@ -1953,7 +1953,8 @@ export interface TurnRule {
    * of spells and abilities you control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too).
    */
   /** "noLoyalty": Revel in Silence's "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (CR 606.3). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty";
+  /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations";
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
 }

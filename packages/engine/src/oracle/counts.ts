@@ -43,6 +43,18 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const card = { kind: "card" as const, types: [], notTypes: [], notColors: [] };
     return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { ...card, anyOf: [{ ...card, subtypes: [m[1]!], text: `${m[1]} card` }, { ...card, named: "~", text: "card named ~" }], text: `${m[1]} card or card named ~` }, graveyardToo: true } };
   }
+  // Frantic Firebolt, Hearth Elemental: "the number of cards in your graveyard that are instant cards, sorcery cards,
+  // and/or have an Adventure"; Candlekeep Inspiration: "... cards you own in exile and in your graveyard that are instant
+  // cards, are sorcery cards, and/or have an Adventure" (face-up ones in exile); Sailors' Bane: "for each card you own in
+  // exile and in your graveyard that's an instant card, a sorcery card, or a card that has an Adventure". An adventurer
+  // card has an Adventure in every zone but the stack (rulings).
+  const advCards = each
+    ? /^card (you own in exile and )?in your graveyard that's an instant card, a sorcery card, or a card that has an Adventure$/.exec(p)
+    : /^(?:the number of )?cards (you own in exile and )?in your graveyard that are instant cards, (?:are )?sorcery cards, (?:and\/)?or have an Adventure$/i.exec(p);
+  if (advCards) {
+    const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], orAdventure: true, text: "instant or sorcery card or card that has an Adventure" };
+    return { count: advCards[1] ? { kind: "cardsInExile", who: { ref: "you" }, filter, graveyardToo: true } : { kind: "cardsInGraveyard", who: { ref: "you" }, filter } };
+  }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
@@ -957,6 +969,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "its" || x === "that creature's" || x === "that permanent's") {
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };
+    // Queen's Bay Paladin: "return up to one target Vampire card from your graveyard to the battlefield ... You lose life
+    // equal to its mana value": the one card targeted, not the permanent with the ability.
+    if (x === "its" && !ctx.spell && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && !ctx.targets[0]!.many && (ctx.targets[0]!.types?.includes("Creature") || ctx.targets[0]!.subtypes?.length)) return { ref: "target", index: 0 };
     // The permanent itself; after it left the battlefield, as it last existed (CR 608.2h).
     if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
     // "Return target creature card from your graveyard to the battlefield. You gain life equal to that creature's

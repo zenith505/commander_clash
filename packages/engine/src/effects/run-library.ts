@@ -18,6 +18,7 @@ import { defMv, sameName } from "../faces";
 import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
+import { dealDamage, objectSource } from "../damage";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
 function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
@@ -303,6 +304,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       log(s, `${p.name} reveals ${d.name} and puts it into their hand.`);
       moveObject(s, id, "hand");
       const n = defMv(d);
+      // Sarkhan the Mad: damage to itself, a planeswalker losing that much loyalty (CR 120.3c; rulings).
+      const me = e.selfDamage && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (me?.zone === "battlefield" && n > 0) {
+        const dealt = dealDamage(s, objectSource(s, me), { object: me }, n);
+        if (dealt) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false });
+      }
       if (!e.life || n <= 0) return;
       for (const pid of players(s, e.life.who, ctx)) {
         if (e.life.gain) gainLife(s, pid, n);
@@ -351,7 +358,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const rp = (sc0.randomPicks ??= Object.fromEntries(
           apnap(s, who).map((pid) => {
             const picked: ObjectId[] = [];
-            const pool = [...player(s, pid).hand];
+            // Rag Man: "discards a creature card at random": among those cards only.
+            const pool = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
             const n = nFor[pid] ?? 0;
             for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
             return [pid, picked];

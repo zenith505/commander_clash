@@ -304,6 +304,14 @@ function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
  * gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h). `here`: that
  * permanent is still on the battlefield as the same object.
  */
+/** Whose blocks a "blockHistory" ref is about: the object it remembers, or the source or target as it is now. */
+export function blockHistoryAt(s: GameState, ref: Extract<ObjRef, { ref: "blockHistory" }>, ctx: ResolveCtx): { id: ObjectId; zc: number } | undefined {
+  if (ref.at) return ref.at;
+  if (ref.of.ref === "self" && ctx.sourceId) return { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 };
+  const t = ref.of.ref === "target" ? ctx.targets[ref.of.index] : undefined;
+  return t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
+}
+
 function attachedHost(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number; here: boolean } | undefined {
   const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
   if (!me) return undefined;
@@ -461,6 +469,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
     const them = s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
     return ref.andSelf ? [me, ...them] : them;
+  }
+  if (ref.ref === "blockHistory") {
+    const at = blockHistoryAt(s, ref, ctx);
+    if (!at) return [];
+    const key = `${at.id}@${at.zc}`;
+    const with_ = new Set((s.turnLog?.blocks ?? []).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`));
   }
   if (ref.ref === "blockingIt") {
     const me = ref.subject ? objects(s, { ref: "subject" }, ctx)[0] : objects(s, { ref: "self" }, ctx)[0];
@@ -953,6 +968,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noPrevention":
     case "damageMod":
     case "pumpPerBlocker":
+    case "rememberGroup":
     case "draw":
     case "drawUpTo":
     case "getEnergy":

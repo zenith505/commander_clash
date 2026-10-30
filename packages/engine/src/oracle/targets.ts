@@ -368,7 +368,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Plague Wight: "Whenever ~ becomes blocked, each creature blocking it gets -1/-1 until end of turn"; Trailblazer's
   // Torch: "Whenever equipped creature becomes blocked, it deals 2 damage to each creature blocking it": the creatures
   // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
-  const blockingIt = !ctx.spell ? /^each creature blocking (~|it|that creature)$/i.exec(p.trim()) : null;
+  // Joven's Ferrets: "all creatures that blocked ~ this turn": declared blocking it this turn, even if they've left combat.
+  if (/^all creatures that blocked ~ this turn$/i.test(p.trim()) && !ctx.spell) return { ref: "blockHistory", of: { ref: "self" }, blockers: true };
+  // The Wretched: "gain control of all creatures blocking ~": the same.
+  const blockingIt = !ctx.spell ? /^(?:each creature|all creatures) blocking (~|it|that creature)$/i.exec(p.trim()) : null;
   if (blockingIt) {
     if (blockingIt[1] === "~" || (blockingIt[1] === "it" && ctx.selfIt && !ctx.subject && !ctx.subjectIt)) return { ref: "blockingIt" };
     return ctx.subject || ctx.subjectIt ? { ref: "blockingIt", subject: true } : null;
@@ -510,7 +513,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "target attacking creature and all Equipment attached to it".
   // Orzhov Charm: "target creature you control and all Auras you control attached to it": only the Auras you control.
   // Essence Reliquary: "another target permanent you control and all Auras you control attached to it".
-  const andAttached = /^(.*target (?:attacking )?(?:creatures?|permanent)(?: with [a-z ]+?| you control)?) and all (Auras|Equipment)( you control)? attached to (?:it|them|that creature)$/i.exec(x);
+  // Portal of Sanctuary: "target creature you control and each Aura attached to it".
+  const andAttached = /^(.*target (?:attacking )?(?:creatures?|permanent)(?: with [a-z ]+?| you control)?) and (?:all (Auras|Equipment)( you control)?|each (Aura)) attached to (?:it|them|that creature)$/i.exec(x);
+  // Word of Undoing: "target creature and all white Auras you own attached to it": only those Auras.
+  const andOwnAuras = !cards ? /^(target creature) and all (white|blue|black|red|green) Auras you own attached to it$/.exec(x) : null;
+  if (andOwnAuras) {
+    const t = parseObjectNow(andOwnAuras[1]!, ctx, cards);
+    if (t?.ref !== "target" || t.n || t.sameName || t.sharesColor) return null;
+    return { ...t, attachedToo: { filter: { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], colors: [COLOR_WORDS[andOwnAuras[2]!]!], owner: "you", text: `${andOwnAuras[2]} Aura you own` } } };
+  }
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
@@ -533,7 +544,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "attachedToSubject", filter: kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" } };
   }
   if ((andAttached || attachedThat) && !cards) {
-    const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
+    const kind = andAttached ? (andAttached[2] ?? `${andAttached[4]}s`) : attachedThat![1]!;
     const filter: TargetSpec = kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
     if (attachedThat) {
       const i = ctx.targets.length - 1;
@@ -1568,6 +1579,10 @@ export function parseTargetPhrase(
   // "Another creature you control with base power 1" (Rapid Augmenter).
   if ((m = / with base power (\d+)$/.exec(p))) {
     extra.basePower = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
+  if ((m = / whose power and toughness aren't equal$/.exec(p))) {
+    extra.ptUnequal = true;
     p = p.slice(0, m.index);
   }
   if ((m = / (?:with toughness greater than (?:its|their) power|that each have toughness greater than their power)$/.exec(p))) {

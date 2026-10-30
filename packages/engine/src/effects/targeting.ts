@@ -179,6 +179,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!c.types.includes("Creature") || (set ? set.power : c.printedPower) !== spec.basePower) return false;
   }
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
+  if (spec.ptUnequal && !(c.types.includes("Creature") && toughness(s, o) !== power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
@@ -403,7 +404,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.ptUnequal || spec.colorOfYourLegend) return false;
   return true;
 }
 
@@ -1120,6 +1121,15 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const tied = all.filter((id) => stat(id) === min);
     const can = e.destroyable ? tied.filter((id) => !objHasKeyword(s, obj(s, id), "Indestructible")) : tied;
     return can;
+  }
+  // Curse Artifact: "unless they sacrifice that artifact": the one the source is attached to.
+  if (e.filter.sourceHost) {
+    const { sourceHost: _, ...filter } = e.filter;
+    // As the source last existed if it has left (CR 608.2h): the permanent it was attached to, if that one is still there.
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const was = me?.zone === "battlefield" ? (me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined) : sourceId ? s.lastKnown?.[sourceId]?.attachedTo : undefined;
+    const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? was.id : undefined;
+    return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => id === host);
   }
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {

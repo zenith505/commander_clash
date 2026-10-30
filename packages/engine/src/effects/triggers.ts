@@ -137,6 +137,8 @@ export type TriggerSourceEvent =
   /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
   /** An Aura or Equipment that stays on the battlefield became unattached from `host` (moved, or unattached). */
   | { type: "unattached"; id: ObjectId; host: ObjectId }
+  /** An Aura or Equipment became attached to `host`: entering attached, or attached by an effect (CR 701.3a). */
+  | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
@@ -317,6 +319,7 @@ function diesMatches(
   // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
   if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
+  if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
     if (d.orSelf) return true;
     if (d.other) return false;
@@ -705,11 +708,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems(entersWatch);
     // "This turn, whenever a creature or enchantment you control enters" (Rite of Harmony; CR 603.7b).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, src, entering, ctrl), triggers, undefined, entering));
+    // Brood Keeper: an Aura entering attached to it becomes attached to it (rulings).
+    const host = entering.attachedTo ? s.objects[entering.attachedTo] : undefined;
+    if (host?.zone === "battlefield" && characteristics(s, entering).subtypes.includes("Aura")) add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, entering);
     locked = null;
     causedBy = null;
   } else if (ev.type === "controlChanged") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
+  } else if (ev.type === "attached") {
+    // "Whenever an Aura becomes attached to ~" (Brood Keeper): the host's controller's trigger, about the Aura.
+    const o = s.objects[ev.id];
+    const host = s.objects[ev.host];
+    if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && characteristics(s, o).subtypes.includes("Aura")) add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, o);
   } else if (ev.type === "unattached") {
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
@@ -2123,6 +2134,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (d.thisTurn !== s.turn) s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
+      // "At this turn's next end of combat" (Venomous Breath): none came this turn, so none will.
+      if (d.when === "endOfCombat" && d.thisTurn !== undefined && d.thisTurn !== s.turn) {
+        s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       // "That combat" never came this turn: it never will.
       if (d.when === "thatCombat" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
@@ -2137,6 +2153,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "beginCombat" && !(d.turn === s.turn && d.step === "beginCombat")
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
+          : d.when === "yourNextTurnEndStep"
+          ? ev.step === "end" && ev.active === d.controller && d.turn < s.turn
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"
           ? ev.step === "end" && ev.active === (d.when === "playersNextEndStep" ? d.player : d.controller) && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "endOfCombat"

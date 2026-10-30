@@ -658,7 +658,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "mostCreatures": {
       const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), ref.lands ? "Land" : "Creature")).length;
-      const most = Math.max(0, ...livingPlayers(s).map(n));
+      const most = ref.fewest ? Math.min(...livingPlayers(s).map(n)) : Math.max(0, ...livingPlayers(s).map(n));
       return apnap(s, livingPlayers(s).filter((p) => n(p) === most));
     }
     case "uniqueMost": {

@@ -357,7 +357,9 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
       continue;
     }
     const taken = new Set(Object.values(yp.picked).flat());
-    const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && isPermanentCard(defOf(s, obj(s, id))));
+    // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
+    const toHand = e.dest === undefined;
+    const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
     const max = Math.min(e.n, cards.length);
     // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
     if ((!e.upTo && cards.length <= e.n) || !cards.length) {
@@ -369,12 +371,19 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : e.fromYours ? ` in ${player(s, ctx.controller).name}'s graveyard` : "";
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
+    const what = e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: toHand ? "hand" : "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
   // Each under its owner's control, or all under yours when you chose them (Breach the Multiverse, CR 110.2a).
   const moves = Object.entries(yp.picked).flatMap(([pid, ids]) => ids.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, pid: Number(pid) as PlayerId })));
+  // Ill-Gotten Gains: each into its owner's hand, all at the same time.
+  if (e.dest === undefined) {
+    for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to their hand.`);
+    for (const { id } of moves) moveObject(s, id, "hand");
+    return;
+  }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
   for (const { id, pid } of moves) log(s, e.youChoose || e.underYours ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller || e.fromYours ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
   enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}) })));

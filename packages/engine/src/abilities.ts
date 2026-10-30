@@ -1244,8 +1244,8 @@ export type PlayerRef =
   | { ref: "subjectControllerOpponents" }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
-  /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. `lands`: "the most lands" (Tectonic Hellion). */
-  | { ref: "mostCreatures"; lands?: true }
+  /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. `lands`: "the most lands" (Tectonic Hellion). `fewest`: "the fewest creatures" (Gor Muldrak, Amphinologist), every player tied for the fewest. */
+  | { ref: "mostCreatures"; lands?: true; fewest?: true }
   /** "Each player other than target player" (Death by Dragons): every player but the target, if it's still legal (CR 608.2b). */
   | { ref: "otherThanTarget"; index: number }
   /** "The player who controls the most Wizards" (Thoughtbound Primoc): the one player with the most, none if two or more tie (rulings on Sokenzan Renegade). */
@@ -3917,7 +3917,7 @@ export type SpellCondition =
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
    */
-  | { kind: "rollIn"; min?: number; max?: number; event?: true; /** "If the result is greater than the damage dealt or the result is 12" (Sword of Hours): above the trigger's event amount, or at least `min`. */ aboveEvent?: true }
+  | { kind: "rollIn"; min?: number; max?: number; event?: true; /** "If any of those results was 10 or higher" (Farideh, Devil's Chosen): the highest die of the trigger's roll (TriggerEventInfo.rollMax). */ eventMax?: true; /** "If the result is greater than the damage dealt or the result is 12" (Sword of Hours): above the trigger's event amount, or at least `min`. */ aboveEvent?: true }
   /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
   | { kind: "noneAttackedYou" }
   /** "If they didn't attack you that turn" (Faramir, Prince of Ithilien): the event player attacked you (not your planeswalkers or battles, rulings) with a creature this turn; `not`: didn't. */
@@ -4015,6 +4015,10 @@ export type SpellCondition =
   | { kind: "targetWasYours"; index: number }
   /** "Target player gets two rad counters. If that player is you, ..." (The Ghoul, Gunslinger): target player `index` is the ability's controller (and still a legal target). */
   | { kind: "targetPlayerIsYou"; index: number }
+  /** "Choose target opponent. If they lost life this turn, ..." (Thought-Stalker Warlock): target player `index` is legal and lost life this turn (not a net change, rulings). */
+  | { kind: "targetPlayerLostLife"; index: number }
+  /** "If that creature was cast for its warp cost" (Full Bore): target `index` is legal and is a permanent whose spell was cast for its warp cost (CR 702.185a). */
+  | { kind: "targetWarped"; index: number }
   /**
    * "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze): the target card `index`, by its
    * printed characteristics, which are the ones it had in the graveyard (CR 608.2h).
@@ -6093,6 +6097,8 @@ export interface CompiledCard {
   youHaveIf?: StaticCondition;
   /** Serra's Emissary: its controller has protection from the card type chosen as it entered (CR 702.16b). */
   youProtectedFromChosenType?: true;
+  /** "You and permanents you control have protection from Salamanders" (Gor Muldrak, Amphinologist): its controller has this protection keyword (CR 702.16b, 702.16e); the permanents get it from a static ability. */
+  youProtectionFrom?: string;
   /**
    * Elvish Refueler: "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate
    * exhaust abilities as though they haven't been activated" (CR 702.177b): see Player.exhaustTurn.

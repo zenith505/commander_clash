@@ -8593,6 +8593,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c88eff74-def5-42ea-873c-b3b479f6fe18",
+  "name": "Ill-Gotten Gains",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile Ill-Gotten Gains. Each player discards their hand, then returns up to three cards from their graveyard to their hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac2b3adb-45bb-4f56-9d52-e08771164b35",
   "name": "Imperial Edict",
   "manaCost": "{1}{B}",

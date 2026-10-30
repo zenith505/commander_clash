@@ -1972,6 +1972,8 @@ export interface AttackCostDue {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Whenever you roll one or more dice": the highest of the dice's results ("if any of those results was 10 or higher", Farideh). */
+  rollMax?: number;
   /** A "whenever you clash" trigger: whether that player won that clash ("If you won, ...", CR 701.30d). */
   wonClash?: boolean;
   /** "One or more opponents lose life": the life loss event it triggered on (lifeLost's batch). */

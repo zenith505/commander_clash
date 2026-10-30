@@ -423,6 +423,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[3] && !m[2]) return null;
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { [m[6]!]: num(m[5]!) } } : {}) }];
   }
+  // Startled Awake: "{3}{U}{U}: Put ~ from your graveyard onto the battlefield transformed": its back face up (CR 712.14a),
+  // under your control (CR 110.2a).
+  if (ctx.selfCard && ctx.activated && /^Put ~ from your graveyard onto the battlefield transformed$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, transformed: true }];
   // Sandman, Shifting Scoundrel: "{3}{G}{G}: Return ~ and target land card from your graveyard to the battlefield tapped":
   // the card and the target enter at the same time (CR 608.2c); with the target illegal the ability doesn't resolve, so
   // the card stays too (CR 608.2b).
@@ -570,6 +573,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter ? [{ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", filter, who: { ref: "eachOpponent" } }] : null;
   }
+  // Ill-Gotten Gains: "Each player ... returns up to three cards from their graveyard to their hand": each chooses their own
+  // as it resolves (fewer if they want, rulings), in APNAP order, all returned together.
+  if ((m = /^[Ee]ach player returns up to (one|two|three) cards from their graveyard to their hand$/.exec(s))) return [{ type: "chooseFromGraveyard", n: num(m[1]!), upTo: true, who: { ref: "eachPlayer" } }];
   // Fall of the Thran: "Each player returns two land cards from their graveyard to the battlefield": each chooses their own
   // as it resolves, all at the same time, the one card if they have only one (rulings).
   if ((m = /^[Ee]ach player returns (an?|two|three) land cards? from their graveyard to the battlefield$/.exec(s)))

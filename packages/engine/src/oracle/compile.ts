@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -611,7 +611,9 @@ export function compile(d: CardDef): CompiledCard {
         }
         // Let's Play a Game: "Delirium — Choose one. If there are four or more card types among cards in your graveyard,
         // choose one or more instead.": checked as the modes are chosen while it's cast (CR 601.2b), one to all of them.
-        const anyIf = isSpell ? /^(?:Delirium — )?Choose one\. If (there are four or more card types among cards in your graveyard), choose one or more instead\.$/.exec(l.trim()) : null;
+        // Wail of the Forgotten: "Descend 8 — Choose one. If there are eight or more permanent cards in your graveyard as you
+        // cast ~, choose one or more instead." the same (descend N is an ability word, rulings).
+        const anyIf = isSpell ? /^(?:Delirium — |Descend 8 — )?Choose one\. If (there are four or more card types among cards in your graveyard|there are eight or more permanent cards in your graveyard)(?: as you cast ~)?, choose one or more instead\.$/.exec(l.trim()) : null;
         if (anyIf) {
           both = "control";
           bothIf = `?${anyIf[1]}`;
@@ -2368,6 +2370,15 @@ export function compile(d: CardDef): CompiledCard {
       for (const st of youAndSt) out.statics.push({ ...st!, text: line });
       continue;
     }
+    // Gor Muldrak, Amphinologist: "You and permanents you control have protection from Salamanders." (CR 702.16b, 702.16e):
+    // you have it, and the permanents get it from a static ability.
+    const youAndProt = /^You and permanents you control have protection from ([A-Z][a-z]+)\.$/.exec(line);
+    const youAndProtSt = youAndProt && creatureTypeOfPlural(youAndProt[1]!) && !out.youProtectionFrom ? parseStatic(`Permanents you control have protection from ${youAndProt[1]}.`) : null;
+    if (youAndProt && youAndProtSt) {
+      out.youProtectionFrom = `Protection from ${youAndProt[1]}`;
+      out.statics.push({ ...youAndProtSt, text: line });
+      continue;
+    }
     // Serra's Emissary: "You and creatures you control have protection from the chosen card type." (CR 702.16a, 702.16b).
     if (line === "You and creatures you control have protection from the chosen card type." && out.entersChoose?.some((c) => c.what === "cardType") && !out.youProtectedFromChosenType) {
       const st = parseStatic("Creatures you control have hexproof.");
@@ -2625,7 +2636,9 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
-    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line);
+    // Auriok Steelshaper: "Equip costs you pay cost {1} less." is the older wording of the same (CR 702.6a: equip is an
+    // activated ability, its cost the equip cost).
+    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line.replace(/^Equip costs you pay cost (\{\d+\}) less\.$/, "Equip abilities you activate cost $1 less to activate."));
     if (equipLess) {
       (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
       continue;
@@ -4384,7 +4397,7 @@ export function compile(d: CardDef): CompiledCard {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
     const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes";
+    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes" || cond?.kind === "graveyardPermanents";
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
@@ -5032,7 +5045,8 @@ function joinModes(lines: string[]): string[] {
     const prev = out[out.length - 1];
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
-    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead)?\.$/i.test(prev);
+    // Glorfindel, Dauntless Rescuer: "..., choose one and ~ gets +1/+1 until end of turn." too.
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
     else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);

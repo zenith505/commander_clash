@@ -1,6 +1,6 @@
 # Roadmap
 
-28,001 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,026 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
 9,979 (91%).
 
@@ -1057,6 +1057,30 @@ line blocks.
    Duel for Dominance, Startled Awake, Rites of Spring, Borrowed Knowledge, Thought-Stalker Warlock, Embermouth Sentinel,
    Contagious Vorrac, Zaffai, The Eighth Doctor, Arcade Gannon, Mortarion, Wail of the Forgotten, Multiple Choice, Gor
    Muldrak.
+   Round 216 took fresh cards from EDHREC rank 14,000 on: "costs {G} less to cast for each green creature you control"
+   (Khalni Hydra, CompiledCard.costLessEachColored); "costs {3} more to cast if it targets a creature" (Vanish into
+   Eternity); "{1} less ... if you control an artifact and {1} less ... if you control an enchantment" (Assassin's Ink);
+   "for each spell your opponents have cast this turn" (Delightful Discovery); "If a permanent was returned this way"
+   (Nurturing Pixie); "another target permanent you control and all Auras you control attached to it" (Essence
+   Reliquary); "When you draw your third card in a turn" (Sneaky Snacker); "mill three cards for each time it was kicked"
+   as it enters (Urborg Lhurgoyf, entersMillPerKick); "Whenever a player loses the game" and "a counter for each 1 life
+   lost this way" (Blood Tyrant); "Whenever an opponent attacks a planeswalker you control with one or more creatures",
+   once for each planeswalker attacked (Oath of Kaya); "Its controller gains control of ~" (Act of Authority); "When this
+   ability resolves for the third time this turn" (Gimli, Mournful Avenger); "by sources of the color of your choice" to
+   one target (Avacyn, Guardian Angel); "Whenever equipped creature attacks the player with the most life" (Seraphic
+   Greatsword); "you may attach ~ to target creature" (Magitek Scythe); "If it's a Spacecraft, put N charge counters on
+   it. If you do, remove them at the beginning of the next end step" (Systems Override); a Sculpture Treasure artifact
+   creature token (Vraska, Soul of Stone); "If it's your turn ... Otherwise" (Stolen Vitality); "sacrifices it, then
+   creates X 1/1 tokens" (Mercy Killing); "if there are three or more basic land types among lands you control" (Path to
+   the Festival); "permanents you control that are creatures and/or Vehicles" (Collision Course); "enchanted creature is
+   a Wolf or Werewolf" (Howl of the Hunt); "you may put a charge counter on ~. If you do" (Sphinx-Bone Wand); "draw cards
+   equal to that creature's power and you lose life equal to that creature's toughness" (Greven, Predator Captain); "If a
+   player is dealt damage this way, they discard a card" (Sonic Shrieker). +25 (28,026 of 31,936).
+   Out after round 216 (looked at, not done): Thelon of Havenwood ("Exile a Fungus card from a graveyard" as a cost from
+   any graveyard needs a cost picker); Wicked Slumber ("either of them" needs a new choice); Mercadia's Downfall (the
+   defending player differs per attacker); Surestrike Trident (a granted ability that names its source); Tamiyo,
+   Inquisitive Student; Demilich (casting from the graveyard by exiling four instants and sorceries). Next fresh
+   candidates are still the ones listed after round 215.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

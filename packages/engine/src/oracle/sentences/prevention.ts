@@ -176,9 +176,12 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const t = rest.replace(/ ?\bthis turn\b ?/i, " ").trim();
     const parts = /^(?:to (.+?))?(?: ?by (.+))?$/i.exec(t);
     if (!parts || (!parts[1] && !parts[2])) return undefined;
-    if (parts[1] && /^(~|it|him|her|that creature|those creatures|(?:another )?target .+|up to .+|any target|enchanted .+|equipped .+)$/i.test(parts[1])) return undefined;
+    // Avacyn, Guardian Angel: "to another target creature this turn by sources of the chosen color": a target, with the
+    // sources a group.
+    const targetBy = !!parts[1] && /^(?:another )?target [a-z ]+$/i.test(parts[1]) && parts[2] === "sources of the chosen color";
+    if (parts[1] && !targetBy && /^(~|it|him|her|that creature|those creatures|(?:another )?target .+|up to .+|any target|enchanted .+|equipped .+)$/i.test(parts[1])) return undefined;
     if (parts[2] && /^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(parts[2])) return undefined;
-    const to = parts[1] ? protectedGroup(parts[1]) : undefined;
+    const to = targetBy ? ((r) => (r ? { target: r } : null))(parseDamageRecipient(parts[1]!, ctx)) : parts[1] ? protectedGroup(parts[1]) : undefined;
     const by = parts[2] ? sourceGroup(parts[2]) : undefined;
     if (to === null || by === null) return null;
     const combat = m[1] ? (m[1].trim().toLowerCase() === "combat" ? "only" : "non") : undefined;

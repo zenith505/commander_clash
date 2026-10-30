@@ -319,7 +319,7 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true; /** "Each spell you've cast this turn other than the first" (Outlaw Stitcher): one fewer, never less than 0. */ beyondFirst?: true }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** "Spells your opponents have cast this turn" (Delightful Discovery): your opponents' only. */ opponents?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true; /** "Each spell you've cast this turn other than the first" (Outlaw Stitcher): one fewer, never less than 0. */ beyondFirst?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true; /** "The greatest mana value among instant and sorcery spells you've cast this turn" (Rootha, Mastering the Moment): the greatest of them, not the total; `filter` by the cards cast. */ greatest?: true; filter?: TargetSpec }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -4663,7 +4663,7 @@ export interface TriggeredAbility {
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
   anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
-  attacksYou?: { min: number; orPlaneswalkers?: true; /** With `orPlaneswalkers`: "attacks one or more planeswalkers you control" (Mila, Crafty Companion), not you. */ walkersOnly?: true; /** Mangara's intervening "if two or more of those creatures are attacking you": checked again as it resolves (CR 603.4). */ recheck?: true };
+  attacksYou?: { min: number; orPlaneswalkers?: true; /** With `orPlaneswalkers`: "attacks one or more planeswalkers you control" (Mila, Crafty Companion), not you. */ walkersOnly?: true; /** With `walkersOnly`: once for each planeswalker attacked (Oath of Kaya). */ perWalker?: true; /** Mangara's intervening "if two or more of those creatures are attacking you": checked again as it resolves (CR 603.4). */ recheck?: true };
   /**
    * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
@@ -5589,6 +5589,8 @@ export interface CompiledCard {
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */
   entersDiscardHand?: true;
+  /** Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked" (rulings: no trigger, CR 614.1c). */
+  entersMillPerKick?: number;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
@@ -6482,6 +6484,8 @@ export interface CompiledCard {
    * (CR 702.41a): each amount comes off the generic mana of its total cost (CR 601.2f).
    */
   costLess?: Amount[];
+  /** Khalni Hydra: "~ costs {G} less to cast for each green creature you control": that color first, then generic (rulings). */
+  costLessEachColored?: { color: Color; count: Amount }[];
   /** "This spell costs {2} less to cast if you control a Wizard": the reduction while the condition holds. */
   /** A negative `n` costs that much more (Hurkyl's Final Meditation); `colored` takes off colored mana too (Discontinuity). */
   costLessIf?: { n: number; cond: StaticCondition; colored?: Color[] }[];

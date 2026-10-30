@@ -9116,7 +9116,12 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
-  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };
+  const kinds = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.kinds : {}) };
+  for (const a of attacks) {
+    const c = characteristics(s, obj(s, a.attacker));
+    kinds[`${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
+  }
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };

@@ -538,14 +538,17 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature blocks" (anyone's), "Whenever a Rat you control becomes blocked": "it" and "that creature" are
   // that creature, once for each (CR 509.3a, 509.3c).
   // "Whenever a creature you control blocks" (Noble Stand), "... with defender blocks" (Perimeter Captain): yours only.
-  const other = /^Whenever (an?) ((?:[a-z]+ )?creature(?: you control)?(?: with [a-z]+)?) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line);
+  // Spined Sliver: "Whenever a Sliver becomes blocked, that Sliver gets ...": anyone's Sliver, "that Sliver" being it.
+  const anyones = /^Whenever an? ([A-Z][a-z]+) becomes blocked, (.+)$/.exec(line);
+  const other = /^Whenever (an?) ((?:[a-z]+ )?creature(?: you control)?(?: with [a-z]+)?) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line) ?? (anyones && CREATURE_TYPES.has(anyones[1]!) ? ["", "a", anyones[1]!, anyones[2]!.replace(new RegExp(`\\bthat ${anyones[1]}\\b(?!'s)`, "g"), "it")] : null);
   if (other) {
     const blocks = / blocks, /.test(line);
     const filter = parseTargetPhrase(other[2]!);
     if (!filter || filter.kind !== "object" || (filter.controller && !(blocks && filter.controller === "you")) || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
     const body = parseBody(other[3]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
     if (!body) return "fail";
-    return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(blocks ? {} : { controller: "you" as const }), text: blocks ? other[2]! : `${other[2]} you control` } };
+    const yours = !blocks && !anyones;
+    return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(yours ? { controller: "you" as const } : {}), text: yours ? `${other[2]} you control` : other[2]! } };
   }
   // Lairwatch Giant: "Whenever ~ blocks two or more creatures": as blockers are declared, once (CR 509.3a, 509.1). Nothing
   // here makes a creature block more creatures later.
@@ -1174,7 +1177,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     return { event: "permanentDies", dies: { filter, attached: true, ...(attachedM![3] !== "dies" ? { leaves: true as const, ...toZones } : {}) }, body };
   }
   let phrase = m![2]!;
-  const damaged = / dealt damage by ~ this turn$/.exec(phrase);
+  // Unscythe: "a creature dealt damage by equipped creature this turn": the creature it's attached to as the other dies,
+  // whenever that damage was dealt (rulings).
+  const damaged = / dealt damage by (~|equipped creature) this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
   // "A creature of the chosen type" (Species Specialist): the type chosen as the watcher entered.
   const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, / of the chosen type$/.test(phrase) ? { chosen: true } : undefined);
@@ -1191,7 +1196,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       filter: { ...filter, ...had, ...wasRange, ...attachedStatus, text: wasAttached ? `${phrase} that was ${wasAttached[1]}` : hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : wasPT ? `${phrase} with ${wasPT[1]} ${wasPT[0].slice(`if its ${wasPT[1]} was `.length, wasPT[0].length - wasPT[6]!.length - 2)}` : phrase },
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
-      ...(damaged ? { damagedBySelf: true } : {}),
+      ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
       ...(leaves ? { leaves: true as const } : {}),
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
@@ -1555,6 +1560,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     selfOrCommander = true;
     line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
   }
+  // W'Kabi, Shield of the Nation: "Whenever you attack with your commander": once for the attack, if a commander you own
+  // (CR 903.3) is among the creatures you attacked with.
+  const withYourCommander = /^Whenever you attack with your commander, /.exec(line);
+  if (withYourCommander) line = `Whenever you attack, ${line.slice(withYourCommander[0].length)}`;
   // "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): once for the attack, if the
   // creatures attacking add up to that much power as they're declared.
   let minTotalPower: number | undefined;
@@ -1564,7 +1573,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     line = `Whenever you attack, ${line.slice(totalPower[0].length)}`;
   }
   // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
-  line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
+  // Teo, Spirited Glider: "Whenever one or more creatures you control with flying attack".
+  line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater|with flying) attack, /, "$1 $3 $2 attack, ");
   if ((m = /^Whenever one or more (creatures that are enchanted by an Aura you control) attack, (.+)$/.exec(line))) {
     // Killian, Decisive Mentor: whoever attacks with them (the Aura yours, the creature anyone's), once for each
     // declaration of attackers (CR 508.1, 603.2c).
@@ -1710,7 +1720,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // attackers of that declaration.
   // Aloy, Savior of Meridian: "discover X, where X is the greatest power among them": the attackers of the group.
   if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.");
-  const those = event === "creaturesYouControlAttack" && !(anyone && min) && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
+  // Vulture, Feathered Fiend: "Whenever one or more creatures you control with flying deal combat damage to a player, put a
+  // +1/+1 counter on each of those creatures": the ones that dealt that player combat damage.
+  const dealtThose = event === "creaturesYouControlDealCombatDamageToPlayer" && /^put an? \+1\/\+1 counter on each of those creatures and draw a card\.?$/.test(bodyText);
+  const those = (event === "creaturesYouControlAttack" || dealtThose) && !(anyone && min) && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
   if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
@@ -1725,6 +1738,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }
+  if (withYourCommander) group = { kind: "object", commander: true, owner: "you", text: "your commander" };
   let text = bodyText;
   // "Draw that many cards" (The Ur-Dragon), "search your library for up to that many basic land cards" (The Earth King):
   // how many of the matching creatures attacked, as they were declared.

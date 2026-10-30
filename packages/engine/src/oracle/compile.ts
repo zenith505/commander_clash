@@ -528,6 +528,11 @@ export function compile(d: CardDef): CompiledCard {
       // Guan Yu, Sainted Warrior: "When ~ is put into your graveyard from the battlefield, you may shuffle ~ into your
       // library": a card goes to its owner's graveyard (CR 400.3), so "your" library is its owner's.
       .replace(/^(When ~ is put into your graveyard from the battlefield, you may shuffle ~ into) your library\.$/m, "$1 its owner's library.")
+      // Soul Tithe: "that player sacrifices it unless they pay {X}, where X is its mana value": "it" is the enchanted permanent.
+      .replace(/^(At the beginning of the upkeep of enchanted permanent's controller, that player sacrifices) it unless they pay \{X\}, where X is its mana value\.$/m, "$1 enchanted permanent unless they pay mana equal to its mana value.")
+      // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
+      // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
+      .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
@@ -4119,7 +4124,7 @@ export function compile(d: CardDef): CompiledCard {
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^When target creature dies this turn, /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

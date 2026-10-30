@@ -1,7 +1,7 @@
 # Roadmap
 
-28,026 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
+28,054 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,148 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3045,9 +3045,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rivals' Duel (two targets that share no creature type), Culling Scales (a target with the lowest mana value), Loyal
   Sentry ("destroy that creature and ~" at once), Gladewalker Ritualist ("another creature you control named ~"),
   Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (each needs a new mechanic).
-- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Colfenor's Plans, Wight, Nivix, Szadek,
-  Rain of Gore, Infernal Darkness, Pako, Goddric. Then the unsupported ones above that, least played first
-  (`npm run popular -- --least`).
+- Round B46 (harder skipped cards, least played first): "a creature dealt damage by ~ / equipped creature this turn
+  dies" (Wight, Unscythe, Scythe of the Wretched, which returns it with the Scythe attached) and "if ~ dealt damage to it
+  this turn" (Hawkeye), "When target creature dies this turn, return that card" (Graceful Reprieve), "Move a +1/+1
+  counter from target creature onto ~" (Cytoplast Root-Kin, Arcbound Fiend), "Exile ~ and all cards from all
+  graveyards" (Silent Gravestone), "whose power and toughness aren't equal" (Gilt-Leaf Winnower), "that player
+  sacrifices it unless they pay {X}, where X is its mana value" (Soul Tithe), "Whenever a Sliver / Beast becomes
+  blocked" (Spined Sliver, Berserk Murlodont), "reveal the top card ... put it into your hand. If you do, you lose life
+  equal to its mana value" (Stronghold Arena), keywords counted once among your creatures (Odric, Blood-Cursed), Sarkhan
+  the Mad (damage to himself; "sacrifices it, then that player creates"; each Dragon deals damage equal to its power),
+  "and each Aura attached to it" (Portal of Sanctuary), "create a token and attach ~ to it" (Auxiliary Boosters), "at
+  the beginning of the end step on your next turn" (Kav Landseeker), "Whenever you attack with your commander"
+  (W'Kabi), "protection from instant spells and from sorcery spells" (Devoted Caretaker), "if you control exactly
+  thirteen permanents, you may sacrifice ~. When you do" (Stensia Uprising), "creatures you control with flying attack"
+  (Teo), "put a +1/+1 counter on each of those creatures" after combat damage (Vulture, Heroes in a Half Shell), "total
+  power and toughness 5 or less" (Meek Attack), "That permanent's controller gains control of ~" (Starke of Rath),
+  "attacked with three or more Merfolk this turn" (Deepway Navigator, attackers' creature types are now remembered),
+  "creature with the greatest power ... You gain life equal to its power" (Consecrate // Consume). Fix: the card data
+  lists keywords that the text only names (Odric's list, Angelic Skirmisher's "choose first strike, vigilance, or
+  lifelink", Zur's "have deathtouch, lifelink"); a card now has such a keyword only from a line of keywords (21 cards).
+  +28 (28,054 of 31,936 with rounds 215 and 216).
+- Out after round B46 (looked at, not done): Sacred Ground (what caused a land to go to the graveyard), Colfenor's Plans
+  (playing cards exiled with it), Nivix ("until your next turn, you may cast it if it's an instant or sorcery"), Szadek
+  (combat damage replaced by counters and milling), Rain of Gore (life gain from spells and abilities turned into loss),
+  Infernal Darkness (mana from lands changed to {B}), Pako (fetch counters on exiled cards), Goddric (celebration makes
+  it a Dragon with a granted ability), Bend or Break (piles chosen by an opponent), Meandering Towershell (returns
+  attacking on your next turn), Diaochan (a target chosen by an opponent), Triton Tactics (creatures blocked by those
+  creatures), Blood Spatter Analysis ("Then sacrifice it if ... When you do").
+- Next for Lane B, least played first: the unsupported ones from about 18,400 up to 17,100 (`npm run popular --
+  --least`), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

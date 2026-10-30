@@ -3842,6 +3842,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         // "Each creature deals 1 damage to its controller": life off each player, by how many of them they control.
         if (e.what.ref !== "each" || e.to) break;
         const f = e.what.filter;
+        // Sarkhan the Mad: each one's power to the target, worth it at an opponent.
+        if (e.recipient) {
+          const t = "index" in e.recipient ? targets[e.recipient.index] : undefined;
+          const hurtsFoe = t?.kind === "player" ? t.id !== pid : t?.kind === "object" ? controllerOf(s, obj(s, t.id)) !== pid : false;
+          for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (hurtsFoe ? 1 : -1) * power(s, obj(s, id));
+          break;
+        }
         for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (controllerOf(s, obj(s, id)) === pid ? -1 : 1) * estimate(e.amount);
         break;
       }

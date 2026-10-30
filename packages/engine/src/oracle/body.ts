@@ -1223,6 +1223,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Tt]ap target untapped creature) and (that creature deals damage equal to its power to its controller)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Wartime Protestors: "put a +1/+1 counter on that creature and it gains haste until end of turn": two instructions about
   // the same creature.
+  // Sarkhan the Mad: "Target creature's controller sacrifices it, then that player creates ...": the player who controlled
+  // it, whether or not it could be sacrificed; nothing if it's an illegal target (rulings).
+  text = text.replace(/^(Target creature's controller sacrifices it), then that player (creates [^.]+)\.$/, "$1. That creature's controller $2.");
+  // Consume: "Target player sacrifices a creature with the greatest power among creatures they control. You gain life
+  // equal to its power": the sacrificed creature's, as it last existed (CR 608.2h).
+  text = text.replace(/^(Target player sacrifices a creature with the greatest power among creatures they control\.) You gain life equal to its power\.$/, "$1 You gain life equal to that creature's power.");
+  // Auxiliary Boosters: "create a 2/2 colorless Robot artifact creature token and attach ~ to it": the token, then the
+  // attachment, as "create ..., then attach ~ to it" (Bladehold War-Whip-style Equipment).
+  text = text.replace(/^(create an? [^.,]+? creature token) and attach ~ to it\.$/, "$1, then attach ~ to it.");
+  // Devoted Caretaker: "protection from instant spells and from sorcery spells": the same qualities as "from instants and
+  // from sorceries" (CR 702.16a): only those spells can't target it, and their damage is prevented (rulings).
+  text = text.replace(/\bgains protection from instant spells and from sorcery spells\b/, "gains protection from instants and from sorceries");
+  // Scythe of the Wretched: "return that card to the battlefield under your control. Attach ~ to that creature.": the
+  // permanent it became (CR 400.7), the same as "... and attach ~ to it" (Nim Deathmantle); not onto a noncreature (rulings).
+  text = text.replace(/^(return that card to the battlefield under your control)\. Attach ~ to that creature\.$/, "$1 and attach ~ to it.");
+  // Silent Gravestone: "Exile ~ and all cards from all graveyards": both at once; ~ goes to exile, not a graveyard.
+  text = text.replace(/^Exile ~ and all cards from all graveyards\./, "Exile ~. Exile all cards from all graveyards.");
   // Sinkhole Surveyor: "you lose 1 life and ~ endures 1" (CR 701.63a), one after the other.
   text = text.replace(/^(you lose \d+ life) and ~ endures (\d+)\.$/, "$1. ~ endures $2.");
   text = text.replace(/^(put a \+1\/\+1 counter on that creature) and it gains ([a-z]+) until end of turn\.$/, "$1. That creature gains $2 until end of turn.");
@@ -2878,6 +2895,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...d, effects: [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], combat: "attackedThisTurn", text: "permanent that attacked this turn" } }, effects: d.effects }], text: "Destroy that creature if it attacked this turn" });
       continue;
     }
+    // Kav Landseeker: "At the beginning of the end step on your next turn, sacrifice that token": yours, on a later turn.
+    const onNext = /^At the beginning of the end step on your next turn, (sacrifice that token)$/.exec(s);
+    if (onNext) s = "Sacrifice that token at the beginning of the end step on your next turn";
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
     if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
     // "Sacrifice any number of other permanents, then draw that many cards" (God-Eternal Bontu), "you may sacrifice any
@@ -5588,12 +5608,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "revealTopToHand", each: true });
       continue;
     }
+    // Stronghold Arena: "you may reveal the top card of your library and put it into your hand. If you do, you lose life
+    // equal to its mana value": decided without seeing the card first (rulings).
+    if (/^[Yy]ou may reveal the top card of your library and put it into your hand$/.test(s) && /^If you do, you lose life equal to its mana value$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "may", effects: [{ type: "revealTopToHand", life: { who: { ref: "you" } } }], text: "reveal the top card of your library and put it into your hand, losing life equal to its mana value" });
+      si++;
+      continue;
+    }
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
     // its mana value."
     if (/^[Rr]eveal the top card of your library and put (?:that card|it) into your hand$/.test(s)) {
       const next = sentences[si + 1]?.replace(/\.$/, "") ?? "";
       const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(next);
       const drain = /^Each opponent loses X life and you gain X life, where X is (?:its|that card's|the card's) mana value$/.test(next);
+      // Sarkhan the Mad: "~ deals damage to himself equal to that card's mana value".
+      if (/^~ deals damage to (?:himself|herself|itself) equal to that card's mana value$/.test(next) && !ctx.spell) {
+        effects.push({ type: "revealTopToHand", selfDamage: true });
+        si++;
+        continue;
+      }
       effects.push({ type: "revealTopToHand", ...(drain ? { life: { who: { ref: "eachOpponent" }, drain: true } } : life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
       if (life || drain) si++;
       continue;
@@ -9129,6 +9162,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Night), "you may discard a card. When you do, ..." : doing it triggers the reflexive ability (CR 603.12), so it's a
       // "you may" whose doing the engine can tell (see checkableMay).
       const mayDo = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.every(checkableMay) && effects.length >= 1;
+      // Stensia Uprising: "Then if you control exactly thirteen permanents, you may sacrifice ~. When you do, it deals 7
+      // damage to any target": the reflexive ability goes with the "you may" inside the "if"; "it" is ~ it sacrificed.
+      const ifMay = prev?.type === "if" && !prev.otherwise?.length && prev.effects.length === 1 && prev.effects[0]!.type === "may" ? prev.effects[0] : undefined;
+      if (ifMay?.type === "may" && prev?.type === "if" && !ifMay.pay && !ifMay.otherwise && ifMay.effects.length === 1 && ifMay.effects[0]!.type === "sacrifice" && ifMay.effects[0]!.what.ref === "self" && si + 1 === sentences.length) {
+        const reflexive = reflexiveBody(whenDo[1]!.replace(/^it deals /, "~ deals "), ctx, false, false, false);
+        if (!reflexive) return null;
+        effects.pop();
+        effects.push({ ...prev, effects: [ifMay, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] }] });
+        si = sentences.length;
+        continue;
+      }
       // "When ~ enters, sacrifice it. When you do, search ..." (Brokers Hideout), "At the beginning of your upkeep,
       // sacrifice ~. When you do, ..." (Smoke Bomb): done if ~ is still there as that object to be sacrificed (CR 400.7).
       const sacSelf = prev?.type === "sacrifice" && prev.what.ref === "self" && !prev.byController && !ctx.selfCard;

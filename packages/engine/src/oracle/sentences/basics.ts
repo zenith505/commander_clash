@@ -1249,6 +1249,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = parseObject(m[3]!, ctx);
     return what && isGroup(what) && to?.ref === "subject" ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), to }] : null;
   }
+  // Sarkhan the Mad: "Each Dragon creature you control deals damage equal to its power to target player or planeswalker":
+  // each one its own source, all at once, to the one target (rulings).
+  if ((m = /^[Ee]ach ([A-Z][a-z]+ creature you control) deals damage equal to its power to (target player or planeswalker)$/.exec(s))) {
+    const what = parseObject(`each ${m[1]}`, ctx);
+    const recipient = what && isGroup(what) ? parseDamageRecipient(m[2]!, ctx) : null;
+    return recipient ? [{ type: "eachDealsDamage", what: what!, amount: 0, ownPower: true, recipient }] : null;
+  }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
   if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
     const what = parseObject(m[1]!.toLowerCase(), ctx);

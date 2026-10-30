@@ -1,7 +1,7 @@
 import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
-import { CREATURE_TYPES } from "../keywords";
+import { CREATURE_TYPES, SUPPORTED_KEYWORDS, canonicalKeyword, type SupportedKeyword } from "../keywords";
 import { STARTING_LIFE } from "../types";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
@@ -660,6 +660,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   if (each && /^creature type among creatures you control$/i.test(p)) return count({ kind: "creatureTypesAmong" });
+  // Odric, Blood-Cursed: "the number of abilities from among flying, first strike, ... found among creatures you control":
+  // each one once, however many creatures have it (rulings).
+  if ((m = /^(?:the number of )?abilities from among ((?:[a-z ]+, )+and [a-z ]+) found among creatures you control$/i.exec(p))) {
+    const keywords = m[1]!.split(/, (?:and )?/).map((k) => canonicalKeyword(k));
+    return keywords.every((k) => k && SUPPORTED_KEYWORDS.includes(k as SupportedKeyword)) ? count({ kind: "keywordsAmong", keywords: keywords as string[] }) : null;
+  }
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });

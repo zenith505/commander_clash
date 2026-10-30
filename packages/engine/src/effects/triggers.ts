@@ -317,6 +317,7 @@ function diesMatches(
   // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
   if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
+  if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
     if (d.orSelf) return true;
     if (d.other) return false;
@@ -2127,6 +2128,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "beginCombat" && !(d.turn === s.turn && d.step === "beginCombat")
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
+          : d.when === "yourNextTurnEndStep"
+          ? ev.step === "end" && ev.active === d.controller && d.turn < s.turn
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"
           ? ev.step === "end" && ev.active === (d.when === "playersNextEndStep" ? d.player : d.controller) && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "endOfCombat"

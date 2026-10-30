@@ -313,6 +313,8 @@ export type Count =
   | { kind: "attachedToHost"; subtypes: string[] }
   /** "For each creature type among creatures you control" (Valiant Changeling): each type once; a creature with changeling has them all (CR 205.3m, 702.73a). */
   | { kind: "creatureTypesAmong" }
+  /** "The number of abilities from among flying, first strike, ... found among creatures you control" (Odric, Blood-Cursed): each listed keyword once if any creature you control has it, a "hexproof from" counting as hexproof (rulings). */
+  | { kind: "keywordsAmong"; keywords: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes"; /** Allied Strategies: "among lands they control", that player's. */ whose?: PlayerRef }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
@@ -531,6 +533,8 @@ export interface TargetSpec {
   basePower?: number;
   /** "With toughness greater than its power" (Fecund Greenshell): as it is now (as it enters, for an enters trigger). */
   toughnessAbovePower?: true;
+  /** "Whose power and toughness aren't equal" (Gilt-Leaf Winnower): as it is now. */
+  ptUnequal?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** For spells: "that wasn't cast from its owner's hand" (Wash Away); a copy was never cast. */
@@ -1863,7 +1867,7 @@ export type StaticCondition =
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
-  | { kind: "attackedWith"; n: number }
+  | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string }
   /** Pack tactics: "if you attacked with creatures with total power 6 or greater this combat": their total power as they were declared as attackers (PlayerState.attackPower; AFR release notes). */
   | { kind: "attackPower"; n: number }
   /** "If you lost life last turn" (First Response, Paladin of Atonement): during the turn before this one (GameState.lastTurn). */
@@ -2104,7 +2108,7 @@ export type Effect =
    * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
    * damage, all dealt at the same time (CR 120.3, 120.4).
    */
-  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController?: true; /** "Each Dragon you control deals 1 damage to that creature" (Sarkhan the Masterless): to this permanent instead, if it's still on the battlefield. */ to?: ObjRef }
+  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController?: true; /** Sarkhan the Mad: "Each Dragon creature you control deals damage equal to its power to target player or planeswalker": each one its own power as this resolves, to that target (`recipient`). */ ownPower?: true; recipient?: DamageRecipient; /** "Each Dragon you control deals 1 damage to that creature" (Sarkhan the Masterless): to this permanent instead, if it's still on the battlefield. */ to?: ObjRef }
   | { type: "draw"; who: PlayerRef; n: Amount }
   /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
   | { type: "drawUpTo"; who: PlayerRef; n: number; /** Truce: "For each card less than two a player draws this way, that player gains 2 life." */ shortLife?: number }
@@ -2668,7 +2672,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3065,7 +3069,7 @@ export type Effect =
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
-  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true }; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
+  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true }; /** Sarkhan the Mad: "~ deals damage to himself equal to that card's mana value", if it's still on the battlefield. */ selfDamage?: true; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
   /**
    * Keen Duelist, Parker Luck: two players each reveal the top card of their library, each loses life equal to the mana
    * value of the card the other revealed, then each puts the card they revealed into their hand.
@@ -4678,7 +4682,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").

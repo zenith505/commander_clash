@@ -1086,6 +1086,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
+  // Last Laugh: "Whenever a permanent other than ~ is put into a graveyard from the battlefield" is "another permanent".
+  line = line.replace(/^Whenever a permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another permanent is put into a graveyard from the battlefield, ");
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -2735,6 +2737,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${inYardReturn[1]}, you may return ~ from your graveyard to your hand.`);
     return t && t !== "fail" && t.zone === "graveyard" && t.event === "batch" && t.batch?.milled ? t : "fail";
   }
+  // Prized Amalgam: works only in the graveyard (CR 113.6m), with an intervening if about the creature that entered (CR
+  // 603.4); the delayed trigger returns this card only if it's still there, the same object (rulings, CR 400.7).
+  if (line === "Whenever a creature enters, if it entered from your graveyard or you cast it from your graveyard, return ~ from your graveyard to the battlefield tapped at the beginning of the next end step.") {
+    const t = parseTrigger("Whenever a creature enters, draw a card.");
+    if (!t || t === "fail" || t.event !== "permanentEnters") return "fail";
+    const text = "return ~ from your graveyard to the battlefield tapped at the beginning of the next end step.";
+    return { ...t, zone: "graveyard", ifCond: { kind: "subjectFromYourGraveyard" }, body: { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, tapped: true }], text: "return ~ from your graveyard to the battlefield tapped" }], text } };
+  }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
@@ -3132,6 +3142,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(youTurn[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
     return filter?.kind === "object" && body ? { event: "permanentTurnedFaceUp", tappedFilter: filter, turnedByYou: true, body } : "fail";
   }
+  // Norn's Inquisitor: "Whenever a permanent you control transforms into a Phyrexian, ...": it transformed or converted,
+  // either way, and is a Phyrexian right after (CR 701.27e, rulings); it's the subject.
+  const transformsInto = /^Whenever a permanent you control transforms into an? ([A-Z][a-z]+), (.+)$/.exec(line);
+  if (transformsInto) {
+    const filter = parseTargetPhrase(`${transformsInto[1]} permanent you control`);
+    const body = parseBody(transformsInto[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
+    return filter?.kind === "object" && filter.subtypes?.length === 1 && body ? { event: "permanentTransformsInto", tappedFilter: filter, body } : "fail";
+  }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);
   if (mutates) {
@@ -3377,9 +3395,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // or greater", Endangered Armodon: "When you control a creature with toughness 2 or less", Goblins of the Flarg: "When
   // you control a Dwarf". Drop of Honey: "When there are no creatures on the battlefield": anyone's; it's sacrificed even if
   // one is back by the time it resolves (rulings).
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
+  // Last Laugh: "When no creatures are on the battlefield" is the same.
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
-    const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }

@@ -1000,6 +1000,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
       return cond.not ? !cast : cast;
     }
+    case "subjectFromYourGraveyard": {
+      // A card can only be in its owner's graveyard; "you cast it": the spell's controller, who controls the permanent.
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.owner === you && (!!sub.enteredFromGraveyard || (!!sub.castFromGraveyard && sub.controller === you));
+    }
     case "subjectWasCast": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.wasCast;

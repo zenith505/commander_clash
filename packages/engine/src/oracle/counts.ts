@@ -37,6 +37,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const b = a && parseCount(m[2]!, ctx);
     return a && b && Object.keys(a).length === 1 && Object.keys(b).length === 1 ? { count: { kind: "difference", of: [a.count, b.count] } } : null;
   }
+  // Seize the Storm: "the number of cards with flashback you own in exile": face-up cards with a printed flashback.
+  if (!each && /^the number of cards with flashback you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Flashback"], text: "card with flashback" } } };
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
   // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named

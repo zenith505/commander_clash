@@ -1,7 +1,7 @@
 # Roadmap
 
-28,104 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,148 of
+28,122 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,154 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1107,6 +1107,34 @@ line blocks.
    died); Rites of Spring (Lane B's range); The Eighth Doctor; Arcade Gannon. Next fresh candidates, not looked at
    closely: Seize the Storm, Aberrant Mind Sorcerer, Key to the Side-Door, Prized Amalgam, Kathril, Aspect Warper,
    Super-Adaptoid, Zimone's Experiment, Bane, Lord of Darkness, Weftwalking, Last Laugh, Sanctuary Blade.
+   Round 218 took those fresh candidates and more: "creatures you control gain flying until end of turn if a creature
+   card in your graveyard has flying. The same is true for ..." (Bleeding Effect, addKeywords sharedAmongYours
+   "graveyard"); "If that creature has haste and ~ doesn't, put a haste counter on ~. Do the same for ..."
+   (Super-Adaptoid); a d20 table on a card target (Aberrant Mind Sorcerer); "You may reveal up to two creature and/or
+   land cards from among them ... Put all land cards revealed this way onto the battlefield tapped" (Zimone's
+   Experiment, dig landsOnto); "When no creatures are on the battlefield, sacrifice ~" and "a permanent other than ~"
+   (Last Laugh); "The first spell each player casts during each of their turns may be cast without paying its mana
+   cost" (Weftwalking, payZero eachPlayerFirst); "a creature card with equal or lesser toughness from your hand" (Bane,
+   Lord of Darkness); "cards with flashback you own in exile" (Seize the Storm); "Whenever a creature enters, if it
+   entered from your graveyard or you cast it from your graveyard, return this card from your graveyard" (Prized
+   Amalgam, StaticCondition subjectFromYourGraveyard); "If you don't put it onto the battlefield, put it into your hand"
+   (N'Yami-Class Mother Ship); "Once during each of your turns, you may cast an instant or sorcery spell from your hand
+   without paying its mana cost" (Zaffai and the Tempests); "cloak two of them" (Hide in Plain Sight); "You may cast a
+   ... spell from your graveyard with mana value less than or equal to that spell's mana value" without exiling it
+   (Counterpoint, castFromHand yardNoExile); "They gain control of ~" after "target opponent" (Pumpkin Bombs); "For
+   each player, choose friend or foe" (Pir's Whim, Virtus's Maneuver, Khorvath's Fury: eachChooses byYou, a new
+   friend-or-foe prompt for each player, e2e round218.spec.ts); "Whenever a permanent you control transforms into a
+   Phyrexian" (Norn's Inquisitor, trigger permanentTransformsInto, CR 701.27e). +18 (28,122 of 31,936 with Lane B rounds B46 and B47).
+   Out after round 218 (looked at, not done): Kathril, Aspect Warper (a counter per keyword, onto any creature,
+   including the hexproof-from variants per its rulings); Key to the Side-Door (a discard cost "with the same name as a
+   legendary permanent you control"); Sivriss, Nightmare Speaker (a per-opponent loop binding "that player"); Sanctuary
+   Blade (a color chosen each time it becomes attached); Eater of Virtue (keywords of the cards exiled with it); Life and
+   Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (tokens
+   "created with this enchantment" destroyed at each end step); Inferno of the Star Mounts ("when its power becomes 20
+   this way"); Anzrag's Rampage (put a creature card from among the exiled ones onto the battlefield, return it at end
+   step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
+   token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (a delayed trigger in which a
+   target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations; Unexplained Absence.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

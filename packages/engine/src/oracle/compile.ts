@@ -2526,8 +2526,22 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${lifeAlt[1]} spell` }))(spec), once: true, yourTurn: true, life: true };
       continue;
     }
+    // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
+    // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
+    const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);
+    if (onceFree) {
+      const spec = parseTargetPhrase(`${onceFree[1]} card from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${onceFree[1]} spell` }))(spec), once: true, yourTurn: true, fromHand: true };
+      continue;
+    }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
+      continue;
+    }
+    // Weftwalking: the same alternative cost of nothing (CR 118.9), for every player's first spell during their own turn.
+    if (line === "The first spell each player casts during each of their turns may be cast without paying its mana cost.") {
+      out.payZero = { eachPlayerFirst: true };
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {

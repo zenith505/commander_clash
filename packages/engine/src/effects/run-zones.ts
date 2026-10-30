@@ -1030,7 +1030,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // From the graveyard: "if that spell would be put into your graveyard, exile it instead" applies to the spell it became.
       if (sc.castFromHand === "cast" && e.fromGraveyard && sc.castFromYard) {
         const o = s.objects[sc.castFromYard];
-        if (o?.zone === "stack") o.exileIfToGraveyard = true;
+        if (o?.zone === "stack" && !e.yardNoExile) o.exileIfToGraveyard = true;
         sc.castFromYard = undefined;
       }
       if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
@@ -2292,7 +2292,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "chooseFromGraveyard": {
-      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent") return eachFromGraveyard(s, e, ctx, src);
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent" || e.who?.ref === "choseWord") return eachFromGraveyard(s, e, ctx, src);
       if (e.fromExile) {
         // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
         // Oblivion Sower: that player's face-up land cards in exile, onto the battlefield under your control.

@@ -1438,9 +1438,11 @@ export type Modification =
   /**
    * `sharedAmongYours`: "creatures you control gain first strike until end of turn if a creature you control has first
    * strike. The same is true for flying, ..." (Odric, Lunarch Marshal): of `keywords`, those a creature its controller
-   * controls has as it resolves, a variant such as hexproof from white included (rulings).
+   * controls has as it resolves, a variant such as hexproof from white included (rulings). `"graveyard"`: "... if a
+   * creature card in your graveyard has flying. The same is true for ..." (Bleeding Effect): those a creature card in
+   * its controller's graveyard has as it resolves.
    */
-  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true }
+  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -1712,6 +1714,8 @@ export type StaticCondition =
   | { kind: "subjectCastFromHand"; not?: true }
   /** Preston, the Vanisher: "if it wasn't cast", about the entering permanent (GameObject.wasCast). */
   | { kind: "subjectWasCast"; not?: true }
+  /** Prized Amalgam: "if it entered from your graveyard or you cast it from your graveyard", about the entering permanent (GameObject.enteredFromGraveyard, castFromGraveyard): one you own. */
+  | { kind: "subjectFromYourGraveyard" }
   /** "If it's the first time that creature has become tapped this turn" (Captain America, Living Legend): the trigger's subject, as the same object (GameObject.tapsThisTurn). */
   | { kind: "subjectFirstTapThisTurn" }
   /** "If its power was different from its base power" (Jason Bright, Glowing Prophet): the trigger's subject now, or as it last existed (CR 608.2h). */
@@ -2692,7 +2696,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
+  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true; /** "... from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead." (Sword of Once and Future): a card there, and the spell is exiled instead of going back. */ fromGraveyard?: true; /** With `fromGraveyard`: no "exile it instead" (Counterpoint). */ yardNoExile?: true; /** Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them": one of the cards this resolution milled, where they went (exile too, rulings). */ milled?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -3111,7 +3115,7 @@ export type Effect =
    * "Each opponent chooses fame or fortune" (Seize the Spotlight): each of `who`, in APNAP order and knowing the earlier
    * answers (CR 101.4), chooses one of the words; what they chose is kept for "for each player who chose ...". Not a vote.
    */
-  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string; /** "Secretly chooses ..., then the choices are revealed": none sees another's word until all have chosen. */ secret?: true }
+  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string; /** "Secretly chooses ..., then the choices are revealed": none sees another's word until all have chosen. */ secret?: true; /** "For each player, choose friend or foe" (Pir's Whim): its controller chooses the word for each of them. */ byYou?: true }
   /**
    * "Each opponent faces a villainous choice — A, or B" (CR 701.55): each of `who` in APNAP order chooses one of the two
    * options, then all of it is done, that player being the event player in it, before the next one chooses (701.55d).
@@ -3675,7 +3679,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; /** "Put X cards from among them into your hand" (Stargaze): `count` is the X it was cast with. */ countX?: true; /** Omarthis: "manifest a number of cards ... equal to ...": every card looked at (`count` unused). */ countAll?: true; /** "If ~ was kicked, put two of those cards into your hand instead": `count` when kicked (CR 702.33e). */ kickedCount?: number; /** "If there is an instant card and a sorcery card in your graveyard, instead put two of them into your hand" (Flow State): `count` while your graveyard has a card matching each of `has`, as it resolves. */ countIfYard?: { has: TargetSpec[]; count: number; /** "If there are three or more Lesson cards in your graveyard" (Accumulate Wisdom): at least this many cards matching `has[0]`. */ min?: number }; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile" | /** Wu Spy: "Put one of them into their graveyard": the owner's. */ "graveyard"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; /** With `play`: "Until end of turn, you may cast the exiled card without paying its mana cost" (Djeru and Hazoret): cast only, free (CR 118.9). */ playFree?: true; /** Into exile, then "You may cast the exiled card without paying its mana cost" (The Key to the Vault): once the rest are put away, as this resolves (CR 608.2g). */ castFree?: true; /** "keep": the rest stay on top, in order, for the next instruction (Expressive Iteration). */ rest: "graveyard" | "bottom" | "shuffle" | "hand" | "keep" | /** "And exile the rest" (Browse). */ "exile"; /** Takes only while this many cards are left for the rest (Expressive Iteration's exile, after one goes to the bottom). */ minRest?: number; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Another player's library the cards come from: "manifest the top card of that player's library" (Orochi Soul-Reaver), `who` getting them. */ library?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it" (Turntimber Symbiosis, CR 614.1c). */ countersIfMv?: { max: number; counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true; /** "Tapped and attacking" (Winota, CR 508.4): a creature put onto the battlefield during combat attacks a player or planeswalker its controller chooses. */ attacking?: true; /** "A creature card and/or a land card" (Kiora): up to one for each, each card taken matching a different one. */ oneOfEach?: TargetSpec[]; /** "Each player looks at the top five cards of their library" (Explore the Vastlands): each one in turn, in their own library. */ each?: true; /** "Any number of nonland permanent cards with total mana value 4 or less" (Ao, the Dawn Sky): of all the cards taken. */ totalMv?: number; /** Birthing Ritual: "Then you may sacrifice a creature. If you do, you may put ...": after looking, a permanent like this may be sacrificed (ResolvingInfo.sacrificedThisWay); nothing is taken if none was. */ sacrificeFirst?: TargetSpec; /** "You lose 3 life for each card you put into your hand this way" follows (Search for Blex): for the prompt and bots only. */ lifeEach?: number }
+  | { type: "dig"; n: Amount; count: number; /** "Put X cards from among them into your hand" (Stargaze): `count` is the X it was cast with. */ countX?: true; /** Omarthis: "manifest a number of cards ... equal to ...": every card looked at (`count` unused). */ countAll?: true; /** "If ~ was kicked, put two of those cards into your hand instead": `count` when kicked (CR 702.33e). */ kickedCount?: number; /** "If there is an instant card and a sorcery card in your graveyard, instead put two of them into your hand" (Flow State): `count` while your graveyard has a card matching each of `has`, as it resolves. */ countIfYard?: { has: TargetSpec[]; count: number; /** "If there are three or more Lesson cards in your graveyard" (Accumulate Wisdom): at least this many cards matching `has[0]`. */ min?: number }; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile" | /** Wu Spy: "Put one of them into their graveyard": the owner's. */ "graveyard"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; /** With `play`: "Until end of turn, you may cast the exiled card without paying its mana cost" (Djeru and Hazoret): cast only, free (CR 118.9). */ playFree?: true; /** Into exile, then "You may cast the exiled card without paying its mana cost" (The Key to the Vault): once the rest are put away, as this resolves (CR 608.2g). */ castFree?: true; /** "keep": the rest stay on top, in order, for the next instruction (Expressive Iteration). */ rest: "graveyard" | "bottom" | "shuffle" | "hand" | "keep" | /** "And exile the rest" (Browse). */ "exile"; /** Takes only while this many cards are left for the rest (Expressive Iteration's exile, after one goes to the bottom). */ minRest?: number; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Another player's library the cards come from: "manifest the top card of that player's library" (Orochi Soul-Reaver), `who` getting them. */ library?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it" (Turntimber Symbiosis, CR 614.1c). */ countersIfMv?: { max: number; counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true; /** "Tapped and attacking" (Winota, CR 508.4): a creature put onto the battlefield during combat attacks a player or planeswalker its controller chooses. */ attacking?: true; /** "A creature card and/or a land card" (Kiora): up to one for each, each card taken matching a different one. */ oneOfEach?: TargetSpec[]; /** "Each player looks at the top five cards of their library" (Explore the Vastlands): each one in turn, in their own library. */ each?: true; /** "Any number of nonland permanent cards with total mana value 4 or less" (Ao, the Dawn Sky): of all the cards taken. */ totalMv?: number; /** Birthing Ritual: "Then you may sacrifice a creature. If you do, you may put ...": after looking, a permanent like this may be sacrificed (ResolvingInfo.sacrificedThisWay); nothing is taken if none was. */ sacrificeFirst?: TargetSpec; /** "You lose 3 life for each card you put into your hand this way" follows (Search for Blex): for the prompt and bots only. */ lifeEach?: number; /** "Put all land cards revealed this way onto the battlefield tapped and put all creature cards revealed this way into your hand" (Zimone's Experiment): with `into` "hand", the land cards taken go onto the battlefield tapped instead. */ landsOnto?: true }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -4167,6 +4171,7 @@ export type TriggerEvent =
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
   | "permanentTurnedFaceUp" // "Whenever a permanent is turned face up" (Aven Farseer): see TriggeredAbility.tappedFilter
+  | "permanentTransformsInto" // "Whenever a permanent you control transforms into a Phyrexian" (Norn's Inquisitor): see TriggeredAbility.tappedFilter
   /**
    * "Whenever you tap ~ for mana", "whenever a player taps a land for mana" (CR 106.12: activating a mana ability with {T}
    * in its cost), with a body that adds no mana, so it isn't a mana ability and uses the stack (CR 605.1b). See manaTap.
@@ -4536,7 +4541,7 @@ export interface TriggeredAbility {
    */
   manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
   /**
-   * For "permanentBecomesTapped", "permanentBecomesUntapped" and "permanentTurnedFaceUp": which permanent ("a Dwarf you control"); it's the subject
+   * For "permanentBecomesTapped", "permanentBecomesUntapped", "permanentTurnedFaceUp" and "permanentTransformsInto": which permanent ("a Dwarf you control"); it's the subject
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;
@@ -6369,6 +6374,8 @@ export interface CompiledCard {
     fromHandOrTop?: true;
     /** Demon of Fate's Design: life equal to the spell's mana value rather than {0} (AltCostKind "lifeForMv"). */
     life?: true;
+    /** Weftwalking: "The first spell each player casts during each of their turns may be cast without paying its mana cost": any player's, during their own turn, while they haven't cast a spell this turn. */
+    eachPlayerFirst?: true;
   };
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield

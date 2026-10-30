@@ -1094,6 +1094,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you were the monarch as the turn began$/.test(text)) return { kind: "monarch", asTurnBegan: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
+  if (/^that player attacked you during their last turn$/.test(text)) return { kind: "eventPlayerAttackedYou" };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1

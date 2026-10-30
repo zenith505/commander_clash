@@ -733,6 +733,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = evalAmount(s, cond.amount, ctx);
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
+    case "eventPlayerAttackedYou": {
+      // O-Kagachi: the trigger's player attacked you during their most recent turn (this one if it's theirs).
+      const p = eventPlayer !== undefined ? s.players[eventPlayer] : undefined;
+      const last = p && (s.activePlayer === eventPlayer ? p.lastTurnBegan : p.turnBegan);
+      return !!p && last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you);
+    }
     case "monarch":
       if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;
       if (cond.none) return s.monarch === undefined;

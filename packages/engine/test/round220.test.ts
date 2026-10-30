@@ -6,7 +6,7 @@
 // process once"), Boxing Ring (a fight with the same mana value, "a creature that fought this turn").
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { act, bear, card, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
 import { applyAction, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -544,5 +544,166 @@ describe("Tolsimir, Midnight's Light", () => {
     expect(r.asked).toBe(0);
     expect(r.s.pending).toMatchObject({ kind: "declareBlockers", player: opp });
     expect(() => act(r.s, { type: "declareBlockers", player: opp, blocks: [] })).not.toThrow();
+  });
+});
+
+// Third batch: O-Kagachi, Vengeful Kami ("if that player attacked you during their last turn"), Vannifar, Evolved Enigma
+// ("cloak a card from your hand"), Thrasta, Tempest's Roar (trample over planeswalkers, CR 702.19c), Reality Scramble
+// (reveal until a card that shares a card type with that permanent).
+const oKagachiVengef = card("O-Kagachi, Vengeful Kami", "Legendary Creature — Dragon Spirit", "{1}{W}{U}{B}{R}{G}", {"cmc":6,"oracleText":"Flying, trample\nWhenever O-Kagachi deals combat damage to a player, if that player attacked you during their last turn, exile target nonland permanent that player controls.","power":"6","toughness":"6","keywords":["Flying","Trample"],"layout":"normal"});
+const vannifarEvolve = card("Vannifar, Evolved Enigma", "Legendary Creature — Elf Ooze Wizard", "{2}{G}{U}", {"cmc":4,"oracleText":"At the beginning of combat on your turn, choose one —\n• Cloak a card from your hand. (Put it onto the battlefield face down as a 2/2 creature with ward {2}. Turn it face up any time for its mana cost if it's a creature card.)\n• Put a +1/+1 counter on each colorless creature you control.","power":"3","toughness":"4","keywords":["Cloak"],"layout":"normal"});
+const thrastaTempest = card("Thrasta, Tempest's Roar", "Legendary Creature — Dinosaur", "{10}{G}{G}", {"cmc":12,"oracleText":"This spell costs {3} less to cast for each other spell cast this turn.\nTrample, haste\nTrample over planeswalkers (This creature can deal excess combat damage to the controller of the planeswalker it's attacking.)\nThrasta has hexproof as long as it entered this turn.","power":"7","toughness":"7","keywords":["Haste","Trample"],"layout":"normal"});
+const realityScrambl = card("Reality Scramble", "Sorcery", "{2}{R}{R}", {"cmc":4,"oracleText":"Put target permanent you own on the bottom of your library. Reveal cards from the top of your library until you reveal a card that shares a card type with that permanent. Put that card onto the battlefield and the rest on the bottom of your library in a random order.\nRetrace (You may cast this card from your graveyard by discarding a land card in addition to paying its other costs.)","keywords":["Retrace"],"layout":"normal"});
+const walker = (name = "Test Walker") => card(name, "Legendary Planeswalker — Jace", "{3}", { loyalty: "3", oracleText: "+1: Draw a card." });
+
+describe("O-Kagachi, Vengeful Kami", () => {
+  it("are fully supported", () => supported(oKagachiVengef, vannifarEvolve, thrastaTempest, realityScrambl));
+
+  it("exiles a nonland permanent of a player who attacked you during their last turn, not of one who didn't", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const third = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    const ok = putOnBattlefield(s0, ap, oKagachiVengef);
+    const raider = putOnBattlefield(s0, opp, bear({ name: "Raider" }));
+    const rock = putOnBattlefield(s0, opp, card("Opp Rock", "Artifact", "{1}", { oracleText: "" }));
+    const rock3 = putOnBattlefield(s0, third, card("Third Rock", "Artifact", "{1}", { oracleText: "" }));
+    // The opponent attacks you on their turn; the third player doesn't attack.
+    let s = act(passUntil(s0, "declareAttackers", opp), { type: "declareAttackers", player: opp, attacks: [{ attacker: raider, defender: ap }] });
+    s = passUntil(s, "declareAttackers", ap);
+    const asked = { n: 0 };
+    let t = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ok, defender: opp }] });
+    for (let i = 0; i < 200 && t.step !== "main2"; i++) {
+      const p = t.pending;
+      if (p?.kind === "declareBlockers") t = act(t, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p?.kind === "chooseTargets" && p.player === ap) (asked.n++, (t = act(t, { type: "chooseTargets", player: ap, targets: [tgt(rock)] })));
+      else if (p) t = act(t, botActions(t, p.player)[0]!);
+      else t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    }
+    expect(asked.n).toBe(1);
+    expect(zone(t, rock)).toBe("exile");
+    // Against the third player: no trigger.
+    asked.n = 0;
+    t = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ok, defender: third }] });
+    for (let i = 0; i < 200 && t.step !== "main2"; i++) {
+      const p = t.pending;
+      if (p?.kind === "declareBlockers") t = act(t, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p?.kind === "chooseTargets" && p.player === ap) (asked.n++, (t = act(t, { type: "chooseTargets", player: ap, targets: [tgt(rock3)] })));
+      else if (p) t = act(t, botActions(t, p.player)[0]!);
+      else t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    }
+    expect(asked.n).toBe(0);
+    expect(zone(t, rock3)).toBe("battlefield");
+  });
+});
+
+describe("Vannifar, Evolved Enigma", () => {
+  it("cloaks the card you pick from your hand: a face-down 2/2 with ward {2}", () => {
+    const sorcery = card("Hand Sorcery", "Sorcery", "{1}{R}", { oracleText: "Draw a card." });
+    const { s: s0, ap, ids } = setup([bear({ name: "Hand Bear" }), sorcery]);
+    emptyHand(s0, ap);
+    s0.players[ap]!.hand.push(...ids);
+    for (const id of ids) s0.objects[id]!.zone = "hand";
+    putOnBattlefield(s0, ap, vannifarEvolve);
+    let s = untilAsked(passUntil(s0, "beginCombat", ap), ap);
+    expect(s.pending?.kind).toBe("chooseModes");
+    s = untilAsked(act(s, { type: "chooseModes", player: ap, modes: [0] }), ap);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", fromHand: true, manifest: true, cloak: true });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [ids[1]!] }), { me: ap });
+    const o = s.objects[ids[1]!]!;
+    expect([o.zone, o.faceDown]).toEqual(["battlefield", "cloak"]);
+    expect(pt(s, ids[1]!)).toBe("2/2");
+    expect(characteristics(s, o).keywords.some((k) => /^Ward/.test(k))).toBe(true);
+    expect(zone(s, ids[0]!)).toBe("hand");
+  });
+
+  it("or a +1/+1 counter on each colorless creature you control", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, vannifarEvolve);
+    const golem = putOnBattlefield(s0, ap, card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" }));
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = untilAsked(passUntil(s0, "beginCombat", ap), ap);
+    s = settle(act(s, { type: "chooseModes", player: ap, modes: [1] }), { me: ap });
+    expect(s.objects[golem]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[b]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+});
+
+describe("Thrasta, Tempest's Roar: trample over planeswalkers", () => {
+  const combat = (s: GameState, ap: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] | null, blocks: { blocker: ObjectId; attacker: ObjectId }[] = []) => {
+    if (attacks) s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks });
+    for (let i = 0; i < 200 && s.step !== "main2"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: blocks.filter((b) => s.objects[b.blocker]!.controller === p.player) });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return s;
+  };
+
+  it("unblocked at a planeswalker: its loyalty less what others assign it, the rest to its controller (rulings)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const th = putOnBattlefield(s0, ap, thrastaTempest);
+    const cub = putOnBattlefield(s0, ap, bear({ name: "Bear Cub" }));
+    const w = putOnBattlefield(s0, opp, walker());
+    s0.objects[w]!.counters.loyalty = 3;
+    const life = s0.players[opp]!.life;
+    const s = combat(s0, ap, [{ attacker: cub, defender: opp, planeswalker: w }, { attacker: th, defender: opp, planeswalker: w }]);
+    expect(zone(s, w)).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 6);
+  });
+
+  it("blocked by a 3/3 at a two-loyalty planeswalker: 3 to the blocker, 2 to the planeswalker, 2 to the player (rulings)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const th = putOnBattlefield(s0, ap, thrastaTempest);
+    const w = putOnBattlefield(s0, opp, walker());
+    s0.objects[w]!.counters.loyalty = 2;
+    const blocker = putOnBattlefield(s0, opp, card("Three Blocker", "Creature — Ox", "{2}{G}", { power: "3", toughness: "3" }));
+    const life = s0.players[opp]!.life;
+    const s = combat(s0, ap, [{ attacker: th, defender: opp, planeswalker: w }], [{ blocker, attacker: th }]);
+    expect(zone(s, blocker)).toBe("graveyard");
+    expect(zone(s, w)).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+
+  it("plain trample at a planeswalker never reaches the player (CR 702.19f)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const big = putOnBattlefield(s0, ap, card("Plain Trampler", "Creature — Beast", "{5}{G}", { power: "7", toughness: "7", keywords: ["Trample"], oracleText: "Trample" }));
+    const w = putOnBattlefield(s0, opp, walker());
+    s0.objects[w]!.counters.loyalty = 3;
+    const life = s0.players[opp]!.life;
+    const s = combat(s0, ap, [{ attacker: big, defender: opp, planeswalker: w }]);
+    expect(zone(s, w)).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life);
+  });
+
+  it("with the planeswalker gone before damage, all of it goes to the defending player (CR 702.19e)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const th = putOnBattlefield(s0, ap, thrastaTempest);
+    const w = putOnBattlefield(s0, opp, walker());
+    s0.objects[w]!.counters.loyalty = 3;
+    const life = s0.players[opp]!.life;
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: th, defender: opp, planeswalker: w }] });
+    // The planeswalker leaves the battlefield before damage.
+    s.objects[w]!.counters.loyalty = 0;
+    s = combat(s, ap, null);
+    expect(zone(s, w)).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 7);
+  });
+});
+
+describe("Reality Scramble", () => {
+  it("puts the target on the bottom, reveals until a card sharing a card type with it, and puts that onto the battlefield", () => {
+    const { s: s0, ap, ids } = setup([realityScrambl]);
+    const rock = putOnBattlefield(s0, ap, card("Old Rock", "Artifact", "{1}", { oracleText: "" }));
+    const lib = s0.players[ap]!.library;
+    const relic = into(s0, ap, card("Found Relic", "Artifact", "{4}", { oracleText: "" }), "library");
+    const b = into(s0, ap, bear({ name: "Top Bear" }), "library");
+    expect(lib.slice(0, 2)).toEqual([b, relic]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(rock)])), { me: ap });
+    expect(zone(s, relic)).toBe("battlefield");
+    expect(zone(s, rock)).toBe("library");
+    expect(zone(s, b)).toBe("library");
+    const l = s.players[ap]!.library;
+    expect(l.indexOf(b)).toBeGreaterThan(l.length - 3);
+    expect(l.includes(rock)).toBe(true);
   });
 });

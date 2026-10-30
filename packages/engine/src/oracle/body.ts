@@ -10821,6 +10821,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Reality Scramble: "Reveal cards from the top of your library until you reveal a card that shares a card type with
+    // that permanent. Put that card onto the battlefield and the rest on the bottom of your library in a random order.":
+    // the target's types as it last existed, once it's gone (CR 608.2h).
+    if (/^Reveal cards from the top of your library until you reveal a card that shares a card type with that permanent$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Put that card onto the battlefield and the rest on the bottom of your library in a random order" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && !ctx.targets[0]!.many) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" }, found: "battlefield", rest: "bottom", sharesTypeWith: 0 });
+      si++;
+      continue;
+    }
     // Blessed Reincarnation: "Exile target creature an opponent controls. That player reveals cards from the top of their
     // library until a creature card is revealed": the same, "that player" being the target's controller.
     const theirs = /^(Its controller|That creature's controller|That permanent's controller|That player) reveals cards from the top of their library until (?:they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?|a (creature card) is revealed)$/.exec(s);

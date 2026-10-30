@@ -269,6 +269,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down
   // (CR 701.40a). "For each card manifested this way" counts them.
   // "Manifest a card from your hand" (Scroll of Fate): you.
+  // "Cloak a card from your hand" (Vannifar, Evolved Enigma): the same, cloaked (CR 701.58a).
+  if (/^Cloak a card from your hand$/.test(s)) {
+    ctx.manifested = true;
+    return [{ type: "putFromHand", who: { ref: "you" }, may: false, manifest: 1, cloak: true }];
+  }
   if ((m = new RegExp(`^(?:(.+?) (?:each )?manifests?|[Mm]anifest) (a card|${NUM} cards) from (their|your) hands?$`).exec(s))) {
     if (!m[1] && m[4] !== "your") return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : undefined;

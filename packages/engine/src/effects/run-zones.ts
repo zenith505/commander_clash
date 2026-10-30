@@ -422,7 +422,7 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
         hp.queue.shift();
         continue;
       }
-      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true };
+      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true, ...(e.cloak ? { cloak: true as const } : {}) };
       return "paused";
     }
     const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
@@ -440,9 +440,9 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
       for (const [pid, ids] of Object.entries(hp.picked)) {
         const mine = ids.filter((id) => obj(s, id).zone === "hand");
         if (!mine.length) continue;
-        log(s, `${player(s, Number(pid) as PlayerId).name} manifests ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature.`);
+        log(s, `${player(s, Number(pid) as PlayerId).name} ${e.cloak ? "cloaks" : "manifests"} ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature${e.cloak ? " with ward {2}" : ""}.`);
         for (const id of mine) {
-          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: "manifest" });
+          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: e.cloak ? "cloak" : "manifest" });
           if (obj(s, id).zone === "battlefield") s.resolving!.created!.push(id);
         }
       }

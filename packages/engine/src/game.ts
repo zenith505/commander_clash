@@ -9691,8 +9691,24 @@ export function combatDamageOf(s: GameState, o: GameObject): number {
 function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
+  // Trample over planeswalkers (CR 702.19c): at a planeswalker, damage up to its loyalty (less what's already assigned
+  // to it this step) goes to it and the rest to its controller; with the planeswalker removed from combat, all of it
+  // goes to the defending player (CR 702.19e). Not a battle's protector.
+  const toRecipient = (at: GameObject, target: { toPlayer: PlayerId } | { toObject: GameObject } | null, amount: number) => {
+    const a = at.attackingPermanent;
+    if (a && a.battleController === undefined && at.attacking !== undefined && objHasKeyword(s, at, "Trample over planeswalkers") && (!target || "toObject" in target)) {
+      const pw = target && "toObject" in target ? target.toObject : undefined;
+      const assigned = pw ? hits.filter((h) => h.toObject === pw).reduce((n, h) => n + h.amount, 0) : 0;
+      const n = pw ? Math.min(amount, Math.max(0, (pw.counters.loyalty ?? 0) - assigned)) : 0;
+      if (pw && n > 0) hits.push({ source: at, toObject: pw, amount: n });
+      if (amount > n) hits.push({ source: at, toPlayer: at.attacking, amount: amount - n });
+      return;
+    }
+    if (target) hits.push({ source: at, ...target, amount });
+  };
   for (const at of attackers(s)) {
     if (!dealsDamageThisStep(s, at, firstStrikeStep) || assignsNoCombatDamage(s, at)) continue;
+    const trample = objHasKeyword(s, at, "Trample") || objHasKeyword(s, at, "Trample over planeswalkers");
     let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
@@ -9700,12 +9716,12 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
     const target = attackedRecipient(s, at);
     if (!at.blockedBy || unblocked) {
-      if (target) hits.push({ source: at, ...target, amount: dmg });
+      toRecipient(at, target, dmg);
       continue;
     }
     const blockers = at.blockedBy.map((id) => obj(s, id));
     if (blockers.length === 0) {
-      if (objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg }); // CR 702.19e
+      if (trample) toRecipient(at, target, dmg); // CR 702.19d
       continue;
     }
     // Blocked by a creature with banding, the defending player divides its damage among the blockers as they
@@ -9718,12 +9734,12 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     blockers.forEach((bl, i) => {
       const lethal = objHasKeyword(s, at, "Deathtouch") ? 1 : lethalLeft(s, bl);
       const last = i === blockers.length - 1;
-      const amt = last && !(objHasKeyword(s, at, "Trample") && target) ? dmg : Math.min(dmg, lethal);
+      const amt = last && !(trample && (target || objHasKeyword(s, at, "Trample over planeswalkers"))) ? dmg : Math.min(dmg, lethal);
       if (amt > 0) hits.push({ source: at, toObject: bl, amount: amt });
       dmg -= amt;
     });
-    // Trample: the rest to the player or planeswalker it attacks (CR 702.19c).
-    if (dmg > 0 && objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg });
+    // Trample: the rest to the player or planeswalker it attacks (CR 702.19b).
+    if (dmg > 0 && trample) toRecipient(at, target, dmg);
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);

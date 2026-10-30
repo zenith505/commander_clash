@@ -1423,6 +1423,8 @@ export function textKeywords(line: string): string[] {
     if (/^(?:protection|hexproof) from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
     const tox = /^toxic (\d+)$/i.exec(p);
     if (tox) out.push(`Toxic ${tox[1]}`);
+    // Scryfall's keyword list leaves it out (Thrasta, Tempest's Roar): CR 702.19c.
+    if (/^trample over planeswalkers$/i.test(p)) out.push("Trample over planeswalkers");
   }
   return out;
 }

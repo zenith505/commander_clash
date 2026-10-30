@@ -116,14 +116,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Skipping (CR 614.10): "Target player skips their next combat phase", "You skip your next two turns", "Skip your next
   // turn", "... their next combat phase this turn" (Moment of Silence).
-  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) next (?:(two|three) )?(untap step|draw step|combat phase|turn)s?( this turn)?$/i.exec(s))) {
+  // Ral Zarek, Guest Lecturer: "Target opponent skips their next X turns, where X is ..." (the X filled in by body.ts).
+  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) next (?:(two|three|X) )?(untap step|draw step|combat phase|turn)s?( this turn)?$/i.exec(s))) {
+    if (m[3] === "X" && (!ctx.whereX || m[4] !== "turn" || m[5] || !m[1] || /^you$/i.test(m[1]))) return null;
     const self = !m[1] || /^you$/i.test(m[1]);
     if (!m[1] && m[2] !== "Skip") return null;
     const who = self ? { ref: "you" as const } : parsePlayer(m[1]!, ctx);
     const skips: Record<string, SkipWhat> = { "untap step": "untap", "draw step": "draw", "combat phase": "combat", turn: "turn" };
     const skip = skips[m[4]!.toLowerCase()]!;
     if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat")) return null;
-    return [{ type: "skip", who, skip, n: m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
+    return [{ type: "skip", who, skip, n: m[3] === "X" ? { count: { kind: "x" } } : m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
   }
   // False Peace, Empty City Ruse: "Target player skips all combat phases of their next turn" (CR 614.10).
   if ((m = /^(Target player|Target opponent) skips all combat phases of their next turn$/.exec(s))) {

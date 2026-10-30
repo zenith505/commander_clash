@@ -1017,8 +1017,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   if (text.includes("•") && (!reflexiveModes || text.indexOf("•") < reflexiveModes.index)) return null;
   const ctx: Ctx = {
     targets: [],
-    // Ral Zarek: "Flip five coins. ... for each coin that comes up heads": flips no one calls (CR 705.2).
-    ...(/\b[Ff]lip (?:two|three|four|five) coins\b/.test(text) && /\bfor each coin that comes up heads\b/.test(text) ? { uncalledFlips: true } : {}),
+    // Ral Zarek: "Flip five coins. ... for each coin that comes up heads": flips no one calls (CR 705.2). Ral Zarek, Guest
+    // Lecturer: "where X is the number of coins that came up heads".
+    ...(/\b[Ff]lip (?:two|three|four|five) coins\b/.test(text) && /\b(?:for each coin that comes up heads|the number of coins that came up heads)\b/.test(text) ? { uncalledFlips: true } : {}),
     ...(opts.subject ? { subject: true } : {}),
     ...(opts.subjectIt ? { subject: true, subjectIt: true } : {}),
     ...(opts.subjectLeft ? { subjectLeft: true } : {}),
@@ -9256,6 +9257,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
       continue;
+    }
+    // Kain, Traitorous Dragoon: "that player gains control of ~. If they do, you draw that many cards, create that many
+    // tapped Treasure tokens, then lose that much life": only if that player now controls ~ (not if it left the
+    // battlefield first); "that many" is the damage dealt.
+    const ifTheyGained = /^If they do, (.+)$/.exec(s);
+    if (ifTheyGained && ctx.eventPlayer) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type === "continuous" && prev.what.ref === "self" && prev.duration === "game" && prev.giveTo?.ref === "eventPlayer" && prev.mods.length === 1 && prev.mods[0]!.kind === "control") {
+        // ("That many" is X by now, the damage dealt.)
+        const kain = /^you draw X cards, create X (tapped [A-Z][a-z]+ tokens), then lose X life$/.exec(ifTheyGained[1]!);
+        const parts = (kain ? ["You draw X cards", `Create X ${kain[1]}`, "You lose X life"] : [capital(ifTheyGained[1]!)]).map((t) => parseOne(t, ctx));
+        if (parts.some((p) => !p)) return null;
+        const inner = parts.flatMap((p) => p!);
+        effects.push({ type: "if", cond: { kind: "selfHere", controlledByEventPlayer: true }, effects: inner });
+        continue;
+      }
     }
     // Yes Man, Personal Securitron: "Target opponent gains control of ~. When they do, ...": a reflexive trigger (CR
     // 603.12) only if that opponent now controls ~ (rulings: not if ~ left the battlefield or the target is illegal).

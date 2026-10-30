@@ -153,6 +153,8 @@ export interface Characteristics {
   ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
+  /** Galactus, Devourer of Worlds: "attacks an opponent with the most life among your opponents each combat if able" (those players worked out as attackers are declared, game.ts mustAttackPlayers). */
+  mustAttackMostLife?: true;
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
   /**
@@ -1574,6 +1576,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       c.attacksIfAble = true;
+      return;
+    case "mustAttackMostLife":
+      c.mustAttackMostLife = true;
       return;
     case "mustAttackPlayer":
       if (m.player === "chosen" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;

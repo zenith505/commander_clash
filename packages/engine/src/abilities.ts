@@ -1505,6 +1505,8 @@ export type Modification =
   /** "Can't have hexproof or shroud" (Arcane Lighthouse): no layer 6 effect gives them these, whatever its timestamp. */
   | { kind: "cantHaveKeywords"; keywords: string[] }
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
+  /** Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able" (CR 508.1d). */
+  | { kind: "mustAttackMostLife" }
   | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
@@ -3677,7 +3679,7 @@ export type Effect =
    */
   | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
-  | { type: "skip"; who: PlayerRef; skip: SkipWhat; n: number; thisTurn?: true; /** "Skips all combat phases of their next turn" (False Peace). */ wholeTurn?: true }
+  | { type: "skip"; who: PlayerRef; skip: SkipWhat; /** "Skips their next X turns, where X is the number of coins that came up heads" (Ral Zarek, Guest Lecturer): counted as it resolves. */ n: Amount; thisTurn?: true; /** "Skips all combat phases of their next turn" (False Peace). */ wholeTurn?: true }
   /**
    * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
    * "main" or "combat" for "after this main/combat phase", which adds nothing in another phase.
@@ -3880,7 +3882,7 @@ export type SpellCondition =
    * The source is still on the battlefield as the same object (CR 400.7), with `yours` under your control: "Sacrifice ~.
    * When you do, ..." can be done (CR 701.21a).
    */
-  | { kind: "selfHere"; yours?: true; /** "When they do" after "target opponent gains control of ~" (Yes Man): that target player controls it. */ controlledByTarget?: number }
+  | { kind: "selfHere"; yours?: true; /** "When they do" after "target opponent gains control of ~" (Yes Man): that target player controls it. */ controlledByTarget?: number; /** "If they do" after "that player gains control of ~" (Kain, Traitorous Dragoon): the trigger's player controls it. */ controlledByEventPlayer?: true }
   /** Your library has at least `n` cards, so "mill n cards" mills them all ("Mill three cards. When you do, ..."). */
   | { kind: "libraryHas"; n: number }
   /**
@@ -5959,6 +5961,8 @@ export interface CompiledCard {
   opponentsDrawOnce?: true;
   /** "Each player can't draw more than one card each turn" (Spirit of the Labyrinth). */
   playersDrawOnce?: true;
+  /** "Lethal damage dealt to creatures you control is determined by their power rather than their toughness" (Zilortha, Strength Incarnate). */
+  lethalByPower?: true;
   /** "Players can't draw cards" (Maralen of the Mornsong, Omen Machine): no draw happens, for any reason, so nothing replaces one (rulings). */
   playersCantDraw?: true;
   /**
@@ -6357,6 +6361,9 @@ export interface CompiledCard {
     life?: true;
     /** Weftwalking: "The first spell each player casts during each of their turns may be cast without paying its mana cost": any player's, during their own turn, while they haven't cast a spell this turn. */
     eachPlayerFirst?: true;
+    /** Aluren: "Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash": any player's spells, at instant speed when cast this way. */
+    anyPlayer?: true;
+    flash?: true;
   };
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield

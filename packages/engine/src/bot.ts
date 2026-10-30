@@ -112,6 +112,7 @@ import {
   landsAllowed,
   landUntappedOffer,
   creatureTypesOf,
+  mustAttackPlayers,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -5495,7 +5496,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     if (atPlayer(owner) >= player(s, owner).life) continue;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
       .filter((a) => hit(obj(s, a.attacker), pw) > 0)
       .sort((a, b) => hit(obj(s, a.attacker), pw) - hit(obj(s, b.attacker), pw));
@@ -5530,7 +5531,7 @@ function attackBattles(s: GameState, pid: PlayerId, attacks: { attacker: ObjectI
     const guard = b.protector!;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && !x.tapped && objIsType(s, x, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), guard))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), guard))
       .filter((a) => atPlayer(a.defender) < player(s, a.defender).life)
       .filter((a) => blockers.every((x) => blockProblem(s, x, obj(s, a.attacker), guard)))
       .filter((a) => hit(obj(s, a.attacker), b) > 0)
@@ -5588,7 +5589,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   });
   // A token that has to attack a particular opponent (encore) attacks them if it can (CR 508.1d).
   for (const o of potentialAttackers(s, pid)) {
-    const d = characteristics(s, o).mustAttack.find((x) => opps.includes(x) && !attackProblem(s, o, x));
+    const d = mustAttackPlayers(s, o).find((x) => opps.includes(x) && !attackProblem(s, o, x));
     if (d === undefined) continue;
     attacks = [...attacks.filter((a) => a.attacker !== o.id), { attacker: o.id, defender: d }];
   }

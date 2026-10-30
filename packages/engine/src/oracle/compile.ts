@@ -375,6 +375,9 @@ export function normalizeSelf(d: CardDef): string {
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
   const short = ofThe ?? first ?? regnal ?? comma;
+  // Galactus, Devourer of Worlds: "a creature named Silver Surfer, Galactus's Herald" is another card's name with the short
+  // name in it.
+  if (short && short !== full) t = t.replace(new RegExp(`(\\bnamed )([A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*, ${esc(short)}'s [A-Z][\\w'-]*)`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
@@ -2198,6 +2201,11 @@ export function compile(d: CardDef): CompiledCard {
       out.skipsExtraTurns = skipExtra[1] === "a player" ? "all" : "opponents";
       continue;
     }
+    // Zilortha, Strength Incarnate: every check of lethal damage on your creatures uses power (CR 120.6, 704.5g, rulings).
+    if (line === "Lethal damage dealt to creatures you control is determined by their power rather than their toughness.") {
+      out.lethalByPower = true;
+      continue;
+    }
     // Maralen of the Mornsong: no player draws, for any reason (rulings); Mornsong Aria: nor gains life (CR 119.7).
     if (line === "Players can't draw cards." || line === "Players can't draw cards or gain life.") {
       out.playersCantDraw = true;
@@ -2537,6 +2545,15 @@ export function compile(d: CardDef): CompiledCard {
     // Weftwalking: the same alternative cost of nothing (CR 118.9), for every player's first spell during their own turn.
     if (line === "The first spell each player casts during each of their turns may be cast without paying its mana cost.") {
       out.payZero = { eachPlayerFirst: true };
+      continue;
+    }
+    // Aluren: the same alternative cost of nothing for any player (CR 118.9), its creature spells matched by their printed
+    // mana value with X at 0 (rulings), and only a spell cast this way may be cast as though it had flash (rulings).
+    const aluren = /^Any player may cast creature spells with mana value (\d+) or less without paying their mana costs and as though they had flash\.$/.exec(line);
+    if (aluren) {
+      const spec = parseTargetPhrase(`creature card with mana value ${aluren[1]} or less from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `creature spell with mana value ${aluren[1]} or less` }))(spec), anyPlayer: true, flash: true };
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {

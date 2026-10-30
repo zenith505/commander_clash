@@ -3,7 +3,9 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, invalidateCharacteristics, isFullySupported, objIsType, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { nextRandom } from "../src/rng";
+import { runStateBasedActions } from "../src/game";
+import { applyAction, botActions, castProblem, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -38,6 +40,17 @@ const settle = (s: GameState, opts: { may?: boolean; targets?: TargetChoice[]; m
   return s;
 };
 const zone = (s: GameState, id: ObjectId) => s.objects[id]!.zone;
+/** The next random numbers come up `values` on a die of `sides` (a coin is 1 heads, 2 tails), in order (CR 706.1b). */
+function rig(s: GameState, sides: number, values: number[]) {
+  for (let st = 1; st < 50_000_000; st++) {
+    const t = { rngState: st };
+    if (values.every((v) => 1 + Math.floor(nextRandom(t) * sides) === v)) {
+      s.rngState = st;
+      return;
+    }
+  }
+  throw new Error("no such seed");
+}
 const emptyHand = (s: GameState, pid: PlayerId) => s.players[pid]!.hand.splice(0).forEach((id) => (s.objects[id]!.zone = "exile"));
 /** `me` votes for `word` when asked (the others vote as the bots do), until the vote is over. */
 const voteThrough = (s: GameState, me: PlayerId, word: string) => {
@@ -59,9 +72,15 @@ const pathOfThePyrom = card("Path of the Pyromancer", "Sorcery", "{4}{R}", {"cmc
 const pathOfTheSchem = card("Path of the Schemer", "Sorcery", "{4}{B}", {"cmc":5,"oracleText":"Each player mills two cards. Then you put a creature card from a graveyard onto the battlefield under your control. It's an artifact in addition to its other types.\nWill of the Planeswalkers — Starting with you, each player votes for planeswalk or chaos. If planeswalk gets more votes, planeswalk. If chaos gets more votes or the vote is tied, chaos ensues.","keywords":["Will of the Planeswalkers","Mill"],"layout":"normal"});
 const maralenOfTheMo = card("Maralen of the Mornsong", "Legendary Creature — Elf Wizard", "{1}{B}{B}", {"cmc":3,"oracleText":"Players can't draw cards.\nAt the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.","power":"2","toughness":"3","keywords":[],"layout":"normal"});
 const mornsongAria = card("Mornsong Aria", "Legendary Enchantment", "{1}{B}{B}", {"cmc":3,"oracleText":"Players can't draw cards or gain life.\nAt the beginning of each player's draw step, that player loses 3 life, searches their library for a card, puts it into their hand, then shuffles.","keywords":[],"layout":"normal"});
+const zilorthaStreng = card("Zilortha, Strength Incarnate", "Legendary Creature — Dinosaur", "{3}{R}{G}", {"cmc":5,"oracleText":"Trample\nLethal damage dealt to creatures you control is determined by their power rather than their toughness.","power":"7","toughness":"3","keywords":["Trample"],"layout":"normal"});
+const ralZarekGuestL = card("Ral Zarek, Guest Lecturer", "Legendary Planeswalker — Ral", "{1}{B}{B}", {"cmc":3,"oracleText":"+1: Surveil 2.\n−1: Any number of target players each discard a card.\n−2: Return target creature card with mana value 3 or less from your graveyard to the battlefield.\n−7: Flip five coins. Target opponent skips their next X turns, where X is the number of coins that came up heads.","loyalty":"3","keywords":["Surveil"],"layout":"normal"});
+const aluren = card("Aluren", "Enchantment", "{2}{G}{G}", {"cmc":4,"oracleText":"Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash.","keywords":[],"layout":"normal"});
+const kainTraitorous = card("Kain, Traitorous Dragoon", "Legendary Creature — Human Knight", "{2}{B}", {"cmc":3,"oracleText":"Jump — During your turn, Kain has flying.\nWhenever Kain deals combat damage to a player, that player gains control of Kain. If they do, you draw that many cards, create that many tapped Treasure tokens, then lose that much life.","power":"2","toughness":"4","keywords":["Jump","Treasure"],"layout":"normal"});
+const galactusDevour = card("Galactus, Devourer of Worlds", "Legendary Creature — Elder Alien", "{10}", {"cmc":10,"oracleText":"Flying, trample, indestructible\nWhen Galactus enters, exile target permanent.\nInsatiable Hunger — Galactus attacks an opponent with the most life among your opponents each combat if able unless you control a creature named Silver Surfer, Galactus's Herald.","power":"12","toughness":"12","keywords":["Flying","Indestructible","Insatiable Hunger","Trample"],"layout":"normal"});
 
 describe("round 219 cards", () => {
   it("compile", () => supported(pathOfTheEnigm, pathOfTheAnimi, pathOfTheGhost, pathOfThePyrom, pathOfTheSchem, maralenOfTheMo, mornsongAria));
+  it("compile (2)", () => supported(zilorthaStreng, ralZarekGuestL, aluren, kainTraitorous, galactusDevour));
 });
 
 describe("Will of the Planeswalkers", () => {
@@ -178,5 +197,128 @@ describe("Maralen of the Mornsong and Mornsong Aria", () => {
     let s = run(s0, planCast(s0, ap, ids[0]!));
     s = settle(s, { me: ap });
     expect(s.players[ap]!.life).toBe(life);
+  });
+});
+
+describe("Zilortha, Strength Incarnate", () => {
+  it("lethal damage to your creatures is measured against their power; a 0-power creature needs 1 damage", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, zilorthaStreng);
+    const wall = putOnBattlefield(s0, ap, bear({ name: "Low Wall", power: "1", toughness: "5" }));
+    const glass = putOnBattlefield(s0, ap, bear({ name: "Glass Hitter", power: "4", toughness: "1" }));
+    const zero = putOnBattlefield(s0, ap, bear({ name: "Zero Wall", power: "0", toughness: "4" }));
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Wall", power: "1", toughness: "5" }));
+    for (const id of [wall, theirs]) s0.objects[id]!.damage = 1;
+    s0.objects[glass]!.damage = 2;
+    runStateBasedActions(s0);
+    expect(zone(s0, wall)).toBe("graveyard");
+    expect(zone(s0, glass)).toBe("battlefield");
+    expect(zone(s0, zero)).toBe("battlefield");
+    // Not the opponent's: toughness still.
+    expect(zone(s0, theirs)).toBe("battlefield");
+    s0.objects[zero]!.damage = 1;
+    runStateBasedActions(s0);
+    expect(zone(s0, zero)).toBe("graveyard");
+  });
+
+  it("a trampler blocked by a creature of Zilortha's controller assigns lethal damage by the blocker's power", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const trampler = putOnBattlefield(s0, ap, bear({ name: "Big Trampler", power: "4", toughness: "4", keywords: ["Trample"], oracleText: "Trample" }));
+    putOnBattlefield(s0, opp, zilorthaStreng);
+    s0.objects[s0.battlefield.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === zilorthaStreng.name)!]!.tapped = true;
+    const wall = putOnBattlefield(s0, opp, bear({ name: "Low Wall", power: "1", toughness: "5" }));
+    const life = s0.players[opp]!.life;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: trampler, defender: opp }] });
+    for (let i = 0; i < 50 && s.step !== "endCombat"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: p.player === opp ? [{ blocker: wall, attacker: trampler }] : [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(zone(s, wall)).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+});
+
+describe("Ral Zarek, Guest Lecturer", () => {
+  it("−7: flips five coins, and the target opponent skips their next turn for each heads", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const r = putOnBattlefield(s0, ap, ralZarekGuestL);
+    s0.objects[r]!.counters.loyalty = 7;
+    rig(s0, 2, [1, 2, 1, 2, 2]);
+    let s = run(s0, planActivate(s0, ap, r, 3, [ply(opp)]));
+    s = settle(s, { me: ap });
+    expect(s.players[opp]!.skips?.filter((x) => x.what === "turn")).toHaveLength(2);
+    expect(s.log.some((l) => /2 came up heads/.test(l.text))).toBe(true);
+  });
+});
+
+describe("Aluren", () => {
+  it("any player may cast creature spells with mana value 3 or less for nothing, at instant speed only that way", () => {
+    const { s: s0, ap, opp, ids } = setup([bear({ name: "Small Bear", manaCost: "{2}{G}" }), bear({ name: "Big Bear", manaCost: "{3}{G}" })]);
+    putOnBattlefield(s0, opp, aluren);
+    // In your main phase: free, any player's Aluren.
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { alt: "payZero" })).toBeNull();
+    // Mana value 4: no.
+    expect(castProblem(s0, ap, ids[1]!, undefined, undefined, undefined, undefined, undefined, { alt: "payZero" })).not.toBeNull();
+    // At instant speed (a spell on the stack): only for free.
+    let s = run(s0, planCast(s0, ap, ids[1]!));
+    while (waitingOn(s) !== ap || !s.stack.length) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.length).toBe(1);
+    expect(castProblem(s, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { alt: "payZero" })).toBeNull();
+    expect(castProblem(s, ap, ids[0]!)).toMatch(/sorcery speed/);
+    const pool = { ...s.players[ap]!.manaPool };
+    s = run(s, planCast(s, ap, ids[0]!, undefined, undefined, undefined, undefined, { alt: "payZero" }));
+    expect(s.stack.length).toBe(2);
+    expect(s.players[ap]!.manaPool).toEqual(pool);
+  });
+});
+
+describe("Kain, Traitorous Dragoon", () => {
+  it("dealing combat damage gives the player control of it; then you draw, make tapped Treasures and lose life, that many", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const kain = putOnBattlefield(s0, ap, kainTraitorous);
+    const hand = s0.players[ap]!.hand.length;
+    const life = s0.players[ap]!.life;
+    let s = passUntil(s0, "declareAttackers", ap);
+    // Flying during your turn.
+    expect(objHasKeyword(s, s.objects[kain]!, "Flying")).toBe(true);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: kain, defender: opp }] });
+    for (let i = 0; i < 60 && s.step !== "endCombat"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(controllerOf(s, s.objects[kain]!)).toBe(opp);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.players[ap]!.life).toBe(life - 2);
+    const treasures = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Treasure Token" && controllerOf(s, s.objects[id]!) === ap);
+    expect(treasures).toHaveLength(2);
+    expect(treasures.every((id) => s.objects[id]!.tapped)).toBe(true);
+  });
+});
+
+describe("Galactus, Devourer of Worlds", () => {
+  it("has to attack an opponent with the most life, unless you control Silver Surfer, Galactus's Herald", () => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, galactusDevour);
+    const [b, c, d] = s0.turnOrder.filter((p) => p !== ap);
+    s0.players[b!]!.life = 30;
+    s0.players[c!]!.life = 35;
+    s0.players[d!]!.life = 35;
+    let s = passUntil(s0, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [] })).toThrow(/must attack/);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: b! }] })).toThrow(/must attack/);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: d! }] })).not.toThrow();
+    // The bot attacks one of them too.
+    const bot = botActions(s, ap).find((a) => a.type === "declareAttackers");
+    expect(bot?.type === "declareAttackers" && bot.attacks.find((a) => a.attacker === g)?.defender).toSatisfy((x: unknown) => x === c || x === d);
+    // With Silver Surfer, no requirement.
+    const s2 = passUntil(s0, "main1", ap);
+    putOnBattlefield(s2, ap, bear({ name: "Silver Surfer, Galactus's Herald", supertypes: ["Legendary"] } as Partial<CardDef>));
+    s = passUntil(s2, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [] })).not.toThrow();
   });
 });

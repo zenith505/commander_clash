@@ -157,6 +157,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
+  if (spec.dealtDamageAsSourceThisTurn && !Object.values(s.turnLog?.damageSources ?? {}).some((keys) => keys.includes(`${o.id}@${o.zoneChanges ?? 0}`))) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
   if (spec.faceDown && !o.faceDown) return false;
@@ -811,6 +812,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;
+  if (spec.lostLifeThisTurn && (t.kind !== "player" || !s.lostLifeThisTurn?.includes(t.id))) return false;
   if (spec.comparedToYou && (t.kind !== "player" || !comparedToYouOk(s, spec.comparedToYou, t.id, controller))) return false;
   if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;

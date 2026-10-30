@@ -1,6 +1,6 @@
 # Roadmap
 
-27,947 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,975 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,147 of
 9,979 (91%).
 
@@ -2971,6 +2971,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   become tapped"), Spiny Starfish (counting regenerations), Magmablood Archaic (colors spent on the triggering spell),
   Wanderwine Farewell (Kindred), Archery Training and Heartseeker (a granted ability that names the source),
   Stormwild Capridor (prevented damage turned into counters), Awesome Presence (a block cost for each blocker).
+- Round B45 (harder skipped cards, least played first): creatures that dealt damage this turn, as that object
+  (Executioner's Swing, Avenging Arrow, Red Guardian, Restore the Peace, Treacherous Greed's sacrifice), creatures dealt
+  damage this turn (Inflame, Death-Rattle Oni), "each other creature that player controls" after a target an opponent
+  controls (Public Execution, Flames of the Raze-Boar; the target is left out even when it survives, rulings), "If it's
+  an Ally, scry 2" (Stand United; the scry pauses inside the "if"), "If it's blocking, instead put two +1/+1 counters
+  on it" (Will of the All-Hunter), "Spirit, creature with disturb, or enchantment" (Thraben Exorcism), "can block
+  Dragons as though it had reach" (Dragon Hunter), "target player who lost life this turn" (Rix Maadi Guildmage),
+  "Whenever a land enters during your turn" (Foe-liage), "lose flying and islandwalk" (Mystic Decree), anyone's Goblin
+  making "that player" discard (Cabal Slaver), "Whenever a player kicks a spell" (Saproling Infestation), "Lands you
+  control are 2/2 creatures with first strike. They're still lands." (Natural Emergence), "cast spells from your
+  graveyard" (Yawgmoth's Agenda), "each creature you control with level up" (Venerated Teacher), "becomes blocked by a
+  Wall, destroy that Wall at end of combat" (Battering Ram), untapped artifacts, creatures and lands counted once
+  (Maraxus of Keld), "each nontoken creature you controlled that died this turn" (Tobias), "When ~ enters and whenever
+  you gain life ... only once each turn" (MACH-1: the two triggers share the once), "~ or equipped creature attacks,
+  it gets +2/+0" (Chainflail Centipede: whichever attacked, rulings), "Lands you control are Swamps" (Swampbenders),
+  "All Slivers are colorless" (Ghostflame Sliver). +28 (27,975 of 31,936).
+- Out after round B45: Tamanoa (a trigger on damage from a noncreature source), Feast of Worms ("another land": a pick
+  that leaves out the target), Wall of Dust ("can't attack during its controller's next turn"), Ley Line (a target
+  chosen by the upkeep's player), Skulking Killer ("if that opponent controls no other creatures" as it resolves),
+  Rivals' Duel (two targets that share no creature type), Culling Scales (a target with the lowest mana value), Loyal
+  Sentry ("destroy that creature and ~" at once), Gladewalker Ritualist ("another creature you control named ~"),
+  Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (each needs a new mechanic).
 - Next for Lane B, least played first (up from about 19,600): Sacred Ground, Colfenor's Plans, Wight, Nivix, Szadek,
   Rain of Gore, Infernal Darkness, Pako, Goddric. Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).

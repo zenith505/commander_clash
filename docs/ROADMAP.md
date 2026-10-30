@@ -1,7 +1,7 @@
 # Roadmap
 
-28,065 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,153 of
+28,079 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,161 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1135,6 +1135,23 @@ line blocks.
    step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
    token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (a delayed trigger in which a
    target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations; Unexplained Absence.
+   Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
+   planeswalk-or-chaos vote, both no-ops outside Planechase, CR 701.31a, 311.7); "Players can't draw cards" (Maralen of
+   the Mornsong, Mornsong Aria: draw() stops, CR 121); "Lethal damage dealt to creatures you control is determined by
+   their power rather than their toughness" (Zilortha, cards.ts lethalLeft, CR 120.6, 704.5g); "skip their next X
+   turns, where X is the number of coins that came up heads" (Ral Zarek, Guest Lecturer); "Any player may cast
+   creature spells with mana value 3 or less without paying their mana costs and as though they had flash" (Aluren,
+   payZero anyPlayer flash; the app now holds priority for it, e2e round219.spec.ts); "if that player controls Kain,
+   ..." after giving it away (Kain, Traitorous Dragoon); "attacks an opponent with the most life among your opponents
+   each combat if able" (Galactus, mustAttackMostLife, CR 508.1d); a choice of three counters as it enters and "put the
+   same number of each kind of counter" (Denry Klin, e2e round219.spec.ts); "exile ... and put a hit counter on that
+   card" and "loses the game if they own three or more exiled cards with hit counters" (Etrata). +14 (28,079 of
+   31,936).
+   Out after round 219 (looked at, not done): Omen Machine (a mandatory "casts it without paying its mana cost if
+   able"); Rebbec, Architect of Ascension (protection from each mana value of artifacts you control); Nissa, Worldsoul
+   Speaker (paying {E} for each mana of a permanent spell's cost); Yusri, Fortune's Flame (choose a number, flips lost,
+   "if you won five flips", free casts for the turn); Party Dude ("Whenever one or more of your opponents are
+   attacked"); Feather, the Redeemed; Maralen, Fae Ascendant.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

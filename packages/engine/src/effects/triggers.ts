@@ -1209,6 +1209,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTransformsInto");
+    // "Whenever a permanent you control transforms into a Phyrexian" (CR 701.27e): the permanent, as it is now, is the subject.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentTransformsInto" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
   } else if (ev.type === "doorUnlocked") {
     // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
     const o = obj(s, ev.id);

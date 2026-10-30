@@ -72,11 +72,12 @@ const counterpoint = card("Counterpoint", "Instant", "{3}{U}{B}", {"cmc":5,"orac
 const pumpkinBombs = card("Pumpkin Bombs", "Artifact", "{1}{R}", {"cmc":2,"oracleText":"{T}, Discard two cards: Draw three cards, then put a fuse counter on this artifact. It deals damage equal to the number of fuse counters on it to target opponent. They gain control of this artifact.","keywords":[],"layout":"normal"});
 const pirsWhim = card("Pir's Whim", "Sorcery", "{3}{G}", {"cmc":4,"oracleText":"For each player, choose friend or foe. Each friend searches their library for a land card, puts it onto the battlefield tapped, then shuffles. Each foe sacrifices an artifact or enchantment of their choice.","keywords":[],"layout":"normal"});
 const virtussManeuve = card("Virtus's Maneuver", "Sorcery", "{2}{B}", {"cmc":3,"oracleText":"For each player, choose friend or foe. Each friend returns a creature card from their graveyard to their hand. Each foe sacrifices a creature of their choice.","keywords":[],"layout":"normal"});
+const nornsInquisito = card("Norn's Inquisitor", "Creature — Phyrexian Knight", "{1}{W}", {"cmc":2,"oracleText":"When this creature enters, incubate 2. (Create an Incubator token with two +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)\nWhenever a permanent you control transforms into a Phyrexian, put a +1/+1 counter on it.","power":"1","toughness":"1","keywords":["Incubate","Transform"],"layout":"normal"});
 const khorvathsFury = card("Khorvath's Fury", "Sorcery", "{4}{R}", {"cmc":5,"oracleText":"For each player, choose friend or foe. Each friend discards all cards from their hand, then draws that many cards plus one. Khorvath's Fury deals damage to each foe equal to the number of cards in their hand.","keywords":[],"layout":"normal"});
 
 describe("round 218 cards", () => {
   it("compile", () => supported(bleedingEffect, superadaptoid, aberrantMindSo, zimonesExperim, lastLaugh, weftwalking, baneLordOfDark, seizeTheStorm, prizedAmalgam));
-  it("compile (2)", () => supported(nyamiclassMoth, zaffaiAndTheTe, hideInPlainSig, counterpoint, pumpkinBombs, pirsWhim, virtussManeuve, khorvathsFury));
+  it("compile (2)", () => supported(nyamiclassMoth, zaffaiAndTheTe, hideInPlainSig, counterpoint, pumpkinBombs, pirsWhim, virtussManeuve, khorvathsFury, nornsInquisito));
 });
 
 describe("Bleeding Effect", () => {
@@ -469,5 +470,19 @@ describe("friend or foe", () => {
     expect(s.players[opp]!.hand.length).toBe(4);
     expect(s.players[others[1]!]!.life).toBe(39);
     expect(s.players[ap]!.life).toBe(40);
+  });
+});
+
+describe("Norn's Inquisitor", () => {
+  it("puts a +1/+1 counter on a permanent you control that transforms into a Phyrexian", () => {
+    const { s: s0, ap, ids } = setup([nornsInquisito]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    const inc = s.battlefield.find((id) => s.objects[id]!.isToken && controllerOf(s, s.objects[id]!) === ap)!;
+    expect(s.objects[inc]!.counters["+1/+1"]).toBe(2);
+    expect(characteristics(s, s.objects[inc]!).types).not.toContain("Creature");
+    s = settle(run(s, planActivate(s, ap, inc, 0)), { me: ap });
+    expect(characteristics(s, s.objects[inc]!).subtypes).toContain("Phyrexian");
+    expect(s.objects[inc]!.counters["+1/+1"]).toBe(3);
+    expect(pt(s, inc)).toBe("3/3");
   });
 });

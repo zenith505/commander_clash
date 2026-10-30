@@ -407,3 +407,142 @@ describe("Boxing Ring", () => {
     expect(planActivate(s, ap, ring, 0)).toBeNull();
   });
 });
+
+// Second batch: Karai, Future of the Foot ("if her sneak cost was paid this turn, instead"), In Search of Greatness
+// ("If you don't" after a free cast from hand), Tolsimir, Midnight's Light ("if ~ attacked this combat", "blocks that
+// Wolf this combat if able").
+const karaiFutureoft = card("Karai, Future of the Foot", "Legendary Creature — Human Ninja", "{1}{W}{B}", {"cmc":3,"oracleText":"Sneak {2}{W}{B} (You may cast this spell for {2}{W}{B} if you also return an unblocked attacker you control to hand during the declare blockers step. She enters tapped and attacking.)\nWhenever Karai deals combat damage to a player, return target creature card from your graveyard to your hand. If her sneak cost was paid this turn, instead return that card to the battlefield.","power":"3","toughness":"3","keywords":["Sneak"],"layout":"normal"});
+const inSearchofGrea = card("In Search of Greatness", "Enchantment", "{G}{G}", {"cmc":2,"oracleText":"At the beginning of your upkeep, you may cast a permanent spell from your hand with mana value equal to 1 plus the greatest mana value among other permanents you control without paying its mana cost. If you don't, scry 1.","keywords":["Scry"],"layout":"normal"});
+const tolsimirMidnig = card("Tolsimir, Midnight's Light", "Legendary Creature — Elf Scout", "{2}{G}{W}{W}", {"cmc":5,"oracleText":"Lifelink\nWhen Tolsimir enters, create Voja Fenstalker, a legendary 5/5 green and white Wolf creature token with trample.\nWhenever a Wolf you control attacks, if Tolsimir attacked this combat, target creature an opponent controls blocks that Wolf this combat if able.","power":"3","toughness":"2","keywords":["Lifelink"],"layout":"normal"});
+const fighterClass = card("Fighter Class", "Enchantment — Class", "{R}{W}", {"cmc":2,"oracleText":"(Gain the next level as a sorcery to add its ability.)\nWhen this Class enters, search your library for an Equipment card, reveal it, put it into your hand, then shuffle.\n{1}{R}{W}: Level 2\nEquip abilities you activate cost {2} less to activate.\n{3}{R}{W}: Level 3\nWhenever a creature you control attacks, up to one target creature blocks it this combat if able.","keywords":[],"layout":"class"});
+
+/** Passes through combat to the second main phase, answering `me`'s trigger targets with `targets`. */
+const throughCombat = (s: GameState, me: PlayerId, targets: TargetChoice[]) => {
+  for (let i = 0; i < 200 && s.step !== "main2"; i++) {
+    const p = s.pending;
+    if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+    else if (p?.kind === "chooseTargets" && p.player === me) s = act(s, { type: "chooseTargets", player: me, targets });
+    else if (p) s = act(s, botActions(s, p.player)[0]!);
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return settle(s, { me });
+};
+
+describe("Karai, Future of the Foot", () => {
+  it("are fully supported", () => supported(karaiFutureoft, inSearchofGrea, tolsimirMidnig, fighterClass));
+
+  it("cast normally: the creature card comes back to hand", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const karai = putOnBattlefield(s0, ap, karaiFutureoft);
+    const dead = into(s0, ap, bear({ name: "Dead Bear" }), "graveyard");
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: karai, defender: opp }] });
+    s = throughCombat(s, ap, [tgt(dead)]);
+    expect(zone(s, dead)).toBe("hand");
+  });
+
+  it("sneaked in this turn: the card returns to the battlefield instead", () => {
+    const { s: s0, ap, opp, ids } = setup([karaiFutureoft]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const dead = into(s0, ap, bear({ name: "Dead Bear" }), "graveyard");
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 40 && s.step !== "declareBlockers"; i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    while (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+    s = run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, { alt: "sneak", returnToHand: [b] }));
+    s = settle(s, { me: ap });
+    expect(s.objects[ids[0]!]!.attacking).toBe(opp);
+    s = throughCombat(s, ap, [tgt(dead)]);
+    expect(zone(s, dead)).toBe("battlefield");
+  });
+});
+
+describe("In Search of Greatness", () => {
+  const upkeep = (s0: GameState, ap: PlayerId) => {
+    let s = passUntil(s0, "upkeep", s0.turnOrder.find((p) => p !== ap));
+    return untilAsked(passUntil(s, "upkeep", ap), ap);
+  };
+
+  it("offers only permanent spells with mana value 1 plus the greatest among other permanents you control, and casts it free", () => {
+    const three = card("Three Drop", "Creature — Ox", "{2}{G}", { power: "3", toughness: "3" });
+    const four = card("Four Drop", "Creature — Ox", "{3}{G}", { power: "4", toughness: "4" });
+    const bolt = card("Three Mana Sorcery", "Sorcery", "{2}{R}", { oracleText: "Draw a card." });
+    const { s: s0, ap, ids } = setup([three, four, bolt]);
+    putOnBattlefield(s0, ap, inSearchofGrea);
+    putOnBattlefield(s0, ap, bear());
+    let s = upkeep(s0, ap);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromHand" });
+    const options = s.pending?.kind === "chooseOption" ? s.pending.options : [];
+    // In Search of Greatness itself doesn't count (other permanents): the greatest is the Bear's 2.
+    expect(options).toContain(ids[0]);
+    expect(options).not.toContain(ids[1]);
+    expect(options).not.toContain(ids[2]);
+    s = act(s, { type: "chooseOption", player: ap, choice: ids[0]! });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: ids[0] });
+    s = run(s, planCast(s, ap, ids[0]!));
+    // Cast: no scry.
+    s = settle(s, { me: ap });
+    expect(s.pending).toBeFalsy();
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("if you don't cast one, scry 1", () => {
+    const three = card("Three Drop", "Creature — Ox", "{2}{G}", { power: "3", toughness: "3" });
+    const { s: s0, ap, ids } = setup([three]);
+    putOnBattlefield(s0, ap, inSearchofGrea);
+    putOnBattlefield(s0, ap, bear());
+    let s = upkeep(s0, ap);
+    s = act(s, { type: "chooseOption", player: ap, choice: "none" });
+    s = settle(s, { me: ap });
+    expect(s.pending?.kind).toBe("arrangeTop");
+    expect(zone(s, ids[0]!)).toBe("hand");
+  });
+});
+
+describe("Tolsimir, Midnight's Light", () => {
+  const toBlocks = (s0: GameState, ap: PlayerId, attackers: ObjectId[], opp: PlayerId, targets: TargetChoice[]) => {
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: attackers.map((attacker) => ({ attacker, defender: opp })) });
+    let asked = 0;
+    for (let i = 0; i < 40 && !(s.pending?.kind === "declareBlockers" && s.pending.player === opp); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets" && p.player === ap) (asked++, (s = act(s, { type: "chooseTargets", player: ap, targets })));
+      else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return { s, asked };
+  };
+
+  it("enters with Voja Fenstalker; when both attack, the target must block the Wolf", () => {
+    const { s: s0, ap, opp, ids } = setup([tolsimirMidnig]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), { me: ap });
+    const voja = s.battlefield.find((id) => nameOf(s, id) === "Voja Fenstalker")!;
+    expect(voja).toBeTruthy();
+    const c = characteristics(s, s.objects[voja]!);
+    expect(c.subtypes).toContain("Wolf");
+    expect(c.supertypes).toContain("Legendary");
+    expect(objHasKeyword(s, s.objects[voja]!, "Trample")).toBe(true);
+    s.objects[voja]!.controlledSinceTurn = -1;
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
+    const blocker = putOnBattlefield(s, opp, bear({ name: "Blocker" }));
+    const r = toBlocks(s, ap, [ids[0]!, voja], opp, [tgt(blocker)]);
+    expect(r.asked).toBe(1);
+    expect(() => act(r.s, { type: "declareBlockers", player: opp, blocks: [] })).toThrow(/must block/);
+    expect(() => act(r.s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: ids[0]! }] })).toThrow(/must block/);
+    expect(act(r.s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: voja }] }).objects[blocker]!.blocking).toEqual([voja]);
+  });
+
+  it("a Wolf attacking without Tolsimir doesn't trigger", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, tolsimirMidnig);
+    const wolf = putOnBattlefield(s0, ap, card("Test Wolf", "Creature — Wolf", "{1}{G}", { power: "2", toughness: "2" }));
+    putOnBattlefield(s0, opp, bear({ name: "Blocker" }));
+    const r = toBlocks(s0, ap, [wolf], opp, []);
+    expect(r.asked).toBe(0);
+    expect(r.s.pending).toMatchObject({ kind: "declareBlockers", player: opp });
+    expect(() => act(r.s, { type: "declareBlockers", player: opp, blocks: [] })).not.toThrow();
+  });
+});

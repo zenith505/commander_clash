@@ -1168,6 +1168,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
   if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };
+  // Tolsimir, Midnight's Light: "if ~ attacked this combat": declared as an attacker in this combat (CR 508.1), even if
+  // it's been removed from combat since.
+  if (/^~ attacked this combat$/.test(text)) return { kind: "self", is: "attackedThisCombat" };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).

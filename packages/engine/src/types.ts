@@ -2392,6 +2392,8 @@ export interface Resolving {
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
     castFromHand?: string;
+    /** The card a castFromHand chose to cast (In Search of Greatness's "if you don't"). */
+    castFromHandId?: string;
     /** The same from the graveyard (Sword of Once and Future): the card being cast, to exile it instead of its going back. */
     castFromYard?: ObjectId;
     /**

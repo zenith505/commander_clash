@@ -9686,6 +9686,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "control" }], duration: "game", whileCounter: counter });
       continue;
     }
+    // In Search of Greatness: "you may cast a permanent spell from your hand ... without paying its mana cost. If you don't,
+    // scry 1.": only if no spell was cast that way (declining, or having none to cast).
+    const dontCast = /^If you don't, (.+)$/.exec(s);
+    if (dontCast && last?.type === "castFromHand" && !last.setsDid && si === sentences.length - 1) {
+      const inner = parseOne(capital(dontCast[1]!), ctx);
+      if (!inner) return null;
+      last.setsDid = true;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      continue;
+    }
+    // Karai, Future of the Foot: "return target creature card from your graveyard to your hand. If her sneak cost was paid
+    // this turn, instead return that card to the battlefield.": where it goes chosen by whether this permanent was cast
+    // for its sneak cost this turn (CR 702.190a), as it resolves.
+    const sneakInstead = /^If (?:his|her|its|~'s) sneak cost was paid this turn, instead return that card to the battlefield$/.test(s);
+    if (sneakInstead) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || si !== sentences.length - 1 || effects.length !== 1 || prev?.type !== "bounce" || prev.what.ref !== "target" || ctx.targets[prev.what.index]?.kind !== "card" || ctx.targets[prev.what.index]?.owner !== "you") return null;
+      effects[0] = { type: "if", cond: { kind: "state", cond: { kind: "self", is: "sneakThisTurn" } }, effects: [{ type: "putOntoBattlefield", what: prev.what }], otherwise: [prev] };
+      continue;
+    }
     // Zimone and Dina: "Draw a card. You may put a land card from your hand onto the battlefield tapped. If you control eight
     // or more lands, repeat this process once.": the whole effect again (not the cost, rulings), if the condition holds
     // after the first time.

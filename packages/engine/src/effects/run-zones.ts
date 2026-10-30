@@ -1033,7 +1033,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o?.zone === "stack" && !e.yardNoExile) o.exileIfToGraveyard = true;
         sc.castFromYard = undefined;
       }
-      if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
+      if (sc.castFromHand === "cast" || sc.castFromHand === "none") {
+        // In Search of Greatness: "If you don't": whether the spell was cast (it's on the stack now).
+        if (e.setsDid) s.resolving!.did = sc.castFromHand === "cast" && s.objects[sc.castFromHandId ?? ""]?.zone === "stack";
+        return;
+      }
+      if (e.setsDid) s.resolving!.did = false;
       // Jace's Mindseeker: the cards this resolution milled, still where they went.
       const milled = e.milled ? [...(s.resolving!.milled ?? []), ...(s.resolving!.milledExiled ?? [])].filter((m) => s.objects[m.id] && (s.objects[m.id]!.zoneChanges ?? 0) === m.zc).map((m) => m.id) : undefined;
       const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
@@ -1063,6 +1068,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const id = sc.castFromHand;
       sc.castFromHand = "cast";
+      sc.castFromHandId = id;
       if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };

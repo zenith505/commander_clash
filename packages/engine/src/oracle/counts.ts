@@ -717,6 +717,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   if (each && /^creature type among creatures you control$/i.test(p)) return count({ kind: "creatureTypesAmong" });
+  if (/^planeswalker types among planeswalkers you control$/i.test(p)) return count({ kind: "planeswalkerTypesAmong" });
   // Odric, Blood-Cursed: "the number of abilities from among flying, first strike, ... found among creatures you control":
   // each one once, however many creatures have it (rulings).
   if ((m = /^(?:the number of )?abilities from among ((?:[a-z ]+, )+and [a-z ]+) found among creatures you control$/i.exec(p))) {

@@ -1379,7 +1379,13 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   const toCreatures = creatureBatch;
   creatureBatch = outerCreatures;
   for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
-  for (const [id, amount] of dealtTo) fireEvent(s, { type: "wasDealtDamage", id, amount, ...(combat ? { combat: true as const } : {}) });
+  for (const [id, amount] of dealtTo) {
+    // Each permanent's damage events this turn: damage dealt at the same time is one event (CR 120.3).
+    const key = `${id}@${s.objects[id]?.zoneChanges ?? 0}`;
+    const times = ((s.turnLog ??= {}).timesDealtDamage ??= {});
+    times[key] = (times[key] ?? 0) + 1;
+    fireEvent(s, { type: "wasDealtDamage", id, amount, ...(combat ? { combat: true as const } : {}) });
+  }
   // "Whenever a source deals damage to ~": each source's damage to it, apart (Phyrexian Obliterator).
   const bySource = new Map<ObjectId, Map<DamageSource, number>>();
   for (const e of out) {

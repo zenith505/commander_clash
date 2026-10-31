@@ -1186,7 +1186,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "sourcesDealtDamage":
       return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
     case "castCount":
-      return (s.castThisTurn ?? []).filter((c) => c.player === (cond.activePlayer ? s.activePlayer : you) && (!cond.fromHand || c.from === "hand") && (cond.mvAtLeast === undefined || (c.mv ?? 0) >= cond.mvAtLeast) && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
+      // In a free-for-all game every other player is an opponent (CR 102.3).
+      return (s.castThisTurn ?? []).filter((c) => (cond.byOpponent ? c.player !== you : c.player === (cond.activePlayer ? s.activePlayer : you)) && (!cond.fromHand || c.from === "hand") && (cond.mvAtLeast === undefined || (c.mv ?? 0) >= cond.mvAtLeast) && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
     case "colorsAmong": {
       const colors = new Set<Color>();
       for (const c of chars.values()) if (c.controller === you) for (const k of c.colors) colors.add(k);

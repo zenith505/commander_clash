@@ -7907,6 +7907,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "739a5220-50cd-4148-be58-1bbdeef2954e",
+  "name": "Greymond, Avacyn's Stalwart",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "As Greymond, Avacyn's Stalwart enters, choose two abilities from among first strike, vigilance, and lifelink.\nHumans you control have each of the chosen abilities.\nAs long as you control four or more Humans, Humans you control get +2/+2.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0144d9bb-d3cb-4c23-b133-6653d7c3a76d",
   "name": "Grip of Amnesia",
   "manaCost": "{1}{U}",
@@ -20634,6 +20667,36 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "70570170-be76-4c56-9151-c4b6e253f462",
+  "name": "Vigilance",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has vigilance. (Attacking doesn't cause it to tap.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

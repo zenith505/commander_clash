@@ -554,7 +554,7 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
-  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? compileCard(defOf(s, obj(s, id))).miracle : compileCard(defOf(s, obj(s, id))).madness;
+  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : compileCard(defOf(s, obj(s, id))).madness;
 }
 
 /**
@@ -2605,18 +2605,22 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
   // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.
   const card = obj(s, top);
-  const miracle = p.draws.n === 1 && card.zone === "hand" ? compileCard(defOf(s, card)).miracle : undefined;
-  if (miracle) {
+  // Each instance of miracle triggers on its own, a granted one too (Lorehold, the Historian: "Each instant and sorcery
+  // card in your hand has miracle {2}"); the first to resolve may cast it, the rest then find it gone (CR 702.94a, 400.7).
+  const own = p.draws.n === 1 && card.zone === "hand" ? compileCard(defOf(s, card)).miracle : undefined;
+  const miracles = p.draws.n === 1 && card.zone === "hand" ? [...(own ? [{ mana: own, granted: false }] : []), ...grantedMiracles(s, pid, defOf(s, card)).map((mana) => ({ mana, granted: true }))] : [];
+  if (miracles.length) {
     log(s, `${p.name} reveals ${defOf(s, card).name} (miracle).`);
     card.miracleRevealed = { turn: s.turn, zc: card.zoneChanges ?? 0 };
-    s.triggerQueue.push({
-      sourceId: top,
-      sourceCardId: cardIdOf(card),
-      controller: pid,
-      index: -1,
-      subject: { id: top, zc: card.zoneChanges ?? 0 },
-      body: { targets: [], effects: [{ type: "miracle" }], text: `Miracle ${miracle}: you may cast ~ for its miracle cost.` },
-    });
+    for (const m of miracles)
+      s.triggerQueue.push({
+        sourceId: top,
+        sourceCardId: cardIdOf(card),
+        controller: pid,
+        index: -1,
+        subject: { id: top, zc: card.zoneChanges ?? 0 },
+        body: { targets: [], effects: [{ type: "miracle", ...(m.granted ? { cost: m.mana } : {}) }], text: `Miracle ${m.mana}: you may cast ~ for its miracle cost.` },
+      });
   }
   return true;
 }
@@ -5259,6 +5263,14 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "prowl") return compileCard(d).altCosts?.find((a) => a.kind === alt) ?? (s && pid !== undefined ? grantedProwl(s, pid, d) : undefined);
   if (alt === "grantedWarp") return s && pid !== undefined ? grantedWarp(s, pid, d) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
+}
+
+/** The miracle costs the permanents `pid` controls give this card in their hand (Lorehold, the Historian; CR 702.94a), checked by its characteristics there. */
+function grantedMiracles(s: GameState, pid: PlayerId, d: CardDef): string[] {
+  return s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).handMiracle ?? []).filter((x) => printedMatches(x.filter, d)).map((x) => x.mana) : [];
+  });
 }
 
 /**
@@ -8119,6 +8131,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       else if (pend.what === "riot")
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
+    } else if (pend.what === "keyword" && entry?.many) {
+      // Greymond: "choose two abilities from among ...": each one different (Chosen.keywords).
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
+      o.chosen = { ...o.chosen, keywords: [...(o.chosen?.keywords ?? []), choice] };
+      log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
     } else {
       o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
@@ -8731,7 +8748,9 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "number", options: [String(r.min)], numberRange: r, objectId: o.id, prompt: r.max === 999 ? "choose a number" : `choose a number between ${r.min} and ${r.max}` };
       return true;
     }
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : {}) };
+    // Greymond: "choose two abilities from among ...": one not chosen already.
+    const many = c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;

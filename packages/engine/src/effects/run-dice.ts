@@ -6,7 +6,8 @@ import { controllerOf } from "../layers";
 import { destroyPermanent, livingPlayers, log, obj, player } from "../game";
 import { nextRandom } from "../rng";
 import type { GameState, PlayerId } from "../types";
-import { ResolveCtx, amountNow, objects } from "./resolve";
+import { ResolveCtx, amountNow, ctxSource, objects, players } from "./resolve";
+import { dealDamage } from "../damage";
 import { fireEvent } from "./triggers";
 
 /** Where `pid` comes in turn order, counted from the active player. */
@@ -84,6 +85,21 @@ export function rollDice(s: GameState, pid: PlayerId, sides: number, n: number, 
 }
 
 /**
+ * Edgar, King of Figaro: "The first time you flip one or more coins each turn, those coins come up heads and you win those
+ * flips": whether `pid`'s next flips are those (a replacement of the results, CR 705.3; rulings: whatever they would have
+ * shown, and won even if they'd have no winner).
+ */
+export function flipsRigged(s: GameState, pid: PlayerId): boolean {
+  return !s.turnLog?.coinsFlipped?.includes(pid) && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).firstFlipsHeads);
+}
+
+/** `pid` has flipped one or more coins this turn (TurnLog.coinsFlipped). */
+export function noteFlipped(s: GameState, pid: PlayerId) {
+  const t = ((s.turnLog ??= {}).coinsFlipped ??= []);
+  if (!t.includes(pid)) t.push(pid);
+}
+
+/**
  * "Flip a coin" (CR 705.2): its controller calls heads or tails and wins the flip if the coin matches, an even chance
  * either way, so only whether they won is kept. "Flip a coin until you lose a flip": as many as it takes. Each flip won
  * or lost is an event of its own ("whenever you win a coin flip").
@@ -105,8 +121,13 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
     log(s, `${player(s, who).name} flips two coins for ${src} and keeps the ${won ? "won" : "lost"} flip.`);
     return;
   }
+  // Edgar: this set of flips comes up heads and is won; with "until you lose a flip", only the first flip of the run is
+  // the first time this turn.
+  const heads = flipsRigged(s, who);
+  const edgar = heads ? " (the first coins flipped this turn come up heads)" : "";
+  noteFlipped(s, who);
   let first: boolean[] | undefined;
-  if (!e.untilLose && thumb && !e.n) {
+  if (!e.untilLose && thumb && !e.n && !heads) {
     const [a, b] = (first = flip());
     if (a !== b) {
       sc.thumbFlip = true;
@@ -118,10 +139,12 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   // Ral Zarek: flips no one calls, only heads or tails (CR 705.2): no "won" or "lost" events (rulings). With Krark's Thumb
   // each is two coins and one is ignored: the heads one is kept.
   if (e.uncalled) {
-    let heads = 0;
-    for (let i = 0; i < (e.n ?? 1); i++) if (flip().some((h) => h)) heads++;
-    s.resolving!.flipped = { won: heads > 0, wins: heads };
-    log(s, `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${heads} came up heads.`);
+    let up = 0;
+    for (let i = 0; i < (e.n ?? 1); i++) if (heads || flip().some((h) => h)) up++;
+    // With Edgar they're won flips too (rulings on Edgar, King of Figaro with Ral Zarek).
+    if (heads) for (let i = 0; i < (e.n ?? 1); i++) fireEvent(s, { type: "coinFlipped", player: who, won: true });
+    s.resolving!.flipped = { won: up > 0, wins: up };
+    log(s, `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${up} came up heads${edgar}.`);
     return;
   }
   let wins = 0;
@@ -130,13 +153,13 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   // With Krark's Thumb, each flip of the run keeps a won coin if there is one: a lost flip would only end the run.
   // "Flip three coins": each flip on its own (CR 705.1); with Krark's Thumb each keeps a won coin if there is one.
   for (let i = 0; i < 100; i++) {
-    won = (i === 0 && first ? first : flip()).some((w) => w);
+    won = heads && (i === 0 || !!e.n) ? true : (i === 0 && first ? first : flip()).some((w) => w);
     fireEvent(s, { type: "coinFlipped", player: who, won });
     if (won) wins++;
     if (e.n ? i + 1 >= e.n : !won || !e.untilLose) break;
   }
   s.resolving!.flipped = { won, wins };
-  log(s, e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won.` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won.` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip.`);
+  log(s, (e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip`) + `${edgar}.`);
 }
 
 /**
@@ -150,10 +173,47 @@ export function runCoinEachEffect(s: GameState, e: Extract<Effect, { type: "flip
   const who = ctx.controller;
   const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
   const each = objects(s, { ref: "each", filter: e.filter }, ctx);
-  const tails = each.filter((o) => {
+  // Edgar: all of them come up heads, and are won (rulings).
+  const heads = each.length > 0 && flipsRigged(s, who);
+  if (each.length) noteFlipped(s, who);
+  if (heads) for (let i = 0; i < each.length; i++) fireEvent(s, { type: "coinFlipped", player: who, won: true });
+  const tails = heads ? [] : each.filter((o) => {
     const coins = thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5];
     return controllerOf(s, o) === who ? coins.every((h) => !h) : coins.some((h) => !h);
   });
   log(s, `${player(s, who).name} flips ${each.length} coin${each.length === 1 ? "" : "s"} for ${src}: ${tails.length ? `tails for ${tails.map((o) => defOf(s, o).name).join(", ")}` : "no tails"}.`);
   for (const o of tails) if (o.zone === "battlefield") destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, false, who);
+}
+
+/**
+ * Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails. Repeat
+ * this process until both players' coins come up heads on the same flip." Flips no one calls or wins (rulings); each point
+ * of damage dealt on its own (rulings). Edgar makes a player's first flip this turn heads, and won (rulings on Edgar). With
+ * Krark's Thumb a player keeps the heads coin (not asked: ROADMAP). The process ends some time; a long run is cut short
+ * where paper Magic would be (CR 732).
+ */
+export function runFlipClashEffect(s: GameState, e: Extract<Effect, { type: "flipClash" }>, ctx: ResolveCtx, src: string): void {
+  const you = ctx.controller;
+  const them = players(s, e.with, ctx)[0];
+  if (them === undefined) return;
+  const coin = (pid: PlayerId): boolean => {
+    const rig = flipsRigged(s, pid);
+    noteFlipped(s, pid);
+    if (rig) {
+      fireEvent(s, { type: "coinFlipped", player: pid, won: true });
+      return true;
+    }
+    const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).flipTwo);
+    return (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]).some((h) => h);
+  };
+  let rounds = 0;
+  const hurt = { [you]: 0, [them]: 0 } as Record<PlayerId, number>;
+  for (; rounds < 200; rounds++) {
+    const mine = coin(you);
+    const theirs = coin(them);
+    for (const [pid, h] of [[you, mine], [them, theirs]] as const)
+      if (!h && !player(s, pid).lost) hurt[pid] = (hurt[pid] ?? 0) + dealDamage(s, ctxSource(s, ctx), { player: pid }, e.damage);
+    if (mine && theirs) break;
+  }
+  log(s, `${player(s, you).name} and ${player(s, them).name} flip coins for ${src} ${rounds + 1} time${rounds ? "s" : ""}: ${player(s, you).name} is dealt ${hurt[you]} damage, ${player(s, them).name} ${hurt[them]}.`);
 }

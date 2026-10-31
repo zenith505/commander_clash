@@ -8292,6 +8292,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails.
+    // Repeat this process until both players' coins come up heads on the same flip." (Effect flipClash; CR 705).
+    if (/^You and target opponent each flip a coin$/.test(s) && /^~ deals (\d+) damage to each player whose coin comes up tails\.?$/.test(sentences[si + 1] ?? "") && /^Repeat this process until both players' coins come up heads on the same flip\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length && !ctx.targets.length) {
+      const index = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+      effects.push({ type: "flipClash", with: { ref: "target", index }, damage: Number(/(\d+)/.exec(sentences[si + 1]!)![1]) });
+      si = sentences.length;
+      continue;
+    }
+    // Behemoth of Vault 0: "you may pay an amount of {E} equal to target nonland permanent's mana value. When you do,
+    // destroy that permanent": the target chosen as the ability is put on the stack, the energy counted and paid as it
+    // resolves; paying triggers a reflexive ability without a target, about that permanent (CR 603.12; rulings).
+    const payEnergyMv = /^[Yy]ou may pay an amount of \{E\} equal to target ([a-z ]+?)'s mana value$/.exec(s);
+    const payEnergyWhen = payEnergyMv && si + 2 === sentences.length ? /^When you do, destroy that (permanent|creature|artifact)\.?$/.exec(sentences[si + 1]!) : null;
+    if (payEnergyMv && payEnergyWhen) {
+      const spec = parseTargetPhrase(payEnergyMv[1]!, { target: true });
+      if (spec?.kind !== "object" || ctx.targets.length) return null;
+      const index = addTarget(ctx, { ...spec, text: `target ${payEnergyMv[1]!}` });
+      const reflexive = reflexiveBody("destroy it", ctx, false, true);
+      if (!reflexive) return null;
+      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive, about: { target: index } }], pay: {}, payEnergy: { count: { kind: "manaValue", of: { ref: "target", index } } }, text: `pay an amount of {E} equal to target ${payEnergyMv[1]!}'s mana value. When you do, destroy that ${payEnergyWhen[1]!}` });
+      si = sentences.length;
+      continue;
+    }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
     if (mayPay) {
       const pay = parsePayCost(mayPay[1]!);
@@ -9653,6 +9676,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Sindbad, Fa'adiyah Seer: "Draw a card and reveal it. If it isn't a land card, discard it.": the card drawn (none if the
     // draw was replaced), revealed, and discarded unless it's a land card.
     if (/^Draw a card and reveal it$/.test(s)) {
+      // Jace, Mirror Mage: "Remove a number of loyalty counters equal to that card's mana value from ~": none if the draw
+      // was replaced (rulings), all he has if it's more (CR 704.5i then).
+      if (/^Remove a number of loyalty counters equal to that card's mana value from ~\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) {
+        effects.push({ type: "draw", who: { ref: "you" }, n: 1 }, { type: "revealDrawn", keep: { kind: "card", types: [], text: "card" } }, { type: "removeCounters", what: { ref: "self" }, counter: "loyalty", n: { count: { kind: "drawnRevealedMv" } } });
+        si++;
+        continue;
+      }
       const unless = /^If it isn't an? ([a-z]+ card), discard it\.?$/.exec(sentences[si + 1] ?? "");
       const keep = unless && parseSearchFilter(unless[1]!);
       if (!keep) return null;
@@ -10293,6 +10323,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "When ~ enters, sacrifice it. When you do, search ..." (Brokers Hideout), "At the beginning of your upkeep,
       // sacrifice ~. When you do, ..." (Smoke Bomb): done if ~ is still there as that object to be sacrificed (CR 400.7).
       const sacSelf = prev?.type === "sacrifice" && prev.what.ref === "self" && !prev.byController && !ctx.selfCard;
+      // Glissa's Retriever: "When ~ dies, exile it. When you do, ...": only if that card was exiled from the graveyard it
+      // went to (CR 400.7, 603.12; rulings).
+      const exiledSelf = prev?.type === "exile" && prev.what.ref === "selfCard" && !prev.until && effects.length === 1 && !ctx.spell;
       // "Mill three cards. When you do, ..." (Wick's Patrol): only if all of them were milled; with fewer in the library,
       // you mill as many as you can but it doesn't trigger (rulings on Wick's Patrol; CR 701.17b).
       const milled = prev?.type === "mill" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0;
@@ -10320,7 +10353,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // ability resolves the counters are put (CR 608.2b).
       const countedTarget = prev?.type === "counters" && prev.what.ref === "target" && prev.what.index === 0 && ctx.targets.length === 1 && !ctx.targets[0]!.many && !ctx.targets[0]!.optional && typeof prev.n === "number" && prev.n > 0;
       const always = (whenDo === searched || countedTarget || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
-      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
+      if (!rolled && !counted && !mayDo && !sacSelf && !exiledSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Ratonhnhaké꞉ton: "Create a 1/1 black Assassin creature token with menace. When you do, return target Equipment card
       // from your graveyard to the battlefield, then attach it to that token": about the token created, which must still
       // be there (CR 603.12, 400.7). With a token doubler it's about the first one created.
@@ -10394,6 +10427,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const aboutSacrificed = sacPick && JSON.stringify(reflexive).includes('"ref":"sacrificed"');
       if (aboutSacrificed) {
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive, sacrificed: true }] });
+        continue;
+      }
+      if (exiledSelf) {
+        effects.push({ type: "if", cond: { kind: "exiledThisWay", cards: true }, effects: [{ type: "reflexive", body: reflexive }] });
         continue;
       }
       if (sacSelf) {
@@ -10698,6 +10735,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[blackAnd[1] as "white"];
       if (prev?.type !== "putOntoBattlefield" || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods || !CREATURE_TYPES.has(blackAnd[2]!)) return null;
       prev.alsoMods = [{ kind: "setColors", colors: [color] }, { kind: "addTypes", types: [], subtypes: [blackAnd[2]!] }];
+      continue;
+    }
+    // Call of the Death-Dweller: "Return up to two target creature cards ... to the battlefield. Put a deathtouch counter on
+    // either of them. Then put a menace counter on either of them.": each counter on one of the permanents they became,
+    // chosen as it resolves (not targeted), the same one or not; none returned, no counters (rulings).
+    const either = new RegExp(`^(?:Then )?[Pp]ut an? ${COUNTER} counter on either of them$`).exec(s);
+    if (either) {
+      const put = [...effects].reverse().find((x) => x.type === "putOntoBattlefield");
+      const last = effects[effects.length - 1];
+      if (put?.type !== "putOntoBattlefield" || put.what.ref !== "target" || put.what.n !== 2 || !(last === put || (last?.type === "pick" && last.fromTargets))) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], text: "creature returned this way" }, n: 1, action: "counters", counter: { kind: counterKind(either[1]!), n: 1 }, fromTargets: { index: put.what.index, n: 2 }, prompt: `put a ${either[1]!} counter on one of them` });
+      continue;
+    }
+    // Xu-Ifit, Osteoharmonist: "Return target creature card from your graveyard to the battlefield. It's a Skeleton in
+    // addition to its other types and has no abilities": the permanent it became, from then on, as it enters, so it loses
+    // its enters abilities before they could apply or trigger (CR 611.2c, 613.1d, 613.1f; rulings).
+    const noAbilities = /^It's an? ([A-Z][a-z]+) in addition to its other types and has no abilities$/.exec(s);
+    if (noAbilities) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n || prev.alsoMods || !CREATURE_TYPES.has(noAbilities[1]!)) return null;
+      prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [noAbilities[1]!] }, { kind: "loseAllAbilities" }];
       continue;
     }
     // Valkyrie's Call: "It has flying and is an Angel in addition to its other types": the same as "It's an Angel with

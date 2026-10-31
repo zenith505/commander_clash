@@ -17,6 +17,8 @@ export interface CopyExcept {
   unlessHas?: string;
   notLegendary?: boolean;
   legendary?: boolean;
+  /** "Its starting loyalty is 1" (Jace, Mirror Mage): the printed loyalty of a copy of a planeswalker (CR 306.5b, 707.9b). */
+  loyalty?: number;
   /**
    * "Except it's a 4/4 black Zombie": these creature types instead of its other ones (CR 205.1a, rulings on God-Pharaoh's
    * Gift); "a 6/6 green Dinosaur creature": these card types instead of its other ones.
@@ -128,6 +130,7 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
     ...(except.pt && (types.includes("Creature") || base.subtypes.includes("Vehicle")) ? { power: String(except.pt[0]), toughness: String(except.pt[1]) } : {}),
     ...(except.colors ? { colors: except.colors } : except.addColors ? { colors: [...base.colors, ...except.addColors.filter((c) => !base.colors.includes(c))] } : {}),
     ...(except.noManaCost ? { manaCost: "", cmc: 0 } : {}),
+    ...(except.loyalty !== undefined && types.includes("Planeswalker") ? { loyalty: String(except.loyalty) } : {}),
   } as Partial<T> & { cmc?: number };
 }
 

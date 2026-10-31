@@ -296,6 +296,8 @@ export type Count =
   | { kind: "discardedMatching"; filter: TargetSpec }
   /** "For each card drawn this way": the cards drawn in this resolution's draw before (Struggle for Project Purity). */
   | { kind: "drawnThisWay" }
+  /** "Remove a number of loyalty counters equal to that card's mana value" after "Draw a card and reveal it" (Jace, Mirror Mage): the drawn card's mana value, 0 if the draw was replaced (rulings). */
+  | { kind: "drawnRevealedMv" }
   /** "For each creature card put into a graveyard this way" after a mill (Dread Summons): the milled cards that went there and match. */
   | { kind: "milledThisWay"; filter?: TargetSpec }
   /** "The number of rad counters you have", "the total number of rad counters among players" (`who` unset; CR 728). */
@@ -506,7 +508,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1746,6 +1748,12 @@ export interface StaticAbility {
    * offFieldTyped).
    */
   offFieldSpells?: true;
+  /**
+   * "Lands you control and land cards you own that aren't on the battlefield are Deserts in addition to their other types"
+   * (Dune Chanter): its type change applies to its controller's land cards outside the battlefield too (layers.ts
+   * offFieldTyped).
+   */
+  offFieldLands?: true;
 }
 
 /**
@@ -2376,7 +2384,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** Ghired, Conclave Exile: "populate. The token enters tapped and attacking." */ attacking?: true; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true; /** "On each of up to two Soldiers you control" (SOLDIER Military Program): up to `n`, none too. */ upTo?: true; /** With "choose" and `least`, before "Destroy that creature" (Drop of Honey): not one with indestructible while another tied one can be destroyed (rulings, CR 702.12b). */ destroyable?: true }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** Ghired, Conclave Exile: "populate. The token enters tapped and attacking." */ attacking?: true; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "Put a deathtouch counter on either of them" (Call of the Death-Dweller): only among the permanents this ability's targets `index` (`n` of them) are or became, not targeted. */ fromTargets?: { index: number; n: number }; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true; /** "On each of up to two Soldiers you control" (SOLDIER Military Program): up to `n`, none too. */ upTo?: true; /** With "choose" and `least`, before "Destroy that creature" (Drop of Honey): not one with indestructible while another tied one can be destroyed (rulings, CR 702.12b). */ destroyable?: true }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -2769,7 +2777,7 @@ export type Effect =
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
   | { type: "madness" }
   /** Miracle's trigger (CR 702.94a): "you may cast it by paying [cost] rather than its mana cost", while it's still in hand. */
-  | { type: "miracle" }
+  | { type: "miracle"; /** The miracle cost of this instance: a granted one (Lorehold, the Historian) rather than the card's own. */ cost?: string }
   /**
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
@@ -3294,6 +3302,8 @@ export type Effect =
    * (no one wins or loses it, CR 705.2); those that come up tails are destroyed at the same time (rulings).
    */
   | { type: "flipCoinEach"; filter: TargetSpec }
+  /** Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails. Repeat this process until both players' coins come up heads on the same flip." (flips no one wins, rulings). */
+  | { type: "flipClash"; with: PlayerRef; damage: number }
   | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
@@ -4016,8 +4026,9 @@ export type SpellCondition =
   | { kind: "anotherDied"; index: number }
   /** "If that spell targets a commander you control" (Bane's Contingency): target `index`, a spell, targets a permanent on the battlefield matching `filter` as this resolves. */
   | { kind: "targetSpellTargets"; index: number; filter: TargetSpec }
-  /** "Exile it. If you do, ..." (Mazemind Tome): this ability's exile instructions exiled a permanent from the battlefield. */
-  | { kind: "exiledThisWay" }
+  /** "Exile it. If you do, ..." (Mazemind Tome): this ability's exile instructions exiled a permanent from the battlefield.
+   * `cards`: "When ~ dies, exile it. When you do, ..." (Glissa's Retriever): they exiled a card from a graveyard instead. */
+  | { kind: "exiledThisWay"; cards?: true }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   | { kind: "bouncedThisWay"; subtype: string; another: true }
   /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
@@ -4325,6 +4336,8 @@ export type TriggerEvent =
   | "selfBecomesUnattached"
   /** "Whenever an Aura becomes attached to ~" (Brood Keeper): one entering attached to it or moved onto it from something else (rulings); the subject is the Aura. */
   | "auraAttachedToSelf"
+  /** "Whenever an Aura you control becomes attached to a creature you control" (Siona, Captain of the Pyleas): entering attached too (rulings). */
+  | "auraAttachedToYours"
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability" (see TriggeredAbility.targeted)
   /** "Whenever a permanent you control becomes the target of a spell or ability an opponent controls": see `subjectFilter`. */
   | "permanentBecomesTarget"
@@ -4630,7 +4643,8 @@ export interface TriggeredAbility {
    * For "youGainLife": "for the first time during each of your turns" (Cat Collector): your first life gain this turn, on your turn. */
   firstOnTheirTurn?: true;
   /** For "youGainLife" and "youLoseLife": "for the first time each turn" (Vengeful Warchief): your first such event this turn, anyone's turn.
-   * For "selfBecomesCrewed": "becomes crewed for the first time each turn" (Mighty Servant of Leuk-o). */
+   * For "selfBecomesCrewed": "becomes crewed for the first time each turn" (Mighty Servant of Leuk-o).
+   * For "selfBecomesTapped": "becomes tapped for the first time during each of your turns" (Tale of Katara and Toph), with activeIf yourTurn. */
   firstEachTurn?: true;
   /** For "selfBecomesCrewed": "if it was crewed by exactly two creatures" (an intervening if about the crewing, CR 603.4). */
   crewedBy?: number;
@@ -5789,7 +5803,7 @@ export interface CompiledCard {
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number } }[];
+  entersChoose?: { what: ChoiceKind; except?: string; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number } }[];
   /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
   noncreatureChosenMvCantBeCast?: true;
   /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */
@@ -6413,6 +6427,8 @@ export interface CompiledCard {
   spellsHaveProwl?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
   handWarp?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian): miracle for those cards in its controller's hand (CR 702.94a), so drawing one as the first card drawn this turn triggers it. */
+  handMiracle?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}." (Dream Devourer): foretell for those cards in its controller's hand (CR 702.143a), a foretell cost of their mana cost less this much generic mana (rulings). */
   handForetell?: { reduce: number; text: string }[];
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
@@ -6605,6 +6621,8 @@ export interface CompiledCard {
   landsFromGraveyard?: boolean;
   /** Krark's Thumb: each coin its controller would flip is two coins, and they ignore one (rulings: they see both first). */
   flipTwo?: true;
+  /** Edgar, King of Figaro: "The first time you flip one or more coins each turn, those coins come up heads and you win those flips" (run-dice.ts rigged; TurnLog.coinsFlipped). */
+  firstFlipsHeads?: true;
   /** "You may play Forests from your graveyard." (Titania, Nature's Force): only lands with one of these subtypes. */
   landsFromGraveyardOf?: string[];
   /** Glacierwood Siege's "• Sultai — You may play lands from your graveyard.": the same as `landsFromGraveyard`, only while this holds. */

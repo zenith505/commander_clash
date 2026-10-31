@@ -1300,7 +1300,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[] }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Miracle: the cost of the instance that triggered (a granted one, Lorehold), when not the card's own. */ miracleCost?: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[] }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1481,6 +1481,8 @@ export interface TurnLog {
   scried?: PlayerId[];
   /** Players who surveilled this turn (Darkblade Agent; Whispering Snitch's "for the first time each turn"). */
   surveilled?: PlayerId[];
+  /** Players who flipped one or more coins this turn (Edgar, King of Figaro's "the first time ... each turn"). */
+  coinsFlipped?: PlayerId[];
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
   /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
@@ -1924,7 +1926,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1964,6 +1966,8 @@ export interface Chosen {
   landType?: string;
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
+  /** "As ~ enters, choose two abilities from among first strike, vigilance, and lifelink" (Greymond), in the order chosen. */
+  keywords?: string[];
   /** "Choose artifact or enchantment" (Season of Gathering): a card type. */
   cardType?: string;
   /** "As ~ enters, choose a player" (True-Name Nemesis). */

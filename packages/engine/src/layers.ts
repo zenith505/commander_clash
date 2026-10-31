@@ -473,6 +473,8 @@ interface Inst {
   offFieldAll?: true;
   /** Its type change applies to its controller's permanent spells too (StaticAbility.offFieldSpells). */
   offFieldSpells?: true;
+  /** Its type change applies to its controller's land cards outside the battlefield too (StaticAbility.offFieldLands). */
+  offFieldLands?: true;
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -566,6 +568,7 @@ function gather(s: GameState): Inst[] {
         ...(st.offField ? { offField: true as const } : {}),
         ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
         ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
+        ...(st.offFieldLands ? { offFieldLands: true as const } : {}),
       }),
     );
   }
@@ -1463,7 +1466,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
@@ -1905,6 +1908,9 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), permanentSpells: true });
       if (pick.offField && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });
+      // Dune Chanter: its controller's land cards outside the battlefield too.
+      if (pick.offFieldLands && layer === "4" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), lands: true });
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
       if (pick.offFieldAll && layer === "5" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true });
@@ -2053,12 +2059,14 @@ interface OffFieldGrant {
   everyone?: true;
   /** A type change for its controller's permanent spells only (Secret Arcade): card types too. */
   permanentSpells?: true;
+  /** A type change for land cards its controller owns outside the battlefield (Dune Chanter). */
+  lands?: true;
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands));
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;
@@ -2090,8 +2098,11 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
   // Secret Arcade: "permanent spells you control are enchantments in addition to their other types" (CR 110.4b: a spell
   // of a permanent card type), card types as well as subtypes.
   const spells = o.zone === "stack" && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) ? offFieldGrants(s).filter((g) => g.permanentSpells && o.controller === g.controller) : [];
-  if (!d.types.includes("Creature") && !spells.length) return d;
-  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
+  // Dune Chanter: land cards its controller owns (a land is played, never cast: CR 305.1; tokens can't stay there).
+  const lands = d.types.includes("Land") && o.zone !== "stack" && !o.isToken ? offFieldGrants(s).filter((g) => g.lands && o.owner === g.controller) : [];
+  if (!d.types.includes("Creature") && !spells.length && !lands.length) return d;
+  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && !g.lands && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
+  gs.push(...lands);
   // The Tomb of Aclazotz: a creature spell cast with its permission "is a Vampire in addition to its other types" (rulings:
   // on the stack too).
   if (o.zone === "stack" && d.types.includes("Creature")) for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "addTypes")) gs.push(g);

@@ -179,6 +179,8 @@ export const CHOSEN_TYPE = "(the chosen creature type)";
 export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
 /** "Gains your choice of menace or lifelink": filled in with the keyword chosen as it resolved. */
 export const CHOSEN_KEYWORD = "(the chosen keyword)";
+/** "Have each of the chosen abilities" (Greymond, Avacyn's Stalwart): the keywords chosen as the source entered (Chosen.keywords). */
+export const CHOSEN_KEYWORDS = "(the chosen keywords)";
 /** "Protection from each of your opponents" (CR 702.16i, 702.16k): from each player who is an opponent of its controller. */
 export const PROTECTION_FROM_OPPONENTS = "Protection from each of your opponents";
 /** "Protection from the chosen player" (True-Name Nemesis): the player chosen as it entered (CR 702.16k). */
@@ -222,9 +224,11 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[]) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_CREATURE_TYPE_PROTECTION
+    k === CHOSEN_KEYWORDS
+      ? [...(chosenKeywords ?? [])]
+      : k === CHOSEN_CREATURE_TYPE_PROTECTION
       ? creatureType ? [`Protection from creatures of type ${creatureType}`] : []
       : k === CHOSEN_TYPE_PROTECTION
       ? cardType && CARD_TYPE_PLURAL[cardType] ? [`Protection from ${CARD_TYPE_PLURAL[cardType]}`] : []

@@ -238,6 +238,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter || except === null) return null;
     return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "yourGraveyard", filter }, each: true, ...(except ? { except } : {}) }];
   }
+  // Parallel Evolution: "For each creature token on the battlefield, its controller creates a token that's a copy of that
+  // creature": every player's, each copy under that token's controller (CR 111.2), all at once.
+  if ((m = /^[Ff]or each (creature token) on the battlefield, its controller creates a token that's a copy of that creature$/.exec(s))) {
+    const what = parseObject(`each ${m[1]!}`, ctx);
+    if (!what || what.ref !== "each") return null;
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what, each: true, eachController: true }];
+  }
   if ((m = /^[Ff]or each (.+?), create a (tapped and attacking )?token that's a copy of (?:that (?:creature|permanent|artifact|token)|it)(?:, except (.+))?$/.exec(s))) {
     const what = parseObject(`each ${m[1]!}`, ctx);
     const except = m[3] ? parseCopyExcept(m[3]) : undefined;

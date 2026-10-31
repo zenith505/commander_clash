@@ -32,7 +32,7 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
 };
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -90,7 +90,10 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
-      } else if (a.by && !(cause && cause.event !== "castOrCopy" && (cause.event === a.by.event || (a.by.event === "entersOrLeaves" && (cause.event === "enters" || cause.event === "dies" || cause.event === "leaves"))) && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
+      } else if (a.by?.event === "draws") {
+        // Krang, the All-Powerful: "If a player drawing a card causes ...": any player's draw.
+        if (cause?.event !== "draws") continue;
+      } else if (a.by && !(cause && cause.event !== "castOrCopy" && cause.event !== "draws" && (cause.event === a.by.event || (a.by.event === "entersOrLeaves" && (cause.event === "enters" || cause.event === "dies" || cause.event === "leaves"))) && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
       // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
       if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
@@ -2089,7 +2092,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    // Krang, the All-Powerful: these trigger because a player drew a card (CR 603.2d).
+    causedBy = { event: "draws", player: ev.player };
     for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) draws(o, controllerOf(s, o));
+    causedBy = null;
     // Dogged Detective: "Whenever an opponent draws their second card each turn, you may return ~ from your graveyard to
     // your hand": a card in its owner's graveyard (CR 113.6m).
     fromGraveyards(draws);

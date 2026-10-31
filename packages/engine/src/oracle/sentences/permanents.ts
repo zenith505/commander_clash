@@ -1594,6 +1594,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("that creature", ctx);
     return what && !isGroup(what) ? [{ type: "cantAttackNextTurn", what }] : null;
   }
+  // Gideon, Battle-Forged: "up to one target creature an opponent controls attacks ~ during its controller's next turn if
+  // able"; Gideon Jura: "during target opponent's next turn, creatures that player controls attack ~ if able". Only a
+  // planeswalker's own ability (walkersToAttack checks it is one): ~ is what they attack (CR 508.1d).
+  if ((m = /^((?:[Uu]p to one t|T)arget creature an opponent controls) attacks ~ during its controller's next turn if able$/.exec(s)) && ctx.activated) {
+    const what = parseObject(m[1]!.replace(/^Up/, "up"), ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "attackWalkerNextTurn", what }] : null;
+  }
+  if (/^[Dd]uring target opponent's next turn, creatures that player controls attack ~ if able$/.test(s) && ctx.activated) {
+    const who = parsePlayer("target opponent", ctx);
+    return who ? [{ type: "attackWalkerNextTurn", who }] : null;
+  }
   // "Until your next turn, creatures your opponents control attack each combat if able and attack a player other than you
   // if able" (Kardur, Doomscourge), "until your next turn, each creature attacks ..." (Maximum Carnage): goad's
   // requirements (CR 701.15b, 508.1d) without goading them, for every creature in the group at any time, those that

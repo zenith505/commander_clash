@@ -205,11 +205,14 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "createTokenCopy": {
       if (e.each) {
         // One copy of each of them (`n` of each, Doppelgang), their copiable values as they are now (CR 707.2), all created at once.
-        const bases = objects(s, e.what, ctx).map((o) => copiableDef(s, o));
+        const objs = objects(s, e.what, ctx);
+        const bases = objs.map((o) => copiableDef(s, o));
         const n = amountNow(s, e.n, ctx);
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {
-          for (const pid of players(s, e.who, ctx)) for (const base of bases) tokenCopies(s, pid, base, n, ctx, e);
+          // Parallel Evolution: each one's controller creates its copy (CR 111.2).
+          if (e.eachController) objs.forEach((o, i) => tokenCopies(s, controllerOf(s, o), bases[i]!, n, ctx, e));
+          else for (const pid of players(s, e.who, ctx)) for (const base of bases) tokenCopies(s, pid, base, n, ctx, e);
         });
         return;
       }

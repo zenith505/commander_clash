@@ -345,6 +345,8 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // you control a creature named Silver Surfer, ~'s Herald" (that name kept as written by normalizeSelf).
   else if ((m = /^(~ attacks (?:an opponent with the most life among your opponents )?each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
+  // Tadeas, Juniper Ascendant: "~ has hexproof unless it's attacking": while it isn't an attacking creature (CR 506.4).
+  else if ((m = /^(~ has hexproof) unless it's attacking$/.exec(text))) [statement, cond, notCond] = [m[1], "~ is attacking", true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
@@ -1243,6 +1245,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Tolsimir, Midnight's Light: "if ~ attacked this combat": declared as an attacker in this combat (CR 508.1), even if
   // it's been removed from combat since.
   if (/^~ attacked this combat$/.test(text)) return { kind: "self", is: "attackedThisCombat" };
+  // Kytheon, Hero of Akros: "if ~ and at least two other creatures attacked this combat": declared as attackers, also ones
+  // that have left the battlefield since; not ones put onto the battlefield attacking (rulings, CR 508.1).
+  if ((m = new RegExp(`^~ and at least ${NUM} other creatures attacked this combat$`).exec(text))) return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisCombat" }, { kind: "attackedWith", n: num(m[1]!) + 1, combat: true }] };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).

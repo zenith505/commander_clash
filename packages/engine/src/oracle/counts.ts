@@ -32,6 +32,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
   if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
+  // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
+  // Hundred-Battle Veteran counts them.
+  if (!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, counterKinds: true } } : null;
+  }
   // Superior Numbers: "the number of creatures you control in excess of the number of creatures target opponent controls":
   // the first less the second, 0 if it's not more (CR 107.1b).
   if (!each && (m = /^(the number of .+?) in excess of (the number of .+)$/.exec(p))) {

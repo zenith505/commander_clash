@@ -1,6 +1,6 @@
 # Roadmap
 
-28,436 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,453 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
@@ -3504,6 +3504,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi, Donnie & April, Path of
   Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
   Celestial Dawn, Death or Glory, Selective Adaptation and the like).
+- Round B57 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,300): "if there is an
+  Elf card in your graveyard and ~ has a -1/-1 counter on it" (Creakwood Safewright), "If a permanent would be put into a
+  graveyard, exile it instead" (Samurai of the Pale Curtain: from the battlefield only, tokens too), "If you put an artifact
+  card into your hand this way" after a look at the top of the library (Chrome Courier), "If you discard a land card this
+  way, put it from your graveyard onto the battlefield tapped" (Silvan Reveler), "costs {2} more to cast if it targets a
+  Dragon" (Dragon's Prey), "Whenever ~ enters or becomes tapped" (Champions of the Shoal), "choose target creature an
+  opponent controls. If it's tapped, put a stun counter on it. Otherwise, tap it" (Shackle Slinger), "That creature can't
+  be blocked this turn and has base power and toughness 1/1 until end of turn" (Atomic Microsizer), "If it's equipped, you
+  may destroy all Equipment attached to that creature" (Awaken the Sleeper), a granted "If ~ is a Wizard, it deals 2 damage
+  instead" (Sorcerer's Wand, as it resolves, rulings), "the number of different kinds of counters among permanents you
+  control" (Perrie, the Pulverizer), "copy it if you control a planeswalker, Cleric, Druid, Shaman, Warlock, or Wizard"
+  (Mentor's Guidance: checked as the trigger resolves, rulings), "Target player draws a card at the beginning of the next
+  turn's upkeep" (Sapphire Charm), "Remove a counter from a creature you control. If you do, draw a card" (Mister Hyde,
+  Monster Within), "target creature you control with the greatest power" (Triumph of Gerrard, rulings), "you may return
+  another creature you control to its owner's hand, then put ... counters equal to that creature's power on ~" (First
+  Responder: its power as it last existed), a granted "If a colorless creature is dealt damage this way, tap it" (Pathway
+  Arrows). +17 (28,453 of 31,936 with round 222).
+- Out after round B57 (looked at, not done): Saw ("a permanent other than that creature or ~": a pick that excludes the
+  trigger's subject), Glimpse the Cosmos (a conditional cast from the graveyard for another cost), Traveler's Cloak (any
+  land type, nonbasic too), Corrosive Ooze (destroying Equipment at end of combat), Trove of Temptation (an attack
+  requirement toward you or your planeswalkers), Viral Spawning (a conditional flashback), Silver Surfer, Galactus's Herald
+  ("attacks that player each combat"), Blue Dragon (three targets until your next turn), Satyr Firedancer (a spell's damage
+  to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (counted
+  landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (a color filter on
+  permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion, The Book of Vile Darkness.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
   19,700 up (rounds B54 to B56 took the easier ones up to about 17,000 but left much of that range unread: about 175
   there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc and Vengevine;

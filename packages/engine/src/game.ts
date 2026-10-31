@@ -1925,7 +1925,7 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   const item = fromZone === "stack" ? s.stack.find((x) => x.objectId === o.id) : undefined;
   const controlled = fromZone === "battlefield" ? controllerOf(s, o) : fromZone === "stack" ? (item?.controller ?? o.controller) : o.owner;
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller);
+    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller);
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;

@@ -363,6 +363,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "bouncedThisWayPower":
+      return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).reduce((n, b) => n + Math.max(0, b.power ?? 0), 0);
     case "preventedByRule":
       return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
@@ -1029,6 +1031,8 @@ function describeCount(c: Count): string {
       return "#poison counters lost";
     case "bouncedThisWayCount":
       return "#returned";
+    case "bouncedThisWayPower":
+      return "the returned creature's power";
     case "preventedByRule":
       return "#damage prevented";
     case "sacrificedThisWayGreatestPower":

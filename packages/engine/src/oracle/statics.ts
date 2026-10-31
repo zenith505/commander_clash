@@ -571,7 +571,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   // Vanish into Eternity: "~ costs {3} more to cast if it targets a creature": an increase, with the targets chosen
   // before the total cost is (CR 601.2c, 601.2f).
-  if ((m = /^~ costs \{(\d+)\} more to cast if it targets (an? [a-z]+)$/.exec(text))) {
+  // Dragon's Prey: "~ costs {2} more to cast if it targets a Dragon": a permanent with that subtype.
+  if ((m = /^~ costs \{(\d+)\} more to cast if it targets (an? [a-z]+|an? [A-Z][a-z]+)$/.exec(text))) {
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return filter?.kind === "object" ? { lessIfTargets: { n: -Number(m[1]), filter } } : "fail";
   }
@@ -860,7 +861,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it".
   // Emergent Haunting: "if you haven't cast a spell from your hand this turn and ~ isn't a creature".
-  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it|~ isn't a creature)$/.exec(text))) {
+  // Creakwood Safewright: "if there is an Elf card in your graveyard and ~ has a -1/-1 counter on it": both at once.
+  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it|~ isn't a creature)$/.exec(text)) || (m = /^(there is an? \w+ card in your graveyard) and (~ has an? \S+ counter on it)$/.exec(text))) {
     const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
@@ -870,6 +872,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment": any one of them.
   if ((m = /^you control (an? [^,]+), (an? [^,]+), or (an? [^,]+)$/.exec(text))) {
     const conds = [m[1]!, m[2]!, m[3]!].map((x) => parseStaticCondition(`you control ${x}`, st));
+    return conds.every((c) => c?.kind === "control") ? { kind: "anyOf", conds: conds as StaticCondition[] } : null;
+  }
+  // Mentor's Guidance: "if you control a planeswalker, Cleric, Druid, Shaman, Warlock, or Wizard": one permanent of any of
+  // those (rulings), a card type or creature types after one article.
+  if ((m = /^you control an? ((?:[A-Za-z]+, ){2,}or [A-Za-z]+)$/.exec(text))) {
+    const conds = m[1]!.replace(/, or /, ", ").split(", ").map((x) => parseStaticCondition(`you control a ${x}`, st));
     return conds.every((c) => c?.kind === "control") ? { kind: "anyOf", conds: conds as StaticCondition[] } : null;
   }
   // Of One Mind: "if you control a Human creature and a non-Human creature": two different creatures, since none can be

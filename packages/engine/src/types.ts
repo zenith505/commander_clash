@@ -2203,7 +2203,7 @@ export interface Resolving {
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
-  bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
+  bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** As it last existed on the battlefield (Count bouncedThisWayPower). */ power?: number; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */

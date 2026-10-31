@@ -173,6 +173,8 @@ export type Count =
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
+  /** First Responder: "you may return another creature you control to its owner's hand, then put ... equal to that creature's power": its power as it last existed on the battlefield (CR 608.2h), if it went to a hand. */
+  | { kind: "bouncedThisWayPower" }
   /** Sacred Boon's delayed trigger: "for each 1 damage prevented this way", all the damage rule `rule` prevented (GameState.preventedTally). */
   | { kind: "preventedByRule"; rule: string }
   /** "The greatest power among creatures sacrificed this way" (Shadowgrange Archfiend): of what this resolution sacrificed, as each last existed (CR 608.2h); 0 if none. */
@@ -5683,7 +5685,8 @@ export interface CompiledCard {
    * `notYours`: "a card you didn't control" (Valgavoth): not one this permanent's controller controlled as a spell or
    * permanent; a card elsewhere counts as its owner's (CR 108.4a). `linked`: the card is "exiled with ~" (CR 607.2a).
    */
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true };
+  /** `permanents`: "If a permanent would be put into a graveyard, exile it instead" (Samurai of the Pale Curtain): only from the battlefield, tokens too. */
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */

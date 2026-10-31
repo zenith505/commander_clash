@@ -354,7 +354,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Its controller may draw up to two cards at the beginning of the next turn's upkeep" (Arcane Denial): the countered
   // spell's controller as this resolves (CR 608.2h), remembered by the delayed trigger as its event player.
-  if ((m = /^(Its controller|That spell's controller) (.+) at the beginning of the next (?:turn's )?upkeep$/.exec(s))) {
+  // Sapphire Charm: "Target player draws a card at the beginning of the next turn's upkeep": that player, the same way.
+  if ((m = /^(Its controller|That spell's controller|Target player) (.+) at the beginning of the next (?:turn's )?upkeep$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const before = ctx.targets.length;
     const inner = who && parseSentence(`That player ${m[2]!}`, { ...ctx, eventPlayer: true, lastPlayerTarget: undefined, chosenOpponent: undefined, controllerNamed: undefined });

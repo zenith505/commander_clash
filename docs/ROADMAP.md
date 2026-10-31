@@ -1,6 +1,6 @@
 # Roadmap
 
-28,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,585 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,180 of
 9,979 (91%).
 
@@ -3699,7 +3699,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Coven), "Players can't pay life to cast spells or to activate abilities that aren't mana abilities" (Karn's Sylex:
   Phyrexian mana and life costs; 0 life can still be paid, CR 119.4b; not turning a face-down permanent face up, a
   special action). Breathless Knight, Bounty of the Luxa, Woodland Weavemaster and Cheering Crowd were dropped from
-  this round: Lane A's round 224 does them. +11 (COUNT of 31,936).
+  this round: Lane A's round 224 does them. +11 (28,585 of 31,936).
 - Out after round B63 (looked at, not done): Divine Deflection (prevention shared by you and your permanents),
   Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from

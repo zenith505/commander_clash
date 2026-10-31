@@ -1464,7 +1464,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // then, which is all combat damage nonred creatures would deal (only creatures deal combat damage, CR 510.1).
   text = text.replace(/^(Prevent all combat damage that would be dealt this turn\. If ~ was kicked, )this effect doesn't affect combat damage that would be dealt by (white|blue|black|red|green) creatures\.$/, "$1prevent all combat damage that would be dealt this turn by non$2 creatures instead.");
   // Treva, the Renewer: "If you do, choose a color, then you gain 1 life for each permanent of that color": the chosen one.
-  text = text.replace(/\b(choose a color, then you gain 1 life for each permanent of) that color\.$/, "$1 the chosen color.");
+  // Rith, the Awakener: "choose a color, then create a 1/1 green Saproling creature token for each permanent of that color".
+  text = text.replace(/\b(choose a color, then (?:you gain 1 life|create an? [^.]+? tokens?) for each permanent of) that color\.$/, "$1 the chosen color.");
   // Talus Paladin: "you may have Allies you control gain lifelink until end of turn, and you may put a +1/+1 counter on ~":
   // two choices, each on its own.
   text = text.replace(/^(you may have [^.]+? until end of turn), and you (may put an? \+1\/\+1 counter on ~\.)$/, "$1. You $2");
@@ -1646,6 +1647,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // In Oketra's Name: "Zombies you control get +2/+1 until end of turn. Other creatures you control get +1/+1 until end of
   // turn.": the other ones are those that aren't Zombies.
   text = text.replace(/^([A-Z][a-z]+)s you control (get [+-]\d+\/[+-]\d+ until end of turn\.) Other creatures you control (get [+-]\d+\/[+-]\d+ until end of turn\.)$/, (all, kind: string, a: string, b: string) => (CREATURE_TYPES.has(kind) ? `${kind}s you control ${a} Non-${kind} creatures you control ${b}` : all));
+  // Nissa, Genesis Mage: "Untap up to two target creatures and up to two target lands": each group of targets untapped.
+  text = text.replace(/(^|\. )(Tap|Untap) up to (\w+) target creatures and up to (\w+) target lands\./, "$1$2 up to $3 target creatures. $2 up to $4 target lands.");
   // Join Forces: "Untap up to two target creatures. They each get +2/+2 until end of turn.": each of them, as "they get".
   // Fancy Footwork: "Untap one or two target creatures. They each get ...": the same.
   text = text.replace(/((?:^|\. )(?:Untap|Tap) (?:up to |one or )?(?:two|three) target creatures\.) They each get /, "$1 They get ");
@@ -1778,15 +1781,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // on the chosen creature you control. Then the chosen creatures fight each other.": "the creature you control" and
   // "those creatures", the two targets.
   if (/^Choose target creature you control and target creature you don't control\. /.test(text)) text = text.replace(/\bthe chosen creature you control\b/g, "the creature you control").replace(/\. Then the chosen creatures fight each other\.$/, ". Then those creatures fight each other.");
-  // Mortarion, Daemon Primarch: "you may pay {X}. If you do, create X ... tokens .... X can't be greater than the amount of
+  // Mortarion, Daemon Primarch (and Shanna, Purifying Blade, "life you gained"): "you may pay {X}. If you do, create X ... tokens .... X can't be greater than the amount of
   // life you lost this turn.": the X paid has that upper bound, as "where X is less than or equal to" (Well of Lost Dreams).
-  text = text.replace(/^([Yy]ou may pay \{X\})\. (If you do, [^.]+)\. X can't be greater than (the amount of life you lost this turn)\.$/, "$1, where X is less than or equal to $3. $2.");
+  text = text.replace(/^([Yy]ou may pay \{X\})\. (If you do, [^.]+)\. X can't be greater than (the amount of life you (?:lost|gained) this turn)\.$/, "$1, where X is less than or equal to $3. $2.");
   // Ill-Gotten Gains: "Each player discards their hand, then returns up to three cards from their graveyard to their hand.":
   // one after the other, the discarded cards among those they may return.
   text = text.replace(/(^|\. )Each player discards their hand, then returns (up to \w+ cards from their graveyard to their hand)\./, "$1Each player discards their hand. Each player returns $2.");
   // Glorfindel, Dauntless Rescuer: "~ can't be blocked by more than one creature each combat this turn": in each combat this
   // turn, the same as "this turn".
   text = text.replace(/^~ can't be blocked by more than one creature each combat this turn\.$/, "~ can't be blocked by more than one creature this turn.");
+  // Ellie, Vengeful Hunter: "~ deals 2 damage to target player and gains indestructible until end of turn": the damage,
+  // then ~ gains it.
+  text = text.replace(/(^|\. )~ deals (\d+) damage to (target (?:player|opponent|creature|player or planeswalker)) and gains ([a-z ]+) until end of turn\./, "$1~ deals $2 damage to $3. ~ gains $4 until end of turn.");
   // Voyager Glidecar: "Until end of turn, ~ becomes an artifact creature and gains flying. Put a +1/+1 counter on it.": it
   // is ~, the only object named.
   text = text.replace(/^(Until end of turn, ~ becomes an artifact creature and gains [a-z]+\.) Put a \+1\/\+1 counter on it\.$/, "$1 Put a +1/+1 counter on ~.");
@@ -7165,8 +7171,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const hasAbout = effects[effects.length - 1];
     if (hasPT && (hasAbout?.type === "continuous" || hasAbout?.type === "counters") && hasAbout.what.ref === "target" && !hasAbout.what.n && ctx.targets[hasAbout.what.index]?.kind === "object") {
       const index = (hasAbout.what as { index: number }).index;
-      const inner = parseOne(capital(hasPT[3]!), ctx);
-      if (!inner || /\b(?:it|its|that creature)\b/.test(hasPT[3]!)) return null;
+      // Strider, Ranger of the North: "Then if that creature has power 4 or greater, it gains first strike until end of
+      // turn": "it" is that target, read as a target of its own in a scratch copy of the context and pointed back at it.
+      const itGains = /^it (gains|gets) ([^,]+ until end of turn)$/.exec(hasPT[3]!);
+      let inner: Effect[] | null;
+      if (itGains) {
+        const scratch = { ...ctx, targets: [...ctx.targets] };
+        const fx = parseOne(`Target creature ${itGains[1]} ${itGains[2]}`, scratch);
+        const added = ctx.targets.length;
+        if (!fx || scratch.targets.length !== added + 1 || fx.some((e) => e.type !== "continuous" || e.what.ref !== "target" || e.what.index !== added)) return null;
+        inner = fx.map((e) => ({ ...e, what: { ref: "target", index } }) as Effect);
+      } else {
+        inner = parseOne(capital(hasPT[3]!), ctx);
+        if (!inner || /\b(?:it|its|that creature)\b/.test(hasPT[3]!)) return null;
+      }
       effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], [hasPT[1]!]: { min: Number(hasPT[2]) }, text: `${hasPT[1]} ${hasPT[2]} or greater` } }, effects: inner });
       continue;
     }

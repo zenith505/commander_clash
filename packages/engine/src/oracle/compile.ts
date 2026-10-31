@@ -2556,6 +2556,22 @@ export function compile(d: CardDef): CompiledCard {
       out.beginOnBattlefield = true;
       continue;
     }
+    // The Chancellors, Sphinx of Foresight, Providence (CR 103.6b): revealed from the opening hand, a delayed trigger
+    // of the revealing player's (CR 603.7) at "the first upkeep" (the game's), "your first upkeep" or "your first main
+    // phase of the game".
+    const revealAt = /^You may reveal ~ from your opening hand\. If you do, at the beginning of (the first upkeep|your first upkeep|your first main phase of the game), (.+)$/.exec(line);
+    const revealAfter = /^You may reveal ~ from your opening hand\. If you do, (.+) at the beginning of (your first upkeep)\.$/.exec(line);
+    const reveal = revealAt ? { at: revealAt[1]!, rest: revealAt[2]! } : revealAfter ? { at: revealAfter[2]!, rest: revealAfter[1]! } : null;
+    if (reveal && !out.openingReveal) {
+      const { at, rest } = reveal;
+      const effect = /\.$/.test(rest) ? rest : `${rest}.`;
+      const t = parseTrigger(`At the beginning of your upkeep, ${effect}`);
+      // Only a plain trigger's instructions: no intervening "if" or other trigger condition to carry over.
+      if (t && t !== "fail" && t.event === "yourUpkeep" && Object.keys(t).every((k) => k === "event" || k === "body")) {
+        out.openingReveal = { when: at === "the first upkeep" ? "nextTurnUpkeep" : at === "your first upkeep" ? "yourNextUpkeep" : "yourNextFirstMain", body: t.body };
+        continue;
+      }
+    }
     // Gemstone Caverns (CR 103.6a; the starting player is the one taking the first turn, 103.1).
     const caverns = /^If ~ is in your opening hand and you're not the starting player, you may begin the game with ~ on the battlefield with an? ([a-z]+) counter on it\. If you do, exile a card from your hand\.$/.exec(line);
     if (caverns) {
@@ -4443,7 +4459,10 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line) ??
       // The Shrines: "At the beginning of your upkeep and whenever you cast a black spell, put a charge counter on ~": a step
       // and a cast are never one event.
-      /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line);
+      /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line) ??
+      // Kratos, Stoic Father: "Whenever you attack with one or more Gods and whenever a God dies, ...": an attack and a
+      // death are never one event.
+      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line);
     // MACH-1, Swooping Scoundrel: "When ~ enters and whenever you gain life, surveil 1. This ability triggers only once each
     // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
     const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
@@ -4451,7 +4470,7 @@ export function compile(d: CardDef): CompiledCard {
       const effect = onceBoth ? twice[twice.length - 1]!.replace(/ This ability triggers only once each turn\.$/, "") : twice[twice.length - 1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
         ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
-        : /^At the beginning of your upkeep and whenever /.test(line)
+        : /^At the beginning of your upkeep and whenever /.test(line) || /^Whenever you attack with one or more [A-Z][a-z]+s and whenever /.test(line)
         ? [`${twice[1]}, ${effect}`, `W${twice[2]!.slice(1)}, ${effect}`]
         : /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]

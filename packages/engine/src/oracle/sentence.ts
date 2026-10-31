@@ -177,6 +177,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     return "more";
   }
   if ((m = new RegExp(`^Put (?:the rest(?: of (?:those|the) cards)?|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
+  // "Exile the rest" (Devourer of Destiny): face up (CR 406.3).
+  if (/^Exile the rest$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "exile" };
   // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
   if (/^Shuffle(?: the rest into your library)?$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "shuffle" };
   return null;

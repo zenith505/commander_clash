@@ -173,10 +173,23 @@ function nextOpeningAction(s: GameState) {
       const begin = compileCard(defOf(s, obj(s, id))).beginOnBattlefield;
       return begin === true || (!!begin && pid !== s.activePlayer);
     });
-    if (cards.length) {
-      s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
-      return;
+    // First the cards that may begin the game on the battlefield (CR 103.6a), then the ones to reveal (103.6b).
+    if (!s.openingStage) {
+      s.openingStage = "reveal";
+      if (cards.length) {
+        s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
+        return;
+      }
     }
+    if (s.openingStage === "reveal") {
+      s.openingStage = "done";
+      const reveals = player(s, pid).hand.filter((id) => !!compileCard(defOf(s, obj(s, id))).openingReveal);
+      if (reveals.length) {
+        s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards: reveals, min: 0, max: reveals.length, fromHand: true, opening: true, reveal: true };
+        return;
+      }
+    }
+    s.openingStage = undefined;
     s.openingActions.shift();
   }
   s.openingActions = undefined;
@@ -7754,6 +7767,17 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend?.kind === "searchLibrary" && pend.opening && pend.player === p.id) {
     if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
     s.pending = null;
+    if (pend.reveal) {
+      // Revealed from the opening hand (CR 103.6b): each makes its delayed trigger (CR 603.7), made before the first turn.
+      for (const id of found) {
+        const o = obj(s, id);
+        const r = compileCard(defOf(s, o)).openingReveal!;
+        log(s, `${p.name} reveals ${nameOf(s, id)} from their opening hand.`);
+        (s.delayed ??= []).push({ when: r.when, controller: p.id, sourceCardId: cardIdOf(o), subject: { id, zc: o.zoneChanges ?? 0 }, body: r.body, turn: 0, step: s.step });
+      }
+      nextOpeningAction(s);
+      return;
+    }
     if (pend.exile) {
       // "If you do, exile a card from your hand" (Gemstone Caverns): one for each that began the game on the battlefield.
       if (found.length !== pend.min) throw new RulesError(`exile ${pend.min} card${pend.min === 1 ? "" : "s"}`);
@@ -7781,7 +7805,6 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
       }
     }
     invalidateCharacteristics(s);
-    s.openingActions!.shift();
     nextOpeningAction(s);
     return;
   }

@@ -390,6 +390,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     cardExiled: t.cardExiled,
     destroyed: [...new Set((t.destroyed ?? []).map((e) => JSON.stringify(e)))].sort(),
     entered,
+    // "For the first time each turn" (Hercules): once or more.
+    timesDealtDamage: Object.fromEntries(Object.entries(t.timesDealtDamage ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),
     // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.

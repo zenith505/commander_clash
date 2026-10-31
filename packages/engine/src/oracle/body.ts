@@ -399,6 +399,9 @@ const checkableMay = (e: Effect): boolean =>
   // Niambi, Esteemed Speaker: "you may return another target creature you control to its owner's hand. If you do, ...":
   // done if that target is still legal.
   (e.type === "bounce" && e.what.ref === "target" && !e.what.n) ||
+  // Workshop Elders: "you may have target noncreature artifact you control become a 0/0 artifact creature. If you do, put
+  // four +1/+1 counters on it": done if that target is still legal (CR 608.2b).
+  (e.type === "continuous" && e.what.ref === "target" && !e.what.n && e.duration === "game" && e.mods.some((m) => m.kind === "addTypes")) ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
   // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
@@ -1724,6 +1727,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Restorative Technique: "Target player gains 2 life, then searches their library for a basic land card, ...": two
   // instructions for that player, in order.
   text = text.replace(/(^|\. )Target player gains (\d+) life, then searches their library /, "$1Target player gains $2 life. That player searches their library ");
+  // Mica, Reader of Ruins: "you may sacrifice an artifact. If you do, copy that spell and you may choose new targets for
+  // the copy": the copy, then its new targets.
+  text = text.replace(/(\. If you do, copy that spell) and you may choose new targets for the copy\./, "$1. You may choose new targets for the copy.");
+  // Revenge of the Hunted: "Until end of turn, target creature gets +6/+6 and gains trample, and all creatures able to
+  // block it this turn do so": the pump, then the lure on the same target.
+  text = text.replace(/^Until end of turn, (target creature) (gets [+-]\d+\/[+-]\d+ and gains [a-z]+), and all creatures able to block it this turn do so\./, (_, w: string, g: string) => `${capital(w)} ${g} until end of turn. All creatures able to block it this turn do so.`);
+  // Infernal Genesis: "that player mills a card. Then they create X ... tokens": that player creates them.
+  text = text.replace(/(^|\. )([Tt])hat player mills (a card|\w+ cards)\. Then they create /, "$1$2hat player mills $3. Then that player creates ");
   // Maralen of the Mornsong: "that player loses 3 life, searches their library for a card, puts it into their hand, then
   // shuffles": the loss, then that player's search.
   text = text.replace(/(^|\. )([Tt])hat player loses (\d+) life, searches their library for ([^,.]+), puts it into their hand, then shuffles\./, "$1$2hat player loses $3 life. That player searches their library for $4, puts it into their hand, then shuffles.");
@@ -2830,7 +2841,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
-    ctx.afterMillOne = ctx.afterMill && last?.type === "mill" && last.n === 1;
+    // Infernal Genesis: "that player mills a card. Then they create X ... tokens, where X is the milled card's mana value":
+    // whoever milled it.
+    ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer");
     ctx.afterAnyMill = last?.type === "mill";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
@@ -7320,6 +7333,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx });
       continue;
     }
+    // Savage Swipe: "Target creature you control gets +2/+2 until end of turn if its power is 2. Then it fights ...": the
+    // target is chosen either way and gets the bonus only if its power is exactly 2 as this resolves; it fights either way
+    // (rulings).
+    const pumpIfPower = /^(Target creature you control gets \+\d+\/\+\d+ until end of turn) if its power is (\d+)$/.exec(s);
+    if (pumpIfPower && !ctx.targets.length && !effects.length) {
+      const fx = parseOne(pumpIfPower[1]!, ctx);
+      if (!fx || ctx.targets.length !== 1 || fx.length !== 1 || fx[0]!.type !== "continuous") return null;
+      const n = Number(pumpIfPower[2]);
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], power: { min: n, max: n }, text: `with power ${n}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: fx });
+      continue;
+    }
     // Hog-Monkey Rampage: "Choose target creature you control and target creature an opponent controls. Put a +1/+1 counter
     // on the creature you control if it has power 4 or greater. Then those creatures fight each other.": the first target,
     // by its power as this resolves.
@@ -7899,6 +7924,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const token = made?.length === 1 ? made[0]! : undefined;
         if (token?.type !== "createToken" || token.n !== 1) return null;
         effects.push({ ...token, n: { count: { kind: "movedLinkedThisWay" } } });
+        si++;
+      }
+      // Discerning Taste: "You gain life equal to the greatest power among creature cards put into your graveyard this
+      // way": the rest that got there, as they are in the graveyard.
+      if (!forEachYard && done.rest === "graveyard" && !digPaid && !done.each && /^You gain life equal to the greatest power among creature cards put into your graveyard this way\.?$/.test(sentences[si + 1] ?? "")) {
+        effects.push({ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "movedThisWayGreatestPower" } } });
         si++;
       }
       digPaid = null;
@@ -9043,6 +9074,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Recommission: "Return target artifact or creature card ... to the battlefield. If a creature enters this way, it enters
     // with an additional +1/+1 counter on it": judged as it would exist on the battlefield (CR 614.12), part of how it enters.
     // What Must Be Done: "It enters with two additional +1/+1 counters on it if it's a creature", the same.
+    // Heroic Return: "If a Hero enters this way, it enters with two additional +1/+1 counters on it": by its subtypes as it
+    // would exist there, the same way.
+    const ifSub = /^If an? ([A-Z][a-z]+) enters this way, it enters with (two|three) additional \+1\/\+1 counters on it$/.exec(s);
+    if (ifSub && CREATURE_TYPES.has(ifSub[1]!)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.counters || last.countersFromLast || last.faceDown || last.atNextEndStep) return null;
+      last.counters = { "+1/+1": ifSub[2] === "two" ? 2 : 3 };
+      last.countersIfSubtype = ifSub[1]!;
+      continue;
+    }
     const ifCreature = /^If a creature enters this way, it enters with an additional \+1\/\+1 counter on it$/.test(s) ? 1 : /^It enters with (two|three) additional \+1\/\+1 counters on it if it's a creature$/.exec(s)?.[1];
     if (ifCreature) {
       const last = effects[effects.length - 1];
@@ -9055,6 +9096,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (those) {
       const last = effects[effects.length - 1];
       const p = parsePreventAll(`${those[1]} them`);
+      // Energy Arc: "Untap any number of target creatures. Prevent all combat damage that would be dealt to and dealt by
+      // those creatures this turn": the targets still legal as it resolves (CR 608.2b).
+      const manyTargets = (last?.type === "untap" || last?.type === "tap") && last.what.ref === "target" && last.what.n !== undefined && ctx.targets[last.what.index]?.many === "any" && effects.length === 1;
+      if (manyTargets && p) {
+        effects.push({ type: "continuous", what: last.what, mods: [p.mod], duration: "endOfTurn" });
+        continue;
+      }
       if (last?.type !== "continuous" || last.what.ref !== "each" || last.duration !== "endOfTurn" || !p) return null;
       effects.push({ type: "continuous", what: last.what, mods: [p.mod], duration: "endOfTurn" });
       continue;
@@ -9343,6 +9391,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", ...(yours ? { you: true as const } : {}) }, effects: inner });
       continue;
     }
+    // Break the Spell: "Destroy target enchantment. If a permanent you controlled or a token was destroyed this way, draw a
+    // card": destroyed even if a replacement effect put it elsewhere, controlled as it last existed (rulings, CR 608.2h).
+    const yoursOrToken = /^If a permanent you controlled or a token was destroyed this way, (.+)$/.exec(s);
+    if (yoursOrToken) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "destroy" || prev.what.ref !== "target" || /\b(?:its?|that)\b/.test(yoursOrToken[1]!)) return null;
+      const inner = parseOne(capital(yoursOrToken[1]!), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", youOrToken: true }, effects: inner });
+      continue;
+    }
     // Shredder's Technique: "Destroy target creature or enchantment. If an enchantment was destroyed this way, you lose 2
     // life": destroyed even if a replacement effect put it elsewhere, an enchantment as it last existed (CR 608.2h).
     // Smashing Success: "If an artifact is destroyed this way, create a Treasure token": the same.
@@ -9414,9 +9473,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const yourDiscard = (es: Effect[]): boolean => es.some((e) => (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) || (e.type === "may" && !e.pay && yourDiscard(e.effects)));
       const filter: TargetSpec | null = whenDiscarded[2] ? { kind: "card", text: "card" } : (parseSearchFilter(whenDiscarded[1]!) ?? null);
       whenDiscarded[2] = whenDiscarded[3]!;
-      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx);
+      // Fiery Encore: "~ deals damage equal to that card's mana value to target creature or planeswalker": its X, the
+      // mana value of the card discarded (ReflexiveEffect.xDiscardedMv).
+      const mvOf = /^~ deals damage equal to that card's mana value to (?!.*\b(?:that card|its?)\b)/.exec(whenDiscarded[2]!);
+      if (mvOf) whenDiscarded[2] = `~ deals X damage to ${whenDiscarded[2]!.slice(mvOf[0].length)}`;
+      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx, false, false, !!mvOf);
       if (!reflexive) return null;
-      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: reflexive }] });
+      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: reflexive, ...(mvOf ? { xDiscardedMv: true as const } : {}) }] });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
@@ -9646,13 +9709,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
-    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If (?:an?|at least one) ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
+    // Sparring Dummy: "You gain 2 life if a Lesson card is milled this way": the same as "If a Lesson card is milled this
+    // way, you gain 2 life", after the pick from the milled cards too.
+    const gainIfMilled = /^(You gain \d+ life) if (an? [A-Za-z]+ card) is milled this way$/.exec(s);
+    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If (?:an?|at least one) ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s) ?? (gainIfMilled ? /^If an? ([A-Za-z]+ card) is milled this way, (.+)$/.exec(`If ${gainIfMilled[2]} is milled this way, ${gainIfMilled[1]!.toLowerCase()}`) : null);
     if (ifMilled) {
       const then = ifMilled[ifMilled.length - 1]!;
       const filter: TargetSpec | null = ifMilled.length === 2 ? { kind: "card", chosen: "name", text: "card with the chosen name" } : (parseSearchFilter(ifMilled[1]!.replace(/, (?=non)/, " ")) ?? null);
       // The mill just before, or another "if ... milled this way" after it.
       let back = effects.length - 1;
-      while (back >= 0 && effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") back--;
+      while (back >= 0 && ((effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") || (gainIfMilled && effects[back]!.type === "chooseFromGraveyard" && (effects[back] as { milled?: true }).milled))) back--;
       const prev = effects[back];
       // Lammastide Weave: "you gain life equal to its mana value" after milling one card: that card.
       if (filter && prev?.type === "mill" && prev.n === 1 && then === "you gain life equal to its mana value") {
@@ -12163,7 +12229,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).
-    if (/^(?:It's still an? (land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/i.test(s)) {
+    // Cavernous Maw: "It's still a Cave land": its subtypes stay too.
+    if (/^(?:It's still an? (?:[A-Z][a-z]+ (?=land$))?(land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/.test(s) || /^(?:it's still an? (land|artifact|enchantment)|they're still (?:lands|artifacts|enchantments))$/.test(s)) {
       // "You may have target land you control become a 3/3 Elemental creature ... It's still a land." (Embodiment of
       // Insight): the effect the "may" makes.
       const lastFx = effects[effects.length - 1];
@@ -12258,6 +12325,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
   { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
   { re: "~'s prowl cost was paid", cond: { kind: "altPaid", alt: "prowl" } },
+  // Sandman's Quicksand: mayhem is paid rather than the mana cost (CR 702.187b), cast from the graveyard; the cost is
+  // paid after targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
+  { re: "~'s mayhem cost was paid", cond: { kind: "altPaid", alt: "mayhem" }, spellOnly: true, noTargets: true },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
   { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
@@ -12931,7 +13001,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes)) return false;
+    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes || o.xDiscardedMv)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

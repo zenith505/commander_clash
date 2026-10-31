@@ -971,6 +971,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentGainsLife" && eventPlayerFits(s, o, t, ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+    // Punishing Fire: "Whenever an opponent gains life, you may pay {R}. If you do, return ~ from your graveyard to your
+    // hand": it triggers only while it's in its owner's graveyard (CR 113.6m, rulings).
+    fromGraveyards((o, owner) => owner !== ev.player && add(o, owner, (e, t) => e === "opponentGainsLife" && eventPlayerFits(s, o, t, ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
   } else if (ev.type === "diceRolled") {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").

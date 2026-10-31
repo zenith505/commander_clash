@@ -847,6 +847,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   // Hazoret, Godseeker: "~ can't attack or block unless you have max speed" (CR 702.179e: speed 4).
   if (text === "you have max speed") return { kind: "maxSpeed" };
+  // Heroic Return: "~ costs {2} less to cast if a creature is attacking you": attacking you, not a planeswalker you control
+  // (CR 506.3).
+  if (text === "a creature is attacking you") return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingYou", text: "creatures attacking you" } } }, min: 1 };
   // Thoughtbound Primoc: "if a player controls more Wizards than each other player", Ghazbán Ogre: "has more life",
   // Sokenzan Renegade: "has more cards in hand": one player with the most, none tied (rulings).
   if ((m = /^a player (?:controls more ([A-Za-z]+)|has more (life|cards in hand)) than each other player$/.exec(text))) {
@@ -886,6 +889,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const a = parseStaticCondition(`you control a ${m[1]} creature`, st);
     const b = parseStaticCondition(`you control a non-${m[1]} creature`, st);
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
+  // Cavernous Maw: "Activate only if the number of other Caves you control plus the number of Cave cards in your graveyard
+  // is three or greater": counted as it's activated.
+  if ((m = new RegExp(`^(the number of .+ plus the number of .+) is ${NUM} or greater$`).exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[2]!) } : null;
   }
   // ED-E, Lonesome Eyebot: "if the number of attacking creatures is greater than the number of quest counters on ~".
   if ((m = /^the number of (.+) is greater than the number of (.+)$/.exec(text))) {

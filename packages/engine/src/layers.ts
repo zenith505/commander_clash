@@ -709,10 +709,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       const here = !!sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc;
       const lk = !here && subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
-      const c = here ? chars.get(subjectId!) : lk?.zc === subjectZc ? lk : undefined;
+      // Gone: as it last existed on the battlefield, whether the trigger names it there or in the zone it went to (a
+      // "dies" trigger's subject is the card in the graveyard, Pelt Collector).
+      const c = here ? chars.get(subjectId!) : lk && (lk.zc === subjectZc || (lk.zc + 1 === subjectZc && sub?.zoneChanges === subjectZc)) ? lk : undefined;
       if (!c) return false;
       const n = cond.stat === "power" ? c.power : c.toughness;
       if (cond.greatest && s.battlefield.some((id) => id !== subjectId && chars.get(id)?.types.includes("Creature") && chars.get(id)!.power >= n)) return false;
+      if (cond.greaterThanSource) {
+        // Pelt Collector: this permanent's power now, or as it last existed on the battlefield (rulings).
+        const me = chars.get(sourceId) ?? s.lastKnown?.[sourceId];
+        if (!me || n <= (cond.stat === "power" ? me.power : me.toughness)) return false;
+      }
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
     case "yourTurn":

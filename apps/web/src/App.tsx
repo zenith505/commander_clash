@@ -2341,7 +2341,7 @@ function KickPickBar({
     return (
       <div className="targeting x-pick">
         <span>
-          <strong>{pick.label}</strong>: {pick.name} <ManaCost cost={pick.costs[0]!} size="sm" />, how many times?
+          <strong>{pick.label}</strong>: {pick.name} {pick.text && !pick.costs[0] ? `(${pick.text})` : <ManaCost cost={pick.costs[0]!} size="sm" />}, how many times?
         </span>
         <button className="ghost" disabled={n <= 0} onClick={() => set(n - 1)} aria-label="Kick one time fewer">
           −

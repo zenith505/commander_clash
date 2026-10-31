@@ -6058,6 +6058,18 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   return `, kicked with ${kicks.map((i) => k.costs[i]).join(" and ")}`;
 }
 
+/**
+ * The parts of a kicker-like cost that aren't mana, for the times it's paid: once for kicker; for squad (CR 702.157a) each
+ * time ("Squad—Exile four cards from your graveyard" paid twice exiles eight cards).
+ */
+function kickerExtraCosts(d: CardDef, kicks?: number[]): AdditionalCost[] {
+  const k = compileCard(d).kicker;
+  const times = kicks?.filter((i) => i === 0).length ?? 0;
+  if (!k?.extraCosts || !times) return [];
+  if (times === 1 || !k.multi) return k.extraCosts;
+  return k.extraCosts.map((c) => (c.kind === "exileFromGraveyard" ? { ...c, n: c.n * times } : c));
+}
+
 /** Why these kicker choices aren't allowed (CR 702.33): each kicker cost once, multikicker's any number of times. */
 function kickProblem(d: CardDef, kicks?: number[]): string | null {
   if (!kicks?.length) return null;
@@ -6284,7 +6296,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // resolves (CR 702.35a).
   const madnessPend = s?.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.player === pid ? s.pending : undefined;
   const madnessLife = madnessPend && s!.objects[madnessPend.objectId] && defOf(s!, s!.objects[madnessPend.objectId]!).name === d.name ? (compileCard(d).madnessLife ?? 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>

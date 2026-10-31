@@ -1597,6 +1597,18 @@ export function compile(d: CardDef): CompiledCard {
       else out.kicker = { costs: [`{${waterbendCost[2]}}`], waterbend: Number(waterbendCost[2]), ...(waterbendCost[1] ? {} : { required: true as const }) };
       continue;
     }
+    // "Squad—Exile four cards from your graveyard." (Ruthless Radrat): a squad cost that isn't mana (CR 702.157a, 118.8),
+    // paid like a multikicker cost whose exiled cards add up (four for each time).
+    const squadOther = /^Squad—(Exile (?:two|three|four|five|six) cards from your graveyard)\.$/.exec(line);
+    if (squadOther) {
+      const cost = parseAdditionalCost(squadOther[1]!.replace(/^E/, "e"));
+      if (out.kicker || cost?.kind !== "exileFromGraveyard" || cost.filter || cost.x || cost.top) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [""], multi: true, squad: true, extraCosts: [cost], text: squadOther[1]!.replace(/^E/, "e") };
+        out.triggers.push({ event: "selfEnters", ifKicked: { kind: "kicked" }, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: { count: { kind: "kicked" } }, what: { ref: "self" } }], text: "Squad: create a token that's a copy of ~ for each time its squad cost was paid." } });
+      }
+      continue;
+    }
     const offspring = /^(Offspring|Squad) ((?:\{[^}]+\})+)$/.exec(line);
     if (offspring) {
       const squad = offspring[1] === "Squad";
@@ -3472,6 +3484,19 @@ export function compile(d: CardDef): CompiledCard {
       // The cost half is read by the cost-change lines below.
       line = `Spells you cast with mana value ${thryx[1]} or greater ${thryx[2].replace(/ and $/, "")}.`;
     }
+    // Cunning Nightbonder: "Spells with flash you cast cost {1} less to cast and can't be countered": spells with flash
+    // its controller cast, not copies or spells they gained control of (rulings), and not the card itself on the stack.
+    const nightbonder = /^Spells with flash you cast (cost \{\d+\} less to cast) and can't be countered\.$/.exec(line);
+    if (nightbonder) {
+      (out.uncounterable ??= []).push({ filter: { kind: "spell", keywords: ["Flash"], text: "spells with flash you cast" }, castOnly: true });
+      line = `Spells with flash you cast ${nightbonder[1]}.`;
+    }
+    // Phyrexian Ingester: "~ gets +X/+Y, where X is the exiled creature card's power and Y is its toughness": the card its
+    // imprint ability exiled (CR 607.2a), as it is in exile, updated continuously (rulings).
+    if (line === "~ gets +X/+Y, where X is the exiled creature card's power and Y is its toughness." && !isSpell) {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "modifyPT", power: { count: { kind: "linkedExiledPT", stat: "power" } }, toughness: { count: { kind: "linkedExiledPT", stat: "toughness" } } }], text: line });
+      continue;
+    }
     // Spider-Punk: "Spells and abilities can't be countered." (CR 101.2): any player's.
     if (line === "Spells and abilities can't be countered.") {
       (out.uncounterable ??= []).push({ filter: { kind: "spell", text: "spells" }, anyone: true });
@@ -3630,6 +3655,13 @@ export function compile(d: CardDef): CompiledCard {
     // Dosan the Falling Leaf: no player can cast a spell during another player's turn, even while something resolves.
     if (line === "Players can cast spells only during their own turns.") {
       out.castOnlyOwnTurn = true;
+      continue;
+    }
+    // City of Solitude: activated abilities too, mana abilities included and in any zone; triggered abilities still
+    // trigger (rulings).
+    if (line === "Players can cast spells and activate abilities only during their own turns.") {
+      out.castOnlyOwnTurn = true;
+      out.activateOnlyOwnTurn = true;
       continue;
     }
     if (/^Compleated(?: \(|$)/.test(line) && d.types.includes("Planeswalker")) {
@@ -4940,7 +4972,8 @@ function linkExile(out: CompiledCard) {
   // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, in the static's condition.
   // Profane Procession: "Exile target creature. Then if there are three or more cards exiled with ~, transform it": the
   // same, in an ability's own condition.
-  if ((out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Phyrexian Ingester: "the exiled creature card's power" is about what its one exile ability (imprint) exiled.
+  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

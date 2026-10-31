@@ -1311,7 +1311,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      if (you !== ev.player) add(o, you, (e) => e === "anotherPlayerLosesGame", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // Curse of Vengeance: "When enchanted player loses the game": the Aura is still attached to them as they leave.
+      if (you !== ev.player) add(o, you, (e) => e === "anotherPlayerLosesGame" || (e === "enchantedPlayerLosesGame" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "connived") {
     // "Whenever a creature you control connives" (Iron Monger, Ultron): even one that has left the battlefield (Toluz

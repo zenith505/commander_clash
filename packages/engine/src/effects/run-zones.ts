@@ -76,16 +76,17 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * with nothing legal it stays where it is (303.4g). One Aura at a time, in the order given; no question when only one
  * thing is legal. Returns "paused" while a player chooses, else the host of each Aura that can enter; an Aura missing
  * from it stays put. Cards that aren't Auras are skipped. `onlyTo`: "attached to ~" (Light-Paws), only that permanent, if
- * it could enchant it (null: it's gone, so nothing).
+ * it could enchant it (null: it's gone, so nothing); `onlyToPlayer`: "attached to target player" (Bitterheart Witch), the
+ * same for a player (null: the target is illegal).
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean, onlyToPlayer?: PlayerId | null): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
   for (const { o, under, face } of cards) {
     // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
     const d = asFace(s, o, face, () => defOf(s, o));
     if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))));
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (onlyToPlayer === undefined || ("attachToPlayer" in h && h.attachToPlayer === onlyToPlayer)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
@@ -2256,7 +2257,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Craft: "the exiled cards used to craft it" are the cards the cost exiled, while they stay exiled (CR 702.167c).
           if (e.linkCostExiled && s.resolving?.item.costExiled?.length) (s.linkedExile ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] = [...s.resolving.item.costExiled];
-          if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+          if (e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype))) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
           // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
           if (e.attachSelf) {
             const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -2454,8 +2455,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.chooser && chooser === undefined) return;
         // Visions of Dread: they choose for you, so the card that helps you least (bots).
         const under = e.underYours && p.id !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
-        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
-        return "paused";
+        // Seek Thrills: "put all cards that have an Adventure from among the milled cards": every one, no choice.
+        if (e.all) sc.found = cards.slice(0, max);
+        else {
+          s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+          return "paused";
+        }
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
       if (e.dest === "battlefield") {

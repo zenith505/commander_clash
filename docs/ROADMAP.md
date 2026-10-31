@@ -1275,7 +1275,7 @@ line blocks.
    sources" (Woodland Weavemaster); "entered from a graveyard or you cast it from a graveyard" (Breathless Knight);
    "the first time counters have been put on that creature this turn" (Stalwart Successor); "a card in your graveyard
    that wasn't put there this combat" (Storrev, Devkarin Lich, CR 506.1); "that player may put a +1/+1 counter on ~. If
-   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,574 of 31,936).
+   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,590 of 31,936 with Lane B B62).
    Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (mana of
    two different colors); Karn's Sylex (players can't pay life, across every life cost); Spark of Creativity ("you may
    have ~ deal damage ... If you don't, you may play that card"); Strength of the Tajuru (one target per multikick);
@@ -3679,8 +3679,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permanents gain protection), Chandra's Phoenix (damage dealt by a red instant or sorcery spell or red planeswalker you
   control), Heart-Shaped Herb, Meticulous Excavation (unearth check), Culmination of Studies, Psychotic Episode,
   Skeletal Swarming, Lochmere Serpent.
+- Round B62 (the unlisted ones from EDHREC rank about 19,700 up): affinity for historic permanents (Banish to Another
+  Universe), "Activate only during your turn" on every player's spells and abilities (City of Solitude: you can't cast
+  spells or activate abilities during another player's turn), "put a +1/+1 counter on target creature for each 1 life
+  you gained" (Cradle of Vitality), "if that player has no cards in hand and ~ has N or more counters on it" (Quest for
+  the Nihil Stone), "Spells with flash you cast cost {1} less" and "can't be countered" for the spells you cast only
+  (Cunning Nightbonder: not copies, not spells whose control changed), "Permanent spells you cast that have an
+  Adventure cost {1} less" and "return all cards with an Adventure milled this way" (Beluna Grandsquall // Seek
+  Thrills), transfigure (Fleshwrither, CR 702.71a), a squad cost that isn't mana ("Squad—Exile four cards from your
+  graveyard", Ruthless Radrat: four more cards each time, CR 702.157a; the squad picker now shows that cost in words),
+  freerunning by returning a creature to hand (Escape Detection), "you may untap all lands you control. If you do, you
+  can't cast spells until your next turn" (Innocuous Researcher), "gets +X/+Y, where X is the power and Y is the
+  toughness of the exiled card" (Phyrexian Ingester, the card as it is in exile), "When enchanted player loses the game"
+  (Curse of Vengeance), "put it onto the battlefield attached to target player" (Bitterheart Witch), "When this
+  creature exploits a creature, return ... all creatures your opponents control with toughness less than the exploited
+  creature's toughness" (Profaner of the Dead), "If it's a Vehicle, it becomes an artifact creature" (Tune Up),
+  "becomes a legendary 0/0 Elemental creature with haste named Vitu-Ghazi. It's still a land" (Awakening of
+  Vitu-Ghazi). +16 (28,574 of 31,936 with round 223).
+- Out after round B62 (looked at, not done): Arcus Acolyte (outlast granted to creatures without a +1/+1 counter),
+  Skyclave Shade (a landfall trigger from the graveyard that lets it be cast this turn), Jocasta, Automaton Avenger
+  (returns tapped and attacking when you attack with your commander, from the graveyard), Undiscovered Paradise
+  (returned to hand during your next untap step), Archangel of Strife (each player chooses war or peace), Lumbering
+  Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (draws replaced, losing if you
+  can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (a loyalty counter instead of
+  crewing).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B61 took the easier ones up to about 15,000 but left some of that range unread: about 130
+  19,700 up (rounds B54 to B62 took the easier ones up to about 15,000 but left some of that range unread: about 130
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported

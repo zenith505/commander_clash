@@ -445,6 +445,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // not (rulings), generic mana only (CR 601.2f).
   if ((m = /^Each creature spell you cast costs \{(\d+)\} less to cast if it has (mutate)$/.exec(text)))
     return { costMod: { who: "you", filter: { kind: "spell", types: ["Creature"], notTypes: [], notColors: [], keywords: [capital(m[2]!)], text: `creature spells with ${m[2]}` }, n: -Number(m[1]), text: line } };
+  // Beluna Grandsquall: "Permanent spells you cast that have an Adventure cost {1} less to cast": adventurer cards cast as
+  // permanent spells (rulings: an Adventure spell is an instant or sorcery, not a permanent spell). Cunning Nightbonder:
+  // "Spells with flash you cast cost {1} less to cast" (the and-can't-be-countered half is read in compile.ts).
+  if ((m = /^(Permanent spells|Spells) you cast that have an Adventure (cost \{\d+\} less to cast)$|^Spells with (flash) you cast (cost \{\d+\} less to cast)$/.exec(text))) {
+    const base = parseCostChange(m[1] ? `${m[1]} you cast ${m[2]}` : `Spells you cast ${m[4]}`);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.who !== "you" || base.costMod.times || base.costMod.nth || base.costMod.if) return "fail";
+    const filter: TargetSpec = m[1] ? { ...base.costMod.filter, hasAdventure: true, text: `${m[1].toLowerCase()} that have an Adventure` } : { ...base.costMod.filter, keywords: ["Flash"], text: "spells with flash" };
+    return { costMod: { ...base.costMod, filter, text: line } };
+  }
   // Doran, Besieged by Time: "Each creature spell you cast with toughness greater than its power costs {1} less to cast".
   if ((m = /^Each creature spell you cast with toughness greater than its power costs (\{\d+\} less to cast)$/.exec(text))) text = `Creature spells you cast with toughness greater than their power cost ${m[1]}`;
   // Eminence: "As long as ~ is in the command zone or on the battlefield, other Dragon spells you cast cost {1} less to

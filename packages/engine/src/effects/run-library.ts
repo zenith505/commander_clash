@@ -1190,7 +1190,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // CR 400.7).
       const me = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
       const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.id : null;
-      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : undefined);
+      // "Attached to target player" (Bitterheart Witch): that player, if still a legal target.
+      const toPlayer = e.dest.attachToPlayer ? (players(s, e.dest.attachToPlayer, ctx)[0] ?? null) : undefined;
+      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : undefined, undefined, toPlayer);
       if (hosts === "paused") return "paused";
       const moves: { pid: PlayerId; id: ObjectId }[] = [];
       for (const pid of searchers) {

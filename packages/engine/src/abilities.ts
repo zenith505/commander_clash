@@ -256,6 +256,8 @@ export type Count =
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
   | { kind: "colorsOf"; of: ObjRef }
+  /** "The damage already dealt to it this turn" (Whipkeeper): all of it, since it became that object, even if regeneration removed it (rulings). */
+  | { kind: "damageDealtToThisTurn"; of: ObjRef }
   /** `highest`: "the highest life total among your opponents" (Malignus): the greatest of theirs, not the sum. */
   | { kind: "life"; who: PlayerRef; highest?: true }
   /** "That player's life total as the turn began" (Sengir, the Dark Baron): the trigger's player's (GameState.lifeAsTurnBegan), in the game or not. */
@@ -676,6 +678,8 @@ export interface TargetSpec {
    * now, checked as it's chosen (a fact that can't change by the time it resolves).
    */
   combatDamagedBySource?: true;
+  /** For players: "target player dealt damage by ~ this turn" (Wicked Akuba): any damage, by the source as the creature it is now (TurnLog.damagedBy). */
+  damagedBySource?: true;
   /** "A creature that fought this turn" (Boxing Ring): one that fought since it became this object (CR 701.14, 400.7). */
   foughtThisTurn?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
@@ -3229,7 +3233,7 @@ export type Effect =
   /** Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn." (Player.nextDrawExiles) */
   | { type: "nextDrawExile"; who: PlayerRef }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
-  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true }
+  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
    * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
    * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
@@ -4950,6 +4954,8 @@ export interface ActivatedAbility {
   costLess?: Amount;
   /** "This ability costs {1} less to activate during your turn" (Hylda's Crown of Winter): `n` less while `cond` holds, generic mana only. */
   costLessIf?: { n: number; cond: StaticCondition };
+  /** "This ability costs {1} less to activate if it targets a creature with power 3 or less" (Raft Security Officer): `n` less once its target is chosen and matches (CR 602.2b, 601.2f), generic mana only. */
+  costLessIfTarget?: { n: number; filter: TargetSpec };
   /**
    * "This ability costs {1} less to activate for each color of the creature it targets" (Dragonfire Blade), "... for each
    * +1/+1 counter on the creature it targets" (Warrior's Blades): `n` less for each, once the target is chosen (CR

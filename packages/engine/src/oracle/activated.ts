@@ -4,7 +4,7 @@ import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { blightCost, parseAdditionalCost } from "./keyword-abilities";
-import { pickFilter } from "./targets";
+import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseOnlyClauses } from "./statics";
 import { parseCount } from "./counts";
 import type { ManaType } from "../types";
@@ -294,6 +294,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
   let costLess: ActivatedAbility["costLess"];
   let costLessIf: ActivatedAbility["costLessIf"];
+  let costLessIfTarget: ActivatedAbility["costLessIfTarget"];
   // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
   let inYard = false;
   // "Any player may activate this ability" (CR 602.2): its controller is whoever activates it (CR 113.8), "you" in it
@@ -345,6 +346,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (lessTurn && !costLess && !costLessIf) {
       costLessIf = { n: Number(lessTurn[1]), cond: { kind: "yourTurn" } };
       effectText = effectText.slice(0, lessTurn.index);
+      found = true;
+    }
+    // Raft Security Officer: "This ability costs {1} less to activate if it targets a creature with power 3 or less": as the
+    // target is when the cost is worked out (CR 601.2f).
+    const lessTarget = / This ability costs \{(\d+)\} less to activate if it targets (?:an? )?([^.]+)\.$/.exec(effectText);
+    if (lessTarget && !costLess && !costLessIf && !costLessIfTarget) {
+      const filter = parseTargetPhrase(lessTarget[2]!);
+      if (filter?.kind !== "object") return "fail";
+      costLessIfTarget = { n: Number(lessTarget[1]), filter: { ...filter, text: lessTarget[2]! } };
+      effectText = effectText.slice(0, lessTarget.index);
       found = true;
     }
     // "Spend only mana of the chosen color to activate this ability." (Throne of Eldraine): the color chosen as it entered.
@@ -564,6 +575,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(xIs ? { xIs } : {}),
     ...(costLess ? { costLess } : {}),
     ...(costLessIf ? { costLessIf } : {}),
+    ...(costLessIfTarget ? { costLessIfTarget } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(/Pay life equal to the number of colors in your commanders' color identity/.test(costs) ? { lifeCostIdentity: true as const } : {}),

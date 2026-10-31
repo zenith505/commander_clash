@@ -3639,7 +3639,7 @@ function ArrangeTop({
           <strong>
             {source}:{" "}
             {how === "look"
-              ? `the top card of ${owner ? `${owner}'s` : "your"} library`
+              ? `the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of ${owner ? `${owner}'s` : "your"} library`
               : how === "order"
               ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
               : how === "bottom"
@@ -3665,7 +3665,7 @@ function ArrangeTop({
                 ? "Top of graveyard (leftmost on top)"
                 : "Top of library (leftmost on top)"}
           </h4>
-          {row(top, true, setTop, how === "bottom")}
+          {row(top, how !== "look", setTop, how === "bottom")}
           {!together && (
             <>
               <h4>{how === "scry" ? `${awayName} (rightmost at the very bottom)` : awayName}</h4>
@@ -4949,7 +4949,9 @@ function Controls({
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
-    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "exile" ? "exile" : pending.action === "libraryTop" ? "put on top of its owner's library" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : pending.action === "flicker" ? "exile and return" : theirs ? "return to their owner's hand" : "return to your hand";
+    // Drake Familiar: "return an enchantment to its owner's hand": anyone's permanents to choose from.
+    const anyones = pending.of === undefined && pending.options.some((id) => s.objects[id] && controllerOf(s, s.objects[id]!) !== HUMAN);
+    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "exile" ? "exile" : pending.action === "libraryTop" ? "put on top of its owner's library" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : pending.action === "flicker" ? "exile and return" : theirs ? "return to their owner's hand" : anyones ? "return to its owner's hand" : "return to your hand";
     // "other creature" reads "another creature".
     const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
@@ -5013,7 +5015,7 @@ function Controls({
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : pending.bounce ? "returned to their owners' hands" : "sacrificed"}.`
                 : pending.owned
                 ? `click a permanent ${theirs ? `${theirs} owns` : "you own"} (whoever controls it) to gain control of it.`
-                : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
+                : `click ${what} ${theirs ? `${theirs} controls` : anyones ? "(anyone's)" : "of yours"} to ${verb}.`}
           {pending.looked?.length ? (
             <>
               {" "}

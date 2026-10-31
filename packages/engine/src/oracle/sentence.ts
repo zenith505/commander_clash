@@ -154,7 +154,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
       if (!filter) return null;
       Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
-    } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
+    // Voda Sea Scavenger: "You may put one of those cards on top of your library": the same, up to one of them.
+    } else if (/^You may put one of (?:them|those cards) (?:back )?on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else if ((m = new RegExp(`^Put one of (?:them|those cards) on top of your library(?: and the rest ${REST})?$`).exec(s))) {
       // Cream of the Crop: one of them must go back on top.

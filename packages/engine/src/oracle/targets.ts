@@ -308,6 +308,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // Wicked Akuba: "target player dealt damage by ~ this turn": any damage, combat or not.
+  if (x === "target player dealt damage by ~ this turn" && ctx.activated && !ctx.spell) {
+    const index = addTarget(ctx, { kind: "player", damagedBySource: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   // Fire and Brimstone: "target player who attacked this turn" (Player.attackedTurn).
   if (x === "target player who attacked this turn") {
     const index = addTarget(ctx, { kind: "player", attackedThisTurn: true, text: x });
@@ -525,8 +531,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
-  // Fulgent Distraction: "all Equipment attached to them": to each of the creatures targeted before.
-  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature|them)$/i.exec(x) : null;
+  // Fulgent Distraction: "all Equipment attached to them": to each of the creatures targeted before. Scarab of the Unseen:
+  // "all Auras attached to target permanent you own".
+  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature|target permanent you own|them)$/i.exec(x) : null;
   if (attachedTarget) {
     const t = parseObjectNow(attachedTarget[2]!, ctx, cards);
     if (t?.ref !== "target" || (t.n && attachedTarget[2] !== "them") || t.sameName || t.sharesColor || t.attachedToo) return null;

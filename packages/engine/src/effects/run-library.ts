@@ -529,6 +529,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (e.plot) {
             o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
             log(s, `${defOf(s, o).name} becomes plotted. ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
+            fireEvent(s, { type: "plotted", id });
           }
           // Linked to the source as it was when the ability triggered (CR 607.2a), like an exile ability's.
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });

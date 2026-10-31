@@ -1527,6 +1527,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
+  // Sheoldred's Restoration: "If ~ was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much
+  // life.": the same amount either way, settled as it resolves; kicked or not was settled as it was cast (CR 702.33e).
+  text = text.replace(/(\. If ~ was kicked, you gain life equal to (that card's mana value)\. Otherwise, you lose) that much life\./, "$1 life equal to $2.");
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
@@ -2548,6 +2551,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^(?:[Tt]hen )?[Pp]roliferate again\.?$/.test(s)) {
       if (last?.type !== "proliferate" || last.n || last.twice || last.thenPhaseOut) return null;
       effects.push({ ...last });
+      continue;
+    }
+    // World Queller: "you may choose a card type. If you do, each player sacrifices a permanent of their choice of that
+    // type.": any card type (CR 205.2a), chosen as it resolves (CR 608.2d); a player with none of that type sacrifices
+    // nothing (CR 701.21a).
+    if (/^[Yy]ou may choose a card type$/.test(s) && /^If you do, each player sacrifices a permanent of their choice of that type\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "may", effects: [{ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }], text: "choose a card type" }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "pick", who: { ref: "eachPlayer" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "permanent of the chosen type" }, n: 1, action: "sacrifice" }] });
+      si++;
       continue;
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
@@ -9405,7 +9416,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Dire-Strain Rampage: "If a land was destroyed this way, ... Otherwise, ...": a target that wasn't destroyed (an
       // indestructible one) or wasn't a land gets the second (rulings).
       const destroyedElse = prev?.type === "if" && prev.cond.kind === "destroyedThisWay" && !!prev.cond.cardType;
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
+      // Sheoldred's Restoration: "If ~ was kicked, ... Otherwise, ...": kicked or not, settled as it was cast (CR 702.33e).
+      const kickedElse = prev?.type === "if" && prev.cond.kind === "kicked" && !prev.cond.cost && ctx.spell;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && !kickedElse && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
       // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
       if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
       // Lily Bowen: after "... on ~ if its power is 16 or less", "it" is ~.

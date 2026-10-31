@@ -722,6 +722,8 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "colorsAmongPermanents":
     // Archipelagore: "the number of times ~ has mutated", fixed as the mutate trigger's targets are chosen.
     case "mutations":
+    // Custodi Soulcaller: "the number of players you attacked this combat", fixed once attackers are declared.
+    case "opponentsAttacked":
       return true;
     // Rot Hulk: "the number of opponents you have".
     case "players":

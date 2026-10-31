@@ -2850,6 +2850,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${castYard[1]!}, ${castYard[2]!}`);
     return !t || t === "fail" || t.event !== "selfEnters" || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "castYours" };
   }
+  // Hulkling, Burgeoning Bruiser: "Whenever another creature you control enters, if it has greater power or toughness than
+  // ~, put a +1/+1 counter on ~.": evolve's words (CR 702.100a), checked as it triggers and resolves (CR 603.4), but not
+  // evolve, so ~ doesn't "evolve" (CR 702.100b).
+  if (/^Whenever another creature you control enters, if it has greater power or toughness than ~, put a \+1\/\+1 counter on ~\.?$/.test(line)) {
+    return { event: "anotherCreatureYouControlEnters", ifEvolves: true, body: { targets: [], effects: [{ type: "evolve", notKeyword: true }], text: line } };
+  }
   // Ray of Frost: "When this Aura enters, if enchanted creature is red, tap it.": "it" is that creature.
   if (/^When ~ enters, if enchanted creature is (?:white|blue|black|red|green), tap it\.?$/.test(line)) {
     const t = parseTrigger(line.replace(/tap it(\.?)$/, "tap enchanted creature$1"));
@@ -3378,6 +3384,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Magmakin Artillerist: "it deals 1 damage to each opponent": the card is the source (CR 702.29c).
     const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
     return body ? { event: "selfCycled", body } : "fail";
+  }
+  // "When ~ becomes plotted" (CR 702.170a, 702.170c): the card in exile, "it" the card as the source (Longhorn
+  // Sharpshooter: "it deals 2 damage to any target").
+  const plottedT = /^When ~ becomes plotted, (.+)$/.exec(line);
+  if (plottedT) {
+    const body = parseBody(plottedT[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
+    return body ? { event: "selfPlotted", body } : "fail";
   }
   // "When you discard ~" (Titanbones, Towering Heart, Edgar's Awakening): the card's ability, wherever the discard put it
   // (CR 701.9a; like cycling, CR 702.29c), its owner controlling it (CR 113.8).

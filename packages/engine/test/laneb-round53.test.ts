@@ -1,0 +1,263 @@
+// Lane B, round 53: unsupported cards no earlier round wrote down, EDHREC rank about 22,000 up, least played first
+// (`npm run popular -- --least`).
+
+import { describe, expect, it } from "vitest";
+import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { attackProblem, blockProblem, botActions, planPlot, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, power, toughness, planCast, planTurnFaceUp, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
+
+const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
+const run = (s: GameState, plan: Action[] | null) => {
+  if (!plan) throw new Error("no plan");
+  for (const a of plan) s = act(s, a);
+  return s;
+};
+/** Everyone passes until the stack is empty, answering choices as the bots would; the choices a test makes stop it. */
+const settle = (s: GameState, stopAt: (s: GameState) => boolean = () => false) => {
+  for (let i = 0; i < 300 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    if (stopAt(s)) break;
+    const p = s.pending;
+    if (p) for (const a of botActions(s, p.player)) s = act(s, a);
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+/** Plays on (no attacks or blocks unless asked, the bots answering other questions) until `stop`. */
+const goUntil = (s: GameState, stop: (s: GameState) => boolean) => {
+  for (let i = 0; i < 3000; i++) {
+    if (stop(s)) return s;
+    const p = s.pending;
+    const pid = waitingOn(s)!;
+    if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: pid, attacks: [] });
+    else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: pid, blocks: [] });
+    else if (p) for (const a of botActions(s, p.player)) s = act(s, a);
+    else s = act(s, { type: "passPriority", player: pid });
+  }
+  throw new Error("never got there");
+};
+const at = (kind: string, pid: PlayerId) => (s: GameState) => s.pending?.kind === kind && s.pending.player === pid;
+const tgt = (id: string): TargetChoice => ({ kind: "object", id });
+const ply = (id: PlayerId): TargetChoice => ({ kind: "player", id });
+const zone = (s: GameState, id: string) => s.objects[id]?.zone;
+const nameOf = (s: GameState, id: string) => s.cards[s.objects[id]!.cardId]!.name;
+const life = (s: GameState, pid: PlayerId) => s.players[pid]!.life;
+const pt = (s: GameState, id: string) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
+const castNow = (s: GameState, pid: PlayerId, id: string, targets: TargetChoice[] = [], choices: CostChoices = {}) => run(s, planCast(s, pid, id, targets, undefined, undefined, undefined, choices));
+/** Moves a new card for `def` into `pid`'s hand, library (on top) or graveyard. */
+const toZone = (s: GameState, pid: PlayerId, def: CardDef, where: "hand" | "library" | "graveyard" | "exile") => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = where;
+  if (where === "library") s.players[pid]!.library.unshift(id);
+  else s.players[pid]![where].push(id);
+  invalidateCharacteristics(s);
+  return id;
+};
+/** Passes to the declare attackers step of the active player's turn and declares `attackers` at `defender`; stops at the first question. */
+const attackWith = (s: GameState, attackers: string[], defender: PlayerId) => {
+  for (let i = 0; i < 50 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  s = act(s, { type: "declareAttackers", player: s.activePlayer, attacks: attackers.map((attacker) => ({ attacker, defender })) });
+  for (let i = 0; i < 50 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+const toBlocks = (s: GameState) => {
+  for (let i = 0; i < 50 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+/** Leaves only `keep` in `pid`'s hand (setup's hand also holds the seven cards drawn). */
+const onlyHand = (s: GameState, pid: PlayerId, keep: string[]) => {
+  const p = s.players[pid]!;
+  for (const id of p.hand.filter((id) => !keep.includes(id))) {
+    s.objects[id]!.zone = "exile";
+    p.exile.push(id);
+  }
+  p.hand = p.hand.filter((id) => keep.includes(id));
+};
+const counters = (s: GameState, id: string, kind = "+1/+1") => s.objects[id]!.counters?.[kind] ?? 0;
+const answerMay = (s: GameState, pid: PlayerId, yes: boolean) => act(s, { type: "chooseMay", player: pid, yes });
+/** Passes until `pid` is asked to choose targets for a trigger, then chooses `targets`. */
+const triggerTargets = (s: GameState, pid: PlayerId, targets: TargetChoice[]) => {
+  s = settle(s, at("chooseTargets", pid));
+  expect(s.pending?.kind).toBe("chooseTargets");
+  return act(s, { type: "chooseTargets", player: pid, targets } as Action);
+};
+
+// Real oracle text (Scryfall).
+const sheoldredsRestoration = () => card("Sheoldred's Restoration", "Sorcery", "{3}{B}", { cmc: 4, colors: ["B"], keywords: ["Kicker"], oracleText: "Kicker {2}{W} (You may pay an additional {2}{W} as you cast this spell.)\nReturn target creature card from your graveyard to the battlefield. If this spell was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much life.\nExile Sheoldred's Restoration." });
+const hulklingBurgeoningBruiser = () => card("Hulkling, Burgeoning Bruiser", "Legendary Creature — Kree Skrull Hero", "{2}{G}", { cmc: 3, colors: ["G"], power: "2", toughness: "3", keywords: ["Vigilance"], oracleText: "Vigilance\nWhenever another creature you control enters, if it has greater power or toughness than Hulkling, put a +1/+1 counter on Hulkling." });
+const coldStorage = () => card("Cold Storage", "Artifact", "{4}", { cmc: 4, colors: [], oracleText: "{3}: Exile target creature you control.\nSacrifice this artifact: Return each creature card exiled with this artifact to the battlefield under your control." });
+const endlessSands = () => card("Endless Sands", "Land — Desert", "", { cmc: 0, colors: [], oracleText: "{T}: Add {C}.\n{2}, {T}: Exile target creature you control.\n{4}, {T}, Sacrifice this land: Return each creature card exiled with this land to the battlefield under its owner's control." });
+const longhornSharpshooter = () => card("Longhorn Sharpshooter", "Creature — Minotaur Rogue", "{2}{R}", { cmc: 3, colors: ["R"], power: "3", toughness: "3", keywords: ["Reach", "Plot"], oracleText: "Reach\nWhen this card becomes plotted, it deals 2 damage to any target.\nPlot {3}{R} (You may pay {3}{R} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)" });
+const aloeAlchemist = () => card("Aloe Alchemist", "Creature — Plant Warlock", "{1}{G}", { cmc: 2, colors: ["G"], power: "3", toughness: "2", keywords: ["Plot", "Trample"], oracleText: "Trample\nWhen this card becomes plotted, target creature gets +3/+2 and gains trample until end of turn.\nPlot {1}{G} (You may pay {1}{G} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)" });
+const custodiSoulcaller = () => card("Custodi Soulcaller", "Creature — Human Cleric", "{1}{W}{W}", { cmc: 3, colors: ["W"], power: "1", toughness: "2", keywords: ["Melee"], oracleText: "Melee (Whenever this creature attacks, it gets +1/+1 until end of turn for each opponent you attacked this combat.)\nWhenever this creature attacks, return target creature card with mana value X or less from your graveyard to the battlefield, where X is the number of players you attacked this combat." });
+const aetherWeb = () => card("Aether Web", "Enchantment — Aura", "{1}{G}", { cmc: 2, colors: ["G"], keywords: ["Enchant", "Flash"], oracleText: "Flash (You may cast this spell any time you could cast an instant.)\nEnchant creature\nEnchanted creature gets +1/+1, has reach, and can block creatures with shadow as though they didn't have shadow. (Creatures with reach can block creatures with flying.)" });
+const aetherflameWall = () => card("Aetherflame Wall", "Creature — Wall", "{1}{R}", { cmc: 2, colors: ["R"], power: "0", toughness: "4", keywords: ["Defender"], oracleText: "Defender\nThis creature can block creatures with shadow as though they didn't have shadow.\n{R}: This creature gets +1/+0 until end of turn." });
+const worldQueller = () => card("World Queller", "Creature — Avatar", "{3}{W}{W}", { cmc: 5, colors: ["W"], power: "4", toughness: "4", oracleText: "At the beginning of your upkeep, you may choose a card type. If you do, each player sacrifices a permanent of their choice of that type." });
+
+// Test cards.
+// Test cards.
+const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
+const bearC = (name = "Plain Bear", p = 2, t = 2) => vanilla(name, "Creature — Bear", "{1}{G}", 2, p, t, { colors: ["G"] });
+const bigC = (name = "Big Beast", p = 5, t = 5) => vanilla(name, "Creature — Beast", "{4}{G}", 5, p, t, { colors: ["G"] });
+const golem = (name = "Test Golem", p = 2, t = 2) => vanilla(name, "Artifact Creature — Golem", "{2}", 2, p, t, { colors: [] });
+const shade = () => vanilla("Test Shade", "Creature — Shade", "{1}{B}", 2, 2, 2, { colors: ["B"], keywords: ["Shadow"], oracleText: "Shadow" });
+const opt = () => card("Test Opt", "Instant", "{U}", { cmc: 1, colors: ["U"], oracleText: "Draw a card." });
+const bolt = () => card("Test Bolt", "Instant", "{R}", { cmc: 1, colors: ["R"], oracleText: "Test Bolt deals 3 damage to any target." });
+const divination = () => card("Test Divination", "Sorcery", "{2}{U}", { cmc: 3, colors: ["U"], oracleText: "Draw two cards." });
+const unsummon = () => card("Test Unsummon", "Instant", "{U}", { cmc: 1, colors: ["U"], oracleText: "Return target nonland permanent to its owner's hand." });
+const trinket = (name = "Test Trinket") => card(name, "Artifact", "{1}", { cmc: 1, colors: [] });
+const walker = () => card("Test Walker", "Legendary Planeswalker — Jace", "{2}{U}", { cmc: 3, colors: ["U"], loyalty: "3", oracleText: "+1: Draw a card." });
+const nonbasic = () => card("Test Vista", "Land", "", { oracleText: "{T}: Add {C}." });
+const upkeepLife = () => card("Test Chalice", "Artifact", "{2}", { cmc: 2, colors: [], oracleText: "At the beginning of your upkeep, you gain 1 life." });
+const kw = (s: GameState, id: string, k: string) => objHasKeyword(s, s.objects[id]!, k);
+const tokensNamed = (s: GameState, pid: PlayerId, name: string) => s.battlefield.filter((id) => s.objects[id]!.isToken && controllerOf(s, s.objects[id]!) === pid && nameOf(s, id).replace(/ Token$/, "") === name);
+/** Takes `pid`'s lands off the battlefield and leaves exactly `pool` to pay with. */
+const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | "B" | "R" | "G" | "C", number>>) => {
+  for (const id of s.battlefield.filter((x) => s.objects[x]!.controller === pid && characteristics(s, s.objects[x]!).types.includes("Land"))) {
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "exile";
+    s.players[pid]!.exile.push(id);
+  }
+  s.players[pid]!.manaPool = { ...s.players[pid]!.manaPool, ...pool };
+  invalidateCharacteristics(s);
+};
+
+
+describe("Lane B round 53", () => {
+  it("are fully supported", () => {
+    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller());
+  });
+
+  it("Sheoldred's Restoration: returns the creature card; kicked you gain its mana value in life, unkicked you lose it", () => {
+    for (const kicks of [[], [0]]) {
+      const { s: s0, ap, ids } = setup([sheoldredsRestoration()]);
+      const big = toZone(s0, ap, bigC(), "graveyard");
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(big)], undefined, undefined, undefined, { kicks })));
+      expect(zone(s, big)).toBe("battlefield");
+      expect(life(s, ap)).toBe(kicks.length ? 45 : 35);
+      expect(zone(s, ids[0]!)).toBe("exile");
+    }
+  });
+
+  it("Hulkling: a counter only for a creature with greater power or toughness, and it doesn't evolve", () => {
+    const { s: s0, ap, ids } = setup([bearC("Small Bear", 1, 1), bearC("Tall Bear", 1, 4), card("Evolve Watcher", "Creature — Ooze", "{G}", { cmc: 1, power: "1", toughness: "1", oracleText: "Whenever a creature you control evolves, you gain 1 life." })]);
+    const hulk = putOnBattlefield(s0, ap, hulklingBurgeoningBruiser());
+    let s = settle(castNow(s0, ap, ids[0]!));
+    expect(counters(s, hulk)).toBe(0);
+    s = settle(castNow(s, ap, ids[1]!));
+    expect(counters(s, hulk)).toBe(1);
+    expect(pt(s, hulk)).toBe("3/4");
+    // Now 3/4: another 1/4 isn't bigger.
+    const tall2 = toZone(s, ap, bearC("Tall Bear 2", 1, 4), "hand");
+    const lifeBefore = life(s, ap);
+    s = settle(castNow(s, ap, tall2));
+    expect(counters(s, hulk)).toBe(1);
+    expect(life(s, ap)).toBe(lifeBefore);
+  });
+
+  it("Cold Storage: exiled creatures come back together under your control when it's sacrificed", () => {
+    const { s: s0, ap } = setup([]);
+    const storage = putOnBattlefield(s0, ap, coldStorage());
+    const a = putOnBattlefield(s0, ap, bearC("Bear A"));
+    const b = putOnBattlefield(s0, ap, bigC());
+    let s = settle(run(s0, planActivate(s0, ap, storage, 0, [tgt(a)])));
+    s = settle(run(s, planActivate(s, ap, storage, 0, [tgt(b)])));
+    expect([zone(s, a), zone(s, b)]).toEqual(["exile", "exile"]);
+    s = settle(run(s, planActivate(s, ap, storage, 1, [])));
+    expect(zone(s, storage)).toBe("graveyard");
+    expect([zone(s, a), zone(s, b)]).toEqual(["battlefield", "battlefield"]);
+    expect([controllerOf(s, s.objects[a]!), controllerOf(s, s.objects[b]!)]).toEqual([ap, ap]);
+  });
+
+  it("Endless Sands: the creature cards come back under their owner's control", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sands = putOnBattlefield(s0, ap, endlessSands());
+    // An opponent's creature we control.
+    const theirs = putOnBattlefield(s0, opp, bearC("Their Bear"));
+    s0.objects[theirs]!.controller = ap;
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planActivate(s0, ap, sands, 0, [tgt(theirs)])));
+    expect(zone(s, theirs)).toBe("exile");
+    s.objects[sands]!.tapped = false;
+    s = settle(run(s, planActivate(s, ap, sands, 1, [])));
+    expect(zone(s, theirs)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(opp);
+  });
+
+  it("Longhorn Sharpshooter: plotting it deals 2 damage to any target from exile", () => {
+    const { s: s0, ap, opp, ids } = setup([longhornSharpshooter()]);
+    let s = run(s0, planPlot(s0, ap, ids[0]!));
+    expect(zone(s, ids[0]!)).toBe("exile");
+    s = triggerTargets(s, ap, [ply(opp)]);
+    s = settle(s);
+    expect(life(s, opp)).toBe(38);
+  });
+
+  it("Aloe Alchemist: plotting it pumps target creature", () => {
+    const { s: s0, ap, ids } = setup([aloeAlchemist()]);
+    const bear = putOnBattlefield(s0, ap, bearC());
+    let s = run(s0, planPlot(s0, ap, ids[0]!));
+    s = triggerTargets(s, ap, [tgt(bear)]);
+    s = settle(s);
+    expect(pt(s, bear)).toBe("5/4");
+    expect(kw(s, bear, "Trample")).toBe(true);
+  });
+
+  it("Custodi Soulcaller: returns a creature card with mana value up to the number of players attacked", () => {
+    const { s: s0, ap } = setup([]);
+    onlyHand(s0, ap, []);
+    const caller = putOnBattlefield(s0, ap, custodiSoulcaller());
+    const helper = putOnBattlefield(s0, ap, bearC("Helper Bear"));
+    const two = toZone(s0, ap, bearC("Dead Bear"), "graveyard");
+    const three = toZone(s0, ap, vanilla("Dead Ogre", "Creature — Ogre", "{2}{R}", 3, 3, 3, { colors: ["R"] }), "graveyard");
+    const [o1, o2] = s0.turnOrder.filter((p) => p !== ap);
+    let s = s0;
+    for (let i = 0; i < 50 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: caller, defender: o1! }, { attacker: helper, defender: o2! }] });
+    s = settle(s, at("chooseTargets", ap));
+    expect(s.pending?.kind).toBe("chooseTargets");
+    // Two players attacked: the 3-drop isn't a legal target, the 2-drop is.
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(three)] } as Action)).toThrow();
+    s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(two)] } as Action);
+    s = settle(s);
+    expect(zone(s, two)).toBe("battlefield");
+    expect(zone(s, three)).toBe("graveyard");
+  });
+
+  it("Aether Web and Aetherflame Wall: block creatures with shadow", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sh = putOnBattlefield(s0, ap, shade());
+    const wall = putOnBattlefield(s0, opp, aetherflameWall());
+    const plain = putOnBattlefield(s0, opp, bearC("Plain Blocker"));
+    const webbed = putOnBattlefield(s0, opp, bearC("Webbed Bear"));
+    const web = putOnBattlefield(s0, opp, aetherWeb());
+    s0.objects[web]!.attachedTo = webbed;
+    // A shadow creature with the web: shadow itself is ignored, so it can't block a shadow creature any more (CR 702.28b).
+    const shadowWebbed = putOnBattlefield(s0, opp, vanilla("Webbed Shade", "Creature — Shade", "{1}{B}", 2, 2, 2, { colors: ["B"], keywords: ["Shadow"], oracleText: "Shadow" }));
+    const web2 = putOnBattlefield(s0, opp, aetherWeb());
+    s0.objects[web2]!.attachedTo = shadowWebbed;
+    invalidateCharacteristics(s0);
+    expect(pt(s0, webbed)).toBe("3/3");
+    expect(kw(s0, webbed, "Reach")).toBe(true);
+    expect(blockProblem(s0, s0.objects[wall]!, s0.objects[sh]!)).toBeNull();
+    expect(blockProblem(s0, s0.objects[webbed]!, s0.objects[sh]!)).toBeNull();
+    expect(blockProblem(s0, s0.objects[plain]!, s0.objects[sh]!)).not.toBeNull();
+    expect(blockProblem(s0, s0.objects[shadowWebbed]!, s0.objects[sh]!)).not.toBeNull();
+  });
+
+  it("World Queller: each player sacrifices a permanent of the chosen type; the bot picks the type that hurts opponents", () => {
+    const { s: s0, ap } = setup([]);
+    const queller = putOnBattlefield(s0, ap, worldQueller());
+    const others = s0.turnOrder.filter((p) => p !== ap);
+    const arts = others.map((p) => putOnBattlefield(s0, p, trinket(`Trinket ${p}`)));
+    let s = goUntil(s0, (x) => x.activePlayer === ap && x.step === "upkeep" && x.turn > s0.turn && !!x.pending);
+    expect(s.pending?.kind).toBe("chooseMay");
+    // The bot would choose: artifacts cost only the opponents.
+    const choice = botActions(s, ap);
+    expect(choice[0]).toMatchObject({ type: "chooseMay", yes: true });
+    s = act(s, choice[0]!);
+    for (const a of botActions(s, ap)) s = act(s, a);
+    s = settle(s);
+    expect(arts.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard"]);
+    expect(zone(s, queller)).toBe("battlefield");
+  });
+});

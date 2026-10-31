@@ -9564,7 +9564,9 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (cantBeBlockedNow(s, attacker)) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach") && !b.reachVs?.some((t) => a.allCreatureTypes || a.subtypes.includes(t))) return `${b.name} can't block a creature with flying`; // CR 702.9b
-  if (has(a, "Shadow") !== has(b, "Shadow") && !(has(a, "Shadow") && b.blocksShadow)) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
+  // Aetherflame Wall: "as though they didn't have shadow": the attacker counts as having none as this blocks.
+  const aShadow = has(a, "Shadow") && !b.blocksShadowAsNone;
+  if (aShadow !== has(b, "Shadow") && !(aShadow && b.blocksShadow)) return aShadow ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b
   if (has(a, "Intimidate") && !b.types.includes("Artifact") && !b.colors.some((c) => a.colors.includes(c))) return `${a.name} has intimidate`; // CR 702.13b
   if (protectedFrom(a.keywords, withCastThisTurn(s, blocker, b), protectionHolder(s, attacker))) return `${a.name} has protection from ${b.name}`; // CR 702.16f, 702.16k
@@ -10672,6 +10674,7 @@ function plotCard(s: GameState, p: Player, id: ObjectId) {
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
   log(s, `${p.name} plots ${d.name} (${cost}). They may cast it without paying its mana cost on a later turn.`);
   s.passedInSuccession = [];
+  fireEvent(s, { type: "plotted", id });
 }
 
 /**

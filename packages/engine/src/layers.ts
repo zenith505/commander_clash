@@ -255,6 +255,8 @@ export interface Characteristics {
   blocksLandwalkers: boolean;
   /** "Can block creatures with shadow as though it had shadow" (Heartwood Dryad). */
   blocksShadow: boolean;
+  /** "Can block creatures with shadow as though they didn't have shadow" (Aetherflame Wall, Aether Web): the attacker's shadow is ignored as it blocks. */
+  blocksShadowAsNone?: boolean;
   /** Creature types it can block as though it had reach (Dragon Hunter). */
   reachVs?: string[];
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
@@ -1714,7 +1716,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "blockAsThough":
       if (m.walk) c.blocksLandwalkers = true;
-      if (m.shadow) c.blocksShadow = true;
+      if (m.shadow && m.notShadow) c.blocksShadowAsNone = true;
+      else if (m.shadow) c.blocksShadow = true;
       if (m.reachVs) (c.reachVs ??= []).push(m.reachVs);
       return;
     case "assignsToughness":

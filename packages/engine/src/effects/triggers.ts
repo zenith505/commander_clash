@@ -163,6 +163,8 @@ export type TriggerSourceEvent =
   /** A player investigated (CR 701.16a), once for each time; `first`: their first time this turn. */
   | { type: "investigated"; player: PlayerId; first: boolean }
   | { type: "foretold"; player: PlayerId }
+  /** A card in exile became plotted (CR 702.170a, 702.170c). */
+  | { type: "plotted"; id: ObjectId }
   | { type: "proliferated"; player: PlayerId }
   /** A player who wasn't the monarch became it (CR 725.3). */
   | { type: "becameMonarch"; player: PlayerId }
@@ -1042,6 +1044,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Voidwing Hybrid: "When you proliferate, return ~ from your graveyard to your hand": its owner's.
     if (ev.type === "proliferated") fromGraveyards((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player }));
+  } else if (ev.type === "plotted") {
+    // "When ~ becomes plotted": from exile, under its owner's control (CR 702.170a, 113.8).
+    const card = s.objects[ev.id];
+    if (card?.zone === "exile") add(card, card.owner, (e) => e === "selfPlotted", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "expended") {
     // "Whenever you expend 4": the total crossed 4 with this payment (CR 700.14).
     for (const id of s.battlefield) {

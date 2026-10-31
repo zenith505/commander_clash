@@ -1250,6 +1250,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
+    // Cold Storage, Endless Sands: "Return each creature card exiled with ~ to the battlefield under your control / its
+    // owner's control": the creature cards among them as they are now, all at once (CR 607.2a, 608.2f).
+    if ((m = /^Return each creature card exiled with ~ to the battlefield under (your|its owner's) control$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] === "your" ? {} : { ownersControl: true }) }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).

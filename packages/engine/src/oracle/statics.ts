@@ -2204,6 +2204,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can attack as though (?:it|they) had haste$/.test(rest)) return [{ kind: "attackAsThoughHaste" }];
   if (/^can block creatures with landwalk abilities as though they didn't have those abilities$/.test(rest)) return [{ kind: "blockAsThough", walk: true }];
   if (/^can block creatures with shadow as though (?:it|they) had shadow$/.test(rest)) return [{ kind: "blockAsThough", shadow: true }];
+  if (/^can block creatures with shadow as though they didn't have shadow$/.test(rest)) return [{ kind: "blockAsThough", shadow: true, notShadow: true }];
   const reachVs = /^can block ([A-Z][a-z]+)s as though (?:it|they) had reach$/.exec(rest);
   if (reachVs && CREATURE_TYPES.has(reachVs[1]!)) return [{ kind: "blockAsThough", reachVs: reachVs[1]! }];
   if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];

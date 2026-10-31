@@ -1002,6 +1002,8 @@ export interface DelayedTrigger {
   thisTurn?: number;
   /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
   dies?: true;
+  /** With `dies`: any permanent, not only a creature (Devouring Tendrils, CR 700.4). */
+  anyPermanent?: true;
   /** With `dies`: "When it dies under your control this turn" (Desperate Measures): only while `controller` controlled it as it died. */
   underControl?: true;
   /** With `dies`: "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only one `controller` owns. */

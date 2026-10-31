@@ -743,7 +743,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       s.delayed = s.delayed!.filter((x) => x !== d);
       // "When that creature dies this turn": only this turn, and only if it dies (CR 700.4).
       if (d.thisTurn !== undefined && d.thisTurn !== s.turn) continue;
-      if (d.dies && !ev.wasCreature) continue;
+      if (d.dies && !ev.wasCreature && !d.anyPermanent) continue;
       if (d.underControl && ev.controller !== d.controller) continue;
       if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.to?.includes(ev.to))

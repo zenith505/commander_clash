@@ -139,6 +139,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // no mana cost it can't be paid (CR 118.6).
       const ownCost = e.payManaCost ? manaCostToPay(s, ctx) : undefined;
       const pay = ownCost !== undefined ? (ownCost === null ? undefined : { mana: ownCost }) : e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.payTimes !== undefined && e.pay ? timesPay(e.pay, Math.max(0, amountNow(s, e.payTimes, ctx))) : e.pay;
+      // Greenbelt Rampager: "pay {E}{E}. If you can't, ...": paid if it can be (rulings), no choice; energy only.
+      if (e.must && sc.may === undefined) {
+        const p = player(s, ctx.controller);
+        sc.may = !!pay?.energy && !pay.mana && !pay.life && (p.energy ?? 0) >= pay.energy;
+        if (sc.may) {
+          loseEnergy(s, p.id, pay!.energy!);
+          log(s, `${p.name} pays ${pay!.energy} energy for ${src}.`);
+        }
+      }
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));

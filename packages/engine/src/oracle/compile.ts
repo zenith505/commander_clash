@@ -2441,6 +2441,17 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Nahiri, Storm of Stone: "During your turn, creatures you control have first strike and equip abilities you activate
+    // cost {1} less to activate.": both only during your turn (an equip ability can be activated in another player's turn
+    // with an instant-speed permission).
+    const turnEquip = /^During your turn, (creatures you control have [a-z ]+?) and equip abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    const turnEquipSt = turnEquip ? parseConditionalStatic(`During your turn, ${turnEquip[1]!}.`) : null;
+    const turnCond = turnEquip ? parseStaticCondition("it's your turn", { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (turnEquip && turnEquipSt && turnCond) {
+      out.statics.push({ ...turnEquipSt, text: line });
+      (out.equipLess ??= []).push({ n: Number(turnEquip[2]), if: turnCond });
+      continue;
+    }
     // Gruul Spellbreaker: "During your turn, you and ~ have hexproof.": you have it in your turn, and so does ~.
     const youAndSelf = /^During your turn, you and ~ have hexproof\.$/.test(line) && !out.youHave ? parseConditionalStatic("During your turn, ~ has hexproof.") : null;
     if (youAndSelf) {

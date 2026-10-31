@@ -3449,11 +3449,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spell or permanent"), Living Conundrum (skip a draw from an empty library), Vhati il-Dal (base power 1 or base
   toughness 1: a new choice), Hedron Matrix ("+X/+X, where X is its mana value" for the equipped creature). Possible
   bug to check: the target phrase "attacking creature or tapped creature" parses to `combat: attacking` plus an anyOf.
+- Round B55 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000): "Then discard
+  two cards unless you discard an instant or sorcery card or a creature card with flying" (Steamcore Scholar), "Look at
+  the top two cards of target opponent's library, then exile one of them" (Thoughtpicker Witch), "pay {E}{E}. If you
+  can't, ..." (Greenbelt Rampager: paid when it can be, no choice), "Whenever ~ is dealt combat damage, you gain that much
+  life and attacking player loses that much life" (Souls of the Faultless: the attacking player is the active player, CR
+  506.2), "target opponent may exile a card from their graveyard. If that player doesn't, you may draw a card"
+  (Gravestorm), "mill a card. When you do, if there are four or more creature cards in your graveyard" (Sigil of Myrkul),
+  "Each attacking creature and each blocking creature doesn't untap" (Spore Cloud), "Each creature you control deals 1
+  damage to that creature" (Case of the Gateway Express), "Another target player creates" (Cybernetica Datasmith), a
+  granted "deals 1 damage to target creature that's blocking it" (Arc Spitter), "When the permanent you don't control
+  dies this turn" for a creature or a planeswalker (Devouring Tendrils, CR 700.4), "Return any number of target
+  permanents you own to your hand" (Leave // Chance), "During your turn, ... and equip abilities you activate cost {1}
+  less" (Nahiri, Storm of Stone), "target artifact (or creature) becomes an artifact creature with base power and
+  toughness 5/5" for good (Iron Man, Futurist Paragon, Tezzeret, Agent of Bolas, Tezzeret the Schemer's emblem), "target
+  creature that player or that planeswalker's controller controls" (Searing Blaze: the planeswalker's last known
+  controller if it has left), "if you control three or more creatures that share a creature type" (Littjara
+  Kinseekers). +18 (28,418 of 31,936 with round 222).
+- Out after round B55 (looked at, not done): Runic Repetition (targets a card in exile), Lymph Sliver (absorb), Mesmeric
+  Sliver (fateseal), Namor ("attacks a player who has more life than you"), Asgardian Inspiration (a trigger from the
+  graveyard on an event that isn't one yet), Old Fat Spider Can't See Me (a damage rule for as long as ~ remains on the
+  battlefield), Isu the Abominable (a choice of payment), Etched Slith ("target permanent or opponent"), Reiterating
+  Bolt (an energy additional cost), Dodgy Jalopy (scavenge with a variable power), Chancellor of the Dross (opening-hand
+  reveals), Words of Worship, Garruk, Curse Breaker (its −4), Kaima, Infernal Kirin, Celestial Judgment and Ancestral
+  Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide and Dream Tides (pay
+  {2} for each of any number of creatures to untap: a new picker), Incriminate (two targets controlled by the same
+  player, like Cannibalize).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (round B54 took the easier ones up to about 17,000 but left most of that range unread: about 570 there are
-  still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc, Fatal Fissure, Souls of the
-  Faultless, Vengevine, Incriminate, Can't Stay Away and Littjara Kinseekers; `npm run popular -- --least`, minus the
-  names already in ROADMAP and HISTORY), then the lists below.
+  19,700 up (rounds B54 and B55 took the easier ones up to about 17,000 but left most of that range unread: about 550
+  there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc, Vengevine and Can't
+  Stay Away; `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

@@ -518,6 +518,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^graveyard with (one|two|three|four|five|six|seven|eight|nine|ten) or more cards in it$/i.exec(p))) return count({ kind: "players", yardAtLeast: num(m[1]!) });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
+  if (each && ctx?.opponentsDiscardedTwo && /^opponent who didn't discard two nonland cards this way$/i.test(p)) return count({ kind: "players", opponents: true, discardedFewerNonland: 2 });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });

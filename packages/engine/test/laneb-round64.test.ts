@@ -101,6 +101,10 @@ const loli = (): CardDef => ({"oracleId":"ad643992-eb9f-4a4a-9b74-a5aee2337f30",
 const sarevok = (): CardDef => ({"oracleId":"4e215ede-e4ac-482a-a2e1-cacb20affa70","name":"Sarevok, Deathbringer","manaCost":"{3}{B}","cmc":4,"typeLine":"Legendary Creature — Human Knight","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Knight"],"oracleText":"At the beginning of each player's end step, if no permanents left the battlefield this turn, that player loses X life, where X is Sarevok's power.\nChoose a Background (You can have a Background as a second commander.)","power":"3","toughness":"4","colors":["B"],"colorIdentity":["B"],"keywords":["Choose a background"],"layout":"normal"}) as CardDef;
 const jared = (): CardDef => ({"oracleId":"b48da54c-002f-4afb-9fdf-2a3e1cf77383","name":"Jared Carthalion, True Heir","manaCost":"{R}{G}{W}","cmc":3,"typeLine":"Legendary Creature — Human Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warrior"],"oracleText":"When Jared Carthalion enters, target opponent becomes the monarch. You can't become the monarch this turn.\nIf damage would be dealt to Jared Carthalion while you're the monarch, prevent that damage and put that many +1/+1 counters on it.","power":"3","toughness":"3","colors":["G","R","W"],"colorIdentity":["G","R","W"],"keywords":[],"layout":"normal"}) as CardDef;
 const numa = (): CardDef => ({"oracleId":"7f4aa98d-3572-4637-9b0d-3c12f63a96ec","name":"Numa, Joraga Chieftain","manaCost":"{2}{G}","cmc":3,"typeLine":"Legendary Creature — Elf Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elf","Warrior"],"oracleText":"At the beginning of combat on your turn, you may pay {X}{X}. When you do, distribute X +1/+1 counters among any number of target Elves.\nPartner (You can have two commanders if both have partner.)","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":["Partner"],"layout":"normal"}) as CardDef;
+const garruk = (): CardDef => ({"oracleId":"4a6972fe-348a-4a19-a1d0-bdf8f1f9c792","name":"Garruk, Veiled Butcher","manaCost":"{3}{B}{B}","cmc":5,"typeLine":"Legendary Planeswalker — Garruk","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Garruk"],"oracleText":"If a creature an opponent controls would die, exile it instead.\n+2: Up to one target creature gets -4/-1 until your next turn.\n−2: Each player sacrifices a creature of their choice. If you sacrificed a creature this way, create a 4/4 green Beast creature token with trample.\n−3: Each opponent discards two cards. For each opponent who didn't discard two nonland cards this way, you draw a card.","loyalty":"5","colors":["B"],"colorIdentity":["B"],"keywords":[],"layout":"normal"}) as CardDef;
+const chromium = (): CardDef => ({"oracleId":"58d8ff36-4a4d-40e0-b812-3d23b2c7606a","name":"Chromium, the Mutable","manaCost":"{4}{W}{U}{B}","cmc":7,"typeLine":"Legendary Creature — Elder Dragon","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elder","Dragon"],"oracleText":"Flash\nThis spell can't be countered.\nFlying\nDiscard a card: Until end of turn, Chromium becomes a Human with base power and toughness 1/1, loses all abilities, and gains hexproof. It can't be blocked this turn.","power":"7","toughness":"7","colors":["B","U","W"],"colorIdentity":["B","U","W"],"keywords":["Flying","Flash"],"layout":"normal"}) as CardDef;
+const pizza = (): CardDef => ({"oracleId":"e71479c9-bb38-4112-bf8a-41b39a3ade51","name":"Pizza Face, Gastromancer","manaCost":"{3}{B}{G}","cmc":5,"typeLine":"Legendary Artifact Creature — Food Mutant","supertypes":["Legendary"],"types":["Artifact","Creature"],"subtypes":["Food","Mutant"],"oracleText":"When Pizza Face enters, create a Food token.\nDisappear — At the beginning of your end step, if a permanent left the battlefield under your control this turn, put three +1/+1 counters on up to one other target artifact or creature. If it isn't a creature, it becomes a 0/0 Mutant creature in addition to its other types.\n{10}, {T}, Sacrifice Pizza Face: You gain 15 life.","power":"2","toughness":"4","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Disappear","Food"],"layout":"normal"}) as CardDef;
+const spire = (): CardDef => ({"oracleId":"7d347d59-0cd5-4207-86cb-5d6244c7c70a","name":"Spire Mechcycle","manaCost":"{4}{R}","cmc":5,"typeLine":"Artifact — Vehicle","supertypes":[],"types":["Artifact"],"subtypes":["Vehicle"],"oracleText":"Haste\nExhaust — Tap another untapped Mount or Vehicle you control: This Vehicle becomes an artifact creature. Put a +1/+1 counter on it for each Mount and/or Vehicle you control other than this Vehicle. (Activate each exhaust ability only once.)\nCrew 2","power":"5","toughness":"4","colors":["R"],"colorIdentity":["R"],"keywords":["Haste","Crew","Exhaust"],"layout":"normal"}) as CardDef;
 
 // Test cards.
 const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
@@ -113,7 +117,7 @@ const pacify = (name = "Test Pacify") => card(name, "Enchantment — Aura", "{W}
 
 describe("Lane B round 64", () => {
   it("are fully supported", () => {
-    supported(moira(), antman(), ginger(), namor(), kaima(), dennick(), biblioplex(), tazri(), loli(), sarevok(), jared(), numa());
+    supported(moira(), antman(), ginger(), namor(), kaima(), dennick(), biblioplex(), tazri(), loli(), sarevok(), jared(), numa(), garruk(), chromium(), pizza(), spire());
   });
 
   it("Moira, Urborg Haunt: combat damage to a player returns a creature card put into your graveyard from the battlefield this turn", () => {
@@ -282,7 +286,7 @@ describe("Lane B round 64", () => {
     ];
     poolOnly(s0, ap, { U: 1, B: 1, R: 1, G: 1 });
     let s = run(s0, planActivate(s0, ap, t, 0));
-    s = settle(s, (x) => x.pending?.kind === "searchLibrary" || x.pending?.kind === "dig");
+    s = settle(s, (x) => x.pending?.kind === "searchLibrary");
     const p = s.pending!;
     expect(p.player).toBe(ap);
     // The bot takes what it can: the two matching cards, not the Bear.
@@ -372,5 +376,109 @@ describe("Lane B round 64", () => {
     expect(counters(s, e1)).toBe(1);
     expect(counters(s, e2)).toBe(1);
     expect(s.players[ap]!.manaPool.G ?? 0).toBe(0);
+  });
+
+  it("Garruk, Veiled Butcher: −2 makes each player sacrifice a creature, and a Beast for you only if you sacrificed one", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, garruk());
+    s0.objects[g]!.counters = { loyalty: 5 };
+    const mine = putOnBattlefield(s0, ap, bearC("My Bear"));
+    const theirs = putOnBattlefield(s0, opp, bearC("Their Bear"));
+    let s = settle(run(s0, planActivate(s0, ap, g, 1)));
+    expect(zone(s, mine)).toBe("graveyard");
+    // Its first ability: an opponent's creature that would die is exiled instead.
+    expect(zone(s, theirs)).toBe("exile");
+    const beasts = tokensNamed(s, ap, "Beast");
+    expect(beasts).toHaveLength(1);
+    expect(kw(s, beasts[0]!)).toContain("Trample");
+    expect(pt(s, beasts[0]!)).toBe("4/4");
+  });
+
+  it("Garruk, Veiled Butcher: −2 with no creature of yours to sacrifice makes no Beast", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, garruk());
+    s0.objects[g]!.counters = { loyalty: 5 };
+    putOnBattlefield(s0, opp, bearC("Their Bear"));
+    const s = settle(run(s0, planActivate(s0, ap, g, 1)));
+    expect(tokensNamed(s, ap, "Beast")).toHaveLength(0);
+  });
+
+  it("Garruk, Veiled Butcher: −3 draws a card for each opponent who didn't discard two nonland cards", () => {
+    const { s: s0, ap } = setup([]);
+    const [o1, o2, o3] = s0.turnOrder.filter((p) => p !== ap);
+    const g = putOnBattlefield(s0, ap, garruk());
+    s0.objects[g]!.counters = { loyalty: 5 };
+    onlyHand(s0, o1!, []);
+    toZone(s0, o1!, bearC("Their Bear A"), "hand");
+    toZone(s0, o1!, bearC("Their Bear B"), "hand");
+    onlyHand(s0, o2!, []);
+    toZone(s0, o2!, bearC("Their Bear C"), "hand");
+    toZone(s0, o2!, card("Test Land", "Land", "", { oracleText: "" }), "hand");
+    onlyHand(s0, o3!, []);
+    onlyHand(s0, ap, []);
+    const s = settle(run(s0, planActivate(s0, ap, g, 2)));
+    expect(s.players[o1!]!.hand).toHaveLength(0);
+    expect(s.players[o2!]!.hand).toHaveLength(0);
+    // Two of them (one discarded a land, one had nothing) didn't discard two nonland cards.
+    expect(s.players[ap]!.hand).toHaveLength(2);
+  });
+
+  it("Chromium, the Mutable: discarding a card makes it a 1/1 Human with hexproof and no other abilities that can't be blocked", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const c = putOnBattlefield(s0, ap, chromium());
+    const blocker = putOnBattlefield(s0, opp, bearC("Their Bear"));
+    onlyHand(s0, ap, []);
+    const junk = toZone(s0, ap, bearC("Junk Bear"), "hand");
+    const s = settle(run(s0, planActivate(s0, ap, c, 0, [], undefined, undefined, undefined, { discard: [junk] })));
+    expect(zone(s, junk)).toBe("graveyard");
+    const ch = characteristics(s, s.objects[c]!);
+    expect(pt(s, c)).toBe("1/1");
+    expect(ch.subtypes).toEqual(["Human"]);
+    expect(ch.keywords).toContain("Hexproof");
+    expect(ch.keywords).not.toContain("Flying");
+    expect(ch.cantBeBlocked).toBe(true);
+    expect(s.objects[blocker]).toBeDefined();
+  });
+
+  it("Pizza Face, Gastromancer: after a permanent left, three +1/+1 counters on an artifact that becomes a 0/0 Mutant creature", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, pizza());
+    const rock = putOnBattlefield(s0, ap, card("Test Rock", "Artifact", "{2}", { cmc: 2, oracleText: "" }));
+    const gone = putOnBattlefield(s0, ap, bearC("Gone Bear"));
+    moveObject(s0, gone, "graveyard");
+    let s = goUntil(s0, (x) => x.activePlayer === ap && x.step === "end" && at("chooseTargets", ap)(x));
+    s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(rock)] } as Action);
+    s = settle(s);
+    const ch = characteristics(s, s.objects[rock]!);
+    expect(ch.types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    expect(ch.subtypes).toContain("Mutant");
+    expect(pt(s, rock)).toBe("3/3");
+  });
+
+  it("Pizza Face, Gastromancer: no trigger if no permanent left the battlefield under your control this turn", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, pizza());
+    putOnBattlefield(s0, ap, card("Test Rock", "Artifact", "{2}", { cmc: 2, oracleText: "" }));
+    let asked = false;
+    goUntil(s0, (x) => (at("chooseTargets", ap)(x) ? (asked = true) : x.activePlayer !== ap));
+    expect(asked).toBe(false);
+  });
+
+  it("Spire Mechcycle: exhaust by tapping another Vehicle: an artifact creature with a counter for each other Mount or Vehicle", () => {
+    const { s: s0, ap } = setup([]);
+    const sp = putOnBattlefield(s0, ap, spire());
+    const v = putOnBattlefield(s0, ap, card("Test Wagon", "Artifact — Vehicle", "{2}", { cmc: 2, power: "3", toughness: "3", oracleText: "Crew 1" }));
+    putOnBattlefield(s0, ap, vanilla("Test Steed", "Creature — Horse Mount", "{1}{W}", 2, 2, 2));
+    const idx = abilitiesOf(s0, s0.objects[sp]!).activated.findIndex((a) => /^Exhaust/.test(a.text ?? "") || /Tap another untapped/.test(a.text ?? ""));
+    expect(idx).toBeGreaterThanOrEqual(0);
+    const plan = planActivate(s0, ap, sp, idx, [], undefined, undefined, undefined, { tap: [v] });
+    let s = settle(run(s0, plan));
+    expect(s.objects[v]!.tapped).toBe(true);
+    expect(characteristics(s, s.objects[sp]!).types).toContain("Creature");
+    expect(counters(s, sp)).toBe(2);
+    expect(pt(s, sp)).toBe("7/6");
+    // Exhaust: only once.
+    s.objects[v]!.tapped = false;
+    expect(planActivate(s, ap, sp, idx, [], undefined, undefined, undefined, { tap: [v] })).toBeNull();
   });
 });

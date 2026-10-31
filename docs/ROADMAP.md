@@ -1,6 +1,6 @@
 # Roadmap
 
-28,381 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,436 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
@@ -3475,10 +3475,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Knowledge (new mechanics), Fatal Fissure (a delayed trigger with a target of its own), Mudslide and Dream Tides (pay
   {2} for each of any number of creatures to untap: a new picker), Incriminate (two targets controlled by the same
   player, like Cannibalize).
+- Round B56 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000): "distribute two
+  +1/+1 counters among one or two other target Vehicles and/or creatures you control" (Cloudspire Skycycle; "other" in a
+  distribute now means other than the source, which also made Rhino, Terrible Trampler supported), "~ enters with a
+  +1/+1 counter on it for each mana spent to cast it" (Verazol, the Split Current), "each player sacrifices all lands they
+  control except for three" (Keldon Firebombers, Cataclysm's keepRest), "Your opponents and permanents your opponents
+  control with hexproof can be the targets ..." (Kaya, Bane of the Dead), "~ deals damage to that player equal to their
+  total power" after destroying them, an indestructible survivor's power included (Angrath, Minotaur Pirate, rulings),
+  "+1/+1 for each point of bushido it has" (Takeno, Samurai General), "land with an activated ability that isn't a mana
+  ability" as a static filter and a target (Tsabo's Web, Ravager Wurm), "for each nonland card in that player's graveyard
+  that was put there from the battlefield this turn" (Wreck Hunter), a granted "If this creature would die, exile it
+  instead" (Can't Stay Away), "{1} less for each card type among permanents you've sacrificed this turn" and "the number
+  of permanent types among cards in your graveyard" (Korvold, Gleeful Glutton), "for each card type among spells you've
+  cast this turn" (April O'Neil, Hacktivist; castThisTurn now keeps the types as cast), "for each loyalty counter on
+  planeswalkers you control" and "Whenever one or more loyalty counters are put on planeswalkers you control" (Bioessence
+  Hydra), "Remove twice X loyalty counters" (Confront the Past), "You exile the top ten cards of your library" after
+  another subject (Diminishing Returns), "That player puts all noncreature cards revealed this way into their graveyard,
+  then you put the creature card onto the battlefield under your control" (Telemin Performance), "The tokens have ..."
+  (Return of the Mole Man). +18 (28,436 of 31,936 with round 222).
+- Out after round B56 (looked at, not done): Sudden Salvation ("for each opponent who controls one or more of those
+  permanents"), Jhoira, Weatherlight Corsair (life loss equal to the mana value of the card put onto the battlefield),
+  Djinn of Wishes (playing the revealed card from the library, else exiling it), The Kingpin of Crime (a group "assign
+  combat damage equal to their toughness" until end of turn), Yasova Dragonclaw ("gain control of target creature an
+  opponent controls with power less than ~'s power ..., untap that creature, and it gains haste"), Tajuru Paragon ("a
+  card that shares a creature type with it from among them"), Makeshift Mannequin (a granted ability for as long as it
+  has a counter), Phylactery Lich (an "as enters" counter on another permanent and a state trigger), Undiscovered
+  Paradise, Hold for Ransom, Mercurial Transformation, Goblin Festival, Trench Gorger, Tatsumasa, Adipose Offspring,
+  Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi, Donnie & April, Path of
+  Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
+  Celestial Dawn, Death or Glory, Selective Adaptation and the like).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 and B55 took the easier ones up to about 17,000 but left most of that range unread: about 550
-  there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc, Vengevine and Can't
-  Stay Away; `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
+  19,700 up (rounds B54 to B56 took the easier ones up to about 17,000 but left much of that range unread: about 175
+  there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc and Vengevine;
+  `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

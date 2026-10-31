@@ -891,9 +891,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves. Defiant Greatmaw:
   // "remove a -1/-1 counter from another target creature you control".
-  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|(?:another )?target .+|enchanted creature)$`, "i").exec(s))) {
+  // Confront the Past: "Remove twice X loyalty counters from target planeswalker an opponent controls".
+  if ((m = new RegExp(`^Remove (all|twice X|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|(?:another )?target .+|enchanted creature)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
-    return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
+    const n = /^all$/i.test(m[1]!) ? "all" : m[1] === "twice X" ? { count: { kind: "x" as const }, times: 2 } : amt(m[1]!);
+    return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n }] : null;
   }
   // "Remove up to three counters from target permanent" (Glissa Sunslayer), "Remove X counters from target permanent,
   // where X is ..." (Thornmantle Striker), "Remove a counter from target nonland permanent" (Thrull Parasite).
@@ -952,12 +954,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = m[3] === "one or two" ? 2 : m[3] === "one, two, or three" ? 3 : upTo ? num(m[3]!.slice(6)) : total;
     const words = m[4]!.replace(/^(other )?target /, "$1").replace(/ and\/or /g, " or ");
     const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bVehicles\b/g, "Vehicle").replace(/\bElves\b/g, "Elf");
-    const spec = one === words ? null : parseTargetPhrase(one);
+    // Cloudspire Skycycle: "other target Vehicles and/or creatures you control": other than the source (a Vehicle itself),
+    // each a creature or a Vehicle.
+    const other = /^other /.test(one) && !ctx.spell;
+    const phrase = other ? one.slice(6).replace(/^Vehicle or creature /, "creature or Vehicle ") : one;
+    const spec = one === words ? null : parseTargetPhrase(phrase);
     if (spec?.kind !== "object") return null;
     const first = ctx.targets.length;
     const divided = { first, n, total, counter: counterKind(m[2]!), ...(upTo ? { upTo: true as const } : {}) };
     for (let k = 0; k < n; k++)
-      addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+      addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(other ? { notSource: true as const } : {}), ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     ctx.lastTargets = { index: first, n };
     return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
   }

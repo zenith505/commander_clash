@@ -180,6 +180,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const who = o && view(o)?.controller;
       return who !== undefined ? (s.players[who]?.hand.length ?? 0) : 0;
     }
+    case "affectedBushido": {
+      // Takeno, Samurai General: "each point of bushido it has": every instance's N, printed (unless it lost its abilities)
+      // or granted, as the layers have it so far (CR 702.45).
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const ch = o && view(o);
+      if (!o || !ch) return 0;
+      const printed = ch.hasPrintedAbilities ? compileCard(defOf(s, o)).triggers.map((tr) => /^Bushido (\d+):/.exec(tr.body.text)) : [];
+      const granted = ch.grantedAbilities.map((g) => /^Bushido (\d+)$/i.exec(g));
+      return [...printed, ...granted].reduce((n, x) => n + (x ? Number(x[1]) : 0), 0);
+    }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -359,6 +369,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "sacrificedThisWayTotalPower":
       return (s.resolving?.sacrificedThisWay ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
+    case "destroyedThisWayTotalPower": {
+      const who = refPlayers(s, c.survivorsOf, ctx);
+      const left = s.battlefield.map((id) => characteristics(s, s.objects[id]!)).filter((ch) => ch.types.includes("Creature") && who.includes(ch.controller));
+      return [...(s.resolving?.destroyed ?? []).map((d) => d.ch), ...left].reduce((n, ch) => n + (ch.types.includes("Creature") ? ch.power : 0), 0);
+    }
     case "costSacrificedTotalPower":
       return (ctx.sacrificed ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
     case "putThisWay":
@@ -470,8 +485,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const sub = c.notSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
     }
-    case "sacrificedThisTurn":
-      return (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
+    case "sacrificedThisTurn": {
+      const sacrificed = (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token));
+      return c.cardTypes ? new Set(sacrificed.flatMap((t) => t.types)).size : sacrificed.length;
+    }
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
     case "youAttackedWithThisTurn": {
@@ -807,7 +824,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "graveyardCardTypes": {
       const types = new Set<string>();
-      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
+      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) if (!c.permanent || ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"].includes(t)) types.add(t);
       return types.size;
     }
     case "graveyardManaValues": {
@@ -867,7 +884,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
-      const n = (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      const cast = (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || (c.opponents ? opponents(s, ctx.controller).includes(x.player) : x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller))) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))));
+      if (c.cardTypes) return new Set(cast.flatMap((x) => x.types ?? s.cards[x.card]?.types ?? [])).size;
+      const n = cast.length;
       return c.beyondFirst ? Math.max(0, n - 1) : n;
     }
     case "manaValueCastThisTurn": {
@@ -974,6 +993,8 @@ function describeCount(c: Count): string {
       return "#cards in hand";
     case "handMoreThanYou":
       return c.yoursMinus ? "#cards in your hand minus theirs" : "#cards in their hand minus yours";
+    case "affectedBushido":
+      return "#points of bushido it has";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
     case "affectedKeywordCount":
@@ -1015,6 +1036,8 @@ function describeCount(c: Count): string {
     case "sacrificedThisWayTotalPower":
     case "costSacrificedTotalPower":
       return "the total power sacrificed";
+    case "destroyedThisWayTotalPower":
+      return "the total power of those creatures";
     case "putThisWay":
       return "#put onto the battlefield";
     case "blockingIt":
@@ -1125,6 +1148,7 @@ function describeCount(c: Count): string {
     case "enteredThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
     case "sacrificedThisTurn":
+      if (c.cardTypes) return "#card types among permanents you sacrificed this turn";
       return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s ${c.anyPlayer ? "" : "you "}sacrificed this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
@@ -1181,9 +1205,10 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
+      if (c.cardTypes) return "#card types among spells you've cast this turn";
       return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.opponents ? "your opponents have " : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}${c.beyondFirst ? " other than the first" : ""}`;
     case "graveyardCardTypes":
-      return "#card types in graveyards";
+      return c.permanent ? "#permanent types in graveyards" : "#card types in graveyards";
     case "graveyardManaValues":
       return `#mana values${c.filter ? ` among ${c.filter.text}s` : ""} in your graveyard`;
     case "greatestPower":

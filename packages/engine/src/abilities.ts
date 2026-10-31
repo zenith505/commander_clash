@@ -130,6 +130,8 @@ export type Count =
   | { kind: "handMoreThanYou"; who: PlayerRef; /** "Cards in your hand minus the number of cards in that player's hand" (Bulwark): yours less theirs. */ yoursMinus?: true }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
   | { kind: "timesAffectedAttacked" }
+  /** Takeno, Samurai General: "for each point of bushido it has", the sum of N over its bushido instances (CR 702.45). */
+  | { kind: "affectedBushido" }
   /** "Creatures you don't control get -1/-1 for each slime counter on them" (Toxrill): each affected object's own counters. */
   | { kind: "affectedCounters"; counter: CounterKind }
   /**
@@ -177,6 +179,11 @@ export type Count =
   | { kind: "sacrificedThisWayGreatestPower" }
   /** "The total power of the creatures sacrificed this way" (Reign of the Pit): as each last existed, negative powers included (rulings). */
   | { kind: "sacrificedThisWayTotalPower" }
+  /**
+   * Angrath, Minotaur Pirate: the total power of the creatures this effect destroyed, as they last existed, plus that of
+   * the creatures `survivorsOf` still controls (those it couldn't destroy), as they are now (rulings).
+   */
+  | { kind: "destroyedThisWayTotalPower"; survivorsOf: PlayerRef }
   /** Corpse Cobble: "the total power of the sacrificed creatures", sacrificed to cast the spell, as each last existed (CR 608.2h), negative powers included. */
   | { kind: "costSacrificedTotalPower" }
   /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
@@ -329,11 +336,11 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** "Spells your opponents have cast this turn" (Delightful Discovery): your opponents' only. */ opponents?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true; /** "Each spell you've cast this turn other than the first" (Outlaw Stitcher): one fewer, never less than 0. */ beyondFirst?: true }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** "Spells your opponents have cast this turn" (Delightful Discovery): your opponents' only. */ opponents?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true; /** "Each spell you've cast this turn other than the first" (Outlaw Stitcher): one fewer, never less than 0. */ beyondFirst?: true; /** "Each card type among spells you've cast this turn" (April O'Neil, Hacktivist): how many different card types, as they were cast. */ cardTypes?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true; /** "The greatest mana value among instant and sorcery spells you've cast this turn" (Rootha, Mastering the Moment): the greatest of them, not the total; `filter` by the cards cast. */ greatest?: true; filter?: TargetSpec }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
-  | { kind: "graveyardCardTypes"; who: PlayerRef }
+  | { kind: "graveyardCardTypes"; who: PlayerRef; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** "Five or more mana values among cards in your graveyard" (Tainted Indulgence): how many different mana values (CR 202.3). */
   | { kind: "graveyardManaValues"; who: PlayerRef; /** "Each different mana value among instant and sorcery cards in your graveyard" (Eris, Roar of the Storm): only these cards. */ filter?: TargetSpec }
   /**
@@ -449,7 +456,7 @@ export type Count =
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
   | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[]; /** Gyome, Master Chef: nontoken ones only. */ nontoken?: true; /** Geralf, the Fleshwright: "each other Zombie that entered ...": not the trigger's subject entering. */ notSubject?: true }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
-  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true; /** "For each permanent sacrificed this turn" (The Balrog, Durin's Bane): by any player (rulings). */ anyPlayer?: true }
+  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true; /** "For each permanent sacrificed this turn" (The Balrog, Durin's Bane): by any player (rulings). */ anyPlayer?: true; /** "Each card type among permanents you've sacrificed this turn" (Korvold, Gleeful Glutton): how many different card types. */ cardTypes?: true }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
   /** "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride): each counted on its own, so a creature planeswalker counts twice. */
@@ -527,6 +534,8 @@ export interface TargetSpec {
   manaAbility?: true;
   /** "That has an activated ability with {T} in its cost" (Magewright's Stone): a mana ability or another, its own or granted; tapping other permanents doesn't count (rulings). */
   tapAbility?: true;
+  /** "With an activated ability that isn't a mana ability" (Tsabo's Web, Ravager Wurm): its own or granted (CR 605.1a). */
+  nonManaActivated?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
   /** "A face-down creature you control" (Ugin's Mastery, CR 708.2): a face-down permanent. */
@@ -5641,6 +5650,8 @@ export interface CompiledCard {
   libraryInsteadOfDying?: "top" | "bottom";
   exileInsteadOfDying?: {
     self?: true;
+    /** A granted "If this creature would die, exile it instead" (Can't Stay Away) beside its own one about others (cards.ts withGranted). */
+    alsoSelf?: true;
     filter?: TargetSpec;
     other?: true;
     /** "Instead exile it and you gain 2 life" (The Darkness Crystal); the card is linked to the permanent (CR 607.2a). */
@@ -6072,6 +6083,11 @@ export interface CompiledCard {
    * control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too); ward still triggers.
    */
   seesOpponentsCreatures?: true;
+  /**
+   * Kaya, Bane of the Dead: "Your opponents and permanents your opponents control with hexproof can be the targets of
+   * spells and abilities you control as though they didn't have hexproof" (CR 702.11e).
+   */
+  seesOpponents?: true;
   /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
   tapBasicManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */

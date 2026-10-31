@@ -1542,6 +1542,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
   // Divine Reckoning: "Each player chooses a creature they control. Destroy the rest." (joined in body.ts): the rest are
   // destroyed instead, at once.
+  // Keldon Firebombers: "each player sacrifices all lands they control except for three": each chooses three to keep (all
+  // they have if three or fewer) and sacrifices the rest, as Cataclysm does.
+  if ((m = /^([Ee]ach player) sacrifices all (lands|creatures) they control except for (two|three|four|five)$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const among = pickFilter(m[2]!.replace(/s$/, ""));
+    return who && among?.kind === "object" ? [{ type: "keepRest", who, keep: [{ filter: among, n: num(m[3]!) }], among }] : null;
+  }
   if ((m = /^(.+?) chooses (.+?),? (?:then|and) (?:sacrifices (?:the rest|all other creatures they control)|the rest are destroyed)$/.exec(s))) {
     const destroy = / the rest are destroyed$/.test(s);
     const who = parsePlayer(m[1]!, ctx);

@@ -1957,6 +1957,7 @@ function boastsTwice(s: GameState, pid: PlayerId): boolean {
 function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; controller: PlayerId; x: NonNullable<CompiledCard["exileInsteadOfDying"]> } | null {
   const own = abilitiesOf(s, o).exileInsteadOfDying;
   if (own?.self) return { id: o.id, controller: controllerOf(s, o), x: own };
+  if (own?.alsoSelf) return { id: o.id, controller: controllerOf(s, o), x: { self: true } };
   const applies = (id: ObjectId, x: CompiledCard["exileInsteadOfDying"], controller: PlayerId) => !!x?.filter && !(x.other && id === o.id) && objectMatches(s, x.filter, o, controller, false);
   for (const id of s.battlefield) {
     const x = abilitiesOf(s, obj(s, id)).exileInsteadOfDying;
@@ -5686,7 +5687,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);

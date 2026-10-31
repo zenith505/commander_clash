@@ -3222,7 +3222,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // time +1/+1 counters have been put on that permanent this turn, ...": counters put on it earlier this turn count, even
   // before Botanical Brawler was on the battlefield (rulings).
   const firstOn = !youPut && !firstTime ? /^(Whenever one or more \+1\/\+1 counters are put on another permanent you control), if it's the first time \+1\/\+1 counters have been put on that permanent this turn, /.exec(line) : null;
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control|an? [A-Z][a-z]+ you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);
+  // Bioessence Hydra: "Whenever one or more loyalty counters are put on planeswalkers you control": once for each
+  // planeswalker they're put on (an entering one's too, rulings), "that many" those put on it.
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 |loyalty )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control|an? [A-Z][a-z]+ you control|planeswalkers you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -3239,7 +3241,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (self) return { event: "selfCountersPut", body, ...kind, ...byYou, ...(firstTime ? { countersFirstTime: true as const } : {}) };
     // All Will Be One: "on a permanent or player", once for each permanent or player they're put on.
     const orPlayer = put[2] === "a permanent or player" ? { countersOrPlayer: true as const } : {};
-    const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
+    const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, "").replace(/^planeswalkers /, "planeswalker "));
     if (filter?.kind !== "object") return "fail";
     return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou, ...orPlayer, ...(firstOn ? { countersFirstTime: true as const } : {}) };
   }

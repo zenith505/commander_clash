@@ -733,6 +733,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = evalAmount(s, cond.amount, ctx);
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
+    case "eventPlayerAttackedYou": {
+      // O-Kagachi: the trigger's player attacked you during their most recent turn (this one if it's theirs).
+      const p = eventPlayer !== undefined ? s.players[eventPlayer] : undefined;
+      const last = p && (s.activePlayer === eventPlayer ? p.lastTurnBegan : p.turnBegan);
+      return !!p && last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you);
+    }
     case "monarch":
       if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;
       if (cond.none) return s.monarch === undefined;
@@ -1215,6 +1221,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "attackedOrBlockedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0);
       if (cond.is === "attackedOrBlockedThisTurn") return src.declaredInCombat?.turn === s.turn;
+      // Only the active player's creatures attack, and nobody else's block in that combat: declared this combat and
+      // attacked this turn is attacked this combat.
+      if (cond.is === "attackedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0) && src.attacked?.turn === s.turn;
       if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
@@ -1230,6 +1239,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "cast") return src.zone === "battlefield" && !!src.wasCast;
+      if (cond.is === "sneakThisTurn") return src.zone === "battlefield" && src.castAlt === "sneak" && src.enteredTurn === s.turn;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));

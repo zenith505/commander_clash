@@ -788,6 +788,7 @@ export function moveObject(
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
+  o.foughtTurn = undefined;
   o.combatHitTurn = undefined;
   o.blockedTurn = undefined;
   o.declaredInCombat = undefined;
@@ -942,6 +943,7 @@ export function moveObject(
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
+    o.costOrPaid = undefined; // and which of its either-or costs was paid
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.extraCounters = undefined; // and the counters a spell will enter with
@@ -3219,6 +3221,12 @@ function beginStep(s: GameState, step: Step): void {
       return untapStep(s, []);
     }
     case "upkeep": {
+      // "Skip your upkeep step if you have no cards in hand" (Gibbering Descent): checked as it would start (rulings); the
+      // whole step is replaced (CR 614.10), so "until your next upkeep" effects go on to the next one that happens.
+      if (!player(s, ap).hand.length && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).skipUpkeepIfHellbent)) {
+        log(s, `${player(s, ap).name} skips their upkeep step.`);
+        return advanceStep(s);
+      }
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
@@ -4710,6 +4718,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
     // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast".
     if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
+    // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
+    if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
   }
   // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
   const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
@@ -4801,6 +4811,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   if (way?.less !== undefined && wayMana !== undefined) less += Math.max(0, evalAmount(s, way.less, { controller: pid, sourceId: o.id }));
+  // Risen Executioner: more generic mana when cast this way (CR 601.2f).
+  const wayMore = way?.more !== undefined ? Math.max(0, evalAmount(s, way.more, { controller: pid, sourceId: o.id })) : 0;
   // Catalyst Stone: "Flashback costs you pay cost {2} less. Flashback costs your opponents pay cost {2} more.": the flashback
   // cost, a card's own or one an effect gave it (CR 702.34a, 601.2f).
   let flashbackMore = 0;
@@ -4836,7 +4848,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? []) if (targetsFor(c.filter)) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore - less) });
+  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore + wayMore - less) });
 }
 
 /**
@@ -4973,8 +4985,17 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     // "From exile": where it's cast from, the zone it's still in while it's paid for (CR 601.2a, 601.2g-h).
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile") && (!g.firstEachTurn || firstOfKindThisTurn(s, pid, o, g.filter)));
   });
+}
+
+/**
+ * Peri Brown's "the first historic spell you cast each turn": no other spell `pid` cast this turn matched `filter`. `o`
+ * itself is in TurnLog's list once it has been cast (its castNth is set then, CR 601.2i).
+ */
+function firstOfKindThisTurn(s: GameState, pid: PlayerId, o: GameObject, filter: TargetSpec): boolean {
+  const n = (s.castThisTurn ?? []).filter((c) => c.player === pid && !!s.cards[c.card] && printedMatches(filter, s.cards[c.card]!)).length;
+  return n <= (o.zone === "stack" && o.castNth !== undefined ? 1 : 0);
 }
 
 /** Does `o`, cast by `pid`, have improvise (CR 702.126)? Its own, or from "nonartifact spells you cast have improvise". */
@@ -4984,7 +5005,7 @@ export function hasImprovise(s: GameState, pid: PlayerId, o: GameObject): boolea
   if (player(s, pid).nextSpellImprovise === s.turn) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d));
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d) && (!g.firstEachTurn || firstOfKindThisTurn(s, pid, o, g.filter)));
   });
 }
 
@@ -5582,6 +5603,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     item.casualty = true;
     closeZoneBatch(s);
   }
+  // Lethal Throwdown: which of its "sacrifice a creature or sacrifice a modified creature" was paid, for "if the modified
+  // creature was sacrificed" (CR 601.2b).
+  if (choices.costOr !== undefined && compileCard(defOf(s, o)).costOr) o.costOrPaid = choices.costOr;
   // Bargain: "you may sacrifice an artifact, enchantment, or token" (CR 702.166a).
   if (choices.bargain) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
@@ -7635,6 +7659,15 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   const given = Object.entries(parts).filter(([, n]) => n !== 0);
   if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
   const sum = given.reduce((a, [, n]) => a + n, 0);
+  // Sensational Spider-Man: up to that many, none from a permanent more than it has.
+  if (pend.remove) {
+    if (sum > pend.total || given.some(([id, n]) => n > (pend.has?.[id] ?? 0))) throw new RulesError(`remove at most ${pend.total} ${pend.counter} counters, no more from each than it has`);
+    r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
+    s.pending = null;
+    log(s, sum ? `${p.name} removes ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} from ${nameOf(s, id)}`).join(", ")}.` : `${p.name} removes no ${pend.counter} counters.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;
@@ -9686,8 +9719,24 @@ export function combatDamageOf(s: GameState, o: GameObject): number {
 function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
+  // Trample over planeswalkers (CR 702.19c): at a planeswalker, damage up to its loyalty (less what's already assigned
+  // to it this step) goes to it and the rest to its controller; with the planeswalker removed from combat, all of it
+  // goes to the defending player (CR 702.19e). Not a battle's protector.
+  const toRecipient = (at: GameObject, target: { toPlayer: PlayerId } | { toObject: GameObject } | null, amount: number) => {
+    const a = at.attackingPermanent;
+    if (a && a.battleController === undefined && at.attacking !== undefined && objHasKeyword(s, at, "Trample over planeswalkers") && (!target || "toObject" in target)) {
+      const pw = target && "toObject" in target ? target.toObject : undefined;
+      const assigned = pw ? hits.filter((h) => h.toObject === pw).reduce((n, h) => n + h.amount, 0) : 0;
+      const n = pw ? Math.min(amount, Math.max(0, (pw.counters.loyalty ?? 0) - assigned)) : 0;
+      if (pw && n > 0) hits.push({ source: at, toObject: pw, amount: n });
+      if (amount > n) hits.push({ source: at, toPlayer: at.attacking, amount: amount - n });
+      return;
+    }
+    if (target) hits.push({ source: at, ...target, amount });
+  };
   for (const at of attackers(s)) {
     if (!dealsDamageThisStep(s, at, firstStrikeStep) || assignsNoCombatDamage(s, at)) continue;
+    const trample = objHasKeyword(s, at, "Trample") || objHasKeyword(s, at, "Trample over planeswalkers");
     let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
@@ -9695,12 +9744,12 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
     const target = attackedRecipient(s, at);
     if (!at.blockedBy || unblocked) {
-      if (target) hits.push({ source: at, ...target, amount: dmg });
+      toRecipient(at, target, dmg);
       continue;
     }
     const blockers = at.blockedBy.map((id) => obj(s, id));
     if (blockers.length === 0) {
-      if (objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg }); // CR 702.19e
+      if (trample) toRecipient(at, target, dmg); // CR 702.19d
       continue;
     }
     // Blocked by a creature with banding, the defending player divides its damage among the blockers as they
@@ -9713,12 +9762,12 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     blockers.forEach((bl, i) => {
       const lethal = objHasKeyword(s, at, "Deathtouch") ? 1 : lethalLeft(s, bl);
       const last = i === blockers.length - 1;
-      const amt = last && !(objHasKeyword(s, at, "Trample") && target) ? dmg : Math.min(dmg, lethal);
+      const amt = last && !(trample && (target || objHasKeyword(s, at, "Trample over planeswalkers"))) ? dmg : Math.min(dmg, lethal);
       if (amt > 0) hits.push({ source: at, toObject: bl, amount: amt });
       dmg -= amt;
     });
-    // Trample: the rest to the player or planeswalker it attacks (CR 702.19c).
-    if (dmg > 0 && objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg });
+    // Trample: the rest to the player or planeswalker it attacks (CR 702.19b).
+    if (dmg > 0 && trample) toRecipient(at, target, dmg);
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);

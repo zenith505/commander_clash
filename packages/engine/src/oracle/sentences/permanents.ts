@@ -213,7 +213,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
   // Wand of the Worldsoul: "The next spell you cast this turn has convoke" (CR 702.51), the same way.
-  if (s === "The next spell you cast this turn has convoke") return [{ type: "nextSpellImprovise", convoke: true }];
+  // Flockchaser Phantom: "Whenever ~ attacks, the next spell you cast this turn has convoke": the same, in a trigger.
+  if (/^[Tt]he next spell you cast this turn has convoke$/.test(s)) return [{ type: "nextSpellImprovise", convoke: true }];
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
@@ -456,8 +457,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
   // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
-  // the attacking creature (the trigger's subject).
-  if ((m = /^((?:up to one )?target .+?) blocks it this combat if able$/i.exec(s)) && ctx.subjectIt) {
+  // the attacking creature (the trigger's subject). Tolsimir, Midnight's Light: "blocks that Wolf this combat if able".
+  if ((m = /^((?:[Uu]p to one )?[Tt]arget .+?) blocks (?:it|that [A-Z][a-z]+) this combat if able$/.exec(s)) && ctx.subjectIt && (/ blocks it /.test(s) || CREATURE_TYPES.has(/ blocks that ([A-Z][a-z]+) /.exec(s)?.[1] ?? ""))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
   }
@@ -526,6 +527,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef = { ref: "target", index: i };
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
+  // Tamiyo's Compleation (rewritten in body.ts): the enchanted permanent, if it's an Equipment as this resolves (CR 701.3d).
+  if (s === "Unattach enchanted permanent if it's an Equipment") return [{ type: "unattach", what: { ref: "attached" }, ifEquipment: true }];
   // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
   // Fulgent Distraction: "Tap two target creatures, then unattach all Equipment from them": from both.
   if ((m = /^Unattach all Equipment from (target creature|them)$/.exec(s))) {
@@ -899,7 +902,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
   // Resourceful Defense: "... put those counters on target permanent you control", the same way.
   // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
-  if ((m = /^Put those counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft) {
+  // Buzzard-Wasp Colony: "Whenever another creature you control dies, if it had counters on it, put its counters on ~": the
+  // same ("its" is the creature that died).
+  if ((m = /^Put (?:those|its) counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
@@ -1463,8 +1468,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,
-  // card and creature types are replaced; its supertypes stay (rulings).
-  if ((m = /^(target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
+  // card and creature types are replaced; its supertypes stay (rulings). "Up to one other target creature" (Lizard,
+  // Connors's Curse) the same.
+  if ((m = /^((?:up to one )?(?:other )?target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];

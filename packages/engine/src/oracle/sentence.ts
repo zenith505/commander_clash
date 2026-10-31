@@ -107,7 +107,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(ofChosen ? phrase.slice(0, ofChosen.index) : phrase);
       if (!filter || (ofChosen && (!ctx || ctx.spell || !filter.types?.includes("Creature")))) return null;
       Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: m[3] === "into your hand" ? "hand" : "libraryTop" });
-    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "")))) {
+    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "").replace(/^Put a random /, "Put a ")))) {
+      // Getaway Barrel: "Put a random creature card from among them onto the battlefield": one of those that match, chosen
+      // at random (rng.ts), not by the player.
+      const random = /^Put a random /.test(s);
       // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout), "Put up to two creature
       // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the
       // same time (enterTogether). "Put a land card ..." takes one if there is one; "all" every one that matches.
@@ -140,7 +143,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
       if (attacking && (count !== 1 || !filter.types?.includes("Creature"))) return null;
-      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), ...(random ? { pickRandom: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
       // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
       else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });
@@ -252,13 +255,22 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return fx?.every((e) => (e.type === "continuous" || e.type === "exchangePower") && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
   // Yuan Shao's Infantry: "~ can't be blocked this combat": the same, for the combat going on (CR 506.1, 511.3).
-  const thisCombat = /^(~|it|that creature) can't be blocked this combat$/i.exec(s);
+  // Tadeas, Juniper Ascendant: "it can't be blocked by creatures with greater power this combat", likewise.
+  const thisCombat = /^(~|it|that creature) can't be blocked( by [^,]+?)? this combat$/i.exec(s);
   if (thisCombat) {
-    const fx = parseSentence(`${thisCombat[1]} can't be blocked this turn`, ctx);
+    const fx = parseSentence(`${thisCombat[1]} can't be blocked${thisCombat[2] ?? ""} this turn`, ctx);
     return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
+  // Tadeas, Juniper Ascendant: "untap it and it can't be blocked by creatures with greater power this combat": two
+  // instructions about the same creature, in order.
+  const untapAnd = /^Untap (it|that creature) and (?:it|that creature) (.+)$/i.exec(s);
+  if (untapAnd) {
+    const untap = parseSentence(`Untap ${untapAnd[1]}`, ctx);
+    const rest = untap && parseSentence(`${untapAnd[1] === "it" ? "It" : "That creature"} ${untapAnd[2]}`, ctx);
+    if (untap && rest) return [...untap, ...rest];
+  }
   // Take the Bait: "Untap all attacking creatures and goad them": the same creatures, untapped then goaded (CR 701.15a).
   const untapGoad = /^Untap (all [^,]+?) and goad them$/.exec(s);
   if (untapGoad) {

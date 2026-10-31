@@ -928,8 +928,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
   // Buzzard-Wasp Colony: "Whenever another creature you control dies, if it had counters on it, put its counters on ~": the
   // same ("its" is the creature that died).
-  if ((m = /^Put (?:those|its) counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
-    const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
+  // Ambitious Augmenter: "When ~ dies, if it had one or more counters on it, create a ... token, then put ~'s counters on
+  // that token": every kind it had as it died, on each token created (rulings).
+  if ((m = /^Put (?:those|its) counters on (~|that token|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
+    const what = m[1] === "~" ? ({ ref: "self" } as const) : /^that token$/i.test(m[1]!) ? ({ ref: "created" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
   // Mari's granted trigger: "you may remove a hit counter from a card that player owns in exile".

@@ -2287,6 +2287,11 @@ export function compile(d: CardDef): CompiledCard {
       out.lifeCantChange = true;
       continue;
     }
+    // Karn's Sylex: costs only (rulings: a resolving spell or ability may still have players pay life; 0 can be paid).
+    if (line === "Players can't pay life to cast spells or to activate abilities that aren't mana abilities.") {
+      out.noLifeCosts = true;
+      continue;
+    }
     if (line === "If a player would gain life, that player gains no life instead.") {
       out.gainsNoLife = true;
       continue;

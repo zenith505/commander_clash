@@ -2043,6 +2043,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects: [{ type: "damage", amount: amt(comet[1]!), to: { ref: "anyTarget", index: 0, n: 2 } }],
       text,
     };
+  // Strength of the Tajuru: "Choose target creature, then choose another target creature for each time ~ was kicked. Put X
+  // +1/+1 counters on each of them.": the same, each target different (rulings), X on each still legal one.
+  const tajuru = /^Choose target creature, then choose another target creature for each time ~ was kicked\. Put (X|\w+) \+1\/\+1 counters on each of them\.$/.exec(text.trim());
+  if (tajuru && opts.spell) {
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" };
+    return {
+      targets: [creature, { ...creature, text: "another target creature", many: "kicked", distinctFrom: [0] }],
+      effects: [{ type: "counters", what: { ref: "target", index: 0, n: 2 }, counter: "+1/+1", n: amt(tajuru[1]!) }],
+      text,
+    };
+  }
   // Odric, Lunarch Marshal: each keyword creatures you control share, as it resolves (Modification sharedAmongYours).
   // Bleeding Effect: "if a creature card in your graveyard has flying", the cards there as it resolves (rulings).
   const odric = /^[Cc]reatures you control gain ([a-z ]+) until end of turn if a creature (you control|card in your graveyard) has \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
@@ -7467,7 +7478,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       /^At the beginning of the next end step, put an? ([+-]\d+\/[+-]\d+) counter on that creature for each 1 damage prevented this way$/.exec(s) ??
       /^If it's a creature, put an? ([+-]\d+\/[+-]\d+) counter on it for each 1 damage prevented this way at the beginning of the next end step$/.exec(s);
     // Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker".
-    const dealToM = /^If damage is prevented this way, ~ deals that much damage to (target [a-z ]+)$/.exec(s);
+    const dealToM = /^If damage is prevented this way, ~ deals that much damage to (target [a-z ]+|any target)$/.exec(s);
     let extraRider: Pick<DamageRuleSpec, "countersOn" | "dealTo"> | undefined;
     if (counterRider || dealToM) {
       // The prevention before it as a damage rule ("Prevent the next 3 damage that would be dealt to target creature this
@@ -8233,13 +8244,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Killer Service: "you may pay {2} and sacrifice a token. If you do, ...", Conspiracy Theorist's "pay {1} and discard
     // a card": both or neither, as it resolves (someone who can't do both isn't asked).
-    const payAnd = /^[Yy]ou may pay ((?:\{[^}]+\})+) and ((?:sacrifice|discard) an? [a-z ]+)$/.exec(s);
-    if (payAnd && plainMana(payAnd[1]!) && /^If you do, /.test(sentences[si + 1] ?? "")) {
+    // Kinzu of the Bleak Coven: "you may pay 2 life and exile it. If you do, ...": the card that died, if it's still in the
+    // graveyard (CR 400.7); someone who can't exile it isn't asked to pay.
+    const payAnd = /^[Yy]ou may pay ((?:\{[^}]+\})+|\d+ life) and ((?:sacrifice|discard) an? [a-z ]+|exile it)$/.exec(s);
+    const payLifeAnd = payAnd && /^(\d+) life$/.exec(payAnd[1]!);
+    if (payAnd && (payLifeAnd || plainMana(payAnd[1]!)) && /^If you do, /.test(sentences[si + 1] ?? "")) {
       const inner = parseOne(capital(payAnd[2]!), ctx);
-      if (!inner || inner.length !== 1 || inner[0]!.type !== (/^sacrifice/.test(payAnd[2]!) ? "pick" : "discard")) return null;
+      const kind = /^sacrifice/.test(payAnd[2]!) ? "pick" : /^discard/.test(payAnd[2]!) ? "discard" : "exile";
+      if (!inner || inner.length !== 1 || inner[0]!.type !== kind) return null;
+      if (inner[0]!.type === "exile" && inner[0]!.what.ref !== "subjectCard") return null;
       const then = parseOne(capital(sentences[si + 1]!.replace(/^If you do, /, "").replace(/\.$/, "")), ctx);
       if (!then) return null;
-      effects.push({ type: "may", effects: inner, pay: { mana: payAnd[1]! }, text: `pay ${payAnd[1]} and ${payAnd[2]}` }, { type: "if", cond: { kind: "youDid" }, effects: then });
+      effects.push({ type: "may", effects: inner, pay: payLifeAnd ? { life: Number(payLifeAnd[1]) } : { mana: payAnd[1]! }, text: `pay ${payAnd[1]} and ${payAnd[2]}` }, { type: "if", cond: { kind: "youDid" }, effects: then });
       si++;
       continue;
     }
@@ -12252,6 +12268,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(capital(foldInto[1]!), ctx);
       if (!inner || inner.length !== 1 || inner[0]!.type !== "putFromHand" || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "spellCountered" }, effects: inner });
+      continue;
+    }
+    // Thranduil's Decree: "If a permanent spell is countered this way, exile it instead of putting it into its owner's
+    // graveyard. You may cast that card without paying its mana cost for as long as it remains exiled": a permanent spell
+    // only (CR 110.4b); the permission is this spell's controller's, with its usual timing (rulings).
+    if (/^If a permanent spell is countered this way, exile it instead of putting it into its owner's graveyard$/.test(s) && /^You may cast that card without paying its mana cost for as long as it remains exiled\.?$/.test(sentences[si + 1] ?? "")) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "counterSpell" || last.bounce || last.exile || last.unless || last.cause) return null;
+      last.exile = true;
+      last.exileIfPermanent = true;
+      last.youMayFree = "cast";
+      si++;
       continue;
     }
     // Hinder: "put that card on your choice of the top or bottom of its owner's library instead ...".

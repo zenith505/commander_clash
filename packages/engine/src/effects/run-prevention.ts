@@ -165,9 +165,10 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.tokens) rule.tokens = spec.tokens;
   if (spec.dealTo) {
     // Vengeful Archon: the target as it resolves; if it's gone, damage is still prevented, with none dealt (rulings).
+    // Acolyte's Reward: "If only the second target is illegal, damage that would be dealt to the first target will be
+    // prevented, but Acolyte's Reward won't deal damage" (rulings, CR 608.2b).
     const r = fixedRecipient(s, spec.dealTo, ctx);
-    if (!r) return;
-    rule.dealTo = r;
+    if (r) rule.dealTo = r;
   }
   if (spec.countersOn && rule.to?.object) {
     const on = rule.to.object;

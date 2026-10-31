@@ -448,6 +448,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const { other: _, ...rest } = to;
     return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ...rest, otherThan: a.index }, ...(m[3] ? { also: [{ ref: m[3] === "each opponent" ? "eachOpponent" : "eachPlayer" }] } : {}), by: { target: a.index } }];
   }
+  // Showstopping Surprise: "Choose target creature you control. Turn it face up if it's face down. Then it deals damage
+  // equal to its power to each other creature": the target, as above, its power as it is now (rulings: a face-down one
+  // that stayed face down deals 2).
+  if ((m = /^(?:[Tt]hen it|It) deals damage equal to its power to (each other creature)$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many && !ctx.targets[ctx.lastObjectTarget]!.optional && !ctx.selfIt && !ctx.subjectIt) {
+    const index = ctx.lastObjectTarget;
+    const to = parseDamageRecipient(m[1]!, ctx);
+    if (to?.ref !== "each" || !(to.other || to.otherThan === index)) return null;
+    const { other: _, ...rest } = to;
+    return [{ type: "damage", amount: { count: { kind: "power", of: { ref: "target", index } } }, to: { ...rest, otherThan: index }, by: { target: index } }];
+  }
   // "Target creature you control deals X damage to any other target and X damage to itself, where X is its power"
   // (Self-Destruct): both at once, from that creature, X as this resolves; with the other target illegal, it's still dealt
   // to itself; with that creature illegal, none (rulings).

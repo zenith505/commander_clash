@@ -1582,6 +1582,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Winterthorn Blessing: "Tap up to one target creature you don't control, and that creature doesn't untap during its
   // controller's next untap step": two instructions about the same creature.
   text = text.replace(/(^|\. )(Tap up to one target creature you don't control), and that creature (doesn't untap during its controller's next untap step)\./, "$1$2. It $3.");
+  // Angrath, Minotaur Pirate: "Destroy all creatures target opponent controls. ~ deals damage to that player equal to their
+  // total power": the destroyed ones as they last existed, and those that weren't destroyed (indestructible) as they are
+  // now, a negative power subtracting (rulings).
+  text = text.replace(/(^|\. )(Destroy all creatures target opponent controls\. ~ deals damage to that player equal to) their total power\./, "$1$2 the total power of creatures destroyed this way and creatures that player controls.");
+  // Diminishing Returns: "Each player shuffles ... You exile the top ten cards of your library.": "You" only because
+  // another player was the subject before.
+  text = text.replace(/(\. )You exile the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library\./, "$1Exile the top $2 cards of your library.");
   // Mageta the Lion: "Destroy all creatures except for ~. Those creatures can't be regenerated.": every other creature.
   text = text.replace(/(^|\. )Destroy all creatures except for ~\. Those creatures can't be regenerated\./, "$1Destroy all other creatures. They can't be regenerated.");
   // Ultimate Nullification: "Exile all creatures and graveyards": the creatures, then the graveyards they didn't go to.
@@ -11237,13 +11244,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Put that card onto the battlefield tapped under your control and the rest into their graveyard." The same, the
     // target's library and graveyard; with no land card, every card revealed goes to the graveyard (CR 701.20a).
     const targetReveals = /^[Tt]arget (opponent|player) reveals cards from the top of their library until they reveal an? ([a-z]+ card)$/.exec(s);
-    const putYours = /^Put that card onto the battlefield( tapped)? under your control and the rest into their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Telemin Performance: "That player puts all noncreature cards revealed this way into their graveyard, then you put the
+    // creature card onto the battlefield under your control": the same, once each is where it goes.
+    const putYours = /^Put that card onto the battlefield( tapped)? under your control and the rest into their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") ?? (targetReveals?.[2] === "creature card" ? /^That player puts all noncreature cards revealed this way into their graveyard(?:, then | )(?:you|You) put the creature card onto the battlefield under your control()$/.exec([sentences[si + 1], sentences[si + 2]].map((x) => x?.replace(/\.$/, "") ?? "").join(" ").replace(/ then /, ", then ")) : null);
+    // (The sentence splitter breaks at ", then": both halves.)
+    const telemin = !!putYours && putYours[0].startsWith("That player puts all noncreature") && !/ put the creature card /.test(sentences[si + 1] ?? "");
     if (targetReveals && putYours) {
       const filter = parseSearchFilter(targetReveals[2]!);
       const who = parsePlayer(`target ${targetReveals[1]}`, ctx);
       if (!filter || filter.kind !== "card" || !filter.types?.length || !who) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who, yours: true, ...(putYours[1] ? { tapped: true as const } : {}) });
-      si++;
+      si += telemin ? 2 : 1;
       continue;
     }
     // Reality Scramble: "Reveal cards from the top of your library until you reveal a card that shares a card type with
@@ -11923,7 +11934,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // 'It has "Sacrifice ~: Add {C}."' gives the tokens just created that ability (CR 111.3).
-    const has = /^(?:It has|They have|They each have|Those tokens have) "(.+)"$/.exec(s);
+    // Return of the Mole Man: "The tokens have ...".
+    const has = /^(?:It has|They have|They each have|Those tokens have|The tokens have) "(.+)"$/.exec(s);
     if (has) {
       const prev = effects[effects.length - 1];
       // Blight Herder: "If you do, create three 1/1 ... tokens. They have ...": the tokens that "if" creates.

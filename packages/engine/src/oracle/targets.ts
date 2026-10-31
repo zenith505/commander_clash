@@ -1253,6 +1253,12 @@ export function parseTargetPhrase(
     const rest = parseTargetPhrase(greater[1]!, opts);
     return rest?.kind === "object" && !rest.power && !rest.many ? { ...rest, greaterPowerThanSource: true, text: `${rest.text} with greater power` } : null;
   }
+  // Tsabo's Web: "land with an activated ability that isn't a mana ability", printed or granted (CR 605.1a).
+  const nonMana = / with an activated ability that isn't a mana ability$/.exec(phrase.trim());
+  if (nonMana) {
+    const rest = parseTargetPhrase(phrase.trim().slice(0, nonMana.index), opts);
+    return rest?.kind === "object" && !rest.nonManaActivated ? { ...rest, nonManaActivated: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
   // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
   const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());
   if (tapAb) {

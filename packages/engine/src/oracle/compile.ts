@@ -2348,6 +2348,11 @@ export function compile(d: CardDef): CompiledCard {
       out.seesOpponentsCreatures = true;
       continue;
     }
+    // Kaya, Bane of the Dead: the same for every permanent an opponent controls, and for opponents themselves.
+    if (line === "Your opponents and permanents your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof.") {
+      out.seesOpponents = true;
+      continue;
+    }
     if (line === "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger.") {
       out.exposesOpponentsCreatures = true;
       continue;
@@ -3736,6 +3741,14 @@ export function compile(d: CardDef): CompiledCard {
     if (aNumber && /^the amount of mana spent to cast (?:it|~)$/.test(aNumber[2]!)) {
       if (out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(aNumber[1]!), n: { count: { kind: "manaSpent" } } };
+      continue;
+    }
+    // Verazol, the Split Current: "~ enters with a +1/+1 counter on it for each mana spent to cast it": the same, none if
+    // it wasn't cast (rulings), commander tax and other additional costs counted.
+    const eachSpent = new RegExp(`^~ enters with an? ${COUNTER} counter on it for each mana spent to cast it\\.$`).exec(line);
+    if (eachSpent) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(eachSpent[1]!), n: { count: { kind: "manaSpent" } } };
       continue;
     }
     if (aNumber) line = `~ enters with X ${aNumber[1]} counters on it, where X is ${aNumber[2]}.`;

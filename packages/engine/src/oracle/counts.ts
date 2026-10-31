@@ -149,6 +149,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Corpse Cobble: "the total power of the sacrificed creatures", those sacrificed to cast the spell (compile checks it has
   // that cost), as each last existed (CR 608.2h).
   if (ctx?.costSacrificedX && /^the total power of the sacrificed creatures$/.test(p)) return { count: { kind: "costSacrificedTotalPower" } };
+  // Angrath, Minotaur Pirate (rewritten in body.ts).
+  if (ctx && (m = /^the total power of creatures destroyed this way and creatures (that player) controls$/.exec(p))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? { count: { kind: "destroyedThisWayTotalPower", survivorsOf: who } } : null;
+  }
   // Reign of the Pit: "the total power of the creatures sacrificed this way".
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
   // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).
@@ -559,6 +564,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^nontoken creatures you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Creature"], nontoken: true });
   // The Balrog, Durin's Bane: "for each permanent sacrificed this turn": by any player (rulings).
   if (each && /^permanent sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn", anyPlayer: true });
+  // Korvold, Gleeful Glutton: "for each card type among permanents you've sacrificed this turn" (CR 205.2a), as each last
+  // existed.
+  if (each && /^card type among permanents you(?:'ve)? sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn", cardTypes: true });
   // Sawblade Skinripper: "the number of permanents you sacrificed this turn".
   if (/^(?:the number of )?permanents you(?:'ve)? sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
@@ -632,8 +640,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
   }
   // "Card types among cards in all graveyards" (Tarmogoyf), "in your graveyard", "in your opponents' graveyards" (CR 205.2a).
-  if ((m = /^card types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
-    return count({ kind: "graveyardCardTypes", who: { ref: m[1] === "your" ? "you" : m[1] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef });
+  // Korvold, Gleeful Glutton: "the number of permanent types among cards in your graveyard" (CR 110.4a).
+  if ((m = /^(?:the number of )?(card|permanent) types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
+    return count({ kind: "graveyardCardTypes", who: { ref: m[2] === "your" ? "you" : m[2] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef, ...(m[1] === "permanent" ? { permanent: true as const } : {}) });
   // The Shrines: "the number of cards in all graveyards with the same name as that spell" in a cast trigger (Aven Shrine;
   // "as the spell", Cephalid Shrine): the name it has on the stack (a split card's half's, CR 709.3b), as it was cast.
   if (/^cards in all graveyards with the same name as (?:that|the) spell$/i.test(p) && ctx?.castSpell)
@@ -646,9 +655,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // Revivify: "the number of creature cards in your graveyard that were put there from the battlefield this turn".
-  if ((m = /^(?:the number of )?([a-z]+ )?cards? in your graveyard that (?:was|were) put there from the battlefield this turn$/i.exec(p))) {
+  // Wreck Hunter: "for each nonland card in that player's graveyard that was put there from the battlefield this turn".
+  if ((m = /^(?:the number of )?([a-z]+ )?cards? in (your|that player's) graveyard that (?:was|were) put there from the battlefield this turn$/i.exec(p))) {
     const spec = m[1] ? parseTargetPhrase(`${m[1].trim()} card from a graveyard`, { chosen: true }) : { kind: "card" as const, types: [], notTypes: [], notColors: [], text: "card" };
-    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
+    const who = m[2] === "your" ? ({ ref: "you" } as const) : ctx ? parsePlayer("that player", ctx) : null;
+    return spec?.kind === "card" && who ? count({ kind: "cardsInGraveyard", who, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
   }
   // Risen Executioner: "each other creature card in your graveyard": not ~ itself (it's on the stack as its cost is
   // determined, CR 601.2a, 601.2f).
@@ -714,6 +725,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // April O'Neil, Hacktivist: "for each card type among spells you've cast this turn" (CR 205.2a).
+  if (each && /^card type among spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", cardTypes: true });
   // Delightful Discovery: "for each spell your opponents have cast this turn" (CR 601.2f: counted as it's cast). A player
   // who has left isn't an opponent any more (CR 800.4a).
   if (/^spells? your opponents have cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", opponents: true });
@@ -848,9 +861,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
   // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
   // Deepwood Denizen: "for each +1/+1 counter on creatures you control", the same.
+  // Bioessence Hydra: "for each loyalty counter on planeswalkers you control", the same.
   // Gleam of Authority: "for each +1/+1 counter on other creatures you control" (an Aura's: other than the enchanted
   // creature, statics.ts ofAffected); Ascendant Acolyte: "among other creatures you control".
-  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
+  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|planeswalkers|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }

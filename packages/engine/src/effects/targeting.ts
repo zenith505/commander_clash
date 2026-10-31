@@ -188,6 +188,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
+  if (spec.nonManaActivated && !hasNonManaActivated(s, o, c)) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view, controller)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
@@ -226,9 +227,17 @@ export function exposed(s: GameState, o: GameObject): boolean {
  * ability, or Detection Tower's this turn.
  */
 function seesHexproofOf(s: GameState, pid: PlayerId, o: GameObject): boolean {
-  if (o.zone !== "battlefield" || !objIsType(s, o, "Creature")) return false;
+  if (o.zone !== "battlefield") return false;
+  // Kaya, Bane of the Dead: any permanent of an opponent's.
+  if (seesOpponents(s, pid)) return true;
+  if (!objIsType(s, o, "Creature")) return false;
   if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "seeHexproof")) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!abilitiesOf(s, s.objects[id]!).seesOpponentsCreatures);
+}
+
+/** Does `pid` control a permanent with Kaya, Bane of the Dead's static ability (opponents and their permanents)? */
+function seesOpponents(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!abilitiesOf(s, s.objects[id]!).seesOpponents);
 }
 
 /**
@@ -549,7 +558,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
     const prot = playerProtection(s, t.id);
     // Detection Tower: its controller's opponents can be targeted as though they didn't have hexproof (CR 702.11e).
-    const sees = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === controller && r.rule === "seeHexproof");
+    const sees = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === controller && r.rule === "seeHexproof") || seesOpponents(s, controller);
     if (prot === "shroud" || (prot === "hexproof" && t.id !== controller && !sees)) return false;
     if (playerProtectedFrom(s, t.id, controller, src)) return false; // CR 702.16b, 702.16k
     // "You gain hexproof from blue and from black until end of turn" (Veil of Summer): as for a permanent (CR 702.11d).
@@ -1206,6 +1215,16 @@ function attackedBattle(s: GameState, o: GameObject): boolean {
  * the ones granted to it, from `c`, its characteristics as they are or as the layers have them so far (Raggadragga's
  * "each creature you control with a mana ability gets +2/+2" applies after the abilities are added, CR 613.1f).
  */
+/**
+ * "With an activated ability that isn't a mana ability" (Tsabo's Web): printed (unless it lost them) or granted, read from
+ * `c` so a static ability's filter can ask while the layers are applied (CR 605.1a).
+ */
+function hasNonManaActivated(s: GameState, o: GameObject, c: Characteristics): boolean {
+  const own = c.hasPrintedAbilities ? compileCard(defOf(s, o)) : undefined;
+  if (own?.activated.some((a) => !a.mana)) return true;
+  return c.grantedAbilities.some((t) => compileGranted(t).activated.some((a) => !a.mana));
+}
+
 function hasManaAbility(s: GameState, o: GameObject, c: Characteristics): boolean {
   if (o.zone !== "battlefield") return !!(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length);
   if (!c.landAbilitiesLost && c.subtypes.some((st) => basicLandManaAbility(st))) return true;

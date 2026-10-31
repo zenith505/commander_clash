@@ -538,6 +538,9 @@ export function compile(d: CardDef): CompiledCard {
       // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
       // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
       .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
+      // Evin, Waterdeep Opportunist: "Whenever one or more players sacrifice one or more creatures, ... This ability
+      // triggers only once each turn.": at most once a turn either way, on the first sacrifice of a creature (CR 603.2h).
+      .replace(/^Whenever one or more players sacrifice one or more creatures, ([^\n]+ This ability triggers only once each turn\.)$/m, "Whenever a player sacrifices a creature, $1")
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
@@ -2552,7 +2555,8 @@ export function compile(d: CardDef): CompiledCard {
       out.villainAgain = true;
       continue;
     }
-    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
+    // Quicksilver, Brash Blur: "... begin the game with him on the battlefield", his name for "it".
+    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield." || line === "If ~ is in your opening hand, you may begin the game with ~ on the battlefield.") {
       out.beginOnBattlefield = true;
       continue;
     }
@@ -4422,6 +4426,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
+      // Jerren, Corrupted Bishop: "Whenever ~ enters or another nontoken Human you control dies, ...": entering and another
+      // creature dying are never one event.
+      /^Whenever ~ enters or (another [^,]+? you control) dies, (.+)$/.exec(line) ??
       // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
       // Restless Revenant): a death and combat damage are never one event.
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
@@ -4516,6 +4523,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
+            : /^Whenever ~ enters or another [^,]+? you control dies, /.test(line)
+              ? [`When ~ enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : /^Whenever a creature dies or a creature card is put into a graveyard from a library, /.test(line)

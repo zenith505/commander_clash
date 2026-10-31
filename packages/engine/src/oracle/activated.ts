@@ -46,6 +46,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:").replace(/(^|, )(Remove [^,:]+? counters? from ~) and exile it:/, "$1$2, Exile ~:")
     // Magosi, the Waterveil: "Remove an eon counter from ~ and return it to its owner's hand": the same, two costs.
     .replace(/(^|, )(Remove [^,:]+? counters? from ~) and return it to its owner's hand:/, "$1$2, Return ~ to its owner's hand:")
+    // The Filigree Sylex: "Remove ten oil counters from among permanents you control and sacrifice ~: It deals 10 damage to
+    // any target": two costs; "it" is ~, the one thing named, as it last existed (CR 608.2h).
+    .replace(/(^|, )(Remove [^,:]+? counters? from among permanents you control) and sacrifice ~: It deals /, "$1$2, Sacrifice ~: ~ deals ")
     // Geistflame Reservoir: "Remove any number of charge counters from ~: It deals that much damage to any target": how
     // many is announced as it's activated (CR 602.2b, 601.2h), an X (none included).
     .replace(/(^|, )Remove any number of ([a-z]+) counters from ~: It deals that much damage to any target\.$/, "$1Remove X $2 counters from ~: ~ deals X damage to any target.")
@@ -421,6 +424,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.replace(/ X is the mana value of (?:that|the exiled) card\.$/, "").replace(/^Create a token that's a copy of the exiled card\./, "Create a token that's a copy of a card exiled with ~.");
       found = true;
     }
+    // Marath, Will of the Wild: "Choose one — • ... X can't be 0. • ... X can't be 0.": the same rule in every mode, so
+    // one for the ability, whichever mode is chosen.
+    if (/^Choose one — (?:• [^•]+? X can't be 0\.\s*)+$/.test(effectText.trim()) && !xMin) effectText = `${effectText.trim().replace(/ X can't be 0\.(?=\s*•|\s*$)/g, "")} X can't be 0.`;
     // "X can't be 0." (Ruthless Technomancer, Lair of the Hydra's {X}{G}): only with an X in its costs.
     if (/ X can't be 0\.$/.test(effectText) && !xMin && (extra.some((x) => "x" in x && x.x) || /\{X\}/.test(costs))) {
       xMin = 1;

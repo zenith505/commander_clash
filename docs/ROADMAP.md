@@ -1,7 +1,7 @@
 # Roadmap
 
-28,323 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,174 of
+28,381 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1212,6 +1212,31 @@ line blocks.
    (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
    Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
    among cards).
+   Round 222 (fresh cards from rank 16,000 on): "It gains ..."/"It gets ..." in an activated ability means the source
+   (Migloz, Maze Crusher); "for each attacking creature other than ~" (Márton Stromgald); "deals X plus 2 damage
+   instead" (Crater's Claws, CR 614.1a); "Activate only if ... and only once" (Thought Shucker, CR 602.5b); Cultivate
+   then scry (Peregrination); "whenever you activate a loyalty ability (of a Chandra planeswalker)" with "if you
+   removed two or more loyalty counters to activate it" and "copy that ability" (Way of the Paradox, Way of the Mind
+   Sculptor, Keral Keep Disciples, Chandra's Regulator, CR 606.4); "creature that crewed it this turn" as a target
+   and as an "each" group (Getaway Car, Golden Argosy, CR 702.122); "loses life equal to the number of creatures they
+   control unless they sacrifice a creature" (Tomb Blade); "at the beginning of the next end step, you lose 1 life
+   and return this card to your hand" (Brood of Cockroaches, CR 603.7); "put a +1/+1 counter on ~ and it gains"
+   (Mukotai Soulripper); "whenever you become the target of a spell or ability an opponent controls" (Amulet of
+   Safekeeping); "whenever you attack while you control" (The Chief Warg, checked only as you attack, rulings);
+   "costs {1} more to activate for each" (Loreseeker's Stone, CR 601.2f); "into your library second from the top"
+   (Screaming Swarm); damage equal to its +1/+1 counters (Goblin Razerunners); "you may discard a card at random. If
+   you do" (Gallia of the Endless Dance); "whenever you surveil for the first time each turn" (Whispering Snitch,
+   counting surveils before it arrived, rulings); "Bird and/or Cleric permanent cards" (Celestial Gatekeeper);
+   "unless they control a commander" (Crimson Honor Guard); granted battle cry (Reckless Pyrosurfer, CR 702.91b).
+   +24 (28,347 of 31,936 with Lane B B48-B52).
+   Smaller gaps from round 222: if Brood of Cockroaches leaves your graveyard before its trigger resolves, no delayed
+   trigger is made, so the 1 life isn't lost; the delayed trigger should probably still be made (CR 603.7a) and only
+   the return fail.
+   Out after round 222 (looked at, not done): Deconstruction Hammer and its kind (a granted ability that sacrifices
+   the Equipment granting it); Subterranean Schooner (explore by the creature that crewed it); Turtle Van; Trove of
+   Temptation (an attack requirement on opponents); Hedron Matrix (a per-object amount in a static); Voracious Dragon
+   (types of the devoured creatures); Jurin, Leading the Charge; Incite Rebellion; Ajani Unrelenting. Sosuke, Dragon's
+   Prey, Dire Downdraft and Nullmage Advocate were left to Lane B, whose templates cover them.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -3388,7 +3413,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   you do" after an optional bounce (Mirkwood Nurturer), "dies during combat" (Mongrel Pack), "This ability costs {N}
   less to activate if <condition>" (Esquire of the King, Starport Security, Sewer Crocodile, Razorlash Transmogrant),
   "at least two creatures that share a creature type" (Synchronized Eviction), "as long as it's blocking and you
-  control a snow land" (Snow Devil). +34 (28,357 of 31,936).
+  control a snow land" (Snow Devil). +34 (28,381 of 31,936 with round 222).
 - Out after round B53 (looked at, not done): Clear the Land (each player reveals), Ninja's Kunai and Blazing Torch
   (granted abilities that sacrifice or name the Equipment), Artificer's Hex (the creature the enchanted Equipment is
   attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure

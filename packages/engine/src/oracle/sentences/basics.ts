@@ -191,6 +191,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(under[2]!, ctx);
     return who ? [{ ...sr, dest: { ...sr.dest, under: who } }] : null;
   }
+  // Bitterheart Witch: "search your library for a Curse card, put it onto the battlefield attached to target player, then
+  // shuffle": an Aura put onto the battlefield enchanting that player, if it could legally enchant them (rulings, CR
+  // 303.4f-g), else it stays in the library.
+  const toPlayer = /^(Search your library for a Curse card, put it onto the battlefield) attached to (target player|target opponent)(, then shuffle)$/.exec(s);
+  if (toPlayer) {
+    const fx = parseSearch(toPlayer[1]! + toPlayer[3]!);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    if (sr?.type !== "search" || sr.n !== 1 || sr.upTo || sr.dest.zone !== "battlefield" || sr.others || sr.landTo || sr.cardTo) return null;
+    const who = parsePlayer(toPlayer[2]!, ctx);
+    return who?.ref === "target" ? [{ ...sr, dest: { ...sr.dest, attachToPlayer: who } }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx), (ref) => sameNameRef(ref, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
@@ -1307,6 +1318,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter?.kind !== "spell") return null;
     return [{ type: "cantCast", who: { ref: "eachOpponent" }, filter: { ...filter, text: `${m[1]!} spell` }, duringTheirNextTurn: true }];
   }
+  // Innocuous Researcher: "If you do, you can't cast spells until your next turn": until this effect's controller's next
+  // turn begins (CR 611.2b), as "Until your next turn, you can't cast spells".
+  if (/^[Yy]ou can't cast spells until your next turn$/.test(s)) return [{ type: "cantCast", who: { ref: "you" }, untilYourNextTurn: true }];
   // Hope of Ghirapur: "Until your next turn, target player ... can't cast noncreature spells": until this effect's
   // controller's next turn begins (CR 611.2b).
   if ((m = /^Until your next turn, (.+?) can't cast (?:(noncreature) )?spells$/.exec(s))) {

@@ -2,8 +2,8 @@
 // (`npm run popular -- --least`).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { attackProblem, blockProblem, botActions, planPlot, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, power, toughness, planCast, planTurnFaceUp, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, addEffect, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { attackProblem, blockProblem, botActions, castProblem, legalTargets, planPlot, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, power, toughness, planCast, planTurnFaceUp, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -92,6 +92,16 @@ const custodiSoulcaller = () => card("Custodi Soulcaller", "Creature — Human C
 const aetherWeb = () => card("Aether Web", "Enchantment — Aura", "{1}{G}", { cmc: 2, colors: ["G"], keywords: ["Enchant", "Flash"], oracleText: "Flash (You may cast this spell any time you could cast an instant.)\nEnchant creature\nEnchanted creature gets +1/+1, has reach, and can block creatures with shadow as though they didn't have shadow. (Creatures with reach can block creatures with flying.)" });
 const aetherflameWall = () => card("Aetherflame Wall", "Creature — Wall", "{1}{R}", { cmc: 2, colors: ["R"], power: "0", toughness: "4", keywords: ["Defender"], oracleText: "Defender\nThis creature can block creatures with shadow as though they didn't have shadow.\n{R}: This creature gets +1/+0 until end of turn." });
 const worldQueller = () => card("World Queller", "Creature — Avatar", "{3}{W}{W}", { cmc: 5, colors: ["W"], power: "4", toughness: "4", oracleText: "At the beginning of your upkeep, you may choose a card type. If you do, each player sacrifices a permanent of their choice of that type." });
+const mazesMantle = () => card("Maze's Mantle", "Enchantment — Aura", "{2}{G}", { cmc: 3, colors: ["G"], keywords: ["Enchant", "Flash"], oracleText: "Flash\nEnchant creature\nWhen this Aura enters, if enchanted creature has toxic, that creature gains hexproof until end of turn.\nEnchanted creature gets +2/+2." });
+const bloodLust = () => card("Blood Lust", "Instant", "{1}{R}", { cmc: 2, colors: ["R"], oracleText: "If target creature has toughness 5 or greater, it gets +4/-4 until end of turn. Otherwise, it gets +4/-X until end of turn, where X is its toughness minus 1." });
+const hemlockVial = () => card("Hemlock Vial", "Artifact", "{1}{B}", { cmc: 2, colors: ["B"], oracleText: "When this artifact enters, you draw a card and you lose 1 life.\n{B}, {T}, Sacrifice this artifact: Each equipped creature and Equipment you control gains deathtouch until end of turn." });
+const forceAway = () => card("Force Away", "Instant", "{1}{U}", { cmc: 2, colors: ["U"], keywords: ["Ferocious"], oracleText: "Return target creature to its owner's hand.\nFerocious — If you control a creature with power 4 or greater, you may draw a card. If you do, discard a card." });
+const partingThoughts = () => card("Parting Thoughts", "Sorcery", "{2}{B}", { cmc: 3, colors: ["B"], oracleText: "Destroy target creature. You draw X cards and you lose X life, where X is the number of counters on that creature." });
+const favorableDestiny = () => card("Favorable Destiny", "Enchantment — Aura", "{1}{W}", { cmc: 2, colors: ["W"], keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature gets +1/+2 as long as it's white.\nEnchanted creature has shroud as long as its controller controls another creature. (It can't be the target of spells or abilities.)" });
+const paralyze = () => card("Paralyze", "Enchantment — Aura", "{B}", { cmc: 1, colors: ["B"], keywords: ["Enchant"], oracleText: "Enchant creature\nWhen this Aura enters, tap enchanted creature.\nEnchanted creature doesn't untap during its controller's untap step.\nAt the beginning of the upkeep of enchanted creature's controller, that player may pay {4}. If the player does, untap the creature." });
+const ragamuffinRaptor = () => card("Ragamuffin Raptor", "Creature — Dinosaur", "{4}{G}", { cmc: 5, colors: ["G"], power: "4", toughness: "3", oracleText: "When this creature enters, return up to one target creature or Food card from your graveyard to your hand." });
+const wardscaleDragon = () => card("Wardscale Dragon", "Creature — Dragon", "{4}{W}{W}", { cmc: 6, colors: ["W"], power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nAs long as this creature is attacking, defending player can't cast spells." });
+const roseNoble = () => card("Rose Noble", "Legendary Creature — Human", "{3}{U}", { cmc: 4, colors: ["U"], power: "2", toughness: "3", keywords: ["Ward", "Doctor's companion"], oracleText: "Ward {2}\nWhenever you cast a Doctor spell or creature spell with doctor's companion, draw a card.\nDoctor's companion (You can have two commanders if the other is the Doctor.)" });
 
 // Test cards.
 // Test cards.
@@ -124,7 +134,7 @@ const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | 
 
 describe("Lane B round 53", () => {
   it("are fully supported", () => {
-    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller());
+    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble());
   });
 
   it("Sheoldred's Restoration: returns the creature card; kicked you gain its mana value in life, unkicked you lose it", () => {
@@ -259,5 +269,154 @@ describe("Lane B round 53", () => {
     s = settle(s);
     expect(arts.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard"]);
     expect(zone(s, queller)).toBe("battlefield");
+  });
+
+  it("Maze's Mantle: hexproof only for a creature with toxic", () => {
+    for (const toxic of [true, false]) {
+      const { s: s0, ap, ids } = setup([mazesMantle()]);
+      const host = putOnBattlefield(s0, ap, toxic ? card("Toxic Rat", "Creature — Rat", "{B}", { cmc: 1, power: "1", toughness: "1", keywords: ["Toxic"], oracleText: "Toxic 1" }) : bearC());
+      const s = settle(castNow(s0, ap, ids[0]!, [tgt(host)]));
+      expect(s.objects[ids[0]!]!.attachedTo).toBe(host);
+      expect(kw(s, host, "Hexproof")).toBe(toxic);
+      expect(pt(s, host)).toBe(toxic ? "3/3" : "4/4");
+    }
+  });
+
+  it("Blood Lust: +4/-4 on toughness 5 or more, otherwise toughness 1, fixed as it resolves", () => {
+    const { s: s0, ap, ids } = setup([bloodLust(), bloodLust()]);
+    const big = putOnBattlefield(s0, ap, bigC("Huge Beast", 6, 6));
+    const small = putOnBattlefield(s0, ap, bearC("Mid Bear", 3, 3));
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(big)]));
+    expect(pt(s, big)).toBe("10/2");
+    s = settle(castNow(s, ap, ids[1]!, [tgt(small)]));
+    expect(pt(s, small)).toBe("7/1");
+    // The -2 was fixed as it resolved (CR 608.2h): more toughness later doesn't change it.
+    addEffect(s, ap, [small], [{ kind: "modifyPT", power: 0, toughness: 2 }]);
+    expect(pt(s, small)).toBe("7/3");
+  });
+
+  it("Hemlock Vial: equipped creatures and Equipment you control gain deathtouch", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const vial = putOnBattlefield(s0, ap, hemlockVial());
+    const equipped = putOnBattlefield(s0, ap, bearC("Equipped Bear"));
+    const bare = putOnBattlefield(s0, ap, bearC("Bare Bear"));
+    const sword = putOnBattlefield(s0, ap, card("Test Sword", "Artifact — Equipment", "{1}", { cmc: 1, oracleText: "Equipped creature gets +1/+0.\nEquip {1}" }));
+    s0.objects[sword]!.attachedTo = equipped;
+    const theirs = putOnBattlefield(s0, opp, bearC("Their Bear"));
+    const theirSword = putOnBattlefield(s0, opp, card("Their Sword", "Artifact — Equipment", "{1}", { cmc: 1, oracleText: "Equipped creature gets +1/+0.\nEquip {1}" }));
+    s0.objects[theirSword]!.attachedTo = theirs;
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planActivate(s0, ap, vial, 0, [])));
+    expect(zone(s, vial)).toBe("graveyard");
+    expect([kw(s, equipped, "Deathtouch"), kw(s, sword, "Deathtouch"), kw(s, bare, "Deathtouch"), kw(s, theirs, "Deathtouch"), kw(s, theirSword, "Deathtouch")]).toEqual([true, true, false, false, false]);
+  });
+
+  it("Force Away: bounces; with a power 4 creature you may loot", () => {
+    for (const ferocious of [true, false]) {
+      const { s: s0, ap, opp, ids } = setup([forceAway()]);
+      if (ferocious) putOnBattlefield(s0, ap, bigC());
+      const victim = putOnBattlefield(s0, opp, bearC("Victim Bear"));
+      const hand = s0.players[ap]!.hand.length - 1;
+      let s = settle(castNow(s0, ap, ids[0]!, [tgt(victim)]), (x) => x.pending?.kind === "chooseMay");
+      expect(zone(s, victim)).toBe("hand");
+      if (!ferocious) {
+        expect(s.pending).toBeFalsy();
+        expect(s.players[ap]!.hand.length).toBe(hand);
+        continue;
+      }
+      expect(s.pending?.kind).toBe("chooseMay");
+      s = answerMay(s, ap, true);
+      expect(s.pending?.kind).toBe("discard");
+      s = act(s, { type: "discard", player: ap, objectIds: [s.players[ap]!.hand[0]!] });
+      s = settle(s);
+      expect(s.players[ap]!.hand.length).toBe(hand);
+      expect(s.players[ap]!.graveyard.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("Parting Thoughts: draw and lose life for each counter the creature had", () => {
+    const { s: s0, ap, opp, ids } = setup([partingThoughts()]);
+    const victim = putOnBattlefield(s0, opp, bearC("Countered Bear"));
+    s0.objects[victim]!.counters = { "+1/+1": 2, charge: 1 };
+    invalidateCharacteristics(s0);
+    const hand = s0.players[ap]!.hand.length - 1;
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(victim)]));
+    expect(zone(s, victim)).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+    expect(life(s, ap)).toBe(37);
+  });
+
+  it("Favorable Destiny: shroud only while its controller controls another creature", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const host = putOnBattlefield(s0, opp, vanilla("White Knight", "Creature — Knight", "{1}{W}", 2, 2, 2, { colors: ["W"] }));
+    const aura = putOnBattlefield(s0, ap, favorableDestiny());
+    s0.objects[aura]!.attachedTo = host;
+    invalidateCharacteristics(s0);
+    expect(pt(s0, host)).toBe("3/4");
+    expect(kw(s0, host, "Shroud")).toBe(false);
+    // Another creature of the enchanted creature's controller, not of the Aura's.
+    putOnBattlefield(s0, ap, bearC("My Bear"));
+    expect(kw(s0, host, "Shroud")).toBe(false);
+    putOnBattlefield(s0, opp, bearC("Their Bear"));
+    expect(kw(s0, host, "Shroud")).toBe(true);
+  });
+
+  it("Paralyze: its controller may pay {4} in their upkeep to untap it", () => {
+    const { s: s0, ap, opp, ids } = setup([paralyze()]);
+    const victim = putOnBattlefield(s0, opp, bearC("Paralyzed Bear"));
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(victim)]));
+    expect(s.objects[victim]!.tapped).toBe(true);
+    for (let i = 0; i < 4; i++) putOnBattlefield(s, opp, card(`Test Waste ${i}`, "Land", "", { oracleText: "{T}: Add {C}." }));
+    // The opponent's untap step leaves it tapped; their upkeep trigger asks them to pay.
+    s = goUntil(s, (x) => x.activePlayer === opp && x.step === "upkeep" && x.pending?.kind === "chooseMay");
+    expect(s.pending?.player).toBe(opp);
+    expect(s.objects[victim]!.tapped).toBe(true);
+    s.players[opp]!.manaPool = { ...s.players[opp]!.manaPool, C: 4 };
+    s = act(s, { type: "chooseMay", player: opp, yes: true });
+    s = settle(s);
+    expect(s.objects[victim]!.tapped).toBe(false);
+  });
+
+  it("Ragamuffin Raptor: returns a creature or Food card", () => {
+    const { s: s0, ap, ids } = setup([ragamuffinRaptor()]);
+    const food = toZone(s0, ap, card("Test Food", "Artifact — Food", "{1}", { cmc: 1, oracleText: "{2}, {T}, Sacrifice this artifact: You gain 3 life." }), "graveyard");
+    const rock = toZone(s0, ap, trinket(), "graveyard");
+    const spec = { kind: "card" as const, types: ["Creature" as const], notTypes: [], notColors: [], orSubtypes: ["Food"], owner: "you" as const, text: "x" };
+    const legal = legalTargets(s0, spec, ap).map((t) => t.id);
+    expect(legal).toContain(food);
+    expect(legal).not.toContain(rock);
+    let s = castNow(s0, ap, ids[0]!);
+    s = triggerTargets(s, ap, [tgt(food)]);
+    s = settle(s);
+    expect(zone(s, food)).toBe("hand");
+  });
+
+  it("Wardscale Dragon: the player it attacks can't cast spells while it's attacking", () => {
+    const { s: s0, ap, opp } = setup([]);
+    onlyHand(s0, ap, []);
+    const dragon = putOnBattlefield(s0, ap, wardscaleDragon());
+    const third = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const oppBolt = toZone(s0, opp, bolt(), "hand");
+    const thirdBolt = toZone(s0, third, bolt(), "hand");
+    s0.players[opp]!.manaPool = { ...s0.players[opp]!.manaPool, R: 1 };
+    s0.players[third]!.manaPool = { ...s0.players[third]!.manaPool, R: 1 };
+    let s = attackWith(s0, [dragon], opp);
+    expect(s.objects[dragon]!.attacking).toBe(opp);
+    expect(castProblem(s, opp, oppBolt, [ply(ap)]) ?? "").toMatch(/Wardscale Dragon/);
+    expect(castProblem(s, third, thirdBolt, [ply(ap)]) ?? "").not.toMatch(/Wardscale Dragon/);
+  });
+
+  it("Rose Noble: draws for a Doctor spell or a creature spell with doctor's companion", () => {
+    const doctor = () => card("Test Doctor", "Legendary Creature — Time Lord Doctor", "{1}{U}", { cmc: 2, power: "2", toughness: "2" });
+    const companion = () => card("Test Companion", "Legendary Creature — Human", "{1}{U}", { cmc: 2, power: "1", toughness: "1", keywords: ["Doctor's companion"], oracleText: "Doctor's companion" });
+    const { s: s0, ap, ids } = setup([doctor(), companion(), bearC()]);
+    putOnBattlefield(s0, ap, roseNoble());
+    const n0 = s0.players[ap]!.hand.length;
+    let s = settle(castNow(s0, ap, ids[0]!));
+    expect(s.players[ap]!.hand.length).toBe(n0);
+    s = settle(castNow(s, ap, ids[1]!));
+    expect(s.players[ap]!.hand.length).toBe(n0);
+    s = settle(castNow(s, ap, ids[2]!));
+    expect(s.players[ap]!.hand.length).toBe(n0 - 1);
   });
 });

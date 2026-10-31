@@ -807,9 +807,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the )?amount of mana spent to cast (?:this spell|this creature|~|it|her|him|them)$/.test(p)) {
     return ctx?.spell || ctx?.selfEntered || ctx?.selfCastSpell ? count({ kind: "manaSpent" }) : null;
   }
-  // "For each counter on ~" (Twitching Doll): every kind.
-  if ((m = /^counters? on (~|it)$/.exec(p))) {
-    const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);
+  // "For each counter on ~" (Twitching Doll): every kind. Parting Thoughts: "the number of counters on that creature",
+  // every kind (rulings), the target as it last existed if it's gone (CR 608.2h).
+  if ((m = /^counters? on (~|it|that creature)$/.exec(p))) {
+    const of = whoseObject(m[1] === "~" ? "~'s" : m[1] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
   // Death's Presence: "where X is the power of the creature that died": the trigger's subject as it last existed on the

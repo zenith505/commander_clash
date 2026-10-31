@@ -5869,6 +5869,8 @@ export interface CompiledCard {
   opponentsCantCastDuringCombat?: true | /** "Players can't cast spells during combat" (Basandra, Battle Seraph): its controller too. */ "all";
   /** "Each opponent who cast a spell this turn can't attack with creatures" (Angelic Arbiter): checked as attackers are declared, counting spells cast before it was there (rulings). */
   opponentsWhoCastCantAttack?: true;
+  /** Wardscale Dragon: "As long as ~ is attacking, defending player can't cast spells": the player it's attacking (CR 506.2). */
+  defendingCantCastWhileAttacking?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */
   opponentsWhoAttackedCantCast?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */

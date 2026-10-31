@@ -1536,6 +1536,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
   if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
+  // Maze's Mantle: "if enchanted creature has toxic": any toxic N (CR 702.164a).
+  if (text === "enchanted creature has toxic") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], toxic: true, text: "creature with toxic" } };
   // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that
   // Equipment, "you" the controller of the source (rulings).
   if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))
@@ -1547,6 +1549,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^its controller controls no other (artifact|creature|land|enchantment)s$/.exec(text)) && st.affects.kind === "attached") {
     const c = parseStaticCondition(`you don't control another ${m[1]}`, st);
     return c?.kind === "control" && c.who === "you" && c.other ? { ...c, who: "attached" } : null;
+  }
+  // Favorable Destiny: "Enchanted creature has shroud as long as its controller controls another creature": the same.
+  if ((m = /^its controller controls another (artifact|creature|land|enchantment)$/.exec(text)) && st.affects.kind === "attached") {
+    const c = parseStaticCondition(`you control another ${m[1]}`, st);
+    return c?.kind === "control" && c.who === "you" && c.other && c.min === 1 && c.max === undefined ? { ...c, who: "attached" } : null;
   }
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".

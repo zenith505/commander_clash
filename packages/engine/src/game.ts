@@ -5692,6 +5692,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const duringCombat = abilitiesOf(s, o).opponentsCantCastDuringCombat;
     if (duringCombat && (duringCombat === "all" || controllerOf(s, o) !== pid) && inCombatPhase(s))
       return `${characteristics(s, o).name}: ${duringCombat === "all" ? "players" : "opponents"} can't cast spells during combat`;
+    // Wardscale Dragon: the player it's attacking, or the controller of the planeswalker or battle it attacks (CR 506.2).
+    if (abilitiesOf(s, o).defendingCantCastWhileAttacking && o.zone === "battlefield" && o.attacking === pid)
+      return `${characteristics(s, o).name}: the defending player can't cast spells while it's attacking`;
     // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
     if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
       return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;

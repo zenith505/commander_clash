@@ -739,6 +739,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const of = (counters: Record<string, number> | undefined) => (c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));
       const o = refObjects(s, c.of, ctx)[0];
       if (o?.zone === "battlefield") return of(o.counters);
+      // Parting Thoughts: "the number of counters on that creature" after an earlier part of this effect moved the target
+      // permanent: as it last existed on the battlefield (CR 608.2h).
+      const t = c.of.ref === "target" ? s.resolving?.item.targets?.[c.of.index] : undefined;
+      const tzc = t?.kind === "object" ? t.zc : undefined;
+      const tlk = o && tzc !== undefined && (o.zoneChanges ?? 0) === tzc + 1 ? s.lastKnown?.[o.id] : undefined;
+      if (tlk && tlk.zc === tzc) return of(tlk.counters);
       // "For each blight counter on it" after it left: as it last existed on the battlefield (CR 608.2h).
       // Not when the ability carries its own (a dies trigger's), only other last known information (a cast spell's copy key).
       const lk = c.of.ref === "self" && !ctx.lki?.counters && ctx.sourceId && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;

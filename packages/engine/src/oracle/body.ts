@@ -1527,6 +1527,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
+  // Force Away: "If you control a creature with power 4 or greater, you may draw a card. If you do, discard a card.": the
+  // discard only after the draw you chose (CR 608.2c), the creature checked as this part resolves.
+  text = text.replace(/(^|\. )(If you control a creature with power \d+ or greater, you may draw a card)\. If you do, discard a card\.$/, "$1$2, then discard a card.");
+  // Hemlock Vial: "Each equipped creature and Equipment you control gains deathtouch until end of turn": both groups, as
+  // this resolves (rulings).
+  text = text.replace(/^Each equipped creature and Equipment you control gains ([a-z]+) until end of turn\.$/, "Each equipped creature you control gains $1 until end of turn. Each Equipment you control gains $1 until end of turn.");
   // Sheoldred's Restoration: "If ~ was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much
   // life.": the same amount either way, settled as it resolves; kicked or not was settled as it was cast (CR 702.33e).
   text = text.replace(/(\. If ~ was kicked, you gain life equal to (that card's mana value)\. Otherwise, you lose) that much life\./, "$1 life equal to $2.");
@@ -1816,6 +1822,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   const uginFilter = ugin ? parseSearchFilter(ugin[1]!) : undefined;
   if (ugin && uginFilter)
     return { targets: [], effects: [{ type: "search", filter: uginFilter, n: 99, upTo: true, dest: { zone: "exile", play: { until: "thisTurn", free: true, castOnly: true } }, reveal: false }], text };
+  // Blood Lust: "If target creature has toughness 5 or greater, it gets +4/-4 until end of turn. Otherwise, it gets +4/-X
+  // until end of turn, where X is its toughness minus 1.": its toughness as this resolves (CR 608.2h), either way.
+  const bloodLust = /^If target creature has toughness (\d+) or greater, it gets \+(\d+)\/-(\d+) until end of turn\. Otherwise, it gets \+(\d+)\/-X until end of turn, where X is its toughness minus 1\.$/.exec(text.trim());
+  if (bloodLust && opts.spell) {
+    const body = parseBody(`Target creature gets +${bloodLust[4]}/-X until end of turn, where X is its toughness minus 1.`, opts);
+    const fx = body?.effects[0];
+    if (!body || body.effects.length !== 1 || body.targets.length !== 1 || fx?.type !== "continuous") return null;
+    const big: Effect = { type: "continuous", what: { ref: "target", index: 0 }, mods: [{ kind: "modifyPT", power: Number(bloodLust[2]), toughness: -Number(bloodLust[3]) }], duration: "endOfTurn" };
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], toughness: { min: Number(bloodLust[1]) }, text: `creature with toughness ${bloodLust[1]} or greater` };
+    return { ...body, effects: [{ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [big], otherwise: [fx] }], text };
+  }
   // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
   // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
   const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());

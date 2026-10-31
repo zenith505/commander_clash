@@ -1792,6 +1792,11 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
   }
+  // Ragamuffin Raptor: "creature or Food card": a creature card, or a Food card (an artifact subtype, CR 205.3g).
+  if (p === "creature or food" && !extra.orSubtypes) {
+    extra.orSubtypes = ["Food"];
+    p = "creature";
+  }
   // Ray of Ruin: "creature, Vehicle, or nonbasic land": any one of the three (TargetSpec.anyOf).
   if (p === "creature, vehicle, or nonbasic land" && !extra.anyOf) {
     extra.anyOf = [

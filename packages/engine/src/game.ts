@@ -4006,7 +4006,7 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid);
+  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid, o);
 }
 
 /** Mayhem on a land (Oscorp Industries): discarded this turn, so its owner may play it from their graveyard (CR 702.187c). */
@@ -4036,14 +4036,28 @@ function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): bool
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id) || anchored(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
-/** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
-function landPermit(s: GameState, pid: PlayerId): string | undefined {
+/**
+ * A card put into its graveyard this turn from a library (Kagha, Shadow Archdruid), or from anywhere other than the
+ * battlefield (Banon, the Returners' Leader). Any later zone change makes it a new object that wasn't (CR 400.7).
+ */
+function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notFromBattlefield"): boolean {
+  if (o.zone !== "graveyard" || o.toGraveyardTurn !== s.turn) return false;
+  return how === "fromLibrary" ? o.fromLibraryTurn === s.turn : o.fromBattlefieldTurn !== s.turn;
+}
+
+/**
+ * Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn.
+ * Kagha's only for a land card `o` put there from a library this turn.
+ */
+function landPermit(s: GameState, pid: PlayerId, o?: GameObject): string | undefined {
   if (s.activePlayer !== pid) return undefined;
   const used = s.turnLog?.gravePermits ?? [];
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const once = controllerOf(s, p) === pid ? abilitiesOf(s, p).landFromGraveyardOnce : undefined;
     if (!once) continue;
+    const arrived = abilitiesOf(s, p).landFromGraveyardArrived;
+    if (arrived && (!o || !arrivedThisTurn(s, o, arrived))) continue;
     // Serra Paragon: the one use it shares with its spell permission.
     const key = `${p.id}@${p.zoneChanges ?? 0}:${once === "shared" ? "" : "Land"}`;
     if (!used.includes(key)) return key;
@@ -4206,7 +4220,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
   if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)) {
-    const permit = landPermit(s, p.id)!;
+    const permit = landPermit(s, p.id, o)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.
     const gains = permitGains(s, permit);
@@ -5933,6 +5947,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
       if (!d.manaCost && !g.way.mana) continue;
       if (!printedMatches(g.filter, d)) continue;
+      if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
       if (g.maxMv !== undefined && defMv(d) > g.maxMv) continue;
       // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
@@ -7498,6 +7513,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
+    ...(ab.crew !== undefined && !ab.saddle && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
   };
   if (manaPick) {

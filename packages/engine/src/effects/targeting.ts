@@ -71,6 +71,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.hasAdventure && !(s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
+  if (spec.minCardTypes !== undefined && c.types.length < spec.minCardTypes) return false;
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
   if (spec.bothColors?.some((col) => !c.colors.includes(col))) return false;
@@ -105,7 +106,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;
   if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
-  if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
+  if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.toxic && !c.keywords.some((x) => /^toxic\b/i.test(x))) return false;
@@ -392,6 +393,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.hasAdventure && d.layout !== "adventure") return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
+  if (spec.minCardTypes !== undefined && d.types.length < spec.minCardTypes) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;
   if (spec.bothColors?.some((col) => !d.colors.includes(col))) return false;
@@ -489,12 +491,13 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   const d = defOf(s, o);
   // "With power or toughness 2 or less" (Stern Scolding): either one, as it is on the stack (below).
   const ptEither = isPtAnyOf(spec.anyOf) ? spec.anyOf : undefined;
-  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, parity, ...rest0 } = spec;
+  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, notCast, parity, ...rest0 } = spec;
   const { anyOf: _anyOf, ...rest1 } = rest0;
   const rest = ptEither ? rest1 : rest0;
   if (!printedMatches(rest, d)) return false;
   if (notCastFromHand && o.castFrom === "hand" && !o.spellCopy) return false;
   if (castFromGraveyard && (o.castFrom !== "graveyard" || o.spellCopy)) return false;
+  if (notCast && !o.spellCopy && o.castFrom !== undefined) return false;
   if (mv && !inRange(spellManaValue(s, item), mv)) return false;
   const pt = (key: "power" | "toughness") => spellPT(s, item, key);
   for (const [key, range] of [["power", pw], ["toughness", tg]] as const) {
@@ -595,6 +598,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
     if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
+    // Errant, Street Artist: "that wasn't cast": a copy (CR 707.10).
+    if (spec.notCast && !s.objects[item.objectId]?.spellCopy && s.objects[item.objectId]?.castFrom !== undefined) return false;
     if (spec.mvAtMostControllersGraveyard && spellManaValue(s, item) > (s.players[item.controller]?.graveyard.length ?? 0)) return false;
     // Power and toughness as the spell has them on the stack (a characteristic-defining ability works there, CR 604.3).
     if (spec.power || spec.toughness || isPtAnyOf(spec.anyOf)) return spellMatches(s, spec, item);
@@ -649,6 +654,8 @@ export function targetsOnlyOne(s: GameState, targets: TargetChoice[], only: "sel
   if (first?.kind !== "object" || chosen.some((t) => t.kind !== "object" || t.id !== first.id)) return undefined;
   const it = s.objects[first.id];
   if (!it || it.zone !== "battlefield") return undefined;
+  // Ivy, Gleeful Spellthief: "a single creature other than ~".
+  if (only !== "self" && only.notSource && it.id === o?.id) return undefined;
   return (only === "self" ? it.id === o?.id : objectMatches(s, only, it, you, false)) ? it.id : undefined;
 }
 

@@ -406,6 +406,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if ((ctx.lastCreated || ctx.lastCreatedAny) && /^the token created this way$/i.test(x)) return { ref: "created" };
   // "Put all land cards from among them onto the battlefield tapped ... untap those lands" (Animist's Awakening).
   if (ctx.lastDugLands && /^those lands$/i.test(x)) return { ref: "created" };
+  // Arthur, Marigold Knight: "Return that creature to its owner's hand at end of combat": the one put onto the battlefield.
+  if (ctx.lastDugCreature && /^that creature$/i.test(x)) return { ref: "created" };
   // "Exile each permanent with the most votes or tied for most votes" (Council's Judgment): what the vote chose.
   if (ctx.vote?.among && !ctx.vote.choose && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
   // "Destroy each permanent chosen this way" (Druid of Purification): every one a player chose.
@@ -1251,10 +1253,11 @@ export function parseTargetPhrase(
   const thatsA = /^(target )?((?:[a-z]+ )*)permanent that's an? ((?:artifact|creature|enchantment|land|planeswalker|battle)(?:, (?:artifact|creature|enchantment|land|planeswalker|battle))*,? or (?:artifact|creature|enchantment|land|planeswalker|battle))$/.exec(phrase.trim());
   if (thatsA) return parseTargetPhrase(`${thatsA[1] ?? ""}${thatsA[2]}${thatsA[3]}`, opts);
   // Yenna, Redtooth Regent: "enchantment you control that doesn't have the same name as another permanent you control".
-  const unique = / that doesn't have the same name as another permanent you control$/.exec(phrase.trim());
+  // The Apprentice's Folly: "nontoken creature you control that doesn't have the same name as a token you control".
+  const unique = / that doesn't have the same name as (another permanent|a token) you control$/.exec(phrase.trim());
   if (unique) {
     const rest = parseTargetPhrase(phrase.trim().slice(0, unique.index), opts);
-    return rest?.kind === "object" && rest.controller === "you" ? { ...rest, uniqueNameAmongYours: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+    return rest?.kind === "object" && rest.controller === "you" ? { ...rest, uniqueNameAmongYours: unique[1] === "a token" ? ("tokens" as const) : true, text: `target ${phrase.trim().toLowerCase()}` } : null;
   }
   // Éowyn, Fearless Knight: "target creature an opponent controls with greater power": than the source's, or its last
   // known power if it has left (as mentor's "lesser power", CR 702.134a). Only a target: it's checked as targets are.
@@ -1353,6 +1356,12 @@ export function parseTargetPhrase(
   if (notFromHand) {
     extra.notCastFromHand = true;
     p = p.slice(0, notFromHand.index);
+  }
+  // Errant, Street Artist: "target spell you control that wasn't cast": a copy (CR 707.10).
+  const uncast = / that wasn't cast$/.exec(p);
+  if (uncast) {
+    extra.notCast = true;
+    p = p.slice(0, uncast.index);
   }
   const fromYard = / cast from a graveyard$/.exec(p);
   if (fromYard) {
@@ -2074,7 +2083,7 @@ export function parseTargetPhrase(
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
-  if (otherThanBasic || ((extra.notCastFromHand || extra.castFromGraveyard) && !isSpell)) return null;
+  if (otherThanBasic || ((extra.notCastFromHand || extra.castFromGraveyard || extra.notCast) && !isSpell)) return null;
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.

@@ -122,7 +122,10 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
     typeLine,
     keywords,
     oracleText: text,
-    ...(except.pt ? { power: String(except.pt[0]), toughness: String(except.pt[1]) } : {}),
+    // "Except it's 4/3" (Mindlink Mech): only for a copy whose copiable values make it a creature or a Vehicle; a copy of
+    // anything else has no power and toughness to set (rulings on Mindlink Mech: crewed by a permanent that isn't
+    // normally a creature or Vehicle, it's 0/0).
+    ...(except.pt && (types.includes("Creature") || base.subtypes.includes("Vehicle")) ? { power: String(except.pt[0]), toughness: String(except.pt[1]) } : {}),
     ...(except.colors ? { colors: except.colors } : except.addColors ? { colors: [...base.colors, ...except.addColors.filter((c) => !base.colors.includes(c))] } : {}),
     ...(except.noManaCost ? { manaCost: "", cmc: 0 } : {}),
   } as Partial<T> & { cmc?: number };

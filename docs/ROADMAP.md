@@ -1275,7 +1275,7 @@ line blocks.
    sources" (Woodland Weavemaster); "entered from a graveyard or you cast it from a graveyard" (Breathless Knight);
    "the first time counters have been put on that creature this turn" (Stalwart Successor); "a card in your graveyard
    that wasn't put there this combat" (Storrev, Devkarin Lich, CR 506.1); "that player may put a +1/+1 counter on ~. If
-   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,574 of 31,936).
+   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,590 of 31,936 with Lane B B62).
    Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (mana of
    two different colors); Karn's Sylex (players can't pay life, across every life cost); Spark of Creativity ("you may
    have ~ deal damage ... If you don't, you may play that card"); Strength of the Tajuru (one target per multikick);

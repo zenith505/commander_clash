@@ -69,7 +69,20 @@ export function parseEntersChoice(line: string): EntersChoice | null {
  * as it's attacking". An ability word in front ("Metalcraft —", "Descend 4 —") has no rules meaning
  * (CR 207.2c); the condition is spelled out after it.
  */
+/**
+ * Threshold granting "Whenever a nontoken creature is put into your graveyard from the battlefield" (Decaying Soil): a
+ * leaves-the-battlefield trigger looks back in time (CR 603.10a), so the creature that makes seven doesn't trigger it
+ * (rulings), but the granted ability is read from the graveyard as it is after the event. Not supported.
+ */
+function lookBackGrant(st: StaticAbility | null): StaticAbility | null {
+  return st?.condition?.kind === "graveyardAtLeast" && st.mods.some((m) => m.kind === "addAbility" && /^Whenever .*(?:\bdies\b|put into [a-z']+ graveyard from the battlefield)/.test(m.text)) ? null : st;
+}
+
 export function parseConditionalStatic(line: string): StaticAbility | null {
+  return lookBackGrant(parseConditionalStatic0(line));
+}
+
+function parseConditionalStatic0(line: string): StaticAbility | null {
   // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
   // long as it has one" (checked as the untap step begins, CR 502.3).
   // Steel Dromedary: "if it has a +1/+1 counter on it"; Alirios, Enraptured: "if you control a Reflection".
@@ -175,7 +188,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // Steel of the Godhead: "As long as enchanted creature is white, it gets +1/+1 and has lifelink": white among its colors
   // now (CR 105.2).
-  if ((m = /^As long as (enchanted|equipped) creature is (white|blue|black|red|green), it (gets|has) (.+)$/.exec(text))) {
+  // Ray of Frost: "As long as enchanted creature is red, it loses all abilities" (layer 6; rulings: abilities it gained
+  // later stay, by timestamp).
+  if ((m = /^As long as (enchanted|equipped) creature is (white|blue|black|red|green), it (gets|has|loses) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
@@ -508,6 +523,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, n: 0, times: c, coloredOrGeneric: m[2] as Color, text: line } };
   }
+  // Hum of the Radix: "Each artifact spell costs {1} more to cast for each artifact its controller controls": everyone's
+  // artifact spells, counted for the spell's caster as it's cast (CR 601.2f).
+  if ((m = /^Each (artifact|creature|enchantment) spell costs \{(\d+)\} more to cast for each (artifact|creature|enchantment) its controller controls$/.exec(text))) {
+    const base = parseCostChange(`${capital(m[1]!)} spells cost {${m[2]}} more to cast`);
+    const c = parseCount(`${m[3]} you control`, null, true);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.who !== "all" || !c) return "fail";
+    return { costMod: { ...base.costMod, times: c, timesForCaster: true, text: line } };
+  }
   if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (.+)$/.exec(text)) && !/^~/.test(text)) {
     const base = parseCostChange(m[1]!);
     const c = parseCount(m[2]!, null, true);
@@ -583,6 +606,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   if ((m = /^Spells you cast but don't own cost \{(\d+)\} less to cast$/.exec(text))) return { costMod: { who: "you", filter: { kind: "spell", text: "spells you don't own" }, n: -Number(m[1]), notOwned: true, text: line } };
   if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother" } } };
+  // Mage Duel: "~ costs {2} less to cast if you've cast another instant or sorcery spell this turn".
+  if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another instant or sorcery spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother", types: ["Instant", "Sorcery"] } } };
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity), "During turns other than yours, ~ costs {3} more to
   // cast" (Hurkyl's Final Meditation): checked as it's cast (CR 601.2f); a colored reduction takes off that colored mana.
@@ -817,7 +842,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
   // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it".
-  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it)$/.exec(text))) {
+  // Emergent Haunting: "if you haven't cast a spell from your hand this turn and ~ isn't a creature".
+  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it|~ isn't a creature)$/.exec(text))) {
     const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
@@ -946,6 +972,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Dreadlight Monstrosity: "Activate only if you own a card in exile."
   if (text === "you own a card in exile") return { kind: "amount", amount: { count: { kind: "cardsInExile", who: { ref: "you" } } }, min: 1 };
+  // Howling Galefang: "as long as you own a card in exile that has an Adventure": any such card, however it got there
+  // (rulings); a face-down card has no characteristics.
+  if (text === "you own a card in exile that has an Adventure") return { kind: "amount", amount: { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", hasAdventure: true, text: "card that has an Adventure" } } }, min: 1 };
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in exile$`).exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInExile" } }, max: num(m[1]!) - 1 };
   // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
   if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {
@@ -981,6 +1010,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
+  // Imaginary Pet: "if you have a card in hand": one or more.
+  if (text === "you have a card in hand") return { kind: "handAtLeast", n: 1 };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
   // "One or fewer cards in hand" (Djeru and Hazoret): fewer than two.
   if ((m = new RegExp(`^you have ${NUM} or fewer cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) + 1, fewer: true };
@@ -1229,6 +1260,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent (?:has been|was) dealt noncombat damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true, noncombat: true };
   // Proctor of Potential: "if you've scried or surveilled this turn" (a scry of 0 is no scry, CR 701.22b, 701.25c).
   if (text === "you've scried or surveilled this turn") return { kind: "scriedThisTurn" };
+  if (text === "you've surveilled this turn") return { kind: "scriedThisTurn", surveil: true };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   // Mysterio's Mirage: "if you discarded a card this turn" is the same.
@@ -1373,6 +1405,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Triton Wavebreaker: "As long as ~ is a creature, it has prowess": not while it's a bestowed Aura (CR 702.103b), its
   // card types as layer 4 left them (CR 613.1d).
   if (/^~ is a creature$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", types: ["Creature"], text: "creature" } };
+  if (/^~ isn't a creature$/.test(text) && st.affects.kind === "self") return { kind: "not", cond: { kind: "selfIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } };
   // Mistform Wall: "~ has defender as long as it's a Wall": its creature types as layer 4 left them (CR 613.1d, 613.1f).
   if ((m = /^it's an? ([A-Z][a-z]+)$/.exec(text)) && st.affects.kind === "self" && CREATURE_TYPES.has(m[1]!))
     return { kind: "selfIs", filter: { kind: "object", subtypes: [m[1]!], text: m[1]! } };
@@ -1458,8 +1491,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
   // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
-  if ((m = /^enchanted (creature|land) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
-    return { kind: "attachedIs", filter: { kind: "object", types: [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
+  // Volition Reins: "if enchanted permanent is tapped": any permanent.
+  if ((m = /^enchanted (creature|land|permanent) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
+    return { kind: "attachedIs", filter: { kind: "object", types: m[1] === "permanent" ? [] : [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
   // Howl of the Hunt: "if enchanted creature is a Wolf or Werewolf": the creature it's attached to, as it is now.
   if ((m = /^enchanted creature is an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && CREATURE_TYPES.has(m[1]!) && (!m[2] || CREATURE_TYPES.has(m[2]))) {
     const kinds = [m[1]!, m[2]].filter((x): x is string => !!x);
@@ -1501,8 +1535,21 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Barren Glory: "if you control no permanents other than ~ and have no cards in hand": both.
+  if ((m = /^you control no permanents other than ~( and have no cards in hand)?$/.exec(text))) {
+    const a = parseStaticCondition("you don't control another permanent", st);
+    const b = m[1] ? parseStaticCondition("you have no cards in hand", st) : a;
+    return a && b ? (m[1] ? { kind: "allOf", conds: [a, b] } : a) : null;
+  }
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
-  if ((m = /^you control no other (artifact|creature|land|enchantment)s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
+  if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
+  // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that
+  // Equipment, "you" the controller of the source (rulings).
+  if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))
+    return { kind: "onBattlefield", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], named: m[1]!, attachedTo: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, text: `Equipment named ${m[1]} attached to a creature you control` }, min: 1 };
+  // Dust Stalker: "if you control no other colorless creatures".
+  if ((m = /^you control no other ((?:colorless )?(?:artifact|creature|land|enchantment))s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the
   // enchanted creature's controller, and creatures other than that one.
   if ((m = /^its controller controls no other (artifact|creature|land|enchantment)s$/.exec(text)) && st.affects.kind === "attached") {
@@ -1956,6 +2003,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const second = parseStaticMods(m[2]!);
     return first && second ? [...first, ...second] : null;
   }
+  // Expedition Lookout: "~ can attack as though it didn't have defender and it can't be blocked".
+  if ((m = /^(can attack as though it didn't have defender) and it (can't be blocked)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second ? [...first, ...second] : null;
+  }
   // Sky Tether: "Enchanted creature has defender and loses flying": both in layer 6, by timestamp (CR 613.7).
   if ((m = /^has (defender|flying|haste|reach|vigilance) and loses (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch)$/.exec(rest)) && m[1] !== m[2]) {
     const [has, lost] = [parseKeywordList(m[1]!), parseKeywordList(m[2]!)];
@@ -2178,7 +2231,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
 
 export function parseStatic(line: string): StaticAbility | null {
   const st = parseStaticLine(line) ?? parseTransform(line);
-  if (st) return st;
+  if (st) return lookBackGrant(st);
 
   // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
   // says the same as "gets ... and has first strike". So does Runechanter's Pike's "has first strike and gets +X/+0,

@@ -48,7 +48,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand", rest: "exile" });
       // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
       // Thassa's Intervention: "Put up to two of them into your hand and the rest on the bottom ...": none to two.
-    } else if ((m = new RegExp(`^Put (up to )?(one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+      // Codecracker Hound: "Put one into your hand and the other into your graveyard", one of them.
+    } else if ((m = new RegExp(`^Put (up to )?(one|two|three|X) (?:(?:of (?:them|those cards)|cards? from among them) )?into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
       if (m[2] === "X" && (!ctx?.spell || m[1])) return null;
       Object.assign(dig, m[2] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[2]!), upTo: !!m[1], into: "hand" });
       if (m[3]) Object.assign(dig, restOf(m[3]));
@@ -154,7 +155,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
       if (!filter) return null;
       Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
-    } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
+    // Voda Sea Scavenger: "You may put one of those cards on top of your library": the same, up to one of them.
+    } else if (/^You may put one of (?:them|those cards) (?:back )?on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else if ((m = new RegExp(`^Put one of (?:them|those cards) on top of your library(?: and the rest ${REST})?$`).exec(s))) {
       // Cream of the Crop: one of them must go back on top.
@@ -209,6 +211,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const a = parseSentence(andNoUntap[1]!, ctx);
     const b = a && parseSentence(`~ ${andNoUntap[2]}`, ctx);
     return a && b ? [...a, ...b] : null;
+  }
+  // Tormented Thoughts: "Target player discards a number of cards equal to the sacrificed creature's power": as it last
+  // existed on the battlefield (rulings, CR 608.2h).
+  const discardsSac = /^(Target player|Target opponent) discards (?:a number of )?cards equal to (the sacrificed creature's (?:power|toughness))$/.exec(s);
+  if (discardsSac) {
+    const who = parsePlayer(discardsSac[1]!.toLowerCase(), ctx);
+    const n = who && parseCount(discardsSac[2]!, ctx);
+    return who && n ? [{ type: "discard", who, n }] : null;
   }
   // "Target player untaps all basic lands they control" (Early Harvest): the same as "untap all basic lands target player
   // controls"; who untaps them changes nothing (CR 701.26b).
@@ -448,7 +458,7 @@ export function parseChanges(text: string): Modification[] | null {
   // "Becomes black, gets +1/-1, and gains "..."" (Defiling Tears), "becomes an Angel, gets +3/+3, and gains flying and
   // lifelink" (Paragon of the Amesha): a list of changes. Dance of the Skywise: "becomes a blue Dragon Illusion with base
   // power and toughness 4/4, loses all abilities, and gains flying": in that order, so it has flying (rulings).
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
+  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) |isn't an artifact$)|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();
@@ -464,6 +474,9 @@ export function parseChanges(text: string): Modification[] | null {
     // Arcum's Weathervane, Thermal Flux: "is no longer snow", "isn't snow until end of turn": the snow supertype goes
     // (layer 4, CR 205.4a), its other types stay (rulings).
     else if (/^(?:is|are) no longer snow$|^(?:isn't|aren't) snow$/i.test(p)) out.push({ kind: "loseTypes", types: ["Snow"] });
+    // Neurok Transmuter: "becomes blue and isn't an artifact": the card type and its subtypes go (layer 4, rulings), its
+    // other types stay.
+    else if (/^isn't an artifact$/i.test(p)) out.push({ kind: "loseTypes", types: ["Artifact"] });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
     else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {

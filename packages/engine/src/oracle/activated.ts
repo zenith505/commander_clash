@@ -4,7 +4,7 @@ import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { blightCost, parseAdditionalCost } from "./keyword-abilities";
-import { pickFilter } from "./targets";
+import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseOnlyClauses } from "./statics";
 import { parseCount } from "./counts";
 import type { ManaType } from "../types";
@@ -46,6 +46,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:").replace(/(^|, )(Remove [^,:]+? counters? from ~) and exile it:/, "$1$2, Exile ~:")
     // Magosi, the Waterveil: "Remove an eon counter from ~ and return it to its owner's hand": the same, two costs.
     .replace(/(^|, )(Remove [^,:]+? counters? from ~) and return it to its owner's hand:/, "$1$2, Return ~ to its owner's hand:")
+    // Geistflame Reservoir: "Remove any number of charge counters from ~: It deals that much damage to any target": how
+    // many is announced as it's activated (CR 602.2b, 601.2h), an X (none included).
+    .replace(/(^|, )Remove any number of ([a-z]+) counters from ~: It deals that much damage to any target\.$/, "$1Remove X $2 counters from ~: ~ deals X damage to any target.")
+    // The Archimandrite: "Tap three untapped Advisors, Artificers, and/or Monks you control": any mix of them, each one that
+    // has any of those creature types.
+    .replace(/(^|, )Tap (\w+) untapped ((?:[A-Z][a-z]+s, )+)and\/or ([A-Z][a-z]+s) you control(?=[,:])/, (_, pre: string, n: string, list: string, last: string) => `${pre}Tap ${n} untapped ${[...list.split(", ").filter(Boolean), last].map((w) => w.replace(/s$/, "")).join(" or ")} you control`)
     // Sawtooth Thresher: "Remove two +1/+1 counters from ~: It gets +4/+4 until end of turn": "it" is ~, the one thing named.
     .replace(/^(Remove [^,:]+? counters? from ~): It (gets|gains) /, "$1: ~ $2 ")
     // Sandstone Deadfall: "Sacrifice two lands and ~", Zombie Assassin: "Exile two cards from your graveyard and ~": the
@@ -57,7 +63,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // permanent itself and one of each of the others.
     .replace(/(^|, )Sacrifice (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), and (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*|~)(?=:)/, (_, pre: string, a: string, b: string, c: string) => (c === "~" ? `${pre}Sacrifice ~, Sacrifice ${a}; and ${b}` : `${pre}Sacrifice ${a}; ${b}; and ${c}`));
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Tap enchanted (?:creature|land)|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove (?:a counter|two counters|three counters) from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Blight \d+|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard another card named ~|Discard X cards|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Put a card an opponent owns from exile into that player's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) (?:other )?untapped [^,:]+? you control(?: other than ~)?|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile any number of cards from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Tap enchanted (?:creature|land)|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove (?:a counter|two counters|three counters) from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Blight \d+|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard another card named ~|Discard X cards|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Put a card an opponent owns from exile into that player's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) (?:other )?untapped [^,:]+? you control(?: other than ~)?|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile any number of cards from your graveyard|Exile X cards from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
   // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
   const water = /^Waterbend \{(\d+|X)\}(?=[,:])/.exec(line);
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(water ? line.slice("Waterbend ".length) : line);
@@ -238,6 +244,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // Painbringer: "Exile any number of cards from your graveyard: ... where X is the number of cards exiled this way":
       // how many is chosen as it's activated (CR 602.2b, 601.2h), so it's an X announced then (none included).
       extra.push({ kind: "exileFromGraveyard", n: 0, x: true });
+    } else if (/^Exile X cards from your graveyard$/.test(part)) {
+      // Necropolis Fiend: "{X}, {T}, Exile X cards from your graveyard": the one X announced as it's activated, paid in
+      // mana and in that many cards (CR 107.3a, 602.2b).
+      extra.push({ kind: "exileFromGraveyard", n: 0, x: true });
     } else if (/^Exile (?!~|the top )/.test(part)) {
       // "Exile a card from your graveyard" (Relic of Progenitus' cousins, Sigarda): cards chosen as it's activated.
       const c2 = parseAdditionalCost(part);
@@ -295,6 +305,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let costLess: ActivatedAbility["costLess"];
   let costMore: ActivatedAbility["costMore"];
   let costLessIf: ActivatedAbility["costLessIf"];
+  let costLessIfTarget: ActivatedAbility["costLessIfTarget"];
   // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
   let inYard = false;
   // "Any player may activate this ability" (CR 602.2): its controller is whoever activates it (CR 113.8), "you" in it
@@ -356,6 +367,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (lessTurn && !costLess && !costLessIf) {
       costLessIf = { n: Number(lessTurn[1]), cond: { kind: "yourTurn" } };
       effectText = effectText.slice(0, lessTurn.index);
+      found = true;
+    }
+    // Raft Security Officer: "This ability costs {1} less to activate if it targets a creature with power 3 or less": as the
+    // target is when the cost is worked out (CR 601.2f).
+    const lessTarget = / This ability costs \{(\d+)\} less to activate if it targets (?:an? )?([^.]+)\.$/.exec(effectText);
+    if (lessTarget && !costLess && !costLessIf && !costLessIfTarget) {
+      const filter = parseTargetPhrase(lessTarget[2]!);
+      if (filter?.kind !== "object") return "fail";
+      costLessIfTarget = { n: Number(lessTarget[1]), filter: { ...filter, text: lessTarget[2]! } };
+      effectText = effectText.slice(0, lessTarget.index);
       found = true;
     }
     // "Spend only mana of the chosen color to activate this ability." (Throne of Eldraine): the color chosen as it entered.
@@ -475,7 +496,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
-  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).
@@ -586,6 +607,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(costLess ? { costLess } : {}),
     ...(costMore ? { costMore } : {}),
     ...(costLessIf ? { costLessIf } : {}),
+    ...(costLessIfTarget ? { costLessIfTarget } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(/Pay life equal to the number of colors in your commanders' color identity/.test(costs) ? { lifeCostIdentity: true as const } : {}),

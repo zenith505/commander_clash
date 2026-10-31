@@ -362,6 +362,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             const pool = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
             const n = nFor[pid] ?? 0;
             for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+            // Fall: the cards revealed, of which only those matching are discarded.
+            if (e.ofRevealed) {
+              if (picked.length) log(s, `${player(s, pid).name} reveals ${picked.map((id) => defOf(s, obj(s, id)).name).join(" and ")} at random from their hand.`);
+              return [pid, picked.filter((id) => printedMatches(e.ofRevealed!, defOf(s, obj(s, id))))];
+            }
             return [pid, picked];
           }),
         ));
@@ -451,7 +456,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.found) {
         // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
-        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        // Never Happened: the graveyard's cards too, after the hand's.
+        const pool = e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
+        const cards = pool.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
         s.resolving!.exiledFromHandCards = [];
         // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
@@ -460,10 +467,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const kind = e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
         const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
         return "paused";
       }
-      const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
+      const ids = sc.found.filter((id) => (obj(s, id).zone === "hand" || (e.orGraveyard && obj(s, id).zone === "graveyard")) && obj(s, id).owner === pid);
       s.resolving!.tookFromHand = ids.length;
       if (e.action === "name") {
         // Lobotomy: "you choose a card other than a basic land card from it. Search ... for all cards with the same name as
@@ -506,7 +513,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       else
         for (const id of ids) {
-          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand${me ? ` until ${src} leaves the battlefield` : ""}.`);
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s ${obj(s, id).zone}${me ? ` until ${src} leaves the battlefield` : ""}.`);
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
@@ -515,6 +522,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           (s.resolving!.exiledCards ??= []).push(id);
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
+          // Covetous Urge: "You may cast that card for as long as it remains exiled" (not a land: "cast").
+          if (e.youMay) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
           // "It becomes plotted" (CR 702.170c): cast without paying its mana cost on a later turn (702.170d).
           if (e.plot) {
@@ -723,7 +732,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const cards = lib.library.slice(0, n);
         // "Look at the top card of your library" (Brutal Deceiver): the player sees it; with more asked for, one card
         // has nothing to order.
-        const look = n === 1 && cards.length === 1;
+        const look = (n === 1 && cards.length === 1) || (!!e.lookOnly && cards.length > 0);
         if (cards.length < 2 && !look) return;
         s.pending = { kind: "arrangeTop", player: ctx.controller, how: e.mayBottom ? "scry" : look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
         return "paused";
@@ -738,6 +747,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const looked = new Set(arranged.top);
       lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
+      if (e.lookOnly && looked.size > 1) return void log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       if (looked.size === 1) return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;
@@ -1834,12 +1844,17 @@ function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec
 }
 
 /**
- * Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn", and how many times
- * each surveilled (TurnLog.surveilled): true for a player's first surveil this turn.
+ * Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn", and who
+ * surveilled (TurnLog.surveilled): true for a player's first surveil this turn (Whispering Snitch).
  */
 function noteScried(s: GameState, player: PlayerId, how: "scry" | "surveil"): boolean {
   const log = (s.turnLog ??= {});
-  const first = how === "surveil" && ((log.surveilled ??= {})[player] = (log.surveilled[player] ?? 0) + 1) === 1;
+  // Darkblade Agent: "As long as you've surveilled this turn": surveilling only (CR 701.25).
+  const first = how === "surveil" && !(log.surveilled ??= []).includes(player);
+  if (first) {
+    log.surveilled!.push(player);
+    invalidateCharacteristics(s);
+  }
   if ((log.scried ??= []).includes(player)) return first;
   log.scried.push(player);
   invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)

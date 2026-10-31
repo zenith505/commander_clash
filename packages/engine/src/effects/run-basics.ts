@@ -11,7 +11,7 @@ import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { evalAmount } from "../amounts";
 import { fireEvent } from "./triggers";
-import { bindChosen, objectMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
@@ -669,7 +669,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.ofPlayer && of === undefined) return;
       const chosen = e.exceptChosen ? objects(s, { ref: "created" }, ctx)[0] : undefined;
       // "Of that quality" (Twins of Discord): the choice made as it resolved.
-      const filter = bindChosen(of !== undefined ? { ...e.filter, controlledBy: of } : e.filter, ctx.chosen);
+      // Rumbling Ruin: "with power less than or equal to that number", counted now (CR 608.2h).
+      const filter0 = bindChosen(of !== undefined ? { ...e.filter, controlledBy: of } : e.filter, ctx.chosen);
+      const filter = filter0.bound ? bindBound(s, filter0, amountCtx(s, ctx)) : filter0;
       (s.cantBlockThisTurn ??= []).push({ filter, controller: ctx.controller, ...(chosen ? { except: { id: chosen.id, zc: chosen.zoneChanges ?? 0 } } : {}) });
       log(s, `${of !== undefined ? `${chosen ? "Other c" : "C"}reatures ${player(s, of).name} controls` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)}`} can't block this turn.`);
       return;

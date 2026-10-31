@@ -120,16 +120,18 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who?.ref === "target" ? [{ type: "controlPlayer", who, controller: { ref: "you" } }] : null;
   }
   // Skipping (CR 614.10): "Target player skips their next combat phase", "You skip your next two turns", "Skip your next
-  // turn", "... their next combat phase this turn" (Moment of Silence).
+  // turn", "... their next combat phase this turn" (Moment of Silence). Elfhame Sanctuary (at the beginning of your upkeep):
+  // "you skip your draw step this turn", the one still to come this turn (none once it's begun, or on another's turn).
   // Ral Zarek, Guest Lecturer: "Target opponent skips their next X turns, where X is ..." (the X filled in by body.ts).
-  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) next (?:(two|three|X) )?(untap step|draw step|combat phase|turn)s?( this turn)?$/i.exec(s))) {
+  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) (?:next (?:(two|three|X) )?(untap step|draw step|combat phase|turn)s?( this turn)?|(draw step)( this turn))$/i.exec(s))) {
+    if (m[6]) [m[4], m[5]] = [m[6], m[7]!];
     if (m[3] === "X" && (!ctx.whereX || m[4] !== "turn" || m[5] || !m[1] || /^you$/i.test(m[1]))) return null;
     const self = !m[1] || /^you$/i.test(m[1]);
     if (!m[1] && m[2] !== "Skip") return null;
     const who = self ? { ref: "you" as const } : parsePlayer(m[1]!, ctx);
     const skips: Record<string, SkipWhat> = { "untap step": "untap", "draw step": "draw", "combat phase": "combat", turn: "turn" };
     const skip = skips[m[4]!.toLowerCase()]!;
-    if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat")) return null;
+    if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat" && !m[6])) return null;
     return [{ type: "skip", who, skip, n: m[3] === "X" ? { count: { kind: "x" } } : m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
   }
   // False Peace, Empty City Ruse: "Target player skips all combat phases of their next turn" (CR 614.10).
@@ -360,6 +362,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Empower Jace (CR 701.71a)
   if ((m = new RegExp(`^Empower Jace ${NUMX}$`, "i").exec(s))) return [{ type: "empowerJace", n: amt(m[1]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"
+  // Rivals' Duel: "Choose two target creatures that share no creature types. Those creatures fight each other." (body.ts
+  // makes it one sentence): the two targets, neither dealing damage if either is illegal (CR 701.14b).
+  if (/^Two target creatures that share no creature types fight each other$/.test(s) && !ctx.targets.length) {
+    const what = parseObject("two target creatures that share no creature types", ctx);
+    return what?.ref === "target" && what.n === 2 ? [{ type: "fight", a: { ref: "target", index: what.index }, b: { ref: "target", index: what.index + 1 } }] : null;
+  }
   // "Choose target creature you control and target creature you don't control. ... Then those creatures fight each other"
   // (Tail Swipe): the two targets, neither dealing damage if either is illegal (CR 701.14b).
   if (/^(?:Then )?[Tt]hose creatures fight each other$/.test(s)) {
@@ -476,6 +484,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     // Consuming Ferocity: "it deals damage equal to its power to its controller", the enchanted creature, to whoever controls it.
     if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^its controller$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "hostController" }, by: "attached" }];
+    // Bind the Monster: "Enchanted creature deals damage equal to its power to you" (reworded from "It deals damage to you
+    // equal to its power"): from that creature, to the Aura's controller.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^you$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "you" }, by: "attached" }];
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     // "... to any other target" (Special Move): not that creature (CR 115.3).
     if (a?.ref === "target" && !a.n && /^any (?:other )?target$/i.test(m[2]!)) {
@@ -736,6 +747,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Counter target ((?:white|blue|black|red|green) spell) unless that spell's controller pays ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);
     const options = parsePunisherOptions(`pays ${m[2]} or pays ${m[3]}`, ctx);
+    if (spec?.kind !== "spell" || !options) return null;
+    const index = addTarget(ctx, spec);
+    return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];
+  }
+  // Molten Influence: "Counter target instant or sorcery spell unless its controller has ~ deal 4 damage to them": that
+  // spell's controller decides as it resolves (CR 608.2d).
+  if ((m = /^Counter target (instant or sorcery spell|spell) unless its controller (has ~ deal \d+ damage to them)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    const options = parsePunisherOptions(m[2]!, ctx);
     if (spec?.kind !== "spell" || !options) return null;
     const index = addTarget(ctx, spec);
     return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];

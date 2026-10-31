@@ -68,6 +68,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
+  if (spec.hasAdventure && !(s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
@@ -95,6 +96,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity") return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
+  // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
+  if (spec.controlledSinceTurnBegan && !(o.zone === "battlefield" && o.controlledSinceTurn < s.turn)) return false;
   if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
@@ -181,6 +184,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   }
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
   if (spec.ptUnequal && !(c.types.includes("Creature") && toughness(s, o) !== power(s, o))) return false;
+  if (spec.ptEqual && !(c.types.includes("Creature") && toughness(s, o) === power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
@@ -372,6 +376,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
   if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
+  if (spec.hasAdventure && d.layout !== "adventure") return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;
@@ -405,7 +410,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.ptUnequal || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.ptUnequal || spec.ptEqual || spec.colorOfYourLegend) return false;
   return true;
 }
 
@@ -815,6 +820,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
+  if (spec.damagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.damagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;
   if (spec.lostLifeThisTurn && (t.kind !== "player" || !s.lostLifeThisTurn?.includes(t.id))) return false;
   if (spec.comparedToYou && (t.kind !== "player" || !comparedToYouOk(s, spec.comparedToYou, t.id, controller))) return false;
@@ -888,7 +894,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -913,6 +919,8 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   // Shifting Loyalties: a card type in common, as they are now (CR 205.2a).
   const cardTypes = (x: GameObject) => characteristics(s, x).types.filter((ty) => CARD_TYPES.has(ty));
   if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty)))) return false;
+  // Rivals' Duel: no creature type in common, as they are now.
+  if (others(spec.sharesNoCreatureTypeWith).some((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
 }
 
@@ -1020,7 +1028,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {
@@ -1114,7 +1122,8 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
 export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
-  if (e.anyController && e.action === "counters") return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
+  // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
+  if (e.anyController && (e.action === "counters" || e.action === "bounce")) return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
   // Drop of Honey, Purging Scythe: "the creature with the least power" on the battlefield, anyone's, or tied for it; to be
   // destroyed, one that can be if any of those can (rulings, CR 702.12b).
   if (e.anyController && e.action === "choose" && e.least) {

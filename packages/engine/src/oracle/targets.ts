@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan", "Room"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 const CREATURE_OR_LEGENDARY: TargetSpec[] = [{ kind: "object", types: ["Creature"], text: "creature" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }];
@@ -308,6 +308,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // Wicked Akuba: "target player dealt damage by ~ this turn": any damage, combat or not.
+  if (x === "target player dealt damage by ~ this turn" && ctx.activated && !ctx.spell) {
+    const index = addTarget(ctx, { kind: "player", damagedBySource: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   // Fire and Brimstone: "target player who attacked this turn" (Player.attackedTurn).
   if (x === "target player who attacked this turn") {
     const index = addTarget(ctx, { kind: "player", attackedThisTurn: true, text: x });
@@ -365,6 +371,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
+  // Trial: "all creatures blocking or blocked by target creature": those in combat with the target as this resolves.
+  if (/^all creatures blocking or blocked by target creature$/i.test(p.trim())) return { ref: "inCombatWithSelf", ofTarget: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" }) };
   // Plague Wight: "Whenever ~ becomes blocked, each creature blocking it gets -1/-1 until end of turn"; Trailblazer's
   // Torch: "Whenever equipped creature becomes blocked, it deals 2 damage to each creature blocking it": the creatures
   // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
@@ -410,6 +418,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Winter Blast: "Tap X target creatures. ~ deals 2 damage to each of those creatures with flying."
   const withKw = /^each of those creatures with (flying|reach|trample|haste)$/i.exec(x);
   if (withKw && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: ["Creature"], keywords: [withKw[1]!.charAt(0).toUpperCase() + withKw[1]!.slice(1).toLowerCase()], text: `creature with ${withKw[1]!.toLowerCase()}` } };
+  // Blow Your House Down: "Up to three target creatures can't block this turn. Destroy any of them that are Walls.": only
+  // the targets of that subtype as it resolves.
+  const thatAre = /^any of them that are ([A-Z][a-z]+)s$/.exec(x);
+  if (thatAre && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: [], subtypes: [thatAre[1]!], text: thatAre[1]! } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -525,8 +537,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
-  // Fulgent Distraction: "all Equipment attached to them": to each of the creatures targeted before.
-  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature|them)$/i.exec(x) : null;
+  // Fulgent Distraction: "all Equipment attached to them": to each of the creatures targeted before. Scarab of the Unseen:
+  // "all Auras attached to target permanent you own".
+  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature|target permanent you own|them)$/i.exec(x) : null;
   if (attachedTarget) {
     const t = parseObjectNow(attachedTarget[2]!, ctx, cards);
     if (t?.ref !== "target" || (t.n && attachedTarget[2] !== "them") || t.sameName || t.sharesColor || t.attachedToo) return null;
@@ -641,6 +654,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const amount = parseCount("the greatest power among creatures on the battlefield", ctx);
     if (amount?.count.kind !== "greatestPower") return null;
     return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], bound: { key: "power", at: "least", amount }, text: `target ${m[1]!}` }) };
+  }
+  // Culling Scales: "target nonland permanent with the lowest mana value": one tied for the lowest among nonland permanents,
+  // as it's chosen and as it resolves (CR 608.2b), as a bound of at most that mana value.
+  if (!cards && /^nonland permanent with the lowest mana value$/i.test(m[1]!)) {
+    const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonland permanent" };
+    const amount: AmountExpr = { count: { kind: "greatestManaValue", filter, least: true } };
+    return { ref: "target", index: addTarget(ctx, { ...filter, bound: { key: "manaValue", at: "most", amount }, text: `target ${m[1]!}` }) };
   }
   // Keeper of the Dead, The Fall of Kroog: "Choose target opponent. Destroy target land that player controls.": controlled
   // by the player an earlier target chose, as it's chosen and as it resolves (CR 608.2b; TargetSpec.controlledByTarget).
@@ -789,6 +809,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const diffCtl = n > 1 && !many && / controlled by different players$/.test(mine0);
   // Shifting Loyalties: "two target permanents that share a card type": each sharing one with the other (CR 205.2a).
   const shareCard = n > 1 && !many && / that share a card type$/.test(mine0);
+  // Rivals' Duel: "two target creatures that share no creature types": each sharing none with the other.
+  const shareNone = n > 1 && !many && / that share no creature types$/.test(mine0);
   // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
@@ -798,7 +820,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Any number of target creatures with equal toughness" (V.A.T.S.).
   const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
+  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that share no creature types$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
   // "Up to three target creatures with toughness X or less" (Finale of Eternity): each one, with the spell's X.
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
@@ -852,7 +874,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...(differ && k ? { differentNameFrom: group } : {}),
       ...(diffCtl ? { differentControllerFrom: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
       ...(shareCard ? { sharesCardTypeWith: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
-      ...(single || share || differ || diffCtl || shareCard ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}${diffCtl ? " controlled by a different player" : ""}${shareCard ? " sharing a card type" : ""}` } : {}),
+      ...(shareNone ? { sharesNoCreatureTypeWith: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
+      ...(single || share || differ || diffCtl || shareCard || shareNone ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}${diffCtl ? " controlled by a different player" : ""}${shareCard ? " sharing a card type" : ""}${shareNone ? " sharing no creature type with the other" : ""}` } : {}),
     });
   }
   // "It" can't mean one of several; "they" / "those creatures" means all of them.
@@ -1251,7 +1274,8 @@ export function parseTargetPhrase(
     p = p.slice(0, atLeastChosen.index);
     phrase = phrase.trim().slice(0, atLeastChosen.index);
   }
-  const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
+  // Master Symmetrist: "with power equal to its toughness" is its own comparison (TargetSpec.ptEqual, below), not an amount.
+  const bound0 = / with power equal to its toughness$/i.test(phrase.trim()) ? null : / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
   const amount0 = bound0 ? opts.count?.(from0 ? bound0[4]!.slice(0, from0.index) : bound0[4]!) : null;
   const bound = bound0 && (amount0 || !bound0[2] || bound0[3]) ? bound0 : null;
@@ -1605,6 +1629,10 @@ export function parseTargetPhrase(
   // "Another creature you control with base power 1" (Rapid Augmenter).
   if ((m = / with base power (\d+)$/.exec(p))) {
     extra.basePower = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
+  if ((m = / with power equal to its toughness$/.exec(p))) {
+    extra.ptEqual = true;
     p = p.slice(0, m.index);
   }
   if ((m = / whose power and toughness aren't equal$/.exec(p))) {

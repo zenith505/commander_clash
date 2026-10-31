@@ -144,6 +144,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   s.players[first]!.turnsTaken = 1;
   s.lifeAsTurnBegan = s.players.map((p) => p.life);
   for (const p of s.players) draw(s, p.id, 7);
+  s.handAsTurnBegan = s.players.map((p) => p.hand.length);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   for (const p of s.players) delete p.draws;
   log(s, `Game start. ${s.players[first]!.name} goes first.`);
@@ -690,6 +691,8 @@ export function moveObject(
     sacrificed?: boolean;
     /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
     destroyedBy?: PlayerId;
+    /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
+    exploitedBy?: { id: ObjectId; zc: number };
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1191,7 +1194,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -3018,9 +3021,22 @@ function startNextTurn(s: GameState, skipping = false) {
   s.turn++;
   s.monarchAsTurnBegan = s.monarch;
   s.lifeAsTurnBegan = s.players.map((p) => p.life);
+  s.handAsTurnBegan = s.players.map((p) => p.hand.length);
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  // Wall of Dust: "can't attack during its controller's next turn": this is that turn, for the same object (CR 400.7).
+  if (s.cantAttackNextTurn) {
+    for (const b of s.cantAttackNextTurn) {
+      const o = s.objects[b.id];
+      if (b.player !== ap.id || s.turn <= b.since || o?.zone !== "battlefield" || (o.zoneChanges ?? 0) !== b.zc) continue;
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: b.player, sourceName: defOf(s, o).name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "cantAttack" }] });
+      invalidateCharacteristics(s);
+    }
+    // Done with, or about an object that has left (a new object, CR 400.7).
+    s.cantAttackNextTurn = s.cantAttackNextTurn.filter((b) => s.objects[b.id]?.zone === "battlefield" && (s.objects[b.id]!.zoneChanges ?? 0) === b.zc && !(b.player === ap.id && s.turn > b.since));
+    if (!s.cantAttackNextTurn.length) s.cantAttackNextTurn = undefined;
+  }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
   // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
@@ -3221,9 +3237,11 @@ function beginStep(s: GameState, step: Step): void {
       return untapStep(s, []);
     }
     case "upkeep": {
+      // Eon Hub: "Players skip their upkeep steps" replaces the whole step (CR 614.10): nothing triggers "at the beginning
+      // of the upkeep", and abilities that triggered in the untap step go on the stack in the draw step (rulings).
       // "Skip your upkeep step if you have no cards in hand" (Gibbering Descent): checked as it would start (rulings); the
       // whole step is replaced (CR 614.10), so "until your next upkeep" effects go on to the next one that happens.
-      if (!player(s, ap).hand.length && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).skipUpkeepIfHellbent)) {
+      if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUpkeepSteps) || (!player(s, ap).hand.length && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).skipUpkeepIfHellbent))) {
         log(s, `${player(s, ap).name} skips their upkeep step.`);
         return advanceStep(s);
       }
@@ -4938,7 +4956,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
       const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
-      const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
+      const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -7092,9 +7110,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !ab.costLessIfTarget && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
   let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
+  // Raft Security Officer: "if it targets a creature with power 3 or less", as that target is now.
+  const lessAim = ab.costLessIfTarget && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
+  if (lessAim && objectMatches(s, ab.costLessIfTarget!.filter, lessAim, pid, false)) less += ab.costLessIfTarget!.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
   const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
@@ -7698,6 +7719,8 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   if ((pend.how === "order" || pend.how === "bottom" || pend.how === "look") && away.length) throw new RulesError(pend.how === "bottom" ? "put them all on the bottom" : "put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
+  // Visions: "Look at the top five cards": only looked at, so they stay in the order they were in.
+  if (pend.how === "look" && top.some((id, i) => id !== pend.cards[i])) throw new RulesError("leave them in the order they were in");
   r.scratch = { ...r.scratch, arranged: { top, away } };
   s.pending = null;
   continueResolution(s);
@@ -10823,7 +10846,8 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   if (megamorph) putCounters(s, o, "+1/+1", 1);
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
   const up = compileCard(d).faceUpCounters;
-  if (up) putCounters(s, o, up.counter, up.n);
+  // Crowd-Control Warden: "put X +1/+1 counters on it, where X is the number of other creatures you control", counted then.
+  if (up) putCounters(s, o, up.counter, typeof up.n === "number" ? up.n : Math.max(0, evalAmount(s, up.n, { controller: controllerOf(s, o), sourceId: o.id })));
   fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}), ...(by !== undefined ? { by } : {}) });
 }
 

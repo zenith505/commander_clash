@@ -5008,6 +5008,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5d144825-594a-454b-9276-fe92e87c19c0",
+  "name": "Drake Familiar",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Drake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Drake"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, sacrifice it unless you return an enchantment to its owner's hand.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "81338d64-8fc3-41ac-afc8-e2a79df1159b",
   "name": "Dream Cache",
   "manaCost": "{2}{U}",
@@ -8585,6 +8617,32 @@
   "set": "10e",
   "releasedAt": "2007-07-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eb4188bb-62df-4309-bde1-f66318fe2f05",
+  "name": "Honor of the Pure",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "White creatures you control get +1/+1.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12660,6 +12718,32 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ec4a1a8d-4071-40e9-812e-42c746180d99",
+  "name": "Never Happened",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose a nonland card from that player's graveyard or hand and exile it.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20388,6 +20472,32 @@
   "set": "bbd",
   "releasedAt": "2018-06-08",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "448fa4e3-7269-446b-8089-675bc1bff5f9",
+  "name": "Visions",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of target player's library. You may then have that player shuffle that library.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

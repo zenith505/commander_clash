@@ -691,6 +691,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.damagedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "playerDamagedThisWay"
             ? (s.resolving!.playersDamagedThisWay ?? []).length > 0
+            : e.cond.kind === "playerMoreLifeThanYou"
+            ? ((who) => players(s, who, ctx).some((pid) => player(s, pid).life > player(s, ctx.controller).life))(e.cond.who)
+            : e.cond.kind === "subjectExploitedBySelf"
+            ? !!ctx.lki?.exploitedBy && ctx.lki.exploitedBy.id === ctx.sourceId && (ctx.sourceZc === undefined || ctx.lki.exploitedBy.zc === ctx.sourceZc)
             : e.cond.kind === "subjectWasAttacking"
             ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
             : e.cond.kind === "causeSpellIs"
@@ -1194,7 +1198,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 }
 
 /** "Lose 3 life" in the middle of a sentence, but not "Ana may draw a card". */
-const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+const lowerFirst = (t: string) => (/^(?:Lose|Take|Let) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
 function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number; losesSource?: true } {

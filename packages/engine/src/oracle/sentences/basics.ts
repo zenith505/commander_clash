@@ -289,6 +289,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (p.options.some((o) => "pay" in o) || p.options.filter((o) => "sacrifice" in o).length > 1) return null;
     return [{ ...p, picks: { count: { kind: "counters", counter: m[1]!, of: { ref: "self" } } } }];
   }
+  // Keldon Twilight: "that player sacrifices a creature of their choice that they controlled since the beginning of the
+  // turn": only such a creature (none, nothing sacrificed).
+  if (/^[Tt]hat player sacrifices a creature of their choice that they controlled since the beginning of the turn$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    return who ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controlledSinceTurnBegan: true, text: "creature they controlled since the beginning of the turn" }, n: 1, action: "sacrifice" }] : null;
+  }
   // Martyr's Bond: "each opponent sacrifices a permanent of their choice that shares a card type with it": the permanent
   // the trigger is about, its card types as it last existed (one permanent of any of them, rulings).
   if (/^[Ee]ach opponent sacrifices a permanent of their choice that shares a card type with it$/.test(s) && (ctx.subject || ctx.subjectIt))
@@ -392,6 +398,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = { ref: "blockHistory" as const, of, blocked: true as const, ...(m[1] === "blocked or were blocked by" ? { blockers: true as const } : {}) };
     return [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what }], text: `destroy all creatures that ${m[1]} it this turn` }];
   }
+  // Heat Stroke: "At end of combat, destroy each creature that blocked or was blocked this turn": every creature still on
+  // the battlefield that was declared as a blocker this turn or that a blocker was declared to block (CR 509.1), whatever
+  // has happened since (TurnLog.blocks).
+  if (/^[Dd]estroy each creature that blocked or was blocked this turn$/.test(s)) return [{ type: "destroy", what: { ref: "blockHistory", of: { ref: "self" }, anyone: true, blockers: true, blocked: true } }];
   // Erosion (as the host-controller trigger reads it): "destroy enchanted land unless that player pays {1} or 1 life": that
   // player decides as it resolves (CR 608.2d); the land as the Aura last existed if it has left (CR 608.2h).
   if ((m = /^[Dd]estroy (enchanted (?:land|artifact|creature)) unless that player (pays .+)$/.exec(s))) {
@@ -412,8 +422,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Rhystic Deluge: "Tap target creature unless its controller pays {1}", Excise: "Exile target attacking creature unless its
   // controller pays {X}", Plague Fiend: "destroy that creature unless its controller pays {2}" (the creature it dealt combat
   // damage to): that creature's controller decides as it resolves (CR 608.2d), as it last existed if it has left.
-  // Crystal Shard: "Return target creature to its owner's hand unless its controller pays {1}".
-  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile|[Rr]eturn) (target (?:attacking )?creature|that creature)( to its owner's hand)? unless its controller (pays (?:\{[^}]+\})+)$/.exec(s)) && !m[3] === !/^[Rr]eturn$/.test(m[1]!)) {
+  // Crystal Shard: "Return target creature to its owner's hand unless its controller pays {1}"; Withdraw: "Then return
+  // another target creature to its owner's hand unless its controller pays {1}".
+  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile|[Rr]eturn) ((?:another )?target (?:attacking )?creature|that creature)( to its owner's hand)? unless its controller (pays (?:\{[^}]+\})+)$/.exec(s)) && !m[3] === !/^[Rr]eturn$/.test(m[1]!)) {
     const target = m[2] !== "that creature";
     if (!target && !ctx.subjectIt) return null;
     const before = ctx.targets.length;
@@ -422,7 +433,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || fx.length !== 1 || !options || ctx.targets.length !== before + (target ? 1 : 0)) return null;
     const what = "what" in fx[0]! ? fx[0]!.what : undefined;
     if (!what || what.ref !== (target ? "target" : "subject")) return null;
-    return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx }];
+    // The payer's prompt: "pay {1} or let Withdraw return it to its owner's hand".
+    const penalty = `Let ~ ${m[1]!.toLowerCase()} it${m[3] ?? ""}`;
+    return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx, penalty }];
   }
   // Combustion Man: "destroy target permanent unless its controller has ~ deal damage to them equal to ~'s power": that
   // permanent's controller decides as it resolves (CR 608.2d), and ~ deals the damage.
@@ -432,6 +445,25 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[2]!, ctx);
     if (fx?.length !== 1 || fx[0]!.type !== "destroy" || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: "Let ~ destroy it" }];
+  }
+  // Skullcage (at the beginning of each opponent's upkeep): "~ deals 2 damage to that player unless they have exactly three
+  // or exactly four cards in hand": the hand counted as it resolves, not as it triggers (rulings).
+  if ((m = /^(~ deals \d+ damage to that player) unless they have exactly (\w+) or exactly (\w+) cards in hand$/.exec(s)) && ctx.eventPlayer && num(m[3]!) === num(m[2]!) + 1) {
+    const fx = parseSentence(m[1]!, ctx);
+    const amount = parseCount("cards in that player's hand", ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "damage" || !amount) return null;
+    return [{ type: "if", cond: { kind: "amountNow", amount, min: num(m[2]!), max: num(m[3]!) }, effects: [], otherwise: fx }];
+  }
+  // Dwarven Driller: "Destroy target land unless its controller has ~ deal 2 damage to them" (Lava Blister: "target
+  // nonbasic land ... 6 damage"), Blazing Salvo: "~ deals 3
+  // damage to target creature unless that creature's controller has ~ deal 5 damage to them": that permanent's controller
+  // decides as it resolves (CR 608.2d), as it last existed if it has left (608.2h).
+  if ((m = /^([Dd]estroy target (?:nonbasic )?land|~ deals \d+ damage to target creature) unless (?:its|that creature's) controller (has ~ deal \d+ damage to them)$/.exec(s)) && (/^[Dd]estroy/.test(m[1]!) || /that creature's/.test(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(capital(m[1]!), ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (fx?.length !== 1 || (fx[0]!.type !== "destroy" && fx[0]!.type !== "damage") || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: fx[0]!.type === "destroy" ? "Let ~ destroy it" : `Let ~ ${m[1]!.replace(/^~ deals (\d+) damage to target creature$/, "deal $1 damage to it")}` }];
   }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
@@ -676,6 +708,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (it?.ref !== "subject") return null;
     return [{ type: "delayed", when: "endOfCombat", each: "subject", withSource: true, effects: [{ type: "bounce", what: { ref: "subject" } }, { type: "bounce", what: { ref: "self" } }], text: "return it and ~ to their owners' hands" }];
   }
+  // Goblin Sappers: "{R}{R}, {T}: Target creature you control can't be blocked this turn. Destroy it and ~ at end of
+  // combat": one delayed trigger about the target and ~, each as it is now (CR 603.7c, 400.7); ~ is destroyed even if the
+  // creature has left by then.
+  if (/^[Dd]estroy it and ~ at end of combat$/.test(s) && ctx.activated && !ctx.spell && ctx.targets.length === 1 && ctx.lastObjectTarget === 0 && ctx.targets[0]!.kind === "object") {
+    const it = parseObject("it", ctx);
+    if (it?.ref !== "target" || it.index !== 0) return null;
+    return [{ type: "delayed", when: "endOfCombat", of: it, withSource: true, effects: [{ type: "destroy", what: { ref: "subject" } }, { type: "destroy", what: { ref: "self" } }], text: "destroy it and ~" }];
+  }
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);
@@ -759,6 +799,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
     const effects = JSON.parse(JSON.stringify(inner).replace(/\{"ref":"self"\}/g, '{"ref":"subject"}')) as Effect[];
     return [{ type: "delayed", when, effects, text: m[1]! }];
+  }
+  // Magmasaur: "If you don't, sacrifice ~ and it deals damage equal to the number of +1/+1 counters on ~ to each creature
+  // without flying and each player": then ~ deals it as it last existed (CR 608.2h), its counters too.
+  if ((m = /^sacrifice ~ and it deals (.+)$/i.exec(s)) && !ctx.targets.length) {
+    const dealt = parseSentence(`~ deals ${m[1]!}`, ctx);
+    if (!dealt?.length || ctx.targets.length || dealt.some((e) => e.type !== "damage")) return null;
+    return [sacrificeSelf, ...dealt];
   }
   // Uro: "When ~ enters, sacrifice it unless it escaped" (CR 702.138b): whether it escaped can't change.
   if (/^[Ss]acrifice (?:~|it) unless (?:it|~) escaped$/.test(s) && ctx.selfIt && ctx.lastObjectTarget === undefined)
@@ -911,6 +958,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !filter) return null;
     return [{ type: "punisher", who, options: [{ discard: 1, filter }], effects: [{ type: "discard", who: { ref: "punished" }, n: num(m[2]!) }] }];
   }
+  // Fall: "Target player reveals two cards at random from their hand, then discards each nonland card revealed this way."
+  // (body.ts keeps it one sentence): those cards revealed, then only the nonland ones discarded.
+  if ((m = /^(Target player|Target opponent) reveals (two|three) cards at random from their hand and discards each (nonland|land|creature|noncreature) card revealed this way$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = parseSearchFilter(`${m[3]} card`);
+    return who && filter ? [{ type: "discard", who, n: num(m[2]!), random: true, ofRevealed: filter }] : null;
+  }
   // Highway Robbery: "You may discard a card or sacrifice a land. If you do, ...": one or the other, as it resolves, only
   // one that can be done (rulings).
   // "You may sacrifice an artifact or discard a card. If you do, ..." (Vision of Love, K'un-Lun Warrior), "sacrifice a
@@ -957,6 +1011,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
+  }
+  // Drake Familiar: "sacrifice it unless you return an enchantment to its owner's hand": any enchantment on the
+  // battlefield, anyone's (not targeted); with none, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you return an? ([a-z]+) to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!);
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", anyController: true }], otherwise: [sacrificeSelf], keep: true, text: `Return ${/^[aeiou]/.test(m[2]!) ? "an" : "a"} ${m[2]} to its owner's hand to keep ~` }];
   }
   // Junk Golem: "sacrifice ~ unless you remove a +1/+1 counter from it": removing one keeps it; with none, or choosing not
   // to, it's sacrificed.

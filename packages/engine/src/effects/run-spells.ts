@@ -186,6 +186,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
             // Mysterio, Master of Illusion: "when ~ leaves the battlefield", for whatever zone it goes to (CR 603.6c).
             if (e.when === "leaves") s.delayed![s.delayed!.length - 1]!.to = ["graveyard", "exile", "hand", "library", "command"];
+            // Goblin Sappers: "destroy it and ~": ~ as it is now, too; if it left, it's a new object (CR 400.7).
+            const me = e.withSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            if (me) s.delayed![s.delayed!.length - 1]!.source = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           }
         return;
       }
@@ -1276,5 +1279,6 @@ export function addDelayed(s: GameState, when: DelayedTrigger["when"], controlle
 /** Was it kicked (CR 702.33d), with that kicker cost if the condition names one (702.33f)? */
 export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition): boolean {
   if (cond.kind !== "kicked") return false;
+  if (cond.times) return (kicked?.length ?? 0) >= cond.times;
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
 }

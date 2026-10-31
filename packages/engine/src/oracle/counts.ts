@@ -148,7 +148,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
   // Reign of the Pit: "the total power of the creatures sacrificed this way".
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
-  if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).
+  if (ctx && !(each && ctx.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  // Rise of the Deathbringer: "Draw cards equal to ... You lose life equal to the number of cards drawn this way": those
+  // really drawn (a replaced draw isn't one, CR 121.6).
+  if (!each && /^the number of cards drawn this way$/i.test(p)) return { count: { kind: "drawnThisWay" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
@@ -238,6 +242,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!a || a.times || a.plus || a.half || a.negate || filter?.kind !== "card") return null;
     return { count: { kind: "greater", of: [a.count, { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...filter, text: m[2]!.replace(/cards$/, "card") }, greatestPower: true }] } };
   }
+  // Freelance Muscle: "the greatest power and/or toughness among other creatures you control": the greatest of all those
+  // powers and toughnesses, 0 with none.
+  if (!each && (m = /^the greatest power or toughness among (.+)$/.exec(p))) {
+    const a = parseCount(`the greatest power among ${m[1]}`, ctx);
+    const b = parseCount(`the greatest toughness among ${m[1]}`, ctx);
+    if (!a || !b || a.times || a.plus || a.half || a.negate || b.times || b.plus || b.half || b.negate) return null;
+    return { count: { kind: "greater", of: [a.count, b.count] } };
+  }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
@@ -322,6 +334,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // Hapatra, the Desert Fang: "the greatest mana value among cards in your graveyard", 0 with none.
+  // Inferno Project: "the total mana value of instant and sorcery cards in your graveyard": a split card's halves added (CR 709.4).
+  if (!each && /^the total mana value of instant and sorcery cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, totalMv: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   if (!each && /^the greatest mana value among cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, greatestMv: true } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   // Emissary Escort: "the greatest mana value among other artifacts you control", the source left out.
@@ -573,6 +587,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     ctx.lastPlayerTarget = i;
     return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: i } });
   }
+  // Final Punishment: "Target player loses life equal to the damage already dealt to that player this turn": by any
+  // source, what was really dealt.
+  if (!each && ctx && /^the damage already dealt to that player this turn$/i.test(p) && ctx.lastPlayerTarget !== undefined) return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: ctx.lastPlayerTarget } });
   // Cryptborn Horror: "where X is the total life lost by your opponents this turn", the same total.
   if (each ? /^1 life your opponents have lost this turn$/i.test(p) : (/^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p) || /^the total life lost by your opponents this turn$/i.test(p))) return count({ kind: "opponentsLifeLost" });
   // Inquisition: "the number of white cards in their hand" (revealed just before).
@@ -684,6 +701,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
+  // Karn, Gilded Guardian: "for each color among other artifacts you control".
+  if ((m = /^colou?rs? among (other )?(artifacts|creatures|enchantments) you control$/i.exec(p)))
+    return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [capital(m[2]!.slice(0, -1)) as "Artifact"], notTypes: [], notColors: [], controller: "you", text: `${m[2]} you control` }, ...(m[1] ? { other: true as const } : {}) });
   // Earthen Ally: "for each color among Allies you control" (itself included).
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
@@ -769,6 +789,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
     return of && count({ kind, of });
+  }
+  // Whipkeeper: "~ deals damage to target creature equal to the damage already dealt to it this turn".
+  if (/^the damage already dealt to it this turn$/.test(p)) {
+    const of = whoseObject("its", ctx);
+    return of?.ref === "target" ? count({ kind: "damageDealtToThisTurn", of }) : null;
   }
   // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
   // (rulings).

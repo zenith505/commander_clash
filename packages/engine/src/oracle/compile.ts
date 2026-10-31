@@ -1470,7 +1470,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked." Part of how it enters, not a trigger
     // (rulings, CR 614.1c), its kicker costs counted (CR 702.33d).
-    const millKicked = /^As ~ enters, mill (two|three|four) cards for each time it was kicked\.$/.exec(line);
+    // Monstrous War-Leech: "As ~ enters, if it was kicked, mill four cards": the same, with a kicker paid at most once (CR
+    // 702.33a), so mill four or none.
+    const millKicked = /^As ~ enters, mill (two|three|four) cards for each time it was kicked\.$/.exec(line) ?? (!d.keywords.includes("Multikicker") ? /^As ~ enters, if it was kicked, mill (two|three|four) cards\.$/.exec(line) : null);
     if (millKicked && d.keywords.includes("Kicker") && !isSpell) {
       out.entersMillPerKick = num(millKicked[1]!);
       continue;
@@ -1717,10 +1719,12 @@ export function compile(d: CardDef): CompiledCard {
     // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
     // Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.": an additional cost with an X
     // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
-    const sacFor = /^As an additional cost to cast ~, you may sacrifice any number of ([A-Z][a-z]+)\.$/.exec(line);
-    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `))) {
+    // Vicious Betrayal: "sacrifice any number of creatures" (none too, CR 601.2b), then "Target creature gets +2/+2 until
+    // end of turn for each creature sacrificed this way."
+    const sacFor = /^As an additional cost to cast ~, (?:you may )?sacrifice any number of ([A-Z][a-z]+|creatures)\.$/.exec(line);
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `) || l.includes(` for each ${singularWord(sacFor[1]!)} sacrificed this way.`))) {
       const spec = parseTargetPhrase(singularWord(sacFor[1]!));
-      if (spec?.kind !== "object" || !spec.subtypes?.length) out.unsupported.push(raw);
+      if (spec?.kind !== "object" || (sacFor[1] === "creatures" ? spec.subtypes?.length || spec.types?.length !== 1 || spec.types[0] !== "Creature" : !spec.subtypes?.length) || spec.controller) out.unsupported.push(raw);
       else {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacFor[1]!) }, n: 0, x: true, optional: true });
         costSacrificedX = singularWord(sacFor[1]!);
@@ -2494,6 +2498,19 @@ export function compile(d: CardDef): CompiledCard {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
       continue;
     }
+    // Crowd-Control Warden: "As ~ enters or is turned face up, put X +1/+1 counters on it, where X is the number of other
+    // creatures you control": a replacement both ways (CR 614.1c, 614.1e), counted as it enters or is turned face up; a
+    // face-down permanent has no abilities as it enters (CR 708.2).
+    const bothWays = new RegExp(`^As ~ enters or is turned face up, put X ${COUNTER} counters on it, where X is (.+)\\.$`).exec(line);
+    if (bothWays) {
+      const def = parseCount(bothWays[2]!, null);
+      if (!def || out.entersWithCounters || out.faceUpCounters) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: counterKind(bothWays[1]!), n: def };
+        out.faceUpCounters = { counter: counterKind(bothWays[1]!), n: def };
+      }
+      continue;
+    }
     const faceUpCounters = new RegExp(`^As ~ is turned face up, put ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
     if (faceUpCounters && !out.faceUpCounters) {
       out.faceUpCounters = { counter: counterKind(faceUpCounters[2]!), n: num(faceUpCounters[1]!) };
@@ -3167,6 +3184,10 @@ export function compile(d: CardDef): CompiledCard {
       out.skipUntapSteps = true;
       continue;
     }
+    if (line === "Players skip their upkeep steps.") {
+      out.skipUpkeepSteps = true;
+      continue;
+    }
     // Teamwork N: "As an additional cost to cast this spell, you may tap any number of creatures you control with total
     // power N or more." (The keyword's reminder text is all the rules there are for it.)
     const teamwork = /^Teamwork (\d+)$/.exec(line);
@@ -3711,6 +3732,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: counterKind(ewcIfTwo[3]!), n: num(ewcIfTwo[2]!), if: cond, also: { counter: counterKind(ewcIfTwo[5]!), n: num(ewcIfTwo[4]!) } };
       continue;
     }
+    // Sheriff of Safe Passage: "~ enters with a +1/+1 counter on it plus an additional +1/+1 counter on it for each other
+    // creature you control": one more than that count, counted as it enters.
+    line = line.replace(/^~ enters with a \+1\/\+1 counter on it plus an additional \+1\/\+1 counter on it for each other creature you control\.$/, "~ enters with X +1/+1 counters on it, where X is one plus the number of other creatures you control.");
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?)| unless (you've cast another (?:white|blue|black|red|green) spell this turn))?\\.$`).exec(line);
     if (ewc) {
@@ -4072,6 +4096,18 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Mishra's Domination: "As long as you control enchanted creature, it gets +2/+2. Otherwise, it can't block.": who
+    // controls it now, checked continuously (CR 611.3a); in a free-for-all game every other player is an opponent.
+    const domination = /^As long as you control enchanted creature, it (gets [+-]\d+\/[+-]\d+)\. Otherwise, it (can't block|can't attack|can't attack or block)\.$/.exec(line);
+    if (domination) {
+      const [a, b] = [parseStatic(`Enchanted creature ${domination[1]}.`), parseStatic(`Enchanted creature ${domination[2]}.`)];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        const yours: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
+        const theirs: TargetSpec = { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yours }, text: line }, { ...b, condition: { kind: "attachedIs", filter: theirs }, text: line });
+        continue;
+      }
+    }
     // Varchild, Betrayer of Kjeldor: "Survivors your opponents control can't block, and they can't attack you or
     // planeswalkers you control": two restrictions on the same group, as two sentences.
     const cantBoth = /^([A-Z][a-z]+s your opponents control) can't block, and they (can't attack you or planeswalkers you control)\.$/.exec(line);
@@ -4111,6 +4147,16 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p0, toughness: t0 }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p1 - p0, toughness: t1 - t0 }], condition: { kind: "completedDungeon" }, text: line });
       continue;
     }
+    // Mind Carver: "Equipped creature gets +1/+0. It gets +3/+1 instead as long as an opponent has eight or more cards in
+    // their graveyard": the same, with the condition the conditional static ability reads.
+    const ptInsteadIf = /^(Enchanted|Equipped) creature gets ([+-])(\d+)\/([+-])(\d+)\. It gets \2(\d+)\/\4(\d+) instead as long as (.+)\.$/.exec(line);
+    const ptInsteadSt = ptInsteadIf ? parseConditionalStatic(`As long as ${ptInsteadIf[8]}, ${ptInsteadIf[1]!.toLowerCase()} creature gets ${ptInsteadIf[2]}${ptInsteadIf[6]}/${ptInsteadIf[4]}${ptInsteadIf[7]}.`) : null;
+    if (ptInsteadIf && ptInsteadSt?.condition && ptInsteadSt.affects.kind === "attached" && ptInsteadSt.mods.length === 1 && ptInsteadSt.mods[0]!.kind === "modifyPT") {
+      const sign = (c: string) => (c === "-" ? -1 : 1);
+      const [p0, t0, p1, t1] = [sign(ptInsteadIf[2]!) * Number(ptInsteadIf[3]), sign(ptInsteadIf[4]!) * Number(ptInsteadIf[5]), sign(ptInsteadIf[2]!) * Number(ptInsteadIf[6]), sign(ptInsteadIf[4]!) * Number(ptInsteadIf[7])];
+      out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p0, toughness: t0 }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p1 - p0, toughness: t1 - t0 }], condition: ptInsteadSt.condition, text: line });
+      continue;
+    }
     // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
     // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
     const byControl = /^Equipped creature has (.+)\.$/.exec(line);
@@ -4140,7 +4186,16 @@ export function compile(d: CardDef): CompiledCard {
     // (rulings); each such ability applies once.
     // Shield of Kaldra: "Equipment named Sword of Kaldra, ~, and Helm of Kaldra have indestructible": by its name too.
     const named = (/^Creatures named ~ /.test(line) || /^Equipment named [^.]*~/.test(line)) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
-    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(named) ?? parseConditionalStatic(named);
+    // Akron Legionnaire: "Except for creatures named ~ and artifact creatures, creatures you control can't attack": each
+    // creature you control that's neither (by its name, CR 201.2, so another one named ~ too).
+    if (line === "Except for creatures named ~ and artifact creatures, creatures you control can't attack.") {
+      out.statics.push({ affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], notTypes: ["Artifact"], notColors: [], notNamed: d.name, text: `nonartifact creature not named ${d.name}` } }, mods: [{ kind: "cantAttack" }], text: line });
+      continue;
+    }
+    // Pipsqueak, Rebel Strongarm: "~ can't attack alone unless ~ has a +1/+1 counter on ~" (the name standing in for "he"
+    // and "him"): as long as it has none.
+    const unlessCounter = /^~ can't attack alone unless ~ has an? (\+1\/\+1) counter on ~\.$/.exec(line);
+    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : unlessCounter ? parseConditionalStatic(`As long as ~ doesn't have a ${unlessCounter[1]} counter on it, it can't attack alone.`) : parseStatic(named) ?? parseConditionalStatic(named);
     if (st) {
       out.statics.push(st);
       continue;
@@ -4159,6 +4214,14 @@ export function compile(d: CardDef): CompiledCard {
     const attachedStatics = attachedParts?.map((p, i) => (i === 0 ? parseStatic(p) : parseConditionalStatic(p.replace(/^As long as it's /, `As long as ${attachedParts[0]!.split(" ")[0]!.toLowerCase()} creature is `))));
     if (attachedStatics?.every((p) => p && p.affects.kind === "attached")) {
       for (const p of attachedStatics) out.statics.push({ ...p!, text: line });
+      continue;
+    }
+    // Bride's Gown: "Equipped creature gets +2/+0. It gets an additional +0/+2 and has first strike as long as an Equipment
+    // named Groom's Finery is attached to a creature you control.": two static abilities, the second with its condition.
+    const extraIf = /^(Equipped creature gets [^.]+)\. It gets an additional ([^.]+?) as long as ([^.]+)\.$/.exec(line);
+    const extraStatics = extraIf ? [parseStatic(`${extraIf[1]}.`), parseConditionalStatic(`As long as ${extraIf[3]}, equipped creature gets ${extraIf[2]}.`)] : null;
+    if (extraStatics?.every((p) => p?.affects.kind === "attached") && !extraStatics[0]!.condition && extraStatics[1]!.condition) {
+      for (const p of extraStatics) out.statics.push({ ...p!, text: line });
       continue;
     }
     // Radiant Destiny: "Creatures you control of the chosen type get +1/+1. As long as you have the city's blessing, they
@@ -4439,7 +4502,9 @@ export function compile(d: CardDef): CompiledCard {
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
     // First Day of Class: "Whenever a creature you control enters this turn, ..." then "Learn." in its own paragraph: the
     // delayed trigger's text ends with its paragraph (CR 603.7a); the next one is another instruction of the spell.
-    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
+    // Benefactor's Draught: "Untap all creatures. Until end of turn, whenever a creature an opponent controls blocks, draw a
+    // card." then "Draw a card.": the same, the delayed trigger after another instruction in its paragraph.
+    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /(?:^|\. )(?:Whenever [^,]+ this turn, |Until end of turn, whenever )/.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
     const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
     const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
@@ -5141,8 +5206,18 @@ function joinModes(lines: string[]): string[] {
     if (restriction) out[out.length - 1] = `${out[out.length - 1]} ${restriction}`;
     restriction = undefined;
   };
-  for (const line of lines) {
+  // Gnostro, Voice of the Crags: "{T}: Choose one. X is the number of spells you've cast this turn." then the modes: X
+  // defined for each mode (CR 107.3c), counted as it resolves (rulings).
+  let xIs: string | undefined;
+  for (const line0 of lines) {
     const before = out[out.length - 1];
+    if (!/^\s*•/.test(line0)) xIs = undefined;
+    const xHead = /^\s*•/.test(line0) && before !== undefined && !xIs ? /: Choose one\. X is ([^.]+)\.$/.exec(before) : null;
+    if (xHead) {
+      xIs = xHead[1]!;
+      out[out.length - 1] = `${before!.slice(0, xHead.index)}: Choose one —`;
+    }
+    const line = xIs ? line0.replace(/\.$/, `, where X is ${xIs}.`) : line0;
     const restricted = /^\s*•/.test(line) && !restriction && before !== undefined ? /: Choose one\.( Activate only [^.]+\.)+$/.exec(before) : null;
     if (restricted) {
       restriction = restricted[0].slice(": Choose one.".length).trim();

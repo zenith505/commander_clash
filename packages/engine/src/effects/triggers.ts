@@ -141,7 +141,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
@@ -323,7 +323,8 @@ function diesMatches(
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
-    if (d.orSelf) return true;
+    // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
+    if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;
     if (d.other) return false;
   } else if (d.self) return false;
   // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
@@ -786,7 +787,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
       // Its subtypes then: "if that creature was a Cleric" (Taborax, Hope's Demise, CR 608.2h).
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), subtypes: [...ev.chars.subtypes], ...(ev.chars.allCreatureTypes ? { allCreatureTypes: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), subtypes: [...ev.chars.subtypes], ...(ev.chars.allCreatureTypes ? { allCreatureTypes: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}), ...(ev.exploitedBy ? { exploitedBy: ev.exploitedBy } : {}) };
       // The Auras attached to it then, by their controllers then (Hateful Eidolon): one gone too, as it last existed.
       const auraControllers = (ev.attachments ?? []).flatMap((aid) => {
         const a = s.objects[aid];
@@ -852,6 +853,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!src || src.zone === "battlefield") continue;
         consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
+      // Curious Cadaver: "When you sacrifice a Clue, return ~ from your graveyard to your hand": an ability of the card in
+      // its owner's graveyard (CR 113.6m), not of a card that left the battlefield in the same event.
+      fromGraveyards((src, owner) => {
+        if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner);
+      });
     }
   } else if (ev.type === "blocksDeclared") {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"
@@ -920,7 +926,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const anyBlocker = (t: TriggeredAbility) => !t.blockFilter || o.blockedBy!.some((b) => !!s.objects[b] && objectMatches(s, t.blockFilter!, s.objects[b]!, you, false));
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
-        addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
+        // Hedron Blade: "Whenever equipped creature becomes blocked by one or more colorless creatures": the same check.
+        addHosted(o, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && anyBlocker(t), undefined, o, { player: o.attacking });
         // Barreling Attack: "When that creature becomes blocked this turn" (a delayed trigger, CR 603.7b).
         for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
         const bearer = isRingBearer(s, o);
@@ -1673,7 +1680,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage" || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {

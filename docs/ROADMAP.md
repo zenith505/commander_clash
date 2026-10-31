@@ -3659,8 +3659,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Battlement (exile any number until it leaves, +2/+2 for each), Forbidden Crypt (draws replaced, losing if you
   can't), Induced Amnesia (exiled face down, returned when it leaves), Heart of Kiran (a loyalty counter instead of
   crewing).
+- Round B63 (the unlisted ones from EDHREC rank about 19,700 up): "If damage is prevented this way, ~ deals that much
+  damage to any target" (Acolyte's Reward: the damage is still prevented when only that second target is gone,
+  rulings), "Whenever you pay ~'s cumulative upkeep" (Hibernation's End), "put this creature's counters on that
+  token" (Ambitious Augmenter), "If a permanent spell is countered this way, exile it instead ... You may cast that
+  card without paying its mana cost for as long as it remains exiled" (Thranduil's Decree), "Put a random creature
+  card from among them onto the battlefield" (Getaway Barrel: no choice, picked by the seeded rng), "Whenever combat
+  damage is dealt to you or a planeswalker you control, if this card is in your graveyard" (Vengeful Pharaoh: one
+  trigger for you and one per planeswalker, per combat damage step, rulings), "has hexproof unless it's attacking"
+  and "untap it and it can't be blocked by creatures with greater power this combat" (Tadeas, Juniper Ascendant),
+  "~'s power is equal to" a characteristic-defining token (Consuming Blob), "choose another target creature for each
+  time ~ was kicked. Put X +1/+1 counters on each of them" (Strength of the Tajuru), "you may pay 2 life and exile
+  it. If you do, create a token that's a copy of that creature, except it's 1/1 and has toxic 1" (Kinzu of the Bleak
+  Coven), "Players can't pay life to cast spells or to activate abilities that aren't mana abilities" (Karn's Sylex:
+  Phyrexian mana and life costs; 0 life can still be paid, CR 119.4b; not turning a face-down permanent face up, a
+  special action). Breathless Knight, Bounty of the Luxa, Woodland Weavemaster and Cheering Crowd were dropped from
+  this round: Lane A's round 224 does them. +11 (COUNT of 31,936).
+- Out after round B63 (looked at, not done): Divine Deflection (prevention shared by you and your permanents),
+  Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
+  turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
+  anywhere), Simic Manipulator and Arcee (remove one or more counters as a variable cost), Benalish Commander and
+  Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute, Serum Powder,
+  Delaying Shield, Immortal Coil, Fires of Mount Doom.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B62 took the easier ones up to about 15,000 but left some of that range unread: about 130
+  19,700 up (rounds B54 to B63 took the easier ones up to about 15,000 but left some of that range unread: about 110
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported

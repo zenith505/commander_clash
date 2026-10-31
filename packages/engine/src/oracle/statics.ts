@@ -331,6 +331,8 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
+  // Tadeas, Juniper Ascendant: "~ has hexproof unless it's attacking": while it isn't an attacking creature (CR 506.4).
+  else if ((m = /^(~ has [a-z]+) unless it's attacking$/.exec(text))) [statement, cond] = [m[1], "it isn't attacking"];
   // Training Drone: "~ can't attack or block unless it's equipped".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's (equipped|enchanted)$/.exec(text))) [statement, cond] = [m[1], `~ isn't ${m[2]}`];
   // Ketramose, the New Dawn: "~ can't attack or block unless there are seven or more cards in exile": while there are fewer.
@@ -1462,6 +1464,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^~ isn't (equipped|enchanted)$/.exec(text))) return { kind: "self", is: m[1] as "equipped" | "enchanted", not: true };
   // Intrepid Ace: "~ gets +2/+0 as long as it isn't attacking or blocking" (CR 506.4).
   if (/^it isn't attacking or blocking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackingOrBlocking", not: true };
+  if (/^it isn't attacking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attacking", not: true };
   if ((m = /^it's (white|blue|black|red|green)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: m[1]! } };
   // Spectral Cloak: "Enchanted creature has shroud as long as it's untapped": the enchanted creature.
   if ((m = /^it's (tapped|untapped)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", tapped: m[1] === "tapped", text: `${m[1]} permanent` } };

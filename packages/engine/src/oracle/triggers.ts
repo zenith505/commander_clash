@@ -85,6 +85,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you investigate, (.+)$/, "youInvestigate"],
   [/^Whenever you give a gift, (.+)$/, "youGiveGift"],
+  [/^Whenever you pay ~'s cumulative upkeep, (.+)$/, "selfCumulativeUpkeepPaid"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
@@ -1088,7 +1089,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     return { ...t, dies: { ...t.dies, orAttached: true } };
   }
   if (selfHad) {
-    const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]}`);
+    // Ambitious Augmenter: "put ~'s counters on that token" is "its counters", ~ being the one that died.
+    const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]!.replace(/\bput ~'s counters on that token\.$/, "put its counters on that token.")}`);
     if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
@@ -2821,6 +2823,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard" } };
   }
+  // Vengeful Pharaoh: "Whenever combat damage is dealt to you or a planeswalker you control, if ~ is in your graveyard,
+  // destroy target attacking creature, then put ~ on top of your library": an ability that works only in the graveyard
+  // with an intervening if (CR 603.4); once for you and once for each planeswalker dealt combat damage (rulings).
+  const pharaoh = /^Whenever combat damage is dealt to you or a planeswalker you control, if ~ is in your graveyard, (destroy target attacking creature), then put ~ on top of your library\.$/.exec(line);
+  if (pharaoh) {
+    const body = parseBody(`${capital(pharaoh[1]!)}, then put ~ from your graveyard on top of your library.`, { selfCard: true });
+    return body ? { event: "combatDamageToYouOrYourPlaneswalker", body, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } } : "fail";
+  }
   // Infesting Radroach: "Whenever an opponent mills a nonland card, if ~ is in your graveyard, you may return it to your
   // hand": the same as "you may return ~ from your graveyard to your hand" below, an ability that works only there.
   const inYardReturn = /^(Whenever an opponent mills [^,]+), if ~ is in your graveyard, you may return it to your hand\.$/.exec(line);
@@ -2976,6 +2986,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ or another creature you control enters, if it entered from your graveyard or you cast it from your
   // graveyard, ..." (Grist, Voracious Larva; Prized Amalgam): how it entered can't change, so the intervening if (CR
   // 603.4) is part of the event: put onto the battlefield from its owner's graveyard, or a spell its owner cast from there.
+  // Breathless Knight: "if that creature entered from a graveyard or you cast it from a graveyard": anyone's graveyard.
   const yardOrCast = /^(When(?:ever)? .+? enters), if it entered from your graveyard or you cast it from your graveyard, (.+)$/.exec(line);
   if (yardOrCast) {
     const t = parseTrigger(`${yardOrCast[1]!}, ${yardOrCast[2]!}`);

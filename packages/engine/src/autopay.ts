@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -740,7 +740,8 @@ function planXMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric:
 /** planMana without Hazel's X mana: `bonus` is mana to count on besides the pool, `lifeLess` life already spent. */
 function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false, bonus?: ManaPool, lifeLess = 0): Action[] | null {
   const p = player(s, pid);
-  const life = payableLife(s, pid) - lifeLess;
+  // Karn's Sylex: no life for a spell's or a nonmana ability's cost.
+  const life = (use === "other" ? payableLife(s, pid) : sylexed(s, payableLife(s, pid))) - lifeLess;
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
   const start = poolFor(s, pid, use);

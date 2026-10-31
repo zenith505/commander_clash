@@ -1864,6 +1864,14 @@ export function canLoseLife(s: GameState, pid: PlayerId): boolean {
 /** "Your life total can't change" (Platinum Emperion, CR 119.7-8): a permanent of this player's says so. */
 const lifeLocked = (s: GameState, pid: PlayerId) => s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).lifeCantChange && controllerOf(s, obj(s, id)) === pid);
 
+/**
+ * Karn's Sylex: "Players can't pay life to cast spells or to activate abilities that aren't mana abilities": the life a
+ * player can pay for such a cost is none (0 life can always be paid, CR 119.4b), Phyrexian mana's included (CR 107.4f).
+ */
+export function sylexed(s: GameState, life: number): number {
+  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).noLifeCosts) ? Math.min(0, life) : life;
+}
+
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
 export function halfLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility): number {
   return ab.halfLifeCost ? halve(Math.max(0, player(s, pid).life), ab.halfLifeCost) : 0;
@@ -5436,7 +5444,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -6281,7 +6289,7 @@ const costOrMana = (d: CardDef, i?: number) => (i === undefined ? "" : (compileC
  * Can these costs beyond mana be paid, for a spell (`o` is the card being cast) or an ability (`o` is its
  * source)? Without choices, just whether they could be. `doing`: "cast X", "activate X's ability".
  */
-function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
+function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string, /** Turning a face-down permanent face up or a mana ability: Karn's Sylex doesn't stop paying life for it. */ lifeAnyway = false): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
   const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
@@ -6303,7 +6311,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "payLife") {
-      if (c.n && payableLife(s, p.id) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
+      if (c.n && (lifeAnyway ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id))) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
       continue;
     }
     if (c.kind === "craft") {
@@ -6934,9 +6942,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
-  if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
+  // Karn's Sylex: not for an ability that isn't a mana ability.
+  const costLife = (n: number) => (ab.mana ? n : sylexed(s, n));
+  if (lifeCost && costLife(payableLife(s, p.id)) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
-  if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
+  if (half && costLife(payableLife(s, p.id)) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
   // "Remove X ki counters from ~": X counters, up to how many it has (CR 107.3a).
   const toRemove = ab.removeCounters?.x ? (x ?? 0) : (ab.removeCounters?.n ?? 0);
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < toRemove) return `${d.name} doesn't have ${toRemove} ${ab.removeCounters.counter} counter${toRemove === 1 ? "" : "s"} to remove`;
@@ -6988,7 +6998,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`);
+    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`, !!ab.mana);
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
@@ -6996,7 +7006,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
-  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, ab.mana ? p.life : sylexed(s, p.life))) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -7308,7 +7318,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
   const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
-  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, payableLife(s, p.id) - halfLife - lifeCost)!;
+  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, (ab.mana ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id))) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -9928,6 +9938,14 @@ function finishCombatDamage(s: GameState): boolean {
       toPlayers.set(e.to.player, g);
     }
   for (const [player, g] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ...g });
+  // Vengeful Pharaoh: each planeswalker dealt combat damage, its controller as it was dealt (it's still on the battlefield:
+  // state-based actions come later, CR 510.2).
+  const walkers = new Map<ObjectId, PlayerId>();
+  for (const e of done) {
+    const w = e.dealt && "object" in e.to ? s.objects[e.to.object] : undefined;
+    if (w?.zone === "battlefield" && objIsType(s, w, "Planeswalker") && !walkers.has(w.id)) walkers.set(w.id, controllerOf(s, w));
+  }
+  for (const [id, player] of walkers) fireEvent(s, { type: "combatDamagedPlaneswalker", id, player });
   // "Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents" (Nelly
   // Borca): once for the step for each player whose creatures dealt it, with the players they dealt it to (CR 603.2c).
   const byController = new Map<PlayerId, PlayerId[]>();
@@ -10833,7 +10851,7 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   if (!Number.isInteger(x) || x < 0 || (x > 0 && !parseManaCost(fd.cost).hasX)) return "that isn't a value of X for it";
   // "Morph—Pay 5 life", "Morph—Sacrifice two Mountains" (CR 702.37e, 118.8): paid as it's turned face up; without the
   // choices, only whether it could be.
-  const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up") : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
+  const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up", true) : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
   if (cp) return cp;
   const cost = faceUpManaCost(fd.cost, x);
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to turn it face up (${cost})`;

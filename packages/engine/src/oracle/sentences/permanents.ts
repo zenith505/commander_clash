@@ -1115,6 +1115,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).
   if (/^[Ii]ts controller gains control of ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "targetController", index: ctx.lastObjectTarget } }];
+  // Pumpkin Bombs: "... to target opponent. They gain control of ~": that target player, for the rest of the game.
+  if (/^(?:They gain|That player gains) control of ~$/.test(s) && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many && !ctx.targets[ctx.lastPlayerTarget]!.optional)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "target", index: ctx.lastPlayerTarget } }];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
   // this resolves (CR 611.2c), until the cleanup step (514.2).
@@ -1145,6 +1148,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
     return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host, eachKind: true }];
   }
+  // Denry Klin, Editor in Chief: "put the same number of each kind of counter on that creature" as ~ has, after "if ~ has
+  // counters on it": each kind ~ has as it resolves, that many (CR 122.1).
+  if (ctx.subject && /^[Pp]ut the same number of each kind of counter on that creature$/.test(s)) return [{ type: "counters", what: { ref: "subject" }, counter: "+1/+1", n: 0, copyFrom: { ref: "self" } }];
   if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;

@@ -5,6 +5,7 @@ import {
   manaValue,
   parseManaCost,
   castProblem,
+  payZeroFlash,
   topPlayable,
   invalidateCharacteristics,
   abilitiesOf,
@@ -150,6 +151,8 @@ function hasInstantPlay(s: GameState): boolean {
     // Cycling works at instant speed from your hand (CR 702.29a).
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     if (abilities.some((ab, i) => ab.zone === "hand" && planActivate(s, HUMAN, id, i))) return true;
+    // Aluren: creature spells cast without paying their mana costs and as though they had flash (CR 118.9, 702.8a).
+    if (payZeroFlash(s, HUMAN, obj(s, id)) && !castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt: "payZero" })) return true;
     if (!(isType(d, "Instant") || d.keywords.includes("Flash"))) continue;
     if (planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
     // "Rather than pay ~'s mana cost" (Force of Will, Daze): with no mana at all (CR 118.9).

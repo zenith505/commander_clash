@@ -122,15 +122,17 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Skipping (CR 614.10): "Target player skips their next combat phase", "You skip your next two turns", "Skip your next
   // turn", "... their next combat phase this turn" (Moment of Silence). Elfhame Sanctuary (at the beginning of your upkeep):
   // "you skip your draw step this turn", the one still to come this turn (none once it's begun, or on another's turn).
-  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) (?:next (?:(two|three) )?(untap step|draw step|combat phase|turn)s?( this turn)?|(draw step)( this turn))$/i.exec(s))) {
+  // Ral Zarek, Guest Lecturer: "Target opponent skips their next X turns, where X is ..." (the X filled in by body.ts).
+  if ((m = /^(?:(.+?) )?(skips?) (?:their|your) (?:next (?:(two|three|X) )?(untap step|draw step|combat phase|turn)s?( this turn)?|(draw step)( this turn))$/i.exec(s))) {
     if (m[6]) [m[4], m[5]] = [m[6], m[7]!];
+    if (m[3] === "X" && (!ctx.whereX || m[4] !== "turn" || m[5] || !m[1] || /^you$/i.test(m[1]))) return null;
     const self = !m[1] || /^you$/i.test(m[1]);
     if (!m[1] && m[2] !== "Skip") return null;
     const who = self ? { ref: "you" as const } : parsePlayer(m[1]!, ctx);
     const skips: Record<string, SkipWhat> = { "untap step": "untap", "draw step": "draw", "combat phase": "combat", turn: "turn" };
     const skip = skips[m[4]!.toLowerCase()]!;
     if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat" && !m[6])) return null;
-    return [{ type: "skip", who, skip, n: m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
+    return [{ type: "skip", who, skip, n: m[3] === "X" ? { count: { kind: "x" } } : m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
   }
   // False Peace, Empty City Ruse: "Target player skips all combat phases of their next turn" (CR 614.10).
   if ((m = /^(Target player|Target opponent) skips all combat phases of their next turn$/.exec(s))) {
@@ -245,13 +247,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (tok?.type !== "createToken" || tok.who.ref !== "you" || tok.n !== 2 || tok.tapped || tok.attacking || tok.counters || tok.attachTo) return null;
     return [{ type: "discard", who: { ref: "eachPlayer" }, n: 0, hand: true }, { ...tok, who: { ref: "eachPlayer" }, n: { count: { kind: "discardedThisWay", who: { ref: "eachOne" } } } }];
   }
-  if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s)) && !/^Counter .+ unless /i.test(s)) {
+  if ((m = /^(Discard|.+? discards?) (?:all the cards in |all cards from )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s)) && !/^Counter .+ unless /i.test(s)) {
     const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
     const out: Effect[] = [{ type: "discard", who, n: 0, hand: true }];
     if (m[2] !== undefined) {
       // Each player draws as many as they discarded themselves.
-      const own = who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { who: { ref: "eachOne" } as const } : {};
+      const own = who.ref === "eachPlayer" || who.ref === "eachOpponent" || who.ref === "choseWord" ? { who: { ref: "eachOne" } as const } : {};
       const k = new RegExp(`^${NUMX} cards?$`, "i").exec(m[2]);
       const n =
         k && !/^that many$/i.test(k[1]!) ? amt(k[1]!)

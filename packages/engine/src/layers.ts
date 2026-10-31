@@ -153,6 +153,8 @@ export interface Characteristics {
   ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
+  /** Galactus, Devourer of Worlds: "attacks an opponent with the most life among your opponents each combat if able" (those players worked out as attackers are declared, game.ts mustAttackPlayers). */
+  mustAttackMostLife?: true;
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
   /**
@@ -1000,6 +1002,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
       return cond.not ? !cast : cast;
     }
+    case "subjectFromYourGraveyard": {
+      // A card can only be in its owner's graveyard; "you cast it": the spell's controller, who controls the permanent.
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.owner === you && (!!sub.enteredFromGraveyard || (!!sub.castFromGraveyard && sub.controller === you));
+    }
     case "subjectWasCast": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.wasCast;
@@ -1593,6 +1600,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       c.attacksIfAble = true;
+      return;
+    case "mustAttackMostLife":
+      c.mustAttackMostLife = true;
       return;
     case "mustAttackPlayer":
       if (m.player === "chosen" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;

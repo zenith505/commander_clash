@@ -52,8 +52,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${p.name} will skip all combat phases of their next turn.`);
           continue;
         }
-        for (let i = 0; i < e.n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
-        log(s, `${p.name} will skip their next ${e.n > 1 ? `${e.n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
+        const n = amountNow(s, e.n, ctx);
+        if (n <= 0) continue;
+        for (let i = 0; i < n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
+        log(s, `${p.name} will skip their next ${n > 1 ? `${n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
       }
       return;
     }

@@ -2498,6 +2498,19 @@ export function compile(d: CardDef): CompiledCard {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
       continue;
     }
+    // Crowd-Control Warden: "As ~ enters or is turned face up, put X +1/+1 counters on it, where X is the number of other
+    // creatures you control": a replacement both ways (CR 614.1c, 614.1e), counted as it enters or is turned face up; a
+    // face-down permanent has no abilities as it enters (CR 708.2).
+    const bothWays = new RegExp(`^As ~ enters or is turned face up, put X ${COUNTER} counters on it, where X is (.+)\\.$`).exec(line);
+    if (bothWays) {
+      const def = parseCount(bothWays[2]!, null);
+      if (!def || out.entersWithCounters || out.faceUpCounters) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: counterKind(bothWays[1]!), n: def };
+        out.faceUpCounters = { counter: counterKind(bothWays[1]!), n: def };
+      }
+      continue;
+    }
     const faceUpCounters = new RegExp(`^As ~ is turned face up, put ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
     if (faceUpCounters && !out.faceUpCounters) {
       out.faceUpCounters = { counter: counterKind(faceUpCounters[2]!), n: num(faceUpCounters[1]!) };
@@ -3169,6 +3182,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Players skip their untap steps.") {
       out.skipUntapSteps = true;
+      continue;
+    }
+    if (line === "Players skip their upkeep steps.") {
+      out.skipUpkeepSteps = true;
       continue;
     }
     // Teamwork N: "As an additional cost to cast this spell, you may tap any number of creatures you control with total
@@ -4128,6 +4145,16 @@ export function compile(d: CardDef): CompiledCard {
       const sign = (c: string) => (c === "-" ? -1 : 1);
       const [p0, t0, p1, t1] = [sign(instead[1]!) * Number(instead[2]), sign(instead[3]!) * Number(instead[4]), sign(instead[1]!) * Number(instead[5]), sign(instead[3]!) * Number(instead[6])];
       out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p0, toughness: t0 }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p1 - p0, toughness: t1 - t0 }], condition: { kind: "completedDungeon" }, text: line });
+      continue;
+    }
+    // Mind Carver: "Equipped creature gets +1/+0. It gets +3/+1 instead as long as an opponent has eight or more cards in
+    // their graveyard": the same, with the condition the conditional static ability reads.
+    const ptInsteadIf = /^(Enchanted|Equipped) creature gets ([+-])(\d+)\/([+-])(\d+)\. It gets \2(\d+)\/\4(\d+) instead as long as (.+)\.$/.exec(line);
+    const ptInsteadSt = ptInsteadIf ? parseConditionalStatic(`As long as ${ptInsteadIf[8]}, ${ptInsteadIf[1]!.toLowerCase()} creature gets ${ptInsteadIf[2]}${ptInsteadIf[6]}/${ptInsteadIf[4]}${ptInsteadIf[7]}.`) : null;
+    if (ptInsteadIf && ptInsteadSt?.condition && ptInsteadSt.affects.kind === "attached" && ptInsteadSt.mods.length === 1 && ptInsteadSt.mods[0]!.kind === "modifyPT") {
+      const sign = (c: string) => (c === "-" ? -1 : 1);
+      const [p0, t0, p1, t1] = [sign(ptInsteadIf[2]!) * Number(ptInsteadIf[3]), sign(ptInsteadIf[4]!) * Number(ptInsteadIf[5]), sign(ptInsteadIf[2]!) * Number(ptInsteadIf[6]), sign(ptInsteadIf[4]!) * Number(ptInsteadIf[7])];
+      out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p0, toughness: t0 }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p1 - p0, toughness: t1 - t0 }], condition: ptInsteadSt.condition, text: line });
       continue;
     }
     // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste

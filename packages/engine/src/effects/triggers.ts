@@ -141,7 +141,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
@@ -323,7 +323,8 @@ function diesMatches(
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
-    if (d.orSelf) return true;
+    // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
+    if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;
     if (d.other) return false;
   } else if (d.self) return false;
   // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
@@ -786,7 +787,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
       // Its subtypes then: "if that creature was a Cleric" (Taborax, Hope's Demise, CR 608.2h).
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), subtypes: [...ev.chars.subtypes], ...(ev.chars.allCreatureTypes ? { allCreatureTypes: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), subtypes: [...ev.chars.subtypes], ...(ev.chars.allCreatureTypes ? { allCreatureTypes: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}), ...(ev.exploitedBy ? { exploitedBy: ev.exploitedBy } : {}) };
       // The Auras attached to it then, by their controllers then (Hateful Eidolon): one gone too, as it last existed.
       const auraControllers = (ev.attachments ?? []).flatMap((aid) => {
         const a = s.objects[aid];

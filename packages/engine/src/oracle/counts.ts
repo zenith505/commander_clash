@@ -150,6 +150,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
   // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).
   if (ctx && !(each && ctx.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  // Rise of the Deathbringer: "Draw cards equal to ... You lose life equal to the number of cards drawn this way": those
+  // really drawn (a replaced draw isn't one, CR 121.6).
+  if (!each && /^the number of cards drawn this way$/i.test(p)) return { count: { kind: "drawnThisWay" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
@@ -331,6 +334,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // Hapatra, the Desert Fang: "the greatest mana value among cards in your graveyard", 0 with none.
+  // Inferno Project: "the total mana value of instant and sorcery cards in your graveyard": a split card's halves added (CR 709.4).
+  if (!each && /^the total mana value of instant and sorcery cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, totalMv: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   if (!each && /^the greatest mana value among cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, greatestMv: true } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   // Emissary Escort: "the greatest mana value among other artifacts you control", the source left out.

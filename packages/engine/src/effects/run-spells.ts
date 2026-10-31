@@ -1279,5 +1279,6 @@ export function addDelayed(s: GameState, when: DelayedTrigger["when"], controlle
 /** Was it kicked (CR 702.33d), with that kicker cost if the condition names one (702.33f)? */
 export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition): boolean {
   if (cond.kind !== "kicked") return false;
+  if (cond.times) return (kicked?.length ?? 0) >= cond.times;
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
 }

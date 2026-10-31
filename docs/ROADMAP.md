@@ -1,6 +1,6 @@
 # Roadmap
 
-28,296 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,323 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,174 of
 9,979 (91%).
 
@@ -3337,8 +3337,40 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Selective Snare (X targets of a chosen type), Roving Keep, Slab Hammer, Leonin Bola, Apathy, Death Match, Display of
   Dominance, Addle, Soul Search, Thought Prison, Spara's Adjudicators and Masked Bandits (until cast from exile), plus
   the many multi-line or new-mechanic cards in the same range.
+- Round B52 (cards no earlier round wrote down, least played first, EDHREC rank about 23,250 to 22,000):
+  "unless its controller has ~ deal 6 damage to them" on a land (Lava Blister), "Exile all noncreature, nonland cards
+  from that player's hand and graveyard" (Thought Distortion), creatures and planeswalkers with mana value 3 or less from
+  the battlefield and from graveyards (Shadows' Verdict), "It gains haste until end of turn if it exploited that
+  creature" (Silumgar Scavenger: the dying creature remembers what exploited it), "costs {2} less if you've cast another
+  instant or sorcery spell this turn" (Mage Duel), "Players skip their upkeep steps" (Eon Hub), "costs {1} more for each
+  artifact its controller controls" (Hum of the Radix), "target opponent puts a deathtouch counter on a creature they
+  control" (Hunted Nightmare), "the total mana value of instant and sorcery cards in your graveyard" (Inferno Project),
+  "Whenever another nonland permanent you control is returned to its owner's hand" (Justice, Vance Astrovik) and
+  "Whenever this creature or another creature is returned to your hand from the battlefield" (Stormfront Riders), "you
+  may remove an oil counter from it. If you do, untap it and it gets +1/+1" (Lattice-Blade Mantis), "Whenever a
+  creature you control with power equal to its toughness attacks/enters" (Master Symmetrist, Symmetry Matrix), "It gets
+  +3/+1 instead as long as an opponent has eight or more cards in their graveyard" (Mind Carver), "draw a card if you
+  had no cards in hand at the beginning of this turn" (Mindstorm Crown: hand size as each turn began is now kept),
+  "becomes blue and isn't an artifact" (Neurok Transmuter), "If a creature is dealt damage this way, it gets +5/+0"
+  (Provoke the Trolls), "if that player or that planeswalker's controller has more life than you, return ~ to its
+  owner's hand" (Pulse of the Forge), "You lose life equal to the number of cards drawn this way" (Rise of the
+  Deathbringer), "Creatures with shadow get +1/+0 ... and creatures without shadow get -1/-0" (Stronghold Overseer),
+  delirium "instead that player sacrifices a creature and a planeswalker" (To the Slaughter), "Until end of turn,
+  creatures you control gain trample and get +1/+1 for each ..." (Tromp the Domains), "if enchanted permanent is
+  tapped, untap it" (Volition Reins), "If you do, each opponent loses 2 life" after returning itself (Bob, Reluctant
+  HYDRA Agent), "if it was kicked twice" (Archangel of Wrath), X counters "as this creature enters or is turned face up"
+  (Crowd-Control Warden). +27 (28,323 of 31,936 with rounds 217 to 221).
+- Out after round B52 (looked at, not done): Gideon the Oathless and Way of the Paradox (Lane A's round 222 adds
+  "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
+  template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
+  Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning, Victor
+  Mancha, Encumbered Reejerey ("while" trigger conditions), Entrails Feaster, Ichorid, Nether Shadow, Cursed Rack,
+  Celestial Kirin, Skyfire Kirin, Lumaret's Favor, Definitely Not a Turtle, Advice from the Fae, Petals of Insight,
+  Rowdy Crew, Thijarian Witness, Riptide Replicator, Teferi's Response, Dawn Evangel, Earthbind, plus the multi-line
+  or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
+  Justice, Bill Potts and others).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  23,200 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
+  22,000 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

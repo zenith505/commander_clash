@@ -660,6 +660,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (amount?.count.kind !== "greatestPower") return null;
     return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], bound: { key: "power", at: "least", amount }, text: `target ${m[1]!}` }) };
   }
+  // Triumph of Gerrard: "target creature you control with the greatest power": one of yours tied for the greatest power among
+  // creatures you control, as it's chosen and as it resolves (rulings).
+  if (!cards && /^creature you control with the greatest power$/i.test(m[1]!)) {
+    const amount = parseCount("the greatest power among creatures you control", ctx);
+    if (amount?.count.kind !== "greatestPower") return null;
+    return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", bound: { key: "power", at: "least", amount }, text: `target ${m[1]!}` }) };
+  }
   // Culling Scales: "target nonland permanent with the lowest mana value": one tied for the lowest among nonland permanents,
   // as it's chosen and as it resolves (CR 608.2b), as a bound of at most that mana value.
   if (!cards && /^nonland permanent with the lowest mana value$/i.test(m[1]!)) {

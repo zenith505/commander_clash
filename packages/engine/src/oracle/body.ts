@@ -1956,6 +1956,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], toughness: { min: Number(bloodLust[1]) }, text: `creature with toughness ${bloodLust[1]} or greater` };
     return { ...body, effects: [{ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [big], otherwise: [fx] }], text };
   }
+  // Shackle Slinger: "choose target creature an opponent controls. If it's tapped, put a stun counter on it. Otherwise, tap
+  // it.": one target, whether it's tapped checked as this resolves (CR 608.2h).
+  const tappedStun = /^[Cc]hoose (target creature(?: an opponent controls| you don't control)?)\. If it's tapped, put a stun counter on it\. Otherwise, tap it\.$/.exec(text.trim());
+  if (tappedStun) {
+    const body = parseBody(`Put a stun counter on ${tappedStun[1]}.`, opts);
+    const fx = body?.effects[0];
+    if (!body || body.effects.length !== 1 || body.targets.length !== 1 || fx?.type !== "counters") return null;
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], tapped: true, text: "tapped creature" };
+    return { ...body, effects: [{ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [fx], otherwise: [{ type: "tap", what: { ref: "target", index: 0 } }] }], text };
+  }
   // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
   // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
   const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());
@@ -2328,6 +2338,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Charitable Levy: "put a collection counter on ~. Then if there are three or more collection counters on it, sacrifice
   // it. If you do, ...": the counters on ~, then ~ itself.
   text = text.replace(/(\bcounters? on ~\. Then if) there are (\w+ or more [a-z]+ counters) on (?:it|~), sacrifice it\./g, "$1 ~ has $2 on it, sacrifice ~.");
+  // Mentor's Guidance: "When you cast this spell, copy it if you control a planeswalker, Cleric, ...": checked as the
+  // ability resolves, not as it triggers (rulings), the same as "If you control ..., copy it".
+  text = text.replace(/^copy it if (you control [^.]+)\.$/, "If $1, copy it.");
+  // Atomic Microsizer: "That creature can't be blocked this turn and has base power and toughness 1/1 until end of turn":
+  // two effects on the same creature.
+  text = text.replace(/\bThat creature can't be blocked this turn and has base power and toughness (\d+)\/(\d+) until end of turn\./g, "That creature can't be blocked this turn. That creature has base power and toughness $1/$2 until end of turn.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -5022,6 +5038,40 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(ifAttacking[1]!), ctx);
       if (!then) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: ctx.lastObjectTarget!, filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } }, effects: then });
+      continue;
+    }
+    // First Responder: "you may return another creature you control to its owner's hand, then put a number of +1/+1 counters
+    // equal to that creature's power on ~": its power as it last existed on the battlefield (CR 608.2h); none returned, none.
+    const responderMay = effects[effects.length - 1];
+    const prevBounce = responderMay?.type === "may" && !responderMay.pay && responderMay.effects.length === 1 ? responderMay.effects[0] : undefined;
+    if (/^(?:[Tt]hen p|P)ut a number of \+1\/\+1 counters equal to that creature's power on ~$/.test(s) && prevBounce?.type === "pick" && prevBounce.action === "bounce" && prevBounce.n === 1 && !ctx.spell) {
+      effects.push({ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "bouncedThisWayPower" } } });
+      continue;
+    }
+    // Mister Hyde, Monster Within: "Remove a counter from a creature you control. If you do, draw a card.": a creature of
+    // yours with a counter on it chosen as it resolves, then one counter of any kind off it (as Chisei's); with none, no
+    // counter is removed and nothing else happens.
+    const removeOne = /^[Rr]emove a counter from a creature you control$/.test(s) ? /^If you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (removeOne) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(removeOne[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", counter: ANY_COUNTER, text: "creature you control with a counter on it" };
+      effects.push(
+        { type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", prompt: "click a creature you control to remove a counter from it, then choose it." },
+        { type: "removeAnyCounters", what: { ref: "created" }, n: 1 },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: then },
+      );
+      si++;
+      continue;
+    }
+    // Awaken the Sleeper: "Gain control of target creature until end of turn. ... If it's equipped, you may destroy all
+    // Equipment attached to that creature.": whether it's equipped as this resolves (CR 608.2h).
+    const ifEquipped = ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many ? /^If it's equipped, you may (destroy all Equipment attached to that creature)$/.exec(s) : null;
+    if (ifEquipped) {
+      const then = parseOne(capital(ifEquipped[1]!), ctx);
+      if (!then) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: ctx.lastObjectTarget!, filter: { kind: "object", types: ["Creature"], status: "equipped", text: "equipped creature" } }, effects: [{ type: "may", effects: then, text: ifEquipped[1]! }] });
       continue;
     }
     // Countryside Crusher: "Reveal the top card of your library. If it's a land card, put it into your graveyard and repeat
@@ -8466,11 +8516,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Redcap Melee: "If a nonred permanent is dealt damage this way, you sacrifice a land".
-    const dealtIs = /^If an? ([A-Z][a-z]+|creature|non(?:white|blue|black|red|green) (?:creature|permanent)) is dealt damage this way, (.+)$/.exec(s);
+    // Pathway Arrows' granted "~ deals 1 damage to target creature. If a colorless creature is dealt damage this way, tap
+    // it.": that target, tapped only if it was dealt damage and is colorless as this resolves.
+    const dealtIs = /^If an? ([A-Z][a-z]+|creature|colorless creature|non(?:white|blue|black|red|green) (?:creature|permanent)) is dealt damage this way, (.+)$/.exec(s);
     if (dealtIs && effects.some((e) => e.type === "damage")) {
       const filter = parseTargetPhrase(dealtIs[1]!);
       const before = ctx.targets.length;
-      const fx = filter?.kind === "object" ? parseOne(dealtIs[2]!, ctx) : null;
+      const lastDmg = effects[effects.length - 1];
+      const tapIt = dealtIs[2] === "tap it" && lastDmg?.type === "damage" && "ref" in lastDmg.to && lastDmg.to.ref === "target" && !lastDmg.to.n ? lastDmg.to.index : undefined;
+      const fx = filter?.kind === "object" ? (tapIt !== undefined ? [{ type: "tap" as const, what: { ref: "target" as const, index: tapIt } }] : parseOne(dealtIs[2]!, ctx)) : null;
       if (!fx || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter: filter! }, effects: fx });
       continue;
@@ -9151,7 +9205,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(ifDiscarded[1]!);
       const then = ifDiscarded[2]!;
       const itsPower = /^~ deals damage equal to that card's power to /.test(then) && prev.n === 1;
-      const inner = filter && (itsPower ? replaceX(parseOne(then.replace(/^~ deals damage equal to that card's power/, "~ deals X damage"), ctx), { count: { kind: "power", of: { ref: "discarded" } } }) : parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx));
+      // Silvan Reveler: "draw a card, then discard a card. If you discard a land card this way, put it from your graveyard
+      // onto the battlefield tapped": the one card discarded, while it's still that card in the graveyard (CR 400.7).
+      const putIt = then === "put it from your graveyard onto the battlefield tapped" && prev.n === 1 && prev.who.ref === "you" && !prev.upTo;
+      const inner = putIt ? [{ type: "putOntoBattlefield" as const, what: { ref: "discarded" as const }, tapped: true as const }] : filter && (itsPower ? replaceX(parseOne(then.replace(/^~ deals damage equal to that card's power/, "~ deals X damage"), ctx), { count: { kind: "power", of: { ref: "discarded" } } }) : parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx));
       if (!filter || !inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
       continue;
@@ -9464,7 +9521,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(`${handThisWay[1]} card`);
       const before = ctx.targets.length;
       const inner = parseOne(capital(handThisWay[2]!), ctx);
-      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(handThisWay[2]!)) return null;
+      // Chrome Courier: "reveal the top two cards of your library. Put one of them into your hand and the other into your
+      // graveyard. If you put an artifact card into your hand this way, you gain 3 life": the same, after a look.
+      const dug = last?.type === "dig" && last.into === "hand" && !last.who && !last.each;
+      if ((!dug && (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who)) || !filter || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(handThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
       continue;
     }
@@ -10871,7 +10931,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment, ...": a list in the condition.
-    const ifState = /^If (you control an? [^,]+, an? [^,]+, or an? [^,]+), (.+)$/.exec(s) ?? /^If ([^,]+), (.+)$/.exec(s);
+    // Mentor's Guidance: "If you control a planeswalker, Cleric, Druid, Shaman, Warlock, or Wizard, ...".
+    const ifState = /^If (you control an? [^,]+, an? [^,]+, or an? [^,]+), (.+)$/.exec(s) ?? /^If (you control an? (?:[A-Za-z]+, ){2,}or [A-Za-z]+), (.+)$/.exec(s) ?? /^If ([^,]+), (.+)$/.exec(s);
     // Sphinx Sovereign: "If ~ is untapped, ...": ~ itself, as it resolves or as it last existed (rulings).
     const selfTapped = !!ifState && /^~ is (?:un)?tapped$/.test(ifState[1]!);
     // Ayara's Oathsworn: "Put a +1/+1 counter on it. Then if it has exactly four +1/+1 counters on it, ...": ~, which the
@@ -10881,7 +10942,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) | isn't your main phase$)/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
-    const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Sorcerer's Wand's granted "{T}: ~ deals 1 damage to target player or planeswalker. If ~ is a Wizard, it deals 2 damage
+    // instead.": the source's creature types as it resolves (CR 608.2c), as with Figure of Destiny's "If ~ is a Warrior".
+    const selfType = ifState && !ctx.spell && /^instead,? |\binstead$/.test(ifState[2]!) ? /^~ is an? ([A-Z][a-z]+)$/.exec(ifState[1]!) : null;
+    const selfTypeFilter = selfType && CREATURE_TYPES.has(selfType[1]!) ? parseTargetPhrase(selfType[1]!.toLowerCase()) : null;
+    const insteadOf: StaticCondition | null = selfTypeFilter?.kind === "object" ? { kind: "selfIs", filter: { ...selfTypeFilter, text: selfType![1]! } } : ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "If that creature has a +1/+1 counter on it" (Bring Low, Marcus): the trigger's subject, or else the one object
     // target; with neither, unsupported.
     const counterSubject = (c: StaticCondition | null): { subject?: ObjRef } | null => !c || c.kind !== "subjectCounter" || (ctx.subjectIt && !ctx.spell) ? {} : ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 ? { subject: { ref: "target", index: ctx.lastObjectTarget } } : null;

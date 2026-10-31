@@ -1910,6 +1910,12 @@ export function compile(d: CardDef): CompiledCard {
       out.graveyardExile = { whose: "opponents", notYours: true, linked: true };
       continue;
     }
+    // Samurai of the Pale Curtain: "If a permanent would be put into a graveyard, exile it instead": any permanent, a token
+    // too, going from the battlefield to any graveyard (CR 614.1a, 110.1).
+    if (line === "If a permanent would be put into a graveyard, exile it instead." && !out.graveyardExile) {
+      out.graveyardExile = { whose: "any", tokens: true, permanents: true };
+      continue;
+    }
     const yardExile = /^If an? (card or token|card|(.+?) card) would be put into (a|an opponent's|your) graveyard from anywhere, (?:exile (?:it|that card) instead|instead exile it with an? ([a-z]+) counter on it)\.$/.exec(line);
     if (yardExile && !out.graveyardExile) {
       // The card's own characteristics (read like a card in a graveyard's, its owner aside).
@@ -4368,8 +4374,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
       // and turning it face up isn't entering (CR 708.8), so one or the other. Shield Mare: "... or becomes the target of a
-      // spell or ability an opponent controls".
-      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls), (.+)$/.exec(line) ??
+      // spell or ability an opponent controls". Champions of the Shoal: "Whenever ~ enters or becomes tapped, ...".
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls|becomes tapped), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       // "When ~ enters and whenever it deals combat damage to a player, create a Blood token." (Ivora, Insatiable Heir)
       /^When ~ enters and whenever it (attacks while saddled|attacks|deals combat damage to a player), (.+)$/.exec(line) ??
@@ -4490,7 +4496,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[2]} is turned face up, ${effect}`]
             : / enters or is turned face up, /.test(line) && /^Whenever an? /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} is turned face up, ${effect}`]
-            : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+            : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals|becomes tapped)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail" || (onceBoth && t.oncePerTurn))) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(onceBoth ? { ...(t as TriggeredAbility), oncePerTurn: true } : (t as TriggeredAbility), line));

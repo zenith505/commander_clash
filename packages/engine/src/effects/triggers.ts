@@ -204,7 +204,7 @@ export type TriggerSourceEvent =
   /** These permanents phased in or are about to phase out (looking back in time, CR 603.10b). */
   | { type: "phases"; ids: ObjectId[]; how: "in" | "out" }
   /** A crew ability of this Vehicle resolved (CR 702.122e). */
-  | { type: "crewed"; id: ObjectId }
+  | { type: "crewed"; id: ObjectId; /** Its first time this turn (TurnLog.timesCrewed). */ first?: true; /** How many creatures were tapped for the crew cost of the ability that crewed it. */ by?: number }
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
   /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
   | { type: "connived"; id: ObjectId; controller: PlayerId }
@@ -1275,7 +1275,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e, t) => e === "selfBecomesLevel" && t.level === ev.level);
   } else if (ev.type === "crewed") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfBecomesCrewed");
+    add(o, controllerOf(s, o), (e, t) => e === "selfBecomesCrewed" && (!t.firstEachTurn || !!ev.first) && (t.crewedBy === undefined || ev.by === t.crewedBy));
   } else if (ev.type === "crews") {
     // "Whenever ~ crews a Vehicle" (CR 702.122d): the creature tapped for the cost, "that Vehicle" the one it crewed.
     const o = s.objects[ev.id];

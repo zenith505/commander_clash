@@ -29,6 +29,9 @@ function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract
   if (eo.onlySelf && first.id !== me) return [];
   const card = orig.objectId ? s.objects[orig.objectId] : undefined;
   const src = card ? spellQuality(s, cardIdOf(card), orig) : undefined;
+  // Ivy, Gleeful Spellthief: only ~, if it's still on the battlefield and the copy (this ability's controller's) could
+  // target it (rulings).
+  if (eo.toSource) return me && me !== first.id && s.objects[me]?.zone === "battlefield" && (ctx.sourceZc === undefined || (s.objects[me]!.zoneChanges ?? 0) === ctx.sourceZc) && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id: me }, ctx.controller, src)) ? [me] : [];
   return s.battlefield.filter((id) => {
     if (id === first.id || (eo.self && id === me)) return false;
     if (!objectMatchesFor(s, eo.among, id, ctx.controller)) return false;
@@ -392,7 +395,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         if (e.n === "eachOther") {
           // Zada, Ink-Treader Nephilim, Precursor Golem: no copy is made if the spell has left the stack.
-          if (orig.kind !== "spell" || !s.stack.some((x) => x.id === orig.id)) return;
+          // Ivy, Gleeful Spellthief's is made from the spell as it last was (rulings).
+          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !s.stack.some((x) => x.id === orig.id))) return;
           const each = eachOtherTargets(s, orig, e.eachOther!, ctx);
           if (!each.length) return;
           const by = e.eachOther!.caster ? orig.controller : ctx.controller;

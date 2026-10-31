@@ -363,7 +363,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "becameCrewed": {
       // "Whenever this Vehicle becomes crewed" (CR 702.122e): its crew ability resolved, whatever it is now.
       const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
-      if (o?.zone === "battlefield") fireEvent(s, { type: "crewed", id: o.id });
+      if (o?.zone !== "battlefield") return;
+      // Mighty Servant of Leuk-o: "for the first time each turn, if it was crewed by exactly two creatures" (rulings: the
+      // creatures tapped to pay the crew cost of the ability that crewed it).
+      const times = ((s.turnLog ??= {}).timesCrewed ??= {});
+      const key = `${o.id}@${o.zoneChanges ?? 0}`;
+      times[key] = (times[key] ?? 0) + 1;
+      const by = s.resolving?.item.crewers;
+      fireEvent(s, { type: "crewed", id: o.id, ...(times[key] === 1 ? { first: true as const } : {}), ...(by !== undefined ? { by } : {}) });
       return;
     }
     case "cumulativeUpkeepPaid": {

@@ -570,7 +570,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const pid of players(s, e.who, ctx)) {
           const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
           const from = manaSourceOrigins(s, ctx);
-          for (const m of added.matchAll(/\{([WUBRGC])\}/g)) addMana(s, pid, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
+          for (const m of added.matchAll(/\{([WUBRGC])\}/g)) addMana(s, pid, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
           if (added) log(s, `${player(s, pid).name} adds ${added}.`);
         }
         return;
@@ -613,7 +613,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const from = manaSourceOrigins(s, ctx);
         const mixed = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
         const colors = s.resolving?.item.manaAbility?.tapped ? timesAsMuch(mixed, tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) : mixed;
-        for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
+        for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
         if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;
       }
@@ -629,7 +629,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
         // "Until end of turn, you don't lose this mana as steps and phases end."
-        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
+        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);

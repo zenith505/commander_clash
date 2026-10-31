@@ -903,6 +903,8 @@ export interface StackItem {
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
+  /** A crew ability: how many creatures were tapped to pay its crew cost (Mighty Servant of Leuk-o, CR 702.122a). */
+  crewers?: number;
   /** Its source's transform count as it was put on the stack: an ability of it transforms it only if unchanged (CR 701.27f). */
   sourceTransforms?: number;
   /** Its source's untap count as it was activated: if the source untaps before it resolves, "for as long as ~ remains tapped" never starts (rulings). */
@@ -1439,6 +1441,8 @@ export interface TurnLog {
   saddledBy?: Record<string, string[]>;
   /** The same for crewing each Vehicle this turn (CR 702.122d: tapped to pay its crew cost; Getaway Car). */
   crewedBy?: Record<string, string[]>;
+  /** How many times each Vehicle became crewed this turn, by `${id}@${zoneChanges}` (CR 702.122e; "for the first time each turn"). */
+  timesCrewed?: Record<string, number>;
   /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
   endSteps?: number;
   /** The players who drew in this turn's draw step for "you draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem). */

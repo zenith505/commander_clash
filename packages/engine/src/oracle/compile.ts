@@ -2074,6 +2074,27 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Kagha, Shadow Archdruid: "Once during each of your turns, you may play a land or cast a permanent spell from among
+    // cards in your graveyard that were put there from your library this turn": one use each turn for either (as Serra
+    // Paragon's), only for a card that came from the library this turn. Banon, the Returners' Leader: "... cast a
+    // creature spell from among cards in your graveyard that were put there from anywhere other than the battlefield this
+    // turn". Rulings: all costs are paid and timing rules followed; another permission doesn't use this one up.
+    const arrivedYard = /^Once during each of your turns, you may (play a land or )?cast an? (permanent|creature) spell from among cards in your graveyard that were put there from (your library|anywhere other than the battlefield) this turn\.$/.exec(line);
+    if (arrivedYard) {
+      const filter = parseTargetPhrase(`${arrivedYard[2]} card from a graveyard`);
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const arrived = arrivedYard[3] === "your library" ? ("fromLibrary" as const) : ("notFromBattlefield" as const);
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${arrivedYard[2]} cards` }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], arrived });
+        if (arrivedYard[1]) {
+          if (arrived !== "fromLibrary") out.unsupported.push(raw);
+          out.landFromGraveyardOnce = "shared";
+          out.landFromGraveyardArrived = "fromLibrary";
+        }
+      }
+      continue;
+    }
     // "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador, Gisa and Geralf): a
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
@@ -4171,6 +4192,20 @@ export function compile(d: CardDef): CompiledCard {
         cast: { by: eachOther[1] === "you cast" ? "you" : "any", spell: { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery spell" }, targetsOnly: single ? { ...single, text: eachOther[3]! } : "self" },
         body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: { ...among, text: eachOther[6]! }, ...(self ? { self: true as const } : {}), ...(eachOther[3] ? { caster: true as const } : {}), ...(eachOther[4] ? { onlySelf: true as const } : {}) } }], text: line.replace(/^Whenever [^,]+(?:, if that spell targets only ~)?, /, "") },
       });
+      continue;
+    }
+    // Ivy, Gleeful Spellthief: "Whenever a player casts a spell that targets only a single creature other than ~, you may
+    // copy that spell. The copy targets ~." Every target of it the same creature (rulings), a copy for this ability's
+    // controller aimed at ~ if ~ is a legal target for it, even if the spell is gone by then (rulings, CR 707.10c).
+    if (line === "Whenever a player casts a spell that targets only a single creature other than ~, you may copy that spell. The copy targets ~.") {
+      const creature = parseTargetPhrase("creature");
+      if (creature?.kind !== "object") out.unsupported.push(raw);
+      else
+        out.triggers.push({
+          event: "castSpell",
+          cast: { by: "any", spell: { kind: "spell", text: "spell" }, targetsOnly: { ...creature, notSource: true, text: "a single creature other than ~" } },
+          body: { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: creature, toSource: true } }], text: "copy that spell (the copy targets ~)" }], text: "you may copy that spell. The copy targets ~." },
+        });
       continue;
     }
     // Thrumming Stone: "Spells you cast have ripple 4." Each spell's granted ripple triggers as it's cast (CR 702.60a),

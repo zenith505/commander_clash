@@ -569,8 +569,12 @@ export interface TargetSpec {
   ptEqual?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
+  /** "A card with two or more card types" (Rendmaw, Creaking Nest): at least this many card types (CR 205.2a). */
+  minCardTypes?: number;
   /** For spells: "that wasn't cast from its owner's hand" (Wash Away); a copy was never cast. */
   notCastFromHand?: true;
+  /** For spells: "target spell you control that wasn't cast" (Errant, Street Artist): a copy (CR 707.10), never cast. */
+  notCast?: true;
   /** Laquatus's Disdain: "target spell cast from a graveyard" (flashback and the like); a copy was never cast. */
   castFromGraveyard?: true;
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
@@ -871,7 +875,7 @@ export interface TargetSpec {
   /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
   /** "Enchantment you control that doesn't have the same name as another permanent you control" (Yenna): no other permanent `you` control has its name (a face-down one has none, CR 708.2). */
-  uniqueNameAmongYours?: true;
+  uniqueNameAmongYours?: true | /** The Apprentice's Folly: "that doesn't have the same name as a token you control". */ "tokens";
   /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
   notNamed?: string;
   /** "With a different name than each Aura you control" (Light-Paws): no permanent of this kind its controller controls as the search resolves has its name (only for searches; a face-down one has none, CR 708.2). */
@@ -2849,7 +2853,7 @@ export type Effect =
      * of its targets. `caster`: the spell's caster copies it (Precursor Golem), else this ability's controller.
      * `onlySelf`: an intervening "if that spell targets only ~" (CR 603.4), checked again as it resolves.
      */
-    eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
+    eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true; /** Ivy, Gleeful Spellthief: "The copy targets ~": one copy, aimed at this ability's source, made even if the spell has left the stack (rulings), if ~ could be every target of it. */ toSource?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
     /** "That player copies it and may choose new targets for the copy" (Bonus Round): the spell's controller copies it and chooses the copy's targets, not this ability's controller. */ byController?: true }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; /** "allButOne": "remove all but one +1/+1 counter from it" (Lily Bowen). */ n: Amount | "all" | "allButOne"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
@@ -3341,8 +3345,8 @@ export type Effect =
       mana?: string;
       chosen?: number;
       times?: Amount;
-      /** "Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4). */
-      keep?: "turn";
+      /** "Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4); "combat": "Until end of combat, you don't lose this mana as steps end" (Fire Lord Ozai). */
+      keep?: "turn" | "combat";
       /** Who adds it: "target player adds", "that player adds" (CR 106.4); the controller if absent. */
       who?: PlayerRef;
       /** "Spend this mana only to cast instant and sorcery spells" after it (CR 106.6). */
@@ -4625,8 +4629,11 @@ export interface TriggeredAbility {
   /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn.
    * For "youGainLife": "for the first time during each of your turns" (Cat Collector): your first life gain this turn, on your turn. */
   firstOnTheirTurn?: true;
-  /** For "youGainLife" and "youLoseLife": "for the first time each turn" (Vengeful Warchief): your first such event this turn, anyone's turn. */
+  /** For "youGainLife" and "youLoseLife": "for the first time each turn" (Vengeful Warchief): your first such event this turn, anyone's turn.
+   * For "selfBecomesCrewed": "becomes crewed for the first time each turn" (Mighty Servant of Leuk-o). */
   firstEachTurn?: true;
+  /** For "selfBecomesCrewed": "if it was crewed by exactly two creatures" (an intervening if about the crewing, CR 603.4). */
+  crewedBy?: number;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
   orLoseLife?: true;
   /** For "youGainLife" and "youLoseLife": "Whenever you gain life during your turn" (Vampire Scrivener): only while you're the active player. */
@@ -6633,9 +6640,16 @@ export interface CompiledCard {
     entersTapped?: true;
     /** Only while this holds: a station symbol's (Exploration Broodship's 8+, CR 721.2a). */
     if?: StaticCondition;
+    /**
+     * Only cards put into the graveyard this turn from a library (Kagha, Shadow Archdruid: GameObject.fromLibraryTurn), or
+     * from anywhere other than the battlefield (Banon, the Returners' Leader: toGraveyardTurn without fromBattlefieldTurn).
+     */
+    arrived?: "fromLibrary" | "notFromBattlefield";
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. "shared": the same use as its once-each-turn spell permission (Serra Paragon's "a land ... or a permanent spell"). */
   landFromGraveyardOnce?: true | "shared";
+  /** Kagha, Shadow Archdruid: that land only if it was put into the graveyard from a library this turn. */
+  landFromGraveyardArrived?: "fromLibrary";
   /**
    * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).

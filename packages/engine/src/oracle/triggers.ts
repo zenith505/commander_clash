@@ -2602,6 +2602,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
     return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
   }
+  // Rendmaw, Creaking Nest: "whenever you play a card with two or more card types": a spell cast or a land played (CR
+  // 305.1, 601.2) whose card has that many card types (CR 205.2a), as it was played.
+  const playTypes = /^Whenever you play a card with (two|three) or more card types, (.+)$/.exec(line);
+  if (playTypes) {
+    if (/\b(it|its|that card|that spell)\b/.test(playTypes[2]!)) return "fail";
+    const t = parseTrigger(`Whenever you cast a spell, ${playTypes[2]}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond) return "fail";
+    const minCardTypes = num(playTypes[1]!);
+    const text = `card with ${playTypes[1]} or more card types`;
+    return { ...t, cast: { ...t.cast, spell: { ...t.cast.spell, minCardTypes, text }, orPlaysLand: { kind: "object", types: ["Land"], notTypes: [], notColors: [], minCardTypes, text } } };
+  }
   // Juju Bubble: "When you play a card, sacrifice ~": "when" and "whenever" are the same here (CR 603.1).
   const playM = /^When(?:ever)? you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
@@ -3727,6 +3738,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return !t || t === "fail" || t.event !== "selfIsDealtDamage" || t.minDamage ? "fail" : { ...t, minDamage: num(dealtMin[1]!) };
   }
   // Hercules, Olympian Hero: "Whenever ~ is dealt damage for the first time each turn": its first damage event this turn.
+  // Mighty Servant of Leuk-o: "Whenever this Vehicle becomes crewed for the first time each turn, if it was crewed by
+  // exactly two creatures, ...": the creatures tapped for the crew cost of the ability that crewed it (rulings), a fact
+  // of that event, so the same as it resolves (CR 603.4).
+  const crewedFirst = /^Whenever ~ becomes crewed for the first time each turn, (?:if it was crewed by exactly (two|three|four) creatures, )?(.+)$/.exec(line);
+  if (crewedFirst) {
+    const t = parseTrigger(`Whenever ~ becomes crewed, ${crewedFirst[2]}`);
+    return !t || t === "fail" || t.event !== "selfBecomesCrewed" ? "fail" : { ...t, firstEachTurn: true, ...(crewedFirst[1] ? { crewedBy: num(crewedFirst[1]) } : {}) };
+  }
   const dealtFirst = /^Whenever ~ is dealt damage for the first time each turn, (.+)$/.exec(line);
   if (dealtFirst) {
     const t = parseTrigger(`Whenever ~ is dealt damage, ${dealtFirst[1]}`);

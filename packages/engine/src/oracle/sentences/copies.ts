@@ -105,6 +105,9 @@ function parseWhat(text: string, ctx: Ctx): ObjRef | null {
 
 /** What it copies: one object, "target creature", "another target creature", "that creature", "the sacrificed creature". */
 function parseOf(text: string, ctx: Ctx): ObjRef | null {
+  // Shuri, Wakandan Inventor: "a second target artifact you control" is another target (CR 115.3 would let one object be
+  // both; copying itself would change nothing), as Resourceful Defense's "onto a second target permanent".
+  text = text.replace(/^a second target /, "another target ");
   if (/^the sacrificed (creature|artifact|permanent)$/.test(text)) return { ref: "sacrificed" };
   // "Choose target artifact you control. Each other artifact you control becomes a copy of that artifact."
   if (/^that (artifact|enchantment|land|token)$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };

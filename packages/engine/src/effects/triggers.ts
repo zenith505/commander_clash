@@ -318,6 +318,8 @@ function diesMatches(
   // "When enchanted creature dies, if that creature was a Horror" (Endless Evil): its types as it last existed (CR 603.10a).
   // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
   if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
+  // One with the Kami: the creature it was attached to, whoever controlled it, or one matching the filter.
+  if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
@@ -970,7 +972,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
     const watch = (o: GameObject) => {
-      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result });
+      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result, rollMax: Math.max(...ev.dice.map((d) => d.result)) });
       for (const d of ev.dice)
         add(o, ev.player, (e, t) => e === "youRollDie" && (t.rolls?.min === undefined || d.result >= t.rolls.min) && (t.rolls?.natural === undefined || d.natural === (t.rolls.natural === "max" ? ev.sides : t.rolls.natural)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: d.result });
     };
@@ -1226,6 +1228,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTransformsInto");
+    // "Whenever a permanent you control transforms into a Phyrexian" (CR 701.27e): the permanent, as it is now, is the subject.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentTransformsInto" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
   } else if (ev.type === "doorUnlocked") {
     // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
     const o = obj(s, ev.id);
@@ -1717,7 +1725,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
     // Cartographer's Hawk: "to a player who controls more lands than you", as the damage is dealt.
     const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.firstHit && !ev.first) && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o))), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    const selfHit = (t: TriggeredAbility) => !(t.firstHit && !ev.first) && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o)));
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && t.host !== "orSelf" && selfHit(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // "Whenever ~ or equipped creature deals combat damage to a player, you may sacrifice it" (Ogre-Head Helm): ~ itself is
+    // the subject when it dealt the damage.
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && t.host === "orSelf" && selfHit(t), undefined, undefined, o, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
@@ -2240,7 +2252,12 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       continue;
     }
     const def = restingDef(s.cards[t.sourceCardId]!);
-    const printed = triggerBody(s, t);
+    let printed = triggerBody(s, t);
+    // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
+    if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
+      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId })));
+      printed = triggerBody(s, t);
+    }
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
       // "Choose one that hasn't been chosen": not one this object has had chosen (rulings on Demonic Pact).
@@ -2253,6 +2270,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       const max = distinctModeCap(s, printed, t.controller, max0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       // "Choose both instead": both, or the one that can be chosen (CR 603.3c).
       if (t.both && printed.modal.bothExactly && n > 0) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
+      // "Choose up to X" with X 0: no modes, so it's removed (CR 603.3c).
+      else if (max === 0 && min === 0) t.modes = [];
       else if (n === 0 || n < min) {
         log(s, `${def.name}'s ability has no mode that can be chosen and is removed.`);
         s.triggerQueue.shift();
@@ -2405,6 +2424,12 @@ function amassedPowerNow(s: GameState, a: { id: ObjectId; zc: number }): number 
 
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
+  const body = triggerBodyAsIs(s, t);
+  // "Choose up to X" (Bumi, King of Three Trials): no more modes than X was as it was put on the stack.
+  return body.modal?.maxCount && t.maxModes !== undefined ? { ...body, modal: { ...body.modal, max: t.maxModes } } : body;
+}
+
+function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
   // Clement: "with lesser mana value" than a subject still on the battlefield: its mana value now (CR 202.3).
   const subj = t.subject && s.objects[t.subject.id];

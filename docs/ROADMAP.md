@@ -1,7 +1,7 @@
 # Roadmap
 
-28,107 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,149 of
+28,296 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,174 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -706,7 +706,7 @@ line blocks.
    may put ~ from your graveyard on top of your library" (Gate Colossus), "then if that creature has toughness 6 or
    greater" (Dormant Grove), "instant and sorcery spells you control have lifelink / deathtouch" (Heartflame Duelist,
    Pestilent Spirit). A browser test clicks through Let's Play a Game's mode menu with and without delirium.
-   Out after round 200 (looked at, not done): Thrasta (trample over planeswalkers isn't modeled), Enchanter's Bane (a
+   Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), Faerie Slumber Party (no record of who controlled the creatures
    returned this way), You Cannot Pass! (no record of which creatures blocked or were blocked by a legendary creature),
    Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (total mana value of
@@ -1081,6 +1081,137 @@ line blocks.
    defending player differs per attacker); Surestrike Trident (a granted ability that names its source); Tamiyo,
    Inquisitive Student; Demilich (casting from the graveyard by exiling four instants and sorceries). Next fresh
    candidates are still the ones listed after round 215.
+   Round 217 took the fresh candidates listed after round 215: "If you didn't put a card into your hand this way,
+   proliferate" (Contagious Vorrac); "Discard your hand, then draw cards equal to the number of cards discarded this way"
+   (Borrowed Knowledge); "Each of your opponents discards" (Everything Pizza); "Put that card onto the battlefield tapped
+   if you control a Dragon. Otherwise, put that card on top" (Embermouth Sentinel); "If they lost life this turn, they
+   reveal their hand, you choose a nonland card" (Thought-Stalker Warlock, SpellCondition targetPlayerLostLife); "the
+   chosen creature you control ... Then the chosen creatures fight" (Duel for Dominance); "you may pay {X} ... X can't be
+   greater than the amount of life you lost this turn" (Mortarion, Daemon Primarch); "~ deals 10 damage to an opponent
+   chosen at random" (Zaffai, Thunder Conductor); "You and permanents you control have protection from Salamanders" and
+   "each player who controls the fewest creatures" (Gor Muldrak, CompiledCard.youProtectionFrom); "Descend 8 — If there
+   are eight or more permanent cards in your graveyard as you cast this spell, choose one or more instead" (Wail of the
+   Forgotten); "each player discards their hand, then returns up to three cards from their graveyard to their hand"
+   (Ill-Gotten Gains, a new "return up to N cards to your hand" picker, e2e round217.spec.ts); "Mounts and/or Vehicles"
+   (Lagorin, Soul of Alacria); "Whenever ~ or equipped creature deals combat damage to a player, you may sacrifice it"
+   with "it" the creature that dealt the damage (Ogre-Head Helm); "If any of those results was 10 or higher" (Farideh,
+   rollIn eventMax); "If that creature was cast for its warp cost, it also gains" (Full Bore, SpellCondition
+   targetWarped); "the number of lands you control in excess of the number of lands target opponent controls" (Waking
+   the Trolls); "choose one and ~ gets +1/+1 until end of turn" (Glorfindel, Dauntless Rescuer); "Equip costs you pay
+   cost {1} less" (Auriok Steelshaper); "Put a +1/+1 counter on it" for a Vehicle that crewed (Voyager Glidecar); "up to
+   one target" exile-and-copy (Renegade Bull); "Put ~ from your graveyard onto the battlefield transformed" (Startled
+   Awake). +21 (28,104 of 31,936 with B46 and B47).
+   Out after round 217 (looked at, not done): Barbed Wire (needs a "prevent the next damage dealt by a source"
+   shield); Decoy Gambit (a per-target "unless its controller has you draw a card"); Multiple Choice; Laboratory Drudge
+   (needs tracking of cards cast and abilities activated from graveyards); Kraven the Hunter (greatest power as it
+   died); The Eighth Doctor; Arcade Gannon. Next fresh candidates, not looked at
+   closely: Seize the Storm, Aberrant Mind Sorcerer, Key to the Side-Door, Prized Amalgam, Kathril, Aspect Warper,
+   Super-Adaptoid, Zimone's Experiment, Bane, Lord of Darkness, Weftwalking, Last Laugh, Sanctuary Blade.
+   Round 218 took those fresh candidates and more: "creatures you control gain flying until end of turn if a creature
+   card in your graveyard has flying. The same is true for ..." (Bleeding Effect, addKeywords sharedAmongYours
+   "graveyard"); "If that creature has haste and ~ doesn't, put a haste counter on ~. Do the same for ..."
+   (Super-Adaptoid); a d20 table on a card target (Aberrant Mind Sorcerer); "You may reveal up to two creature and/or
+   land cards from among them ... Put all land cards revealed this way onto the battlefield tapped" (Zimone's
+   Experiment, dig landsOnto); "When no creatures are on the battlefield, sacrifice ~" and "a permanent other than ~"
+   (Last Laugh); "The first spell each player casts during each of their turns may be cast without paying its mana
+   cost" (Weftwalking, payZero eachPlayerFirst); "a creature card with equal or lesser toughness from your hand" (Bane,
+   Lord of Darkness); "cards with flashback you own in exile" (Seize the Storm); "Whenever a creature enters, if it
+   entered from your graveyard or you cast it from your graveyard, return this card from your graveyard" (Prized
+   Amalgam, StaticCondition subjectFromYourGraveyard); "If you don't put it onto the battlefield, put it into your hand"
+   (N'Yami-Class Mother Ship); "Once during each of your turns, you may cast an instant or sorcery spell from your hand
+   without paying its mana cost" (Zaffai and the Tempests); "cloak two of them" (Hide in Plain Sight); "You may cast a
+   ... spell from your graveyard with mana value less than or equal to that spell's mana value" without exiling it
+   (Counterpoint, castFromHand yardNoExile); "They gain control of ~" after "target opponent" (Pumpkin Bombs); "For
+   each player, choose friend or foe" (Pir's Whim, Virtus's Maneuver, Khorvath's Fury: eachChooses byYou, a new
+   friend-or-foe prompt for each player, e2e round218.spec.ts); "Whenever a permanent you control transforms into a
+   Phyrexian" (Norn's Inquisitor, trigger permanentTransformsInto, CR 701.27e). +18 (28,122 of 31,936 with Lane B rounds B46 and B47).
+   Out after round 218 (looked at, not done): Kathril, Aspect Warper (a counter per keyword, onto any creature,
+   including the hexproof-from variants per its rulings); Key to the Side-Door (a discard cost "with the same name as a
+   legendary permanent you control"); Sivriss, Nightmare Speaker (a per-opponent loop binding "that player"); Sanctuary
+   Blade (a color chosen each time it becomes attached); Eater of Virtue (keywords of the cards exiled with it); Life and
+   Limb (Forests that are Saprolings and Saprolings that are Forests, a layer 4 dependency); Tombstone Stairwell (tokens
+   "created with this enchantment" destroyed at each end step); Inferno of the Star Mounts ("when its power becomes 20
+   this way"); Anzrag's Rampage (put a creature card from among the exiled ones onto the battlefield, return it at end
+   step); Regna's Sanction and Zndrsplt's Judgment (friend or foe with "chooses one ..., then taps the rest" and "a
+   token that's a copy of a creature they control"; Lane B's range); Swooping Pteranodon (a delayed trigger in which a
+   target land deals the damage); Hellish Rebuke; Osteomancer Adept; Hostile Negotiations; Unexplained Absence.
+   Round 219: the Will of the Planeswalkers paths (Path of the Enigma, Animist, Ghosthunter, Pyromancer, Schemer: a
+   planeswalk-or-chaos vote, both no-ops outside Planechase, CR 701.31a, 311.7); "Players can't draw cards" (Maralen of
+   the Mornsong, Mornsong Aria: draw() stops, CR 121); "Lethal damage dealt to creatures you control is determined by
+   their power rather than their toughness" (Zilortha, cards.ts lethalLeft, CR 120.6, 704.5g); "skip their next X
+   turns, where X is the number of coins that came up heads" (Ral Zarek, Guest Lecturer); "Any player may cast
+   creature spells with mana value 3 or less without paying their mana costs and as though they had flash" (Aluren,
+   payZero anyPlayer flash; the app now holds priority for it, e2e round219.spec.ts); "if that player controls Kain,
+   ..." after giving it away (Kain, Traitorous Dragoon); "attacks an opponent with the most life among your opponents
+   each combat if able" (Galactus, mustAttackMostLife, CR 508.1d); a choice of three counters as it enters and "put the
+   same number of each kind of counter" (Denry Klin, e2e round219.spec.ts); "exile ... and put a hit counter on that
+   card" and "loses the game if they own three or more exiled cards with hit counters" (Etrata). +14 (28,136 of
+   31,936 with Lane B B46 and B47).
+   Out after round 219 (looked at, not done): Omen Machine (a mandatory "casts it without paying its mana cost if
+   able"); Rebbec, Architect of Ascension (protection from each mana value of artifacts you control); Nissa, Worldsoul
+   Speaker (paying {E} for each mana of a permanent spell's cost); Yusri, Fortune's Flame (choose a number, flips lost,
+   "if you won five flips", free casts for the turn); Party Dude ("Whenever one or more of your opponents are
+   attacked"); Feather, the Redeemed; Maralen, Fae Ascendant.
+   Round 220: "each Vehicle you control gets +1/+1 as long as it's a creature" and a paid "reveal the top X cards, put
+   all Dwarf and Vehicle cards into your hand" (Depala, Pilot Exemplar); "If it's an Equipment, attach it to ~" after
+   a put from hand (The Invincible Iron Man, CR 701.3); "When you do, return target Equipment card ... then attach it
+   to that token" (Ratonhnhaké꞉ton, CR 603.12); "up to one other target creature loses all abilities and becomes a
+   green Lizard" (Lizard, Connors's Curse); "for as long as that creature has a bounty counter on it, it has ..."
+   (Mathas, Fiend Seeker); "enchanted creature or another modified creature you control dies" (One with the Kami, CR
+   700.9); "choose up to X, where X is ..." (Bumi, King of Three Trials: the most modes counted as it triggers, CR
+   603.3c); "remove up to three stun counters from among all permanents. Draw cards equal to the number removed" (Sensational
+   Spider-Man: the distribute picker's remove mode, e2e round220.spec.ts); "if you control eight or more lands, repeat
+   this process once" (Zimone and Dina); a fight "with the same mana value" and "a creature that fought this turn"
+   (Boxing Ring); "if her sneak cost was paid this turn, instead return that card to the battlefield" (Karai, Future of
+   the Foot); "If you don't, scry 1" after a free cast from hand (In Search of Greatness); "if ~ attacked this combat,
+   target creature an opponent controls blocks that Wolf this combat if able" (Tolsimir, Midnight's Light); "if that
+   player attacked you during their last turn" (O-Kagachi, Vengeful Kami); "cloak a card from your hand" (Vannifar,
+   Evolved Enigma, e2e round220.spec.ts); trample over planeswalkers (Thrasta, Tempest's Roar, CR 702.19c-e, in
+   dealCombatDamage); "reveal ... until you reveal a card that shares a card type with that permanent" (Reality
+   Scramble). +17 (28,153 of 31,936).
+   Smaller gaps from round 220: Ratonhnhaké꞉ton's reflexive return is about the first token only when a token doubler
+   makes more; Karai's "her sneak cost was paid this turn" needs Karai still on the battlefield as the same object; the
+   Iron Man test runs its back face as a card of its own; bots choose Vannifar's mode like any modal trigger.
+   Out after round 220 (looked at, not done): Ghost of Ramirez DePietro (no record yet of a card discarded this turn,
+   only of cards put into a graveyard from a library); Reservoir Kraken ("any opponent may tap an untapped creature they
+   control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
+   instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
+   this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (a Tarmogoyf token isn't a predefined token);
+   Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
+   creature); Yidris, Maelstrom Wielder (cascade on spells cast from hand for the turn); Animal Friend (a quoted
+   ability that refers to its source); Hive Mind.
+   Round 221: "put a +1/+1 counter on target creature and goad it" (Bhaal, Lord of Murder); "the number of cards you
+   own in exile" (Cosmogoyf); "{C} for each artifact you control named ~" (Powerstone Shard); "enters or becomes the
+   target of a spell or ability an opponent controls" (Shield Mare); "counter that spell unless you sacrifice a
+   creature" (Blood Funnel); "are artifacts in addition to their other types" (The Flesh Is Weak); "creatures with no
+   +1/+1 counters on them" (Hindervines); "put its counters on this creature" (Buzzard-Wasp Colony, and with it Host
+   of the Hereafter); hellbent "skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10);
+   cards a search exiled "with ~" (Endless Horizons, CR 607.2a); cast from your graveyard for {1} more per other
+   creature card (Risen Executioner, CR 601.2f); hexproof from card types (Nevinyrral, Urborg Tyrant, CR 702.11d);
+   "remove an eon counter ... and return it to its owner's hand" as costs (Magosi, the Waterveil: with both abilities
+   in one turn the skipped turn is the extra one, rulings); "one mana of any color among cards in your graveyard"
+   (Corrupted Grafstone); "sacrifice a creature or sacrifice a modified creature ... If the modified creature was
+   sacrificed" (Lethal Throwdown: the way chosen to pay, SpellCondition costOrPaid); convoke or improvise for the next
+   spell or the first spell of a kind each turn (Flockchaser Phantom, Peri Brown, The Fifteenth Doctor); "put all cards
+   exiled with it onto the battlefield" (Underworld Sentinel); "spells that target ~ cost {2} less" (Spellwild Ouphe);
+   two "costs {1} less" conditions (Geistlight Snare); "power or toughness 6 or greater" (Rootless Yew); "it deals 2
+   damage to each creature without flying that player controls" (Siege Dragon); "If it's an Equipment, unattach it"
+   (Tamiyo's Compleation); "If an outlaw was sacrificed this way" (Boneyard Desecrator, CR 700.12); "sacrifice another
+   creature or token" (Ice Cream Kitty); "Put a land card from among the milled cards into your hand. If you can't,
+   create a Treasure token" (Patient Naturalist). +28 (28,181 of 31,936).
+   Smaller gaps from round 221: Endless Horizons' search is played by bots as an "away" search, so they may exile few
+   Plains; Peri Brown and The Fifteenth Doctor count spells of that kind cast this turn, so a spell cast before either
+   arrived uses up the turn's first one (as the rules say).
+   Out after round 221 (looked at, not done): New Perspectives ({0} instead of every cycling cost, non-mana ones
+   included); Clay Golem (a die roll as a cost); Ian the Reckless (damage to you and any target at once); Tesak,
+   Judith's Hellhound (granted unleash); Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
+   Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
+   suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
+   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles); Ib Halfheart, Goblin Tactician
+   ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
+   (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
+   Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
+   among cards).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -3110,7 +3241,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "sacrifice any number of creatures" as X (Vicious Betrayal), "the damage already dealt to it this turn" (Whipkeeper),
   "Target player dealt damage by ~ this turn" (Wicked Akuba), "discards a card with that name. If they can't, you draw
   a card" (Brain Pry), "choose two cards from it. Put them on top of that player's library in any order" (Agonizing
-  Memories), and "You may put one of those cards on top of your library" (Voda Sea Scavenger). +24 (28,107 of 31,936).
+  Memories), and "You may put one of those cards on top of your library" (Voda Sea Scavenger). +24 (28,205 of 31,936 with rounds 217 to 221).
 - Out after round B48 (looked at, not done): Dwarven Sea Clan (a target "whose controller controls an Island", damage
   at end of combat, "before the end of combat step"), Feint (tap the target's blockers, prevent its and their combat
   damage), Blood Oath ("Choose a card type" as a spell instruction), Specter's Shriek (exile a chosen card, then a
@@ -3140,7 +3271,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   less" (Eagle's Rescue), kicked "that creature can't be regenerated this turn and if it would die this turn, exile it
   instead" (Scorching Lava), "Return target card from an opponent's graveyard to their hand" (Forcemage Advocate,
   Shieldmage Advocate), "Sacrifice a Room" (Intruding Soulrager), and "creatures that have -1/-1 counters on them"
-  (Grind // Dust). +26 (28,133 of 31,936).
+  (Grind // Dust). +26 (28,231 of 31,936 with rounds 217 to 221).
 - Out after round B49 (looked at, not done): Anthropede ("discard a card or pay {2}" as one cost choice), Retribution
   and Barrin's Spite (the targets' controller chooses one of them), Goblin Test Pilot (a random target as it's
   activated), Ley Line and Mausoleum Turnkey (another player chooses the target), Tamanoa and Molten Lavamancer
@@ -3165,7 +3296,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control no permanents other than ~ and have no cards in hand" (Barren Glory), "Tap three untapped Advisors,
   Artificers, and/or Monks" (The Archimandrite), "Whenever a creature is put into your graveyard from the battlefield,
   you may pay {1}{W}. If you do, return that card" (Sigil of the New Dawn), Clockwork Hydra, Grozoth, Tibalt, the
-  Fiend-Blooded, Trade Route Envoy and Witness the Future (rewordings). +33 (28,166 of 31,936).
+  Fiend-Blooded, Trade Route Envoy and Witness the Future (rewordings). +33 (28,264 of 31,936 with rounds 217 to 221).
 - Out after round B50 (looked at, not done): Decaying Soil (now unsupported on purpose: a threshold-granted "Whenever a
   nontoken creature is put into your graveyard from the battlefield" must look back in time, CR 603.10a, so the
   creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage
@@ -3198,7 +3329,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   4/2" (Mirkwood Meditator), "As long as you control enchanted creature ... Otherwise, it can't block" (Mishra's
   Domination), "if enchanted creature is red" (Ray of Frost), "becomes blocked by one or more colorless creatures"
   (Hedron Blade), "As long as you've surveilled this turn" (Darkblade Agent: surveil now tracked apart from scry),
-  "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,198 of 31,936).
+  "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,296 of 31,936 with rounds 217 to 221).
 - Out after round B51 (looked at, not done): Backfire ("that much damage" from damage the enchanted creature dealt to
   you), Equal Treatment and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
   (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may

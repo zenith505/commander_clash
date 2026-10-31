@@ -75,6 +75,12 @@ export function parseGraveyardKeyword(
   // permission with an alternative cost (CR 118.9), so at the usual timing (rulings).
   if ((m = /^You may cast (?:~|this card) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) rather than paying its mana cost\.?$/.exec(line)))
     return parseManaCost(m[1]!).supported ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [], exile: false } } : "fail";
+  // Risen Executioner: "You may cast ~ from your graveyard if you pay {1} more to cast it for each other creature card in
+  // your graveyard": a permission with a cost increase (CR 601.2f), at the usual timing (rulings).
+  if ((m = /^You may cast (?:~|this creature) from your graveyard if you pay \{1\} more to cast it for each (.+)\.$/.exec(line))) {
+    const more = parseCount(m[1]!, null, true);
+    return more ? { fromGraveyard: { kind: "permission", costs: [], exile: false, more } } : "fail";
+  }
   if (/^You may cast (?:~|this card) from your graveyard or from exile\.?$/.test(line)) return { fromExile: true, fromGraveyard: { kind: "permission", costs: [], exile: false } };
   if ((m = /^You may cast (?:~|this card|this creature) from your graveyard(?: (?:as long as|if) (.+?))?(?: by (.+?) in addition to paying its other costs)?$/.exec(line.replace(/\.$/, "")))) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
@@ -1424,6 +1430,8 @@ export function textKeywords(line: string): string[] {
     if (/^(?:protection|hexproof) from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
     const tox = /^toxic (\d+)$/i.exec(p);
     if (tox) out.push(`Toxic ${tox[1]}`);
+    // Scryfall's keyword list leaves it out (Thrasta, Tempest's Roar): CR 702.19c.
+    if (/^trample over planeswalkers$/i.test(p)) out.push("Trample over planeswalkers");
   }
   return out;
 }

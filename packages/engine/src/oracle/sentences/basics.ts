@@ -211,9 +211,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Magmatic Hellkite: "destroy target nonbasic land an opponent controls. Its controller searches their library for a
   // basic land card, puts it onto the battlefield tapped with a stun counter on it, then shuffles": that land's controller
   // (as it last existed, CR 608.2h) must search (rulings).
-  if ((m = /^([Tt]arget player|[Tt]arget opponent|That player|Its controller) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped(?: with a stun counter on it)?)?, then shuffles$/.exec(s))) {
+  // Maralen of the Mornsong: "that player loses 3 life, searches their library for a card, puts it into their hand, then
+  // shuffles": the player the trigger is about.
+  if ((m = /^([Tt]arget player|[Tt]arget opponent|That player|Its controller) searches their library for (.+?), puts (it|that card) (?:onto the battlefield( tapped(?: with a stun counter on it)?)?|(into their hand)), then shuffles$/.exec(s))) {
     const who = m[1] === "Its controller" ? (ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
-    const fx = who && parseSearch(`Search your library for ${m[2]!}, put ${m[3]} onto the battlefield${m[4] ?? ""}, then shuffle`);
+    if (m[5] && m[1] !== "That player") return null;
+    const fx = who && parseSearch(`Search your library for ${m[2]!}, put ${m[3]} ${m[5] ? "into your hand" : `onto the battlefield${m[4] ?? ""}`}, then shuffle`);
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ ...fx[0]!, who: who! }];
   }
@@ -253,10 +256,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles" (Field of
   // Ruin, Avatar of Growth): each player chooses in APNAP order, then the cards go there at the same time (CR 101.4).
-  if ((m = /^[Ee]ach player searches their library for (.+?), puts (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffles$/.exec(s))) {
-    const fx = parseSearch(`Search your library for ${m[1]!}, put ${m[2]!} ${m[3]!.replace(/ their hand$/, " your hand")}, then shuffle`);
+  // Pir's Whim: "Each friend searches ..." (each player who chose friend).
+  if ((m = /^[Ee]ach player(?: who chose ([a-z]+))? searches their library for (.+?), puts (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffles$/.exec(s))) {
+    if (m[1] && !ctx.chooseWords?.includes(m[1])) return null;
+    const fx = parseSearch(`Search your library for ${m[2]!}, put ${m[3]!} ${m[4]!.replace(/ their hand$/, " your hand")}, then shuffle`);
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
-    return [{ ...fx[0]!, who: { ref: "eachPlayer" } }];
+    return [{ ...fx[0]!, who: m[1] ? { ref: "choseWord", option: m[1] } : { ref: "eachPlayer" } }];
   }
   // "Each player may search their library for up to two basic land cards, put them onto the battlefield, then shuffle"
   // (Veteran Explorer), "each opponent may search ... for a creature card and put it onto the battlefield. Then each
@@ -869,6 +874,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile", filter }], otherwise: [discard], keep: true, text: `${capital(m[1]!)} rather than discard a card` }];
   }
+  // Blood Funnel: "Whenever you cast a noncreature spell, counter that spell unless you sacrifice a creature": you choose as
+  // the trigger resolves; with no creature, or choosing not to, the spell is countered (as with Bog Elemental's).
+  if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless you sacrifice an? (creature|artifact|land|enchantment)$/i.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: m[1]! }, n: 1, action: "sacrifice" }], otherwise: [{ type: "counterCause" }], keep: true, text: `Sacrifice a ${m[1]} so that spell isn't countered` }];
+  }
   // Custody Battle's granted "target opponent gains control of ~ unless you sacrifice a land": sacrifice one to keep it;
   // otherwise that opponent controls it for the rest of the game (layer 2).
   if ((m = /^([Tt]arget opponent) gains control of ~ unless you sacrifice (an? (?:land|creature|artifact))$/.exec(s))) {
@@ -1412,7 +1424,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "~ deals damage to each player equal to twice the number of nonbasic lands that player controls" (Price of
   // Progress): each player their own amount, all dealt at once (CR 120.3).
-  if ((m = /^~ deals damage to (each player|each opponent) equal to (twice )?the number of (.+)$/i.exec(s))) {
+  if ((m = /^~ deals damage to (each player|each opponent|each player who chose [a-z]+) equal to (twice )?the number of (.+)$/i.exec(s))) {
     const to = parseDamageRecipient(m[1]!, ctx);
     ctx.eachOne = true;
     const c = parseCount(m[3]!, ctx);

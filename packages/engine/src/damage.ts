@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { abilitiesOf, cardIdOf, defOf, toughness, wasCastThisTurn } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, lethalLeft, toughness, wasCastThisTurn } from "./cards";
 import { isRingBearer } from "./effects/run-ring";
 import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
@@ -90,7 +90,7 @@ export function lethalAmounts(s: GameState, src: DamageSource, o: GameObject): n
   const c = characteristics(s, o);
   const out: number[] = [];
   if (c.types.includes("Creature")) {
-    const left = Math.max(0, toughness(s, o) - o.damage);
+    const left = lethalLeft(s, o);
     out.push(has(src, "Deathtouch") ? Math.min(left, 1) : left);
   }
   if (c.types.includes("Planeswalker")) out.push(o.counters.loyalty ?? 0);

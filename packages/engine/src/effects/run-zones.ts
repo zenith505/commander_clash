@@ -357,7 +357,9 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
       continue;
     }
     const taken = new Set(Object.values(yp.picked).flat());
-    const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && isPermanentCard(defOf(s, obj(s, id))));
+    // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
+    const toHand = e.dest === undefined;
+    const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
     const max = Math.min(e.n, cards.length);
     // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
     if ((!e.upTo && cards.length <= e.n) || !cards.length) {
@@ -369,12 +371,19 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : e.fromYours ? ` in ${player(s, ctx.controller).name}'s graveyard` : "";
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
+    const what = e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: toHand ? "hand" : "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
   // Each under its owner's control, or all under yours when you chose them (Breach the Multiverse, CR 110.2a).
   const moves = Object.entries(yp.picked).flatMap(([pid, ids]) => ids.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, pid: Number(pid) as PlayerId })));
+  // Ill-Gotten Gains: each into its owner's hand, all at the same time.
+  if (e.dest === undefined) {
+    for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to their hand.`);
+    for (const { id } of moves) moveObject(s, id, "hand");
+    return;
+  }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
   for (const { id, pid } of moves) log(s, e.youChoose || e.underYours ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller || e.fromYours ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
   enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}) })));
@@ -413,7 +422,7 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
         hp.queue.shift();
         continue;
       }
-      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true };
+      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true, ...(e.cloak ? { cloak: true as const } : {}) };
       return "paused";
     }
     const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
@@ -431,9 +440,9 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
       for (const [pid, ids] of Object.entries(hp.picked)) {
         const mine = ids.filter((id) => obj(s, id).zone === "hand");
         if (!mine.length) continue;
-        log(s, `${player(s, Number(pid) as PlayerId).name} manifests ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature.`);
+        log(s, `${player(s, Number(pid) as PlayerId).name} ${e.cloak ? "cloaks" : "manifests"} ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature${e.cloak ? " with ward {2}" : ""}.`);
         for (const id of mine) {
-          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: "manifest" });
+          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: e.cloak ? "cloak" : "manifest" });
           if (obj(s, id).zone === "battlefield") s.resolving!.created!.push(id);
         }
       }
@@ -1021,10 +1030,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // From the graveyard: "if that spell would be put into your graveyard, exile it instead" applies to the spell it became.
       if (sc.castFromHand === "cast" && e.fromGraveyard && sc.castFromYard) {
         const o = s.objects[sc.castFromYard];
-        if (o?.zone === "stack") o.exileIfToGraveyard = true;
+        if (o?.zone === "stack" && !e.yardNoExile) o.exileIfToGraveyard = true;
         sc.castFromYard = undefined;
       }
-      if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
+      if (sc.castFromHand === "cast" || sc.castFromHand === "none") {
+        // In Search of Greatness: "If you don't": whether the spell was cast (it's on the stack now).
+        if (e.setsDid) s.resolving!.did = sc.castFromHand === "cast" && s.objects[sc.castFromHandId ?? ""]?.zone === "stack";
+        return;
+      }
+      if (e.setsDid) s.resolving!.did = false;
       // Jace's Mindseeker: the cards this resolution milled, still where they went.
       const milled = e.milled ? [...(s.resolving!.milled ?? []), ...(s.resolving!.milledExiled ?? [])].filter((m) => s.objects[m.id] && (s.objects[m.id]!.zoneChanges ?? 0) === m.zc).map((m) => m.id) : undefined;
       const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
@@ -1054,6 +1068,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const id = sc.castFromHand;
       sc.castFromHand = "cast";
+      sc.castFromHandId = id;
       if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
@@ -2040,6 +2055,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Deathrender: attached if it could be, otherwise it stays unattached (CR 701.3b; rulings).
           if (e.attachSelf && self) attachTo(s, self, o);
+          // The Invincible Iron Man: an Equipment attached to the source after it enters, if it could be (CR 701.3b).
+          if (e.equipToSelf && self && objIsType(s, o, "Artifact") && characteristics(s, o).subtypes.includes("Equipment")) attachTo(s, o, self);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {
             const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";
@@ -2283,7 +2300,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "chooseFromGraveyard": {
-      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent") return eachFromGraveyard(s, e, ctx, src);
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent" || e.who?.ref === "choseWord") return eachFromGraveyard(s, e, ctx, src);
       if (e.fromExile) {
         // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
         // Oblivion Sower: that player's face-up land cards in exile, onto the battlefield under your control.
@@ -2347,6 +2364,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
             moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
             if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
+            if (e.alsoMods && o.zone === "battlefield") {
+              s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+              invalidateCharacteristics(s);
+            }
             continue;
           }
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);

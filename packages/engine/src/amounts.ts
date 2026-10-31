@@ -418,7 +418,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
       if (c.greatestMv) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => defMv(defOf(s, s.objects[id]!)))));
       // Revivify: only those put there from the battlefield this turn.
-      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn)).length, 0);
+      // Risen Executioner: "each other creature card": not the source.
+      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn) && !(filter?.notSource && id === ctx.sourceId)).length, 0);
     }
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));
@@ -830,7 +831,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const filter = c.filter && { ...named(c.filter), ...(c.filter.anyOf ? { anyOf: c.filter.anyOf.map(named) } : {}) };
       // With no filter (Dreadlight Monstrosity: "if you own a card in exile"), any card, face down or not.
       const fits = (id: ObjectId) => !filter || (!s.objects[id]!.faceDown && printedMatches(filter, defOf(s, s.objects[id]!)));
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
+      const marked = (id: ObjectId) => !c.counter || (s.objects[id]!.counters[c.counter] ?? 0) > 0;
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id) && marked(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
     }
     case "greatestMvInExile":
       return Math.max(0, ...s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => (s.objects[id]!.faceDown ? 0 : defMv(defOf(s, s.objects[id]!))))));

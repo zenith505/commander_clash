@@ -1387,6 +1387,8 @@ function joinForcesAmount(s: GameState, pid: PlayerId, max: number): number {
   const paid = r.scratch?.join?.paid ?? 0;
   const me = player(s, pid);
   const mine = r.item.controller === pid;
+  // Mana-Charged Dragon: "~ gets +X/+0 until end of turn" helps only its controller: nothing from anyone else.
+  if (fx.every((e) => e.type === "joinForces" || (e.type === "continuous" && e.what.ref === "self"))) return mine ? max : 0;
   let room = Infinity;
   for (const e of fx) {
     if (e.type === "draw" || (e.type === "mill" && mine)) room = Math.min(room, me.library.length - 1 - paid);
@@ -4134,6 +4136,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
+      // Metzali's "Choose a creature at random that attacked this turn. Destroy that creature.": only when none of them are
+      // ours and there is one.
+      const randomKill = ab.body.effects.find((e) => e.type === "destroyRandom");
+      if (randomKill?.type === "destroyRandom") {
+        const pool = s.battlefield.filter((x) => objectMatches(s, randomKill.filter, obj(s, x), pid, false));
+        if (!pool.length || pool.some((x) => controllerOf(s, obj(s, x)) === pid)) continue;
+      }
       // "When that creature dies this turn, ..." alone (Together Forever): nothing until it would die, which bots don't foresee.
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.

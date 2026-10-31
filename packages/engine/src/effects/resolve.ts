@@ -1041,6 +1041,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "meld":
     case "sacrificeEach":
     case "sacrificeRandom":
+    case "destroyRandom":
     case "keepRest":
     case "keepDestroyRest":
     case "empowerJace":
@@ -1072,6 +1073,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnExiled":
     case "exileIfDies":
     case "exileDyingThisTurn":
+    case "exileUncastThisTurn":
     case "noSearchThisTurn":
     case "exileReturnThisTurn":
     case "exileIfLeaves":
@@ -1348,7 +1350,10 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled.`);
     return;
   }
-  if ((compileCard(d).rebound || o.reboundGained) && o.castFrom === "hand" && !o.exileIfLeaves) {
+  // Cast Through Time: rebound from a permanent its controller controls as the spell finishes resolving (rulings). Buyback
+  // paid as well is a choice between the two (rulings); the buyback the caster paid for is kept.
+  const reboundFrom = !o.buyback && !compileCard(d).rebound && !o.reboundGained && o.castFrom === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === item.controller && (abilitiesOf(s, obj(s, id)).spellsHaveRebound ?? []).some((f) => spellMatches(s, f, item)));
+  if ((compileCard(d).rebound || o.reboundGained || reboundFrom) && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");
     log(s, `${d.name} is exiled (rebound).`);
     addDelayed(s, "yourNextUpkeep", controller, o, { targets: [], effects: [{ type: "castFromExileFree" }], text: "Rebound: you may cast ~ from exile without paying its mana cost." });

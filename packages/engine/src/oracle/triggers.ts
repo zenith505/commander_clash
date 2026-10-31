@@ -1573,6 +1573,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let perPlayer = false;
   // "When you attack with three or more creatures, transform ~" (Legion's Landing): "when" and "whenever" trigger alike.
   line = line.replace(/^When you attack with /, "Whenever you attack with ");
+  // Path of Mettle: "Whenever you attack with at least two creatures that have first strike, double strike, vigilance,
+  // and/or haste": two or more attackers with any of those, as they're declared.
+  line = line.replace(/^Whenever you attack with at least (two|three|four) creatures that have ((?:[a-z ]+, )+and\/or [a-z]+), /, "Whenever you attack with $1 or more creatures with $2, ");
   // Rigo, Streetwise Mentor: "Whenever you attack a player or planeswalker with one or more creatures with power 1 or
   // less": once for each player and each planeswalker those creatures attack (CR 508.3a, 508.3e), not a battle.
   const youAttackAPlayer = /^Whenever you attack a player( or planeswalker)?( with one or more [^,]+)?, /.exec(line);
@@ -1634,7 +1637,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     phrase = m[1];
     bodyText = m[2]!;
     anyone = true;
-  } else if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more (.+?)|you attack), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more ((?:[^,]+?, )+and\/or [a-z ]+?|.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;

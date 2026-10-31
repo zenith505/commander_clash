@@ -1488,6 +1488,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^(Target (?:player|opponent) loses \d+ life) and reveals their hand\.$/, "$1. That player reveals their hand.");
   // Rookie Mistake: "Until end of turn, target creature gets +0/+2 and another target creature gets -2/-0": each until end
   // of turn, two different targets.
+  // Battle of Frost and Fire: "Whenever you cast a spell with mana value 5 or greater this turn, draw two cards, then
+  // discard a card." (a chapter ability's instruction) is a delayed triggered ability until end of turn (CR 603.7c).
+  text = text.replace(/^Whenever you cast ([^,]+?) this turn, /, "Until end of turn, whenever you cast $1, ");
+  // Frenzied Fugue: "gain control of enchanted permanent until end of turn. Untap that permanent." is the enchanted one.
+  text = text.replace(/\b([Gg]ain control of enchanted (permanent|creature) until end of turn\. )Untap that \2\./, "$1Untap enchanted $2.");
+  // Path of Mettle: "each creature that doesn't have first strike, double strike, vigilance, or haste" is each creature
+  // without any of them.
+  text = text.replace(/\b(each creature|creatures) that (?:doesn't|don't) have ((?:[a-z ]+, )+or [a-z]+)(?=\.)/g, "$1 without $2");
   text = text.replace(/^Until end of turn, target creature (gets [+-]\d+\/[+-]\d+) and another target creature (gets [+-]\d+\/[+-]\d+)\.$/, "Target creature $1 until end of turn. Another target creature $2 until end of turn.");
   // Stinging Vitriol: "That player reveals their hand. You choose a nonland card from it. They discard that card.": the
   // same as "... That player discards that card.", "they" being that player.
@@ -3217,8 +3225,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Graveyard Shovel: "Target player exiles a card from their graveyard. If it's a creature card, you gain 2 life.": the
     // card they exiled, by its printed characteristics; nothing if their graveyard was empty.
-    const lastYard = effects[effects.length - 1];
-    const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && !lastYard.upTo && lastYard.dest === "exile" && !lastYard.anyNumber ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
+    // Deathbonnet Hulk: "you may exile a card from a graveyard. If a creature card was exiled this way, put a +1/+1 counter
+    // on ~": the same, about the card exiled (none if you didn't).
+    const lastYard0 = effects[effects.length - 1];
+    const lastYard = lastYard0?.type === "may" && lastYard0.effects.length === 1 && lastYard0.effects[0]!.type === "chooseFromGraveyard" && lastYard0.effects[0]!.anyGraveyard ? lastYard0.effects[0]! : lastYard0;
+    const yardIs = lastYard?.type === "chooseFromGraveyard" && lastYard.n === 1 && lastYard.dest === "exile" && !lastYard.anyNumber ? (lastYard.upTo ? null : /^If it's an? (.+? card), (.+)$/.exec(s)) ?? (lastYard.anyGraveyard ? /^If an? (.+? card) was exiled this way, (.+)$/.exec(s) : null) : null;
     if (yardIs) {
       const filter = parseSearchFilter(yardIs[1]!);
       const then = filter && parseOne(capital(yardIs[2]!), ctx);
@@ -3363,7 +3374,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // none, chosen as it resolves (CR 701.20a); the rest only if one was revealed.
     // Sarkhan, Dragon Ascendant: "You may behold a Dragon. If you do, ...": a Dragon you control or a Dragon card revealed
     // from your hand (CR 701.4a), chosen as it resolves.
-    const revealOne = /^[Yy]ou may (?:reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand|behold an? ([A-Z][a-z]+))$/.exec(s);
+    // Invasion of the Giants: "Then you may reveal a Giant card from your hand. When you do, ~ deals 2 damage to target
+    // opponent or planeswalker.": revealing one triggers a reflexive ability (CR 603.12), its target chosen then.
+    const revealOne = /^(?:Then )?[Yy]ou may (?:reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand|behold an? ([A-Z][a-z]+))$/.exec(s);
+    const revealWhen = revealOne && !revealOne[2] ? /^When you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (revealOne && revealWhen && si + 2 === sentences.length) {
+      const filter = parseSearchFilter(`${revealOne[1]} card`);
+      const reflexive = filter ? reflexiveBody(revealWhen[1]!, ctx) : null;
+      if (!filter || !reflexive) return null;
+      effects.push({ type: "revealFromHand", filter, one: true }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: [{ type: "reflexive", body: reflexive }] });
+      si++;
+      continue;
+    }
     const revealDo = revealOne && /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
     if (revealOne && revealDo && (!revealOne[2] || CREATURE_TYPES.has(revealOne[2]))) {
       const filter = parseSearchFilter(`${revealOne[1] ?? revealOne[2]} card`);
@@ -4150,7 +4172,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // (CR 608.2d), and what happens either way is yours to do.
     // Join forces (Minds Aglow, Collective Voyage, Alliance of Arms): "Starting with you, each player may pay any amount of
     // mana. Each player draws X cards, where X is the total amount of mana paid this way."
-    if (/^Starting with you, each player may pay any amount of mana$/.test(s)) {
+    // Mana-Charged Dragon: "each player starting with you may pay any amount of mana" is the same.
+    if (/^(?:Starting with you, each player|[Ee]ach player starting with you) may pay any amount of mana$/.test(s)) {
       // "..., where X is the total amount of mana paid this way, puts them onto the battlefield tapped" (Collective Voyage).
       const where = /^(.+?), where X is the total amount of mana paid this way(, .+)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!where) return null;
@@ -4696,6 +4719,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Metzali, Tower of Triumph: "Choose a creature at random that attacked this turn. Destroy that creature.": any player's
+    // creature declared as an attacker this turn (not one put onto the battlefield attacking), chosen as it resolves with
+    // nothing in between (rulings); not targeted.
+    const randomPick = /^Choose an? (creature|permanent) at random that attacked this turn$/.exec(s);
+    if (randomPick && sentences[si + 1]?.replace(/\.$/, "") === `Destroy that ${randomPick[1]}`) {
+      const filter = parseTargetPhrase(`${randomPick[1]} that attacked this turn`);
+      if (filter?.kind !== "object" || filter.combat !== "attackedThisTurn") return null;
+      effects.push({ type: "destroyRandom", filter });
+      si++;
+      continue;
+    }
+    // Bruse Tarl, Roving Rancher: "Exile the top card of your library. If it's a land card, create a 2/2 white Ox creature
+    // token. Otherwise, you may cast it until the end of your next turn." The card as it is in exile, face up (CR 406.3): a
+    // land gets the token and no permission (a land can't be cast, CR 305.9), anything else the permission.
+    const landElseCast = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If it's an? (land card), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    const elseCast = landElseCast ? /^Otherwise, you may cast (?:it|that card) (this turn|until the end of your next turn)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
+    if (landElseCast && elseCast && !/\b(?:it|its|that card)\b/.test(landElseCast[2]!)) {
+      const filter = parseSearchFilter(landElseCast[1]!);
+      const before = ctx.targets.length;
+      const then = parseOne(capital(landElseCast[2]!), ctx);
+      if (!filter || !then || ctx.targets.length !== before || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "impulse", n: 1, until: elseCast[1] === "this turn" ? "thisTurn" : "nextTurn", castOnly: true }, { type: "if", cond: { kind: "impulsedIs", filter }, effects: then });
+      ctx.exiledTop = true;
+      si += 2;
+      continue;
+    }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
     // Chaos Harlequin: "Exile the top card of your library. If that card is a land card, ~ gets -4/-0 until end of turn.
     // Otherwise, ~ gets +2/+0 until end of turn.": the card as it is in exile, face up (CR 406.3); nothing more about it.
@@ -4862,6 +4911,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects.at(-1);
       if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
       effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
+      continue;
+    }
+    // Isperia the Inscrutable: "choose a card name. That player reveals their hand. If a card with the chosen name is revealed
+    // this way, search ...": whether the hand just revealed holds one (nothing happens in between, rulings).
+    const nameRevealed = /^If a card with the chosen name is revealed this way, (.+)$/.exec(s);
+    if (nameRevealed) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal || !effects.some((e) => e.type === "choose" && e.choice === "cardName")) return null;
+      const before = ctx.targets.length;
+      const then = parseOne(capital(nameRevealed[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } } }, min: 1 }, effects: then });
       continue;
     }
     // Baleful Stare, Withering Gaze: "Target opponent reveals their hand. You draw a card for each Mountain and red card in
@@ -11266,7 +11327,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Choose a nonland card name. Target player reveals their hand and discards all cards with that name." (Cabal
     // Therapy): the name is chosen as it resolves (CR 201.4, 608.2d; rulings), and "that name" or "the chosen name" after
     // it is that one. One per ability.
-    const nameChoice = /^Choose (an? (?:[a-z]+(?:, | ))*?card name(?: other than a basic land card name)?)$/.exec(s);
+    const nameChoice = /^[Cc]hoose (an? (?:[a-z]+(?:, | ))*?card name(?: other than a basic land card name)?)$/.exec(s);
     if (nameChoice) {
       const c = parseCardNameChoice(nameChoice[1]!);
       if (!c || allEffects(effects).some((x) => x.type === "choose" && x.choice === "cardName")) return null;
@@ -13105,7 +13166,11 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   for (const p of parts) {
     // "that player discards a card and you untap all lands you control" (Sword of Feast and Famine): "you untap" is
     // "untap", done by the ability's controller.
-    const part = (p.charAt(0).toUpperCase() + p.slice(1)).replace(/^You (untap|tap|create|exile|destroy|return) /, (_, v: string) => `${capital(v)} `);
+    const part0 = (p.charAt(0).toUpperCase() + p.slice(1)).replace(/^You (untap|tap|create|exile|destroy|return) /, (_, v: string) => `${capital(v)} `);
+    // Dovin Baan: "Until your next turn, up to one target creature gets -3/-0 and its activated abilities can't be
+    // activated": the leading duration is for both parts.
+    const lead = p !== parts[0] ? /^Until (your next turn|end of turn), /.exec(s) : null;
+    const part = lead && /^Its activated abilities can't be activated$/.test(part0) ? `${part0} ${lead[1] === "end of turn" ? "this turn" : "until your next turn"}` : part0;
     // "Put a +1/+1 counter on ~ for each strength vote and create a 1/1 white Soldier creature token for each numbers vote"
     // (Lieutenants of the Guard): either part may count.
     const fx = attempt(ctx, () => parseSentence(part, ctx)) ?? attempt(ctx, () => parseForEach(part, ctx));

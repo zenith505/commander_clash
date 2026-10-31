@@ -711,6 +711,8 @@ export interface TargetSpec {
   foughtThisTurn?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
   attackedThisTurn?: true;
+  /** "A creature card with no abilities" (Fang-Druid Summoner): a card whose rules text is empty but for reminder text. */
+  noAbilities?: true;
   /** For players: "target player who lost life this turn" (Rix Maadi Guildmage): any life loss, damage or paid life too (CR 119.3). */
   lostLifeThisTurn?: true;
   /**
@@ -2608,6 +2610,8 @@ export type Effect =
   /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
+  /** Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (GameState.exileUncastTurn). */
+  | { type: "exileUncastThisTurn" }
   | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
   | { type: "noSearchThisTurn" }
@@ -2684,6 +2688,8 @@ export type Effect =
    * those they control (CR 701.21a), again while the last one sacrificed wasn't a land (`repeatNonland`).
    */
   | { type: "sacrificeRandom"; who: PlayerRef; repeatNonland?: true }
+  /** "Choose a creature at random that attacked this turn. Destroy that creature." (Metzali, Tower of Triumph): one of those matching `filter` as it resolves, not targeted. */
+  | { type: "destroyRandom"; filter: TargetSpec }
   | { type: "sacrifice"; what: ObjRef; byController?: true; /** "That player sacrifices that creature" (Lingering Death): only if the trigger's player controls it (CR 701.21a). */ byEventPlayer?: true }
   /**
    * Exploit (CR 702.110a-b): "you may sacrifice a creature". If the source is still on the battlefield as this
@@ -6345,6 +6351,8 @@ export interface CompiledCard {
   splitSecondIfArtifactMana?: true;
   /** Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a): spells of its controller's on the stack that match. */
   spellsHaveSplitSecond?: TargetSpec[];
+  /** Cast Through Time: "Instant and sorcery spells you control have rebound" (CR 702.88a), as they finish resolving. */
+  spellsHaveRebound?: TargetSpec[];
   /** "Instant and sorcery spells you control have lifelink" (Soulfire Grand Master), "... deathtouch" (Pestilent Spirit): its controller's spells that match, while it's on the battlefield, as their damage is dealt (CR 702.15b, 702.2b). */
   spellsHaveKeywords?: { filter: TargetSpec; keyword: "Lifelink" | "Deathtouch" }[];
   /**

@@ -340,6 +340,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who, options, effects: fx.map((e) => (e.type === "loseLife" && e.who.ref === "target" ? { ...e, who: { ref: "punished" as const } } : e)) }];
   }
+  // Umbilicus: "that player may pay 2 life. If they don't, they return a permanent they control to its owner's hand" (one
+  // sentence by now, body.ts): that player decides as it resolves, and chooses the permanent then, not targeted (rulings).
+  if (ctx.eventPlayer && (m = /^[Tt]hat player returns an? ([a-z]+) they control to its owner's hand unless they (pay \d+ life)$/.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    const options = parsePunisherOptions(m[2]!.replace(/^pay/, "pays"), ctx);
+    if (filter?.kind !== "object" || !options) return null;
+    return [{ type: "punisher", who: { ref: "eventPlayer" }, options, effects: [{ type: "pick", who: { ref: "punished" }, filter, n: 1, action: "bounce" }], penalty: `Return ${m[1] === "permanent" ? "a permanent" : `a ${m[1]}`} you control to its owner's hand` }];
+  }
   // Tyrannize: "Target player discards their hand unless they pay 7 life": that player decides as it resolves (CR 608.2d).
   if ((m = /^(Target player|Target opponent) discards their hand unless they (pay \d+ life)$/.exec(s))) {
     const before = ctx.targets.length;
@@ -680,6 +688,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     return who ? [{ type: "shuffleZones", who, hand: true, drawThatMany: true }] : null;
   }
+  // Sway of the Stars: "Each player shuffles their hand, graveyard, and all permanents they own into their library, then
+  // draws seven cards.": the permanents too, tokens ceasing to exist (rulings).
+  if (/^Each player shuffles their hand, graveyard, and all permanents they own into their library, then draws seven cards$/.test(s))
+    return [{ type: "shuffleZones", who: { ref: "eachPlayer" }, hand: true, graveyard: true, permanents: true }, { type: "draw", who: { ref: "eachPlayer" }, n: 7 }];
   // "..., then that player shuffles their hand into their library" (Jace, the Mind Sculptor): the player targeted before.
   if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent|[Tt]hat player) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard and hand|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };

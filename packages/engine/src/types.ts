@@ -2092,6 +2092,8 @@ export interface Resolving {
   exiled?: { o: GameObject; ch: Characteristics }[];
   /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */
   exiledCards?: ObjectId[];
+  /** The total toughness of what a returnExiled with `toughnessThisWay` returned (Count "returnedToughness"). */
+  returnedToughness?: number;
   /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
   faceDownExiled?: ObjectId[];
   /** The cards this resolution's linked exiles took (Mimic Vat's "each other card exiled with ~"). */

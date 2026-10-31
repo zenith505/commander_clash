@@ -458,13 +458,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         // Never Happened: the graveyard's cards too, after the hand's.
         const pool = e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
-        const cards = pool.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        const cards = pool.filter((id) => !filter || (e.anyFromYard && obj(s, id).zone === "graveyard") || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
         s.resolving!.exiledFromHandCards = [];
         // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
         const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         if (!cards.length || n <= 0) return;
-        const kind = e.filter?.text ?? "card";
+        const kind = e.anyFromYard ? `${e.filter?.text ?? "card"} from the hand or card from the graveyard` : e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
         const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
         s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
@@ -943,6 +943,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "shuffleZones": {
       const shuffled: [PlayerId, number][] = [];
+      if (e.permanents) {
+        // Sway of the Stars: all of them leave the battlefield at once (CR 101.4), each into its owner's library.
+        const who = new Set(players(s, e.who, ctx));
+        const leaving = s.battlefield.filter((id) => who.has(obj(s, id).owner));
+        if (leaving.length) log(s, `${src} puts ${leaving.map((id) => characteristics(s, obj(s, id)).name).join(", ")} into their owners' libraries.`);
+        for (const id of leaving) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "library");
+      }
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         // "Of the chosen type" (Elvish Soultiller): the type chosen as it resolved.
@@ -978,7 +985,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         shuffleLibrary(s, p);
         shuffled.push([pid, ids.length]);
         if (e.countThisWay && s.resolving) s.resolving.movedLinked = (s.resolving.movedLinked ?? 0) + ids.length;
-        log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"}`} into their library.`);
+        log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? (e.permanents ? "hand, graveyard and permanents" : "hand and graveyard") : e.hand ? "hand" : "graveyard"}`} into their library.`);
       }
       // Winds of Change: each draws as many as they shuffled into their own library (rulings).
       if (e.drawThatMany) for (const [pid, n] of shuffled) if (n && !player(s, pid).lost) draw(s, pid, n);
@@ -1229,6 +1236,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
+          // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many ...":
+          // the cards this exiled (Count "cardsExiledThisWay").
+          if (to.zone === "exile" && obj(s, id).zone === "exile" && e.dest.zone === "exile" && exiledFor(pid) === undefined) (r.exiledCards ??= []).push(id);
           // Endless Horizons: linked to the source as it is (CR 607.2a).
           if (to.linked && to.zone === "exile" && obj(s, id).zone === "exile" && ctx.sourceId && exiledFor(pid) === undefined) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.

@@ -229,6 +229,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const left = self?.zone === "battlefield" ? toughness(s, self) - (upkeepFx.selfCounter === "-1/-1" ? n : 0) : 0;
       return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
     }
+    // Psychic Vortex: keep drawing while the library has plenty left and the hand isn't overfull.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.drawCost) {
+      const n = s.resolving?.scratch?.n ?? 0;
+      return [{ type: "chooseMay", player: pid, yes: player(s, pid).library.length > n + 10 && n <= 4 }];
+    }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;
@@ -3120,7 +3125,9 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
   }
   // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
-  if ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
+  // Riches: "Each opponent chooses a creature they control. You gain control of those creatures.": the same.
+  const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control");
+  if (((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") || lose) return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one

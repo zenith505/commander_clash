@@ -756,6 +756,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[2]!.replace(/^an? /i, ""));
     return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }] : null;
   }
+  // Riches: "Each opponent chooses a creature they control. You gain control of those creatures.": each opponent in turn
+  // order picks one, not targeted (rulings), then control of all of them changes at once, indefinitely.
+  if (/^Each opponent chooses a creature they control and you gain control of those creatures$/.test(s)) {
+    const filter = pickFilter("creature");
+    return filter ? [{ type: "pick", who: { ref: "eachOpponent" }, filter, n: 1, action: "choose" }, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: "game" }] : null;
+  }
   // "You may tap five untapped artifacts and/or creatures you control. If you do, transform ~." (Thousand Moons Smithy):
   // picked as it resolves, not targeted, all of them or none (it can't be done with fewer, CR 101.3).
   // Tidal Terror: "tap two other untapped creatures you control"; Gravelgill Scoundrel: "tap another untapped creature you

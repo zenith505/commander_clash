@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf } from "../cards";
+import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
 import { graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -182,7 +182,8 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const after = e.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
       // Drop of Honey, Purging Scythe: one of those tied for the least power or toughness, anyone's.
       const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
-      const fate = tied ?? ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : undefined);
+      const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
+      const fate = tied ?? ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, ...(fate ? { prompt: fate } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}) };
       return "paused";
     }
@@ -2764,8 +2765,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
           addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : e.at === "nextBeginCombat" ? "nextBeginCombat" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
-            text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
+            effects: [{ type: "returnExiled", under: e.under, ...(e.thenDiscardToughness ? { toughnessThisWay: true as const } : {}), ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }, ...(e.thenDiscardToughness ? [{ type: "discard" as const, who: { ref: "you" as const }, n: { count: { kind: "returnedToughness" as const } } }] : [])],
+            text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control${e.thenDiscardToughness ? ", then discard cards equal to its toughness" : ""}.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
       }
@@ -2777,6 +2778,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (c.zone !== "battlefield" || !objectMatches(s, e.counterIf.filter, c, ctx.controller, false)) continue;
           putCounters(s, c, e.counterIf.counter, 1);
           log(s, `${src} puts a ${e.counterIf.counter} counter on ${defOf(s, c).name}.`);
+        }
+        invalidateCharacteristics(s);
+      }
+      if (e.yoursCounterElseTap) {
+        for (const c of back) {
+          if (c.zone !== "battlefield") continue;
+          if (controllerOf(s, c) === ctx.controller) {
+            putCounters(s, c, e.yoursCounterElseTap, 1);
+            log(s, `${src} puts a ${e.yoursCounterElseTap} counter on ${defOf(s, c).name}.`);
+          } else if (!c.tapped) {
+            tapPermanent(s, c);
+            log(s, `${src} taps ${defOf(s, c).name}.`);
+          }
         }
         invalidateCharacteristics(s);
       }
@@ -2864,6 +2878,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: e.haste === "endOfTurn" ? "endOfTurn" : "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
         }
       if (e.haste) invalidateCharacteristics(s);
+      if (e.toughnessThisWay)
+        s.resolving!.returnedToughness = came.reduce((n, l) => {
+          const c = s.objects[l.id];
+          return c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1 && characteristics(s, c).types.includes("Creature") ? n + Math.max(0, toughness(s, c)) : n;
+        }, 0);
       const me = e.selfCounter && s.objects[e.selfCounter.id];
       if (me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === e.selfCounter!.zc && came.some((l) => { const c = s.objects[l.id]; return c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1 && controllerOf(s, c) === ctx.controller; })) {
         const put = putCounters(s, me, e.selfCounter!.counter, 1);

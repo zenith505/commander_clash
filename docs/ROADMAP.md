@@ -1,6 +1,6 @@
 # Roadmap
 
-28,453 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,472 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
@@ -3529,8 +3529,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to an opponent), Thrill-Kill Disciple (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (counted
   landwalk and creature types), Exotic Pets and Storm of Forms (each kind of counter), Sanctifier en-Vec (a color filter on
   permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion, The Book of Vile Darkness.
+- Round B58 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "If that player
+  can't, they discard a card, they lose 2 life, you draw a card, ..., then you sacrifice ~" (Doom Foretold: the whole list
+  only when nothing was sacrificed), "If it entered under your control, put a +1/+1 counter on it. Otherwise, tap it"
+  after a flicker (Hallowed Respite), "Shuffle a card from your hand into your library. If you do, draw two cards at the
+  beginning of the next turn's upkeep" (Lat-Nam's Legacy), "Cumulative upkeep—Draw a card" and "sacrifice a land and
+  discard your hand" (Psychic Vortex), "exile them, then create that many ... tokens" after a search (Myr Incubator), "Each
+  player shuffles their hand, graveyard, and all permanents they own into their library" (Sway of the Stars), "You draw
+  cards equal to that creature's power. At the beginning of your next upkeep, return that card ... If you do, discard
+  cards equal to that creature's toughness" (Vanish into Memory: the toughness of the creature that returned, rulings),
+  three converge clauses with one "where X is" (Together as One), "if its mana value is equal to the amount of unspent mana
+  you have" (Glissa Sunseeker), "You choose a nonland card from it or a card from their graveyard" (Agonizing Remorse),
+  "Each creature you control is a Vampire in addition to its other creature types and has ..." (Mephidross Vampire), "Each
+  opponent chooses a creature they control. You gain control of those creatures" (Rags // Riches), "return a creature card
+  with lesser mana value than the creature that died" (Death's Oasis), "You may reveal that card. If an instant or sorcery
+  card is revealed this way, transform ~" (Delver of Secrets), "sacrifice ~ and return all cards exiled with it" (Promise
+  of Tomorrow), "that player may pay 2 life. If they don't, they return a permanent they control to its owner's hand"
+  (Umbilicus, and Blood Clock with the "unless" wording), "each creature that player controls with power greater than the
+  number of cards in their hand" (Noetic Scales), "If the creature you control entered this turn, put a +1/+1 counter on
+  it" (Malamet Battle Glyph). +19 (28,472 of 31,936).
+- Out after round B58 (looked at, not done): Divine Intervention (a trigger on removing counters), Soulgorger Orgg (the
+  life it took, returned as it leaves), Blood Sun ("except mana abilities", and lands entering under it), Archangel of
+  Strife (a new choice for each player as it enters), Haktos the Unscarred (protection from each mana value but one), plus
+  Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax, Hibernation's
+  End, Jeskai Infiltrator and Flash Foliage.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B56 took the easier ones up to about 17,000 but left much of that range unread: about 175
+  19,700 up (rounds B54 to B58 took the easier ones up to about 15,000 but left some of that range unread: about 150
   there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc and Vengevine;
   `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
@@ -3540,7 +3564,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from
-  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex,
+  Below, Demonfire, Drain Life, Desolation, War Tax, Urza's Sylex,
   Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips
   included): Sandman's Quicksand (mayhem), Aeon Engine, Workshop Elders, Turtle Van, Haunting Imitation, The Fugitive

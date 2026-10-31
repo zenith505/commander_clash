@@ -581,7 +581,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Tectonic Instability: "Whenever a land enters, tap all lands its controller controls": the trigger's permanent's
   // controller.
   const of = /^(.+?) (target player|target opponent|that player|defending player|its controller) (controls|owns)\b(.*)$/i.exec(x);
-  const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) && (of[3] === "controls" || (/^all /i.test(of[1]!) && !of[4])) ? parseGroup(`${of[1]}${of[4]}`, true) : null;
+  const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) && (of[3] === "controls" || (/^all /i.test(of[1]!) && !of[4])) ? parseGroup(`${of[1]}${of[4]}`, true, of[4] ? (t) => parseBoundCount(t, ctx) : undefined) : null;
   if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller && !ofGroup.filter.owner) {
     const who = of[2]!.toLowerCase();
     let whose: PlayerRef | null = null;

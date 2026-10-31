@@ -12,6 +12,7 @@ export const SUPPORTED_KEYWORDS = [
   "First strike",
   "Double strike",
   "Trample",
+  "Trample over planeswalkers", // CR 702.19c: see dealCombatDamage
   "Menace",
   "Indestructible",
   "Hexproof",

@@ -814,6 +814,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         noteExcess(s, to(d), excessOver(lethal.get(`${d.src.id}>${to(d)}`)!, d.dealt), true);
       }
       for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+      for (const f of pairs.flat()) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       return;
     }
     case "fight":
@@ -867,6 +868,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
       if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
+      // Boxing Ring: "a creature that fought this turn", even one that's dealt no damage (CR 701.14b).
+      for (const f of [a, b]) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       fireEvent(s, { type: "fought", ids: fighters.map((f) => f.id), controllers: fighters.map((f) => f.controller) });
       return;
     }

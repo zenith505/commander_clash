@@ -422,7 +422,7 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
         hp.queue.shift();
         continue;
       }
-      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true };
+      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true, ...(e.cloak ? { cloak: true as const } : {}) };
       return "paused";
     }
     const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
@@ -440,9 +440,9 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
       for (const [pid, ids] of Object.entries(hp.picked)) {
         const mine = ids.filter((id) => obj(s, id).zone === "hand");
         if (!mine.length) continue;
-        log(s, `${player(s, Number(pid) as PlayerId).name} manifests ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature.`);
+        log(s, `${player(s, Number(pid) as PlayerId).name} ${e.cloak ? "cloaks" : "manifests"} ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature${e.cloak ? " with ward {2}" : ""}.`);
         for (const id of mine) {
-          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: "manifest" });
+          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: e.cloak ? "cloak" : "manifest" });
           if (obj(s, id).zone === "battlefield") s.resolving!.created!.push(id);
         }
       }
@@ -1033,7 +1033,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o?.zone === "stack" && !e.yardNoExile) o.exileIfToGraveyard = true;
         sc.castFromYard = undefined;
       }
-      if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
+      if (sc.castFromHand === "cast" || sc.castFromHand === "none") {
+        // In Search of Greatness: "If you don't": whether the spell was cast (it's on the stack now).
+        if (e.setsDid) s.resolving!.did = sc.castFromHand === "cast" && s.objects[sc.castFromHandId ?? ""]?.zone === "stack";
+        return;
+      }
+      if (e.setsDid) s.resolving!.did = false;
       // Jace's Mindseeker: the cards this resolution milled, still where they went.
       const milled = e.milled ? [...(s.resolving!.milled ?? []), ...(s.resolving!.milledExiled ?? [])].filter((m) => s.objects[m.id] && (s.objects[m.id]!.zoneChanges ?? 0) === m.zc).map((m) => m.id) : undefined;
       const zone = milled ?? (e.fromGraveyard ? p.graveyard : p.hand);
@@ -1063,6 +1068,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const id = sc.castFromHand;
       sc.castFromHand = "cast";
+      sc.castFromHandId = id;
       if (!s.objects[id] || (milled ? !milled.includes(id) : obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand")) || !castable(id)) return;
       if (e.fromGraveyard) sc.castFromYard = id;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
@@ -2049,6 +2055,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Deathrender: attached if it could be, otherwise it stays unattached (CR 701.3b; rulings).
           if (e.attachSelf && self) attachTo(s, self, o);
+          // The Invincible Iron Man: an Equipment attached to the source after it enters, if it could be (CR 701.3b).
+          if (e.equipToSelf && self && objIsType(s, o, "Artifact") && characteristics(s, o).subtypes.includes("Equipment")) attachTo(s, o, self);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {
             const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";

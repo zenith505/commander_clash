@@ -16147,6 +16147,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8c489e39-b9ff-400f-a855-3cddf7e112e6",
+  "name": "Sensational Spider-Man",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Spider Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spider",
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Whenever Sensational Spider-Man attacks, tap target creature defending player controls and put a stun counter on it. Then you may remove up to three stun counters from among all permanents. Draw cards equal to the number of stun counters removed this way.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spe",
+  "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bf2dc318-7b51-451e-ac4d-0f1b756dc860",
   "name": "Senu, Keen-Eyed Protector",
   "manaCost": "{1}{W}",
@@ -19970,6 +20006,44 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "e8aa0d7d-e5f6-4d66-bdc1-315483e1b256",
+  "name": "Vannifar, Evolved Enigma",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Elf Ooze Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Ooze",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of combat on your turn, choose one —\n• Cloak a card from your hand. (Put it onto the battlefield face down as a 2/2 creature with ward {2}. Turn it face up any time for its mana cost if it's a creature card.)\n• Put a +1/+1 counter on each colorless creature you control.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Cloak"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "66fc64db-7dc4-43fa-8087-281a72286c35",

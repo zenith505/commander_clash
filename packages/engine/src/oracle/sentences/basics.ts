@@ -849,6 +849,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile", filter }], otherwise: [discard], keep: true, text: `${capital(m[1]!)} rather than discard a card` }];
   }
+  // Blood Funnel: "Whenever you cast a noncreature spell, counter that spell unless you sacrifice a creature": you choose as
+  // the trigger resolves; with no creature, or choosing not to, the spell is countered (as with Bog Elemental's).
+  if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless you sacrifice an? (creature|artifact|land|enchantment)$/i.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: m[1]! }, n: 1, action: "sacrifice" }], otherwise: [{ type: "counterCause" }], keep: true, text: `Sacrifice a ${m[1]} so that spell isn't countered` }];
+  }
   // Custody Battle's granted "target opponent gains control of ~ unless you sacrifice a land": sacrifice one to keep it;
   // otherwise that opponent controls it for the rest of the game (layer 2).
   if ((m = /^([Tt]arget opponent) gains control of ~ unless you sacrifice (an? (?:land|creature|artifact))$/.exec(s))) {

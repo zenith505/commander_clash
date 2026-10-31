@@ -318,6 +318,8 @@ function diesMatches(
   // "When enchanted creature dies, if that creature was a Horror" (Endless Evil): its types as it last existed (CR 603.10a).
   // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
   if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
+  // One with the Kami: the creature it was attached to, whoever controlled it, or one matching the filter.
+  if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (srcId === dying.o.id) {
@@ -2249,7 +2251,12 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       continue;
     }
     const def = restingDef(s.cards[t.sourceCardId]!);
-    const printed = triggerBody(s, t);
+    let printed = triggerBody(s, t);
+    // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
+    if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
+      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId })));
+      printed = triggerBody(s, t);
+    }
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
       // "Choose one that hasn't been chosen": not one this object has had chosen (rulings on Demonic Pact).
@@ -2262,6 +2269,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       const max = distinctModeCap(s, printed, t.controller, max0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       // "Choose both instead": both, or the one that can be chosen (CR 603.3c).
       if (t.both && printed.modal.bothExactly && n > 0) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
+      // "Choose up to X" with X 0: no modes, so it's removed (CR 603.3c).
+      else if (max === 0 && min === 0) t.modes = [];
       else if (n === 0 || n < min) {
         log(s, `${def.name}'s ability has no mode that can be chosen and is removed.`);
         s.triggerQueue.shift();
@@ -2414,6 +2423,12 @@ function amassedPowerNow(s: GameState, a: { id: ObjectId; zc: number }): number 
 
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
+  const body = triggerBodyAsIs(s, t);
+  // "Choose up to X" (Bumi, King of Three Trials): no more modes than X was as it was put on the stack.
+  return body.modal?.maxCount && t.maxModes !== undefined ? { ...body, modal: { ...body.modal, max: t.maxModes } } : body;
+}
+
+function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
   // Clement: "with lesser mana value" than a subject still on the battlefield: its mana value now (CR 202.3).
   const subj = t.subject && s.objects[t.subject.id];

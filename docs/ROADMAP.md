@@ -1,6 +1,6 @@
 # Roadmap
 
-28,585 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,601 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,180 of
 9,979 (91%).
 
@@ -1262,6 +1262,25 @@ line blocks.
    (replacing the next draw this turn); Become the Pilot (can't be blocked unless attacking its owner); Nemesis Phoenix
    (returned tapped and attacking from the graveyard); Battletide Alchemist ("you may prevent X of that damage" for any
    player).
+   Round 224 (fresh cards from the top): a floating "whenever one or more Gorgons and/or Snakes you control deal combat
+   damage to a player" (Aphelia, Viper Whisperer); "spend this mana only to cast a spell that's one or more colors
+   without {X} in its mana cost" (Titans' Nest); "whenever you and/or at least one permanent you control becomes the
+   target of a spell or ability an opponent controls" once per spell or ability (Leyline of Combustion, CR 115.10);
+   "whenever a creature deals combat damage to its owner" (The Beast, Deathless Prince); "the number of colors of mana
+   spent to cast it" in a cast trigger (Wildgrowth Archaic, CR 601.2h); "remove all +1/+1 counters from ~, and it deals
+   that much damage" (Ashling the Pilgrim); "defending player sacrifices a creature of their choice that's blocking it"
+   (Labyrinth Raptor, CR 509.1h); "it deals damage equal to its power to each other creature" (Showstopping Surprise,
+   Nova Flame); "If no counters were removed this way, ... Otherwise, ..." (Bounty of the Luxa); "creatures dealt
+   damage this way can't block this turn" (Huatli, Warrior Poet); "cast Elf spells and activate abilities of Elf
+   sources" (Woodland Weavemaster); "entered from a graveyard or you cast it from a graveyard" (Breathless Knight);
+   "the first time counters have been put on that creature this turn" (Stalwart Successor); "a card in your graveyard
+   that wasn't put there this combat" (Storrev, Devkarin Lich, CR 506.1); "that player may put a +1/+1 counter on ~. If
+   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,590 of 31,936 with Lane B B62).
+   Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (mana of
+   two different colors); Spark of Creativity ("you may have ~ deal damage ... If you don't, you may play that card");
+   Fires of Mount Doom ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
+   more); Myr Superion (spend only mana produced by creatures). (Karn's Sylex and Strength of the Tajuru, also looked at
+   here, went in with Lane B round B63.)
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -3699,7 +3718,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Coven), "Players can't pay life to cast spells or to activate abilities that aren't mana abilities" (Karn's Sylex:
   Phyrexian mana and life costs; 0 life can still be paid, CR 119.4b; not turning a face-down permanent face up, a
   special action). Breathless Knight, Bounty of the Luxa, Woodland Weavemaster and Cheering Crowd were dropped from
-  this round: Lane A's round 224 does them. +11 (28,585 of 31,936).
+  this round: Lane A's round 224 does them. +11 (28,601 of 31,936 with round 224).
 - Out after round B63 (looked at, not done): Divine Deflection (prevention shared by you and your permanents),
   Refraction Trap (trap cost and a chosen source), Intermediate Chirography (a modified creature that died this
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from

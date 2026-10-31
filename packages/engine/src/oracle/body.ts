@@ -222,7 +222,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage"]);
+const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage"]);
 const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group"]);
 
 /**
@@ -1261,6 +1261,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // permanents target opponent controls, in that player's library, the cards coming under your control.
   text = text.replace(/^For each creature you control, you may search your library for a creature card with the same name as that creature\. Put those cards onto the battlefield, then shuffle\.$/, "Search your library for any number of creature cards with the same name as each creature you control, put them onto the battlefield, then shuffle.");
   text = text.replace(/^For each (tapped nonland permanent) target opponent controls, search that player's library for a card with the same name as that permanent\. Put those cards onto the battlefield under your control, then that player shuffles\.$/, "Search target opponent's library for cards with the same name as each $1 that player controls and put them onto the battlefield under your control. Then that player shuffles.");
+  // Midnight Oil: "At the beginning of your draw step, draw an additional card and remove two hour counters from ~": two
+  // instructions, in that order (CR 608.2c); counters are removed only as many as there are (rulings).
+  text = text.replace(/^(draw an additional card) and (remove (?:a|an|one|two|three) [a-z]+ counters? from ~\.?)$/, (_, a: string, b: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}`);
+  // Sadistic Sacrament: "Search target player's library for up to three cards, exile them, then that player shuffles. If
+  // ~ was kicked, instead search that player's library for up to fifteen cards, exile them, then that player shuffles.":
+  // Denying Wind's search, for more cards when kicked (CR 702.33e).
+  text = text.replace(/^Search target player's library for up to (\w+) cards, exile them, then that player shuffles\. If ~ was kicked, instead search that player's library for up to (\w+) cards, exile them, then that player shuffles\.$/, "Search target player's library for up to $1 cards and exile them. If ~ was kicked, search that player's library for up to $2 cards and exile them instead.");
   // Analyze the Pollen: "Search your library for a basic land card. If evidence was collected, instead search your
   // library for a creature or land card. Reveal that card, put it into your hand, then shuffle.": either search, each
   // revealed and put into your hand.
@@ -2090,6 +2097,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const yours: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" };
     return { targets: [], effects: [{ type: "continuous", what: { ref: "each", filter: yours }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: odric[2] === "you control" ? true : "graveyard" }], duration: "endOfTurn" }], text };
   }
+  // Majestic Myriarch: "~ gains flying until end of turn if you control a creature with flying. The same is true for first
+  // strike, ...": each keyword a creature you control has as it resolves, itself included, a "hexproof from" variant as
+  // that variant (rulings; Modification sharedAmongYours).
+  const myriarch = /^~ gains ([a-z ]+) until end of turn if you control a creature with \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
+  if (myriarch && !opts.spell) {
+    const keywords = [myriarch[1]!, ...myriarch[2]!.split(", "), myriarch[3]!].map((k) => canonicalKeyword(k));
+    if (keywords.some((k) => !k || /^(Protection|Hexproof from|Toxic)/.test(k) || k.includes("("))) return null;
+    return { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: true }], duration: "endOfTurn" }], text };
+  }
   // Super-Adaptoid: "choose another target creature. If that creature has haste and ~ doesn't, put a haste counter on ~.
   // Do the same for flying, ...": each keyword checked in turn as it resolves (keyword counters, CR 122.1b).
   const adaptoid = /^[Cc]hoose another target creature\. If that creature has ([a-z ]+) and ~ doesn't, put an? \1 counter on ~\. Do the same for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
@@ -2857,6 +2873,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // Spinal Embrace: "At the beginning of the next end step, sacrifice it. If you do, you gain life equal to its toughness":
+    // one delayed trigger (CR 603.7) about the creature; you sacrifice it only if you still control it then (rulings, CR
+    // 701.21a), and gain life only if you did, its toughness as it last existed (CR 608.2h).
+    if (s === "At the beginning of the next end step, sacrifice it" && sentences[si + 1]?.replace(/\.$/, "") === "If you do, you gain life equal to its toughness") {
+      const fx = parseOne(s, ctx);
+      const d = fx?.length === 1 ? fx[0] : undefined;
+      if (d?.type !== "delayed" || d.when !== "nextEndStep" || !d.of || d.effects.length !== 1 || d.effects[0]!.type !== "sacrifice" || d.effects[0]!.what.ref !== "subject") return null;
+      effects.push({ ...d, effects: [...d.effects, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "toughness", of: { ref: "sacrificed" } } } }] }], text: "Sacrifice it. If you do, you gain life equal to its toughness" });
+      si++;
+      continue;
+    }
     // The Invincible Iron Man: "You may put an artifact card from your hand onto the battlefield. If it's an Equipment,
     // attach it to ~": the card put, attached after it enters (CR 701.3a).
     if (s === "If it's an Equipment, attach it to ~" && last?.type === "putFromHand" && !ctx.spell && !last.any && last.upTo === undefined && !last.who && !last.fromHandOf && !last.attachToSubject && !last.attachSelf && !last.orGraveyard && !last.attacking && !last.manifest) {
@@ -12717,6 +12744,13 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "search" || prev.n !== 1 || prev.upTo || prev.filter?.kind !== "card" || `${moreCards[2]} card` !== prev.filter.text) return null;
     return { effects: [{ ...prev, n: num(moreCards[1]!) }], instead: true };
+  }
+  // Sadistic Sacrament (rewritten above): the same search of that player's library, for more cards.
+  const moreTheirs = new RegExp(`^search that player's library for up to ${NUM} cards and exile them instead$`).exec(text);
+  if (moreTheirs) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "search" || !prev.upTo || prev.filter || prev.dest.zone !== "exile" || prev.library?.ref !== "target") return null;
+    return { effects: [{ ...prev, n: num(moreTheirs[1]!) }], instead: true };
   }
   // Scorching Lava: "that creature can't be regenerated this turn and if it would die this turn, exile it instead": the
   // "instead" is the replacement's own (CR 614.1a), added to the damage, not instead of it.

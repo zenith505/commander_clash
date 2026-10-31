@@ -382,6 +382,8 @@ interface ShieldPlan {
   final: DamageEvent[];
   /** How many of the answers it used. */
   used?: number;
+  /** The rules it planned with, static ones included (Purity's are made for this event only). */
+  rules?: DamageRule[];
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -422,7 +424,10 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     if (nine) out.push({ id: `static-counter:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "you" }, counterOn: { id, kind: nine } });
     // The Wanderer: "Prevent all noncombat damage that would be dealt to you and other permanents you control."
     const pv = abilitiesOf(s, cover).preventToYou;
-    if (pv) out.push({ id: `static-prevent:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(pv.combat ? { combat: pv.combat } : {}), to: { players: "you", ...(pv.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" }, notObject: id } : {}) } });
+    if (pv) out.push({ id: `static-prevent:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(pv.combat ? { combat: pv.combat } : {}), to: { players: "you", ...(pv.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" }, notObject: id } : {}) }, ...(pv.gain ? { gainLife: {} } : {}) });
+    // Stormwild Capridor: "prevent that damage. Put a +1/+1 counter on ~ for each 1 damage prevented this way."
+    const selfCounters = abilitiesOf(s, cover).preventToSelfCounters;
+    if (selfCounters) out.push({ id: `static-selfcounters:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(selfCounters.combat ? { combat: selfCounters.combat } : {}), to: { object: { id, zc: cover.zoneChanges ?? 0 } }, countersOn: { counter: selfCounters.counter } });
     // Pariah, Palisade Giant (CR 614.9): all damage that would be dealt to its controller (and their other permanents) is
     // dealt to it or the creature it's attached to instead. Several of them: the player being dealt the damage chooses
     // which applies (CR 616.1, rulings on Palisade Giant).
@@ -1027,7 +1032,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (m) m.n += e.n;
     else out.set(k, { src: e.src, to: e.to, n: e.n, ...(e.combat ? { combat: true } : {}) });
   }
-  return { ops, final: [...out.values()], used: next };
+  return { ops, final: [...out.values()], used: next, rules: allRules };
 }
 
 /**
@@ -1141,8 +1146,9 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const reflectLater = new Map<ObjectId, { n: number; by: PlayerId; body: AbilityBody }>();
   // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
   const madeLater = new Map<string, { r: DamageRule; n: number }>();
+  const ruleById = (id: string) => s.damageRules?.find((x) => x.id === id) ?? plan.rules?.find((x) => x.id === id);
   const ruleUsed = (id: string, n: number, src?: DamageSource, prevented = false) => {
-    const r = s.damageRules?.find((x) => x.id === id);
+    const r = ruleById(id);
     if (!r) return;
     if (r.left !== undefined) r.left -= n;
     if (r.nextTime) used.add(r.id);
@@ -1156,7 +1162,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     else if (op.kind === "prevent" && "player" in op.to) prevented(op.to.player, op.n);
     if (op.kind === "protection") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented (protection).`);
     else if (op.kind === "preventAll") {
-      const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
+      const r = op.rule ? ruleById(op.rule) : undefined;
       log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : op.plusOnes?.card ? ` (${op.plusOnes.card})` : ""}.`);
       if (op.plusOnes) plusOnesLater.push(op.plusOnes);
       if (op.reflect && op.reflect.n > 0) reflectLater.set(op.reflect.id, { n: (reflectLater.get(op.reflect.id)?.n ?? 0) + op.reflect.n, by: op.reflect.by, body: op.reflect.body });
@@ -1191,7 +1197,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       syncControl(s);
     }
     else if (op.kind === "prevent" && op.rule) {
-      const r = s.damageRules?.find((x) => x.id === op.rule);
+      const r = ruleById(op.rule);
       log(s, `${op.n} damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : ""}.`);
       ruleUsed(op.rule, op.n, op.src, true);
     } else if (op.kind === "redirect" && op.rule) {
@@ -1299,7 +1305,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters);
   });
 }
 

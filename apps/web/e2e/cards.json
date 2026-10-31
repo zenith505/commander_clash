@@ -8202,6 +8202,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "feb65f2e-6f71-4f29-bf31-b210c85f3ab3",
+  "name": "Hand of Honor",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Samurai",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Samurai"
+  ],
+  "oracleText": "Protection from black\nBushido 1 (Whenever this creature blocks or becomes blocked, it gets +1/+1 until end of turn.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Bushido",
+   "Protection"
+  ],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0e735ba6-7fd1-4d12-b20c-21525dc1e2b5",
   "name": "Hanweir Battlements",
   "manaCost": "",
@@ -9953,6 +9987,41 @@
   "set": "exo",
   "releasedAt": "1998-06-15",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bfaf20a7-a11c-4f57-8eb6-b03b5223704d",
+  "name": "Kentaro, the Smiling Cat",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Samurai",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Samurai"
+  ],
+  "oracleText": "Bushido 1 (Whenever this creature blocks or becomes blocked, it gets +1/+1 until end of turn.)\nYou may pay {X} rather than pay the mana cost for Samurai spells you cast, where X is that spell's mana value.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Bushido"
+  ],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

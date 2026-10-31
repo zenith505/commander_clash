@@ -1063,6 +1063,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "One or fewer cards in hand" (Djeru and Hazoret): fewer than two.
   if ((m = new RegExp(`^you have ${NUM} or fewer cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) + 1, fewer: true };
   if ((m = new RegExp(`^you have exactly ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), exactly: true };
+  // The Biblioplex: "Activate only if you have exactly zero or seven cards in hand": either.
+  if ((m = new RegExp(`^you have exactly (zero|${NUM.slice(1, -1)}) or ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "anyOf", conds: [{ kind: "handAtLeast", n: m[1] === "zero" ? 0 : num(m[1]!), exactly: true }, { kind: "handAtLeast", n: num(m[2]!), exactly: true }] };
   // "If you control eight or more artifacts with the same name as one another" (Mechanized Production): all of them
   // artifacts (rulings).
   if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
@@ -1364,6 +1366,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If a permanent you controlled left the battlefield this turn" (Pegasus Guardian): the same (revolt).
   if (/^a permanent (?:left the battlefield under your control|you controlled left the battlefield) this turn$/.test(text)) return { kind: "revolt" };
   if (/^a creature left the battlefield under your control this turn$/.test(text)) return { kind: "revolt", creature: true };
+  if (/^no permanents left the battlefield this turn$/.test(text)) return { kind: "revolt", none: true };
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
@@ -2730,6 +2733,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Anti-Venom, Horrifying Healer: "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on
   // ~": that damage's amount, so also when it can't be prevented (then it's dealt too, CR 615.12).
   if (text === "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
+  // Jared Carthalion, True Heir: "If damage would be dealt to ~ while you're the monarch, prevent that damage and put that
+  // many +1/+1 counters on it": the same, only while you're the monarch (CR 724).
+  if (text === "If damage would be dealt to ~ while you're the monarch, prevent that damage and put that many +1/+1 counters on it") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], condition: { kind: "monarch" }, text: line };
   // Panther Habit: "If equipped creature would be dealt damage, prevent that damage and put that many +1/+1 counters on
   // it": the same for the creature it's attached to.
   if (/^If (?:equipped|enchanted) creature would be dealt damage, prevent that damage and put that many \+1\/\+1 counters on it$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };

@@ -1006,12 +1006,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // it, chosen with the targets, each getting at least one (rulings, CR 601.2d).
   // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
   // was cast with, divided as the ability is put on the stack (rulings).
-  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures you control)$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
-    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
+  // Numa, Joraga Chieftain: "among any number of target Elves" after "you may pay {X}{X}. When you do": any Elves, the X paid.
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+    const tribe = /target ([A-Z][a-z]+)$/.exec(m[2]!)?.[1];
+    if (tribe && !CREATURE_TYPES.has(singular(tribe))) return null;
+    const spec = parseTargetPhrase(tribe ? singular(tribe) : m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
     if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
     const first = ctx.targets.length;
     const x: AmountExpr = { count: { kind: "x" } };
-    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!) }, many: "any" });
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: tribe ? `target ${singular(tribe)}` : m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!) }, many: "any" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
     return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];

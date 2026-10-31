@@ -91,12 +91,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
-    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards|cards of the chosen type) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards|(?:[A-Z][a-z]+, )+and\/or [A-Z][a-z]+ cards|cards of the chosen type) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+      // Tazri, Beacon of Unity: "up to two Cleric, Rogue, Warrior, Wizard, and/or Ally cards": each card any one of them.
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       // Reality Heist: "You may reveal up to two artifact cards from among them and put them into your hand".
       // For the Ancestors: "... any number of cards of the chosen type ..." after "Choose a creature type": any card with
       // that creature type (CR 205.3m), a changeling's too (CR 702.73a).
-      const filter = ctx?.choseCreatureType && m[2] === "cards of the chosen type" ? ({ kind: "card", chosen: "type", text: "card of the chosen type" } as const) : parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
+      const filter = ctx?.choseCreatureType && m[2] === "cards of the chosen type" ? ({ kind: "card", chosen: "type", text: "card of the chosen type" } as const) : parseSearchFilter(m[2]!.replace(/\bcards\b/, "card").replace(/, and\/or /, ", or "));
       if (!filter || (/ of the chosen /.test(m[2]!) && !filter.chosen)) return null;
       Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", reveal: true });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) (into your hand|on top of your library)$/.exec(s))) {

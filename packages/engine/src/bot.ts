@@ -3263,6 +3263,9 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // World Queller: "you may choose a card type. If you do, each player sacrifices ...": only for a type that costs the
+  // opponents more than us.
+  if (e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "choose" && e.effects[0]!.choice === "cardType" && edictsChosenType(s)) return (e.effects[0]!.options ?? []).some((ty) => edictTypeScore(s, pid, ty) > 0);
   // Eternity Vessel: "you may have your life total become the number of charge counters on ~": when that's more life.
   const set = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "setLife" && e.effects[0]!.who.ref === "you" ? e.effects[0]! : undefined;
   if (r && set?.type === "setLife" && set.amount) return evalAmount(s, set.amount, { controller: pid, sourceId: r.item.sourceId }) > player(s, pid).life;
@@ -3677,6 +3680,15 @@ function chooseParity(s: GameState, pid: PlayerId): string {
   return mine.filter((d) => odd(defMv(d))).length > mine.length / 2 ? "odd" : "even";
 }
 
+/** World Queller's edict: each player sacrifices their least worthy permanent of the type, ours counting against it. */
+function edictTypeScore(s: GameState, pid: PlayerId, ty: string): number {
+  return s.turnOrder.filter((p) => !s.players[p]!.lost).reduce((n, p) => {
+    const ws = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && characteristics(s, o).types.includes(ty)).map((o) => Math.max(1, worth(s, pid, o)));
+    return ws.length ? n + (p === pid ? -1 : 1) * Math.min(...ws) : n;
+  }, 0);
+}
+const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "pick" && e.action === "sacrifice" && e.filter.chosen === "cardType");
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid);
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
@@ -3710,6 +3722,7 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const score = (ty: string) => s.players[pid]!.graveyard.reduce((n, id) => (defOf(s, obj(s, id)).types.includes(ty) ? n + (ty === "Land" ? 0.5 : 1) : n), 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
+  if (what === "cardType" && edictsChosenType(s)) return [...options].sort((a, b) => edictTypeScore(s, pid, b) - edictTypeScore(s, pid, a))[0]!;
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
     const hurts = c ? choiceHurts(c) : true;

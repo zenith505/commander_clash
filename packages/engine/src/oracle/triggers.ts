@@ -2281,6 +2281,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Paralyze: "that player may pay {4}. If the player does, untap the creature.": the enchanted creature.
+    .replace(/^(At the beginning of the upkeep of enchanted creature's controller, that player may pay (?:\{[^}]+\})+\. If the player does, untap) the creature\.$/, "$1 enchanted creature.")
     // Awaken the Sky Tyrant: "When a source an opponent controls deals damage to you, sacrifice ~. ...": each time, the
     // same (rulings: once for each source, though ~ can be sacrificed only once).
     .replace(/^When a source an opponent controls deals damage to you, (?=sacrifice ~\.)/, "Whenever a source an opponent controls deals damage to you, ")
@@ -2904,9 +2906,35 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${castYard[1]!}, ${castYard[2]!}`);
     return !t || t === "fail" || t.event !== "selfEnters" || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "castYours" };
   }
+  // Hulkling, Burgeoning Bruiser: "Whenever another creature you control enters, if it has greater power or toughness than
+  // ~, put a +1/+1 counter on ~.": evolve's words (CR 702.100a), checked as it triggers and resolves (CR 603.4), but not
+  // evolve, so ~ doesn't "evolve" (CR 702.100b).
+  if (/^Whenever another creature you control enters, if it has greater power or toughness than ~, put a \+1\/\+1 counter on ~\.?$/.test(line)) {
+    return { event: "anotherCreatureYouControlEnters", ifEvolves: true, body: { targets: [], effects: [{ type: "evolve", notKeyword: true }], text: line } };
+  }
   // Ray of Frost: "When this Aura enters, if enchanted creature is red, tap it.": "it" is that creature.
   if (/^When ~ enters, if enchanted creature is (?:white|blue|black|red|green), tap it\.?$/.test(line)) {
     const t = parseTrigger(line.replace(/tap it(\.?)$/, "tap enchanted creature$1"));
+    return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
+  }
+  // Mongrel Pack: "When ~ dies during combat, ...": only a death during a combat phase (CR 506.1).
+  const diesCombat = /^When ~ dies during combat, (.+)$/.exec(line);
+  if (diesCombat) {
+    const t = parseTrigger(`When ~ dies, ${diesCombat[1]!}`);
+    return !t || t === "fail" || t.event !== "selfDies" ? "fail" : { ...t, ifDiesInCombat: true };
+  }
+  // Rose Noble: "Whenever you cast a Doctor spell or creature spell with doctor's companion": a spell that's either.
+  const doctorOr = /^Whenever you cast a Doctor spell or creature spell with doctor's companion, (.+)$/.exec(line);
+  if (doctorOr) {
+    const t = parseTrigger(`Whenever you cast a Doctor spell, ${doctorOr[1]!}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast?.spell) return "fail";
+    const spell: TargetSpec = { kind: "spell", anyOf: [t.cast.spell, { kind: "spell", types: ["Creature"], keywords: ["Doctor's companion"], text: "creature spell with doctor's companion" }], text: "Doctor spell or creature spell with doctor's companion" };
+    return { ...t, cast: { ...t.cast, spell } };
+  }
+  // Maze's Mantle: "When this Aura enters, if enchanted creature has toxic, that creature gains hexproof until end of turn.":
+  // "that creature" is the enchanted creature.
+  if (/^When ~ enters, if enchanted creature has toxic, that creature gains /.test(line)) {
+    const t = parseTrigger(line.replace(/, that creature gains /, ", enchanted creature gains "));
     return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
   }
   // Volition Reins: "When this Aura enters, if enchanted permanent is tapped, untap it.": "it" is that permanent.
@@ -3440,6 +3468,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Magmakin Artillerist: "it deals 1 damage to each opponent": the card is the source (CR 702.29c).
     const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
     return body ? { event: "selfCycled", body } : "fail";
+  }
+  // "When ~ becomes plotted" (CR 702.170a, 702.170c): the card in exile, "it" the card as the source (Longhorn
+  // Sharpshooter: "it deals 2 damage to any target").
+  const plottedT = /^When ~ becomes plotted, (.+)$/.exec(line);
+  if (plottedT) {
+    const body = parseBody(plottedT[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
+    return body ? { event: "selfPlotted", body } : "fail";
   }
   // "When you discard ~" (Titanbones, Towering Heart, Edgar's Awakening): the card's ability, wherever the discard put it
   // (CR 701.9a; like cycling, CR 702.29c), its owner controlling it (CR 113.8).

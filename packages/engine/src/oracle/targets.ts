@@ -723,6 +723,8 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "colorsAmongPermanents":
     // Archipelagore: "the number of times ~ has mutated", fixed as the mutate trigger's targets are chosen.
     case "mutations":
+    // Custodi Soulcaller: "the number of players you attacked this combat", fixed once attackers are declared.
+    case "opponentsAttacked":
       return true;
     // Rot Hulk: "the number of opponents you have".
     case "players":
@@ -1820,6 +1822,11 @@ export function parseTargetPhrase(
   if (p === "creature or vehicle") {
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
+  }
+  // Ragamuffin Raptor: "creature or Food card": a creature card, or a Food card (an artifact subtype, CR 205.3g).
+  if (p === "creature or food" && !extra.orSubtypes) {
+    extra.orSubtypes = ["Food"];
+    p = "creature";
   }
   // Ray of Ruin: "creature, Vehicle, or nonbasic land": any one of the three (TargetSpec.anyOf).
   if (p === "creature, vehicle, or nonbasic land" && !extra.anyOf) {

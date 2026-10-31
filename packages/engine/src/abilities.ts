@@ -1635,7 +1635,7 @@ export type Modification =
    * "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy), "can block
    * creatures with shadow as though it had shadow" (Heartwood Dryad): evasion it ignores as it blocks (CR 509.1b).
    */
-  | { kind: "blockAsThough"; walk?: true; shadow?: true; /** "Can block Dragons as though it had reach" (Dragon Hunter, CR 702.17b): attackers of this creature type. */ reachVs?: string }
+  | { kind: "blockAsThough"; walk?: true; shadow?: true; /** "As though they didn't have shadow" (Aetherflame Wall): the attacker's shadow is ignored, not the blocker given it (CR 702.28b). */ notShadow?: true; /** "Can block Dragons as though it had reach" (Dragon Hunter, CR 702.17b): attackers of this creature type. */ reachVs?: string }
   /** "Enchanted creature can attack as though it had haste" (Instill Energy): it may attack while summoning sick (CR 302.6); its {T} abilities still can't be activated. */
   | { kind: "attackAsThoughHaste" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
@@ -2934,7 +2934,7 @@ export type Effect =
    */
   | { type: "ripple"; n: number; of?: "cause" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
-  | { type: "evolve" }
+  | { type: "evolve"; /** Hulkling, Burgeoning Bruiser: evolve's check and counter spelled out, not the keyword, so ~ doesn't "evolve" (CR 702.100b). */ notKeyword?: true }
   /**
    * `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). "whileTapped": "for as long as ~
    * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped". Duration
@@ -4476,6 +4476,8 @@ export type TriggerEvent =
   | "selfCycled"
   /** "When you discard ~" (Titanbones, Towering Heart): the card's ability, wherever it went (as with cycling). */
   | "selfDiscarded"
+  /** "When ~ becomes plotted" (Longhorn Sharpshooter, Aloe Alchemist): it triggers from exile, under its owner's control (CR 702.170a, 702.170c). */
+  | "selfPlotted"
   /**
    * "When ~ is put into a graveyard from anywhere" (Serra Avatar): it triggers from the graveyard, under its owner's control
    * (CR 603.3a), never as a leaves-the-battlefield ability (CR 603.6c).
@@ -4772,6 +4774,8 @@ export interface TriggeredAbility {
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
+  /** Mongrel Pack: "When ~ dies during combat": only if it dies during a combat phase (CR 506.1). */
+  ifDiesInCombat?: true;
   /** Fyndhorn Druid: "When ~ dies, if it was blocked this turn": it became blocked this turn as that object (CR 509.1h, 603.10a). */
   ifBlockedThisTurn?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
@@ -5894,6 +5898,8 @@ export interface CompiledCard {
   opponentsCantCastDuringCombat?: true | /** "Players can't cast spells during combat" (Basandra, Battle Seraph): its controller too. */ "all";
   /** "Each opponent who cast a spell this turn can't attack with creatures" (Angelic Arbiter): checked as attackers are declared, counting spells cast before it was there (rulings). */
   opponentsWhoCastCantAttack?: true;
+  /** Wardscale Dragon: "As long as ~ is attacking, defending player can't cast spells": the player it's attacking (CR 506.2). */
+  defendingCantCastWhileAttacking?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */
   opponentsWhoAttackedCantCast?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */

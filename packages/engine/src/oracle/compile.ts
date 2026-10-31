@@ -3564,6 +3564,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsWhoAttackedCantCast = true;
       continue;
     }
+    if (line === "As long as ~ is attacking, defending player can't cast spells.") {
+      out.defendingCantCastWhileAttacking = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during combat.") {
       out.opponentsCantCastDuringCombat = true;
       continue;

@@ -1578,6 +1578,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
+  // Okiba Salvage: "Then put two +1/+1 counters on that permanent if you control an artifact and an enchantment": checked
+  // after it's returned (CR 608.2c), the permanent it became.
+  text = text.replace(/^(Return target [^.]+ card from your graveyard to the battlefield\.) Then put (\w+) \+1\/\+1 counters on that permanent if (you control an? [a-z]+ and an? [a-z]+)\.$/, "$1 If $3, put $2 +1/+1 counters on it.");
+  // Force Away: "If you control a creature with power 4 or greater, you may draw a card. If you do, discard a card.": the
+  // discard only after the draw you chose (CR 608.2c), the creature checked as this part resolves.
+  text = text.replace(/(^|\. )(If you control a creature with power \d+ or greater, you may draw a card)\. If you do, discard a card\.$/, "$1$2, then discard a card.");
+  // Hemlock Vial: "Each equipped creature and Equipment you control gains deathtouch until end of turn": both groups, as
+  // this resolves (rulings).
+  text = text.replace(/^Each equipped creature and Equipment you control gains ([a-z]+) until end of turn\.$/, "Each equipped creature you control gains $1 until end of turn. Each Equipment you control gains $1 until end of turn.");
+  // Sheoldred's Restoration: "If ~ was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much
+  // life.": the same amount either way, settled as it resolves; kicked or not was settled as it was cast (CR 702.33e).
+  text = text.replace(/(\. If ~ was kicked, you gain life equal to (that card's mana value)\. Otherwise, you lose) that much life\./, "$1 life equal to $2.");
   // Goblin Razerunners: "you may have ~ deal damage equal to the number of +1/+1 counters on it to target player or
   // planeswalker": "it" is ~, the only object named.
   text = text.replace(/^(you may have ~ deal damage equal to the number of [+-]\d\/[+-]\d counters on) it (to [^.]+)\.$/, "$1 ~ $2.");
@@ -1915,6 +1927,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   const uginFilter = ugin ? parseSearchFilter(ugin[1]!) : undefined;
   if (ugin && uginFilter)
     return { targets: [], effects: [{ type: "search", filter: uginFilter, n: 99, upTo: true, dest: { zone: "exile", play: { until: "thisTurn", free: true, castOnly: true } }, reveal: false }], text };
+  // Blood Lust: "If target creature has toughness 5 or greater, it gets +4/-4 until end of turn. Otherwise, it gets +4/-X
+  // until end of turn, where X is its toughness minus 1.": its toughness as this resolves (CR 608.2h), either way.
+  const bloodLust = /^If target creature has toughness (\d+) or greater, it gets \+(\d+)\/-(\d+) until end of turn\. Otherwise, it gets \+(\d+)\/-X until end of turn, where X is its toughness minus 1\.$/.exec(text.trim());
+  if (bloodLust && opts.spell) {
+    const body = parseBody(`Target creature gets +${bloodLust[4]}/-X until end of turn, where X is its toughness minus 1.`, opts);
+    const fx = body?.effects[0];
+    if (!body || body.effects.length !== 1 || body.targets.length !== 1 || fx?.type !== "continuous") return null;
+    const big: Effect = { type: "continuous", what: { ref: "target", index: 0 }, mods: [{ kind: "modifyPT", power: Number(bloodLust[2]), toughness: -Number(bloodLust[3]) }], duration: "endOfTurn" };
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], toughness: { min: Number(bloodLust[1]) }, text: `creature with toughness ${bloodLust[1]} or greater` };
+    return { ...body, effects: [{ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [big], otherwise: [fx] }], text };
+  }
   // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
   // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
   const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());
@@ -2707,6 +2730,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^(?:[Tt]hen )?[Pp]roliferate again\.?$/.test(s)) {
       if (last?.type !== "proliferate" || last.n || last.twice || last.thenPhaseOut) return null;
       effects.push({ ...last });
+      continue;
+    }
+    // World Queller: "you may choose a card type. If you do, each player sacrifices a permanent of their choice of that
+    // type.": any card type (CR 205.2a), chosen as it resolves (CR 608.2d); a player with none of that type sacrifices
+    // nothing (CR 701.21a).
+    if (/^[Yy]ou may choose a card type$/.test(s) && /^If you do, each player sacrifices a permanent of their choice of that type\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "may", effects: [{ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }], text: "choose a card type" }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "pick", who: { ref: "eachPlayer" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "permanent of the chosen type" }, n: 1, action: "sacrifice" }] });
+      si++;
       continue;
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
@@ -6789,7 +6820,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nurturing Pixie: "return up to one target non-Faerie, nonland permanent you control to its owner's hand. If a permanent
     // was returned this way, put a +1/+1 counter on ~.": only if one went to the hand (none chosen, or a commander put in
     // the command zone instead, CR 903.9b, and none was).
-    const permBack = /^If a permanent was returned this way, (.+)$/.exec(s);
+    // Mirkwood Nurturer: "return up to one other target permanent you control to its owner's hand. If you do, put a +1/+1
+    // counter on this creature": the same.
+    const permBack = /^If (?:a permanent was returned this way|you do), (.+)$/.exec(s);
     const permBounce = effects[effects.length - 1];
     if (permBack && permBounce?.type === "bounce" && permBounce.what.ref === "target" && !permBounce.what.n && ctx.targets[permBounce.what.index]?.kind === "object" && !ctx.spell) {
       const before = ctx.targets.length;
@@ -6819,6 +6852,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const noTake = /^If you didn't put a card into your hand this way, (draw a card|proliferate)$/.exec(s);
     if (noTake && tookDig?.type === "dig" && tookDig.into === "hand" && tookDig.count === 1 && tookDig.upTo) {
       effects.push({ type: "if", cond: { kind: "digTook" }, effects: [], otherwise: [noTake[1] === "proliferate" ? { type: "proliferate" } : { type: "draw", who: { ref: "you" }, n: 1 }] });
+      continue;
+    }
+    // Rosecot Knight: "If you didn't put a card into your hand this way, put a +1/+1 counter on ~", Blossom Prancer: "...,
+    // you gain 4 life", Inscribed Tablet's "Put a land card from among them into your hand" (none if there's none): the
+    // same, with no targets of its own.
+    const didntTake = /^If you didn't put a card into your hand this way, (.+)$/.exec(s);
+    if (didntTake && tookDig?.type === "dig" && tookDig.into === "hand" && tookDig.count === 1 && !tookDig.countX && !tookDig.countAll) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(didntTake[1]!), ctx);
+      if (!inner?.length || ctx.targets.length !== before || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "digTook" }, effects: [], otherwise: inner });
       continue;
     }
     // Reptilian Recruiter: "choose target creature. If that creature's power is 2 or less or if you control another Lizard,
@@ -9631,7 +9675,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Dire-Strain Rampage: "If a land was destroyed this way, ... Otherwise, ...": a target that wasn't destroyed (an
       // indestructible one) or wasn't a land gets the second (rulings).
       const destroyedElse = prev?.type === "if" && prev.cond.kind === "destroyedThisWay" && !!prev.cond.cardType;
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
+      // Sheoldred's Restoration: "If ~ was kicked, ... Otherwise, ...": kicked or not, settled as it was cast (CR 702.33e).
+      const kickedElse = prev?.type === "if" && prev.cond.kind === "kicked" && !prev.cond.cost && ctx.spell;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && !kickedElse && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
       // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
       if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
       // Lily Bowen: after "... on ~ if its power is 16 or less", "it" is ~.

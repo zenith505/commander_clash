@@ -1214,7 +1214,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return;
       }
       // It evolves only if one or more counters were put on it (CR 702.100d; rulings on Watchful Radstag: once, however many).
-      if (putCounters(s, o, "+1/+1", 1) <= 0) return;
+      if (putCounters(s, o, "+1/+1", 1) <= 0 || e.notKeyword) return;
       log(s, `${characteristics(s, o).name} evolves.`);
       fireEvent(s, { type: "evolved", id: o.id });
       return;

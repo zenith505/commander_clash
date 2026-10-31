@@ -1,7 +1,7 @@
 # Roadmap
 
-28,347 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,176 of
+28,381 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3394,8 +3394,38 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rowdy Crew, Thijarian Witness, Riptide Replicator, Teferi's Response, Dawn Evangel, Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
   Justice, Bill Potts and others).
+- Round B53 (cards no earlier round wrote down, least played first, EDHREC rank about 22,000 to 19,700):
+  "If this spell was kicked, you gain life equal to that card's mana value. Otherwise, you lose that much life"
+  (Sheoldred's Restoration), "if it has greater power or toughness than Hulkling" (Hulkling, Burgeoning Bruiser: evolve's
+  check without evolving), "Return each creature card exiled with ~ to the battlefield under your/its owner's control"
+  (Cold Storage, Endless Sands), "When this card becomes plotted" (Longhorn Sharpshooter, Aloe Alchemist), "the number
+  of players you attacked this combat" (Custodi Soulcaller), "can block creatures with shadow as though they didn't have
+  shadow" (Aether Web, Aetherflame Wall), "you may choose a card type. If you do, each player sacrifices a permanent of
+  their choice of that type" (World Queller, with a bot pick), "if enchanted creature has toxic" (Maze's Mantle), "If
+  target creature has toughness 5 or greater ... Otherwise, +4/-X" (Blood Lust), "Each equipped creature and Equipment
+  you control" (Hemlock Vial), ferocious "you may draw a card. If you do, discard a card" (Force Away), "the number of
+  counters on that creature" after it's destroyed (Parting Thoughts), "as long as its controller controls another
+  creature" (Favorable Destiny), "that player may pay {4}. If the player does, untap the creature" (Paralyze), "creature
+  or Food card" (Ragamuffin Raptor, Sugar Coat), "As long as ~ is attacking, defending player can't cast spells"
+  (Wardscale Dragon), "a Doctor spell or creature spell with doctor's companion" (Rose Noble), "If you didn't put a
+  card into your hand this way, X" for any X (Rosecot Knight, Blossom Prancer, Pulsar Squadron Ace, Inscribed Tablet),
+  "Then put two +1/+1 counters on that permanent if you control an artifact and an enchantment" (Okiba Salvage), "If
+  you do" after an optional bounce (Mirkwood Nurturer), "dies during combat" (Mongrel Pack), "This ability costs {N}
+  less to activate if <condition>" (Esquire of the King, Starport Security, Sewer Crocodile, Razorlash Transmogrant),
+  "at least two creatures that share a creature type" (Synchronized Eviction), "as long as it's blocking and you
+  control a snow land" (Snow Devil). +34 (28,381 of 31,936 with round 222).
+- Out after round B53 (looked at, not done): Clear the Land (each player reveals), Ninja's Kunai and Blazing Torch
+  (granted abilities that sacrifice or name the Equipment), Artificer's Hex (the creature the enchanted Equipment is
+  attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure
+  (prevention for a target opponent's creatures), Ancient Hellkite (a defending-player target), Alluring Siren
+  ("attacks you if able"), Warren Weirding (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo
+  ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar
+  ("sacrifice a token or a land"), Guul Draz Overseer ("If that land is a Swamp ... instead"), Unnatural Aggression
+  (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix and Voltage Surge (what the
+  sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane, Thieving Sprite, Serene Sunset, plus the
+  multi-line or new-mechanic cards in the same range.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  22,000 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
+  19,700 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

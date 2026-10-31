@@ -188,6 +188,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.ptEqual && !(c.types.includes("Creature") && toughness(s, o) === power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
+  if (spec.noManaAbility && hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
   if (spec.nonManaActivated && !hasNonManaActivated(s, o, c)) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
@@ -422,6 +423,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
+  if (spec.noManaAbility && (compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.ptUnequal || spec.ptEqual || spec.colorOfYourLegend) return false;
   return true;
 }
@@ -935,7 +937,8 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (others(spec.differentManaValueFrom).some((x) => defMv(defOf(s, x)) === defMv(defOf(s, o)))) return false;
   // Shifting Loyalties: a card type in common, as they are now (CR 205.2a).
   const cardTypes = (x: GameObject) => characteristics(s, x).types.filter((ty) => CARD_TYPES.has(ty));
-  if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty)))) return false;
+  // Legerdemain: "that shares one of those types with it", only artifact or creature (rulings: checked again as it resolves).
+  if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty) && (!spec.sharesCardTypeAmong || spec.sharesCardTypeAmong.includes(ty))))) return false;
   // Rivals' Duel: no creature type in common, as they are now.
   if (others(spec.sharesNoCreatureTypeWith).some((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));

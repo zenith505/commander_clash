@@ -184,6 +184,8 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^becomes blocked, (.+)$/, "selfBecomesBlocked", { defending: true }],
   [/^attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked", { defending: true }],
   [/^attacks alone, (.+)$/, "selfAttacksAlone", { defending: true }],
+  // Neglected Heirloom: "When equipped creature transforms, transform this Equipment" (CR 701.27).
+  [/^transforms, (.+)$/, "selfTransforms", {}],
   [/^blocks, (.+)$/, "selfBlocks", {}],
   // An attacking creature's combat damage to a player is dealt to the player it attacks (CR 510.1a); a blocking
   // creature deals none to players. So "defending player" is that player.
@@ -292,7 +294,8 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)) || (event === "selfDealsCombatDamageToPlayer" && /^you may sacrifice it\. If you do, (?:(?!\b(?:it|its|that creature)\b)[^.])+\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
-      if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
+      // Neko-Te: "That creature doesn't untap during its controller's untap step": "its" is that creature's there.
+      if (/\b(it|its)\b/i.test(text.replace(/\b(that creature) doesn't untap during its controller's untap step\b/gi, "$1 doesn't untap"))) return "fail"; // the creature dealing damage, or the one dealt it?
       text = text.replace(/\bthe other creature\b/g, "that creature");
     }
     // Mask of the Schemer: "it connives X, where X is the amount of damage it dealt to that player": that much.
@@ -683,10 +686,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
   // "Whenever you cast your first spell during each opponent's turn" (Wavebreak Hippocamp): the first you cast in that turn.
   // "Your third spell each turn" (Emeritus of Conflict, Captain Ripley Vance), "... in a turn" (Vance's Blasting Cannons):
-  // counting the spells you've cast this turn, whether they resolved or not (rulings).
+  // counting the spells you've cast this turn, whether they resolved or not (rulings). "Your fourth noncreature spell each
+  // turn" (The Fantasticar): the same, counting noncreature spells.
   // Nev, the Practical Dean: "your first spell with {X} in its mana cost each turn": the first of those (TargetSpec.xInCost),
   // and "X" in what it does is the X that spell was cast with (CR 107.3a).
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second|third) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|in a turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
+  // Vengevine: "Whenever you cast a spell, if it's the second creature spell you cast this turn": only that one, counting
+  // the whole turn's spells (rulings), which stays true once it is, so the same as "your second creature spell each turn".
+  line = line.replace(/^Whenever you cast a spell, if it's the (first|second|third|fourth) ((?:creature|noncreature|instant or sorcery) )?spell you cast this turn, /, "Whenever you cast your $1 $2spell each turn, ");
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second|third|fourth) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|in a turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, ...(nth[4] ? { xInCost: true as const } : {}), text: `${nth[3] ? `${nth[3]} spell` : "spell"}${nth[4] ?? ""}` };
@@ -701,7 +708,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body1 = body0 && youOpp ? { ...(JSON.parse(JSON.stringify(body0).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body0), text: body0.text } : body0;
     const body = body1 && spellX ? { ...replaceX(body1, { count: { kind: "castSpellX" } }), text: body1.text } : body1;
     const nth4 = nth[5];
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: ["first", "second", "third"].indexOf(nth[2]!) + 1, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: ["first", "second", "third", "fourth"].indexOf(nth[2]!) + 1, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
   // "Whenever you cast a spell other than your first spell each turn" (Arcbound Tracker): its second or later this turn,
   // counting spells cast before this was on the battlefield (rulings).
@@ -2277,7 +2284,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -2467,9 +2474,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Quirion Dryad: "Whenever you cast a spell that's white, blue, black, or red": a spell of any of those colors.
   const castThats = /^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )+or (?:white|blue|black|red|green)), (.+)$/.exec(line);
   if (castThats) return parseTrigger(`Whenever you cast a ${castThats[1]} spell, ${castThats[2]}`);
-  const castTheirTurn = /^Whenever you cast a spell during an opponent's turn, (.+)$/.exec(line);
+  // Breath of the Sleepless: "Whenever you cast a creature spell during an opponent's turn", the same.
+  const castTheirTurn = /^Whenever you cast (an? (?:(?:creature|noncreature|artifact|enchantment|instant|sorcery) )?spell) during an opponent's turn, (.+)$/.exec(line);
   if (castTheirTurn) {
-    const t = parseTrigger(`Whenever you cast a spell, ${castTheirTurn[1]}`);
+    const t = parseTrigger(`Whenever you cast ${castTheirTurn[1]}, ${castTheirTurn[2]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
   }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
@@ -3379,6 +3387,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // most life or are tied for most life": as it attacks; what happens to life totals later doesn't matter (rulings).
   // Seraphic Greatsword: "Whenever equipped creature attacks the player with the most life or tied for most life": the same,
   // about the creature it equips (rulings: not when it attacks a planeswalker).
+  // The Spear of Bashenga: "Whenever equipped creature attacks the monarch, destroy target tapped nonland permanent that
+  // player controls": the monarch as it attacks (CR 724), a player, not a planeswalker they control; "that player" is the
+  // player attacked.
+  const monarchAttacked = /^Whenever (~|equipped creature) attacks the monarch, (.+)$/.exec(line);
+  if (monarchAttacked) {
+    const t = parseTrigger(`Whenever ${monarchAttacked[1]} attacks, ${monarchAttacked[2]!.replace(/\bthat player\b/g, "defending player")}`);
+    if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.attacksPlayer || t.ifCond) return "fail";
+    return { ...t, attacksMonarch: true };
+  }
   const mostLife = /^Whenever (~|equipped creature) attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
   if (mostLife && (mostLife[1] === "~" || mostLife[2]!.startsWith("the player"))) {
     mostLife.splice(1, 1);

@@ -1876,6 +1876,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, reflexive: body };
       continue;
     }
+    // Mossbridge Troll: "If ~ would be destroyed, regenerate it": a replacement effect that regenerates it each time
+    // (CR 614.1a, 701.19a), a shield that's never used up (rulings); "can't be regenerated" still stops it (701.19c).
+    if (/^If ~ would be destroyed, regenerate it\.$/.test(line)) {
+      out.regeneratesInsteadOfDestroyed = true;
+      continue;
+    }
     const libraryDies = /^If ~ would die, put it on (top|the bottom) of its owner's library instead\.$/.exec(line);
     if (libraryDies) {
       out.libraryInsteadOfDying = libraryDies[1] === "top" ? "top" : "bottom";
@@ -4474,7 +4480,11 @@ export function compile(d: CardDef): CompiledCard {
     // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
     const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
     if (twice && (!/\bonly once\b/.test(line) || onceBoth)) {
-      const effect = onceBoth ? twice[twice.length - 1]!.replace(/ This ability triggers only once each turn\.$/, "") : twice[twice.length - 1]!;
+      let effect = onceBoth ? twice[twice.length - 1]!.replace(/ This ability triggers only once each turn\.$/, "") : twice[twice.length - 1]!;
+      // Pelt Collector: "Whenever another creature you control enters or dies, if that creature's power is greater than
+      // ~'s, ...": an intervening "if" (CR 603.4) on each, the dying one's power as it last existed (rulings).
+      const greaterThanMine = /^Whenever [^,]+? you control enters or dies, /.test(line) ? /^if that creature's power is greater than ~'s, (.+)$/.exec(effect) : null;
+      if (greaterThanMine) effect = greaterThanMine[1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
         ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
         : /^At the beginning of your upkeep and whenever /.test(line) || /^Whenever you attack with one or more [A-Z][a-z]+s and whenever /.test(line)
@@ -4535,8 +4545,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} is turned face up, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals|becomes tapped)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
-      if (both.some((t) => !t || t === "fail" || (onceBoth && t.oncePerTurn))) out.unsupported.push(raw);
-      else for (const t of both) out.triggers.push(bindThisAbility(onceBoth ? { ...(t as TriggeredAbility), oncePerTurn: true } : (t as TriggeredAbility), line));
+      if (both.some((t) => !t || t === "fail" || (onceBoth && t.oncePerTurn) || (greaterThanMine && t.ifCond))) out.unsupported.push(raw);
+      else for (const t of both) out.triggers.push(bindThisAbility(onceBoth ? { ...(t as TriggeredAbility), oncePerTurn: true } : greaterThanMine ? { ...(t as TriggeredAbility), ifCond: { kind: "subjectPT", stat: "power", greaterThanSource: true } } : (t as TriggeredAbility), line));
       continue;
     }
     // Battle Cry: "Untap all white creatures you control.\nWhenever a creature blocks this turn, ...": a delayed trigger
@@ -4924,7 +4934,9 @@ function linkExile(out: CompiledCard) {
   // Unlicensed Hearse: "power and toughness are each equal to the number of cards exiled with it" counts what its one
   // exile ability exiled (CR 607.2a).
   // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, in the static's condition.
-  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Profane Procession: "Exile target creature. Then if there are three or more cards exiled with ~, transform it": the
+  // same, in an ability's own condition.
+  if ((out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
@@ -5164,11 +5176,11 @@ function checkCastingLinks(out: CompiledCard) {
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
-  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl"] as const) {
+  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
     // Madness is a keyword, not an alternative cost of the card's own text (CR 702.35).
-    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alt === "madness" ? alts.length > 0 || out.madness !== undefined : alts.length > 0;
+    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alt === "madness" ? alts.length > 0 || out.madness !== undefined : alt === "mayhem" ? !!out.fromGraveyard?.some((g) => g.kind === "mayhem") : alts.length > 0;
     if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
     if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
   }

@@ -304,6 +304,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "movedLinkedThisWay":
       return s.resolving?.movedLinked ?? 0;
+    case "movedThisWayGreatestPower":
+      return Math.max(0, ...(s.resolving?.movedLinkedIds ?? []).flatMap((id) => {
+        const o = s.objects[id];
+        if (!o || o.zone !== "graveyard") return [];
+        const c = characteristics(s, o);
+        return c.types.includes("Creature") ? [c.power] : [];
+      }));
     case "stillExiled":
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
@@ -1102,6 +1109,8 @@ function describeCount(c: Count): string {
       return "#cards exiled with it";
     case "movedLinkedThisWay":
       return "#cards put into graveyards";
+    case "movedThisWayGreatestPower":
+      return "the greatest power among creature cards put into your graveyard";
     case "stillExiled":
       return "#those cards still exiled";
     case "eventGroupPower":

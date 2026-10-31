@@ -644,7 +644,14 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       // Gremlin Infestation: "enchanted artifact's controller", the permanent the source is attached to now.
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const host = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && me.attachedTo ? s.objects[me.attachedTo] : undefined;
-      return host?.zone === "battlefield" && !player(s, controllerOf(s, host)).lost ? [controllerOf(s, host)] : [];
+      // Strangling Grasp: "enchanted permanent's controller sacrifices a nonland permanent of their choice, then that player
+      // loses 1 life": the same player even if they sacrificed the enchanted permanent (as it last existed, CR 608.2h).
+      if (host?.zone === "battlefield") {
+        if (s.resolving) s.resolving.hostControllerWas = controllerOf(s, host);
+        return !player(s, controllerOf(s, host)).lost ? [controllerOf(s, host)] : [];
+      }
+      const was = s.resolving?.hostControllerWas;
+      return was !== undefined && !player(s, was).lost ? [was] : [];
     }
     case "selfController": {
       // The source's controller now, or as it last existed on the battlefield (CR 608.2h).

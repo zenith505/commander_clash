@@ -236,6 +236,8 @@ export type Count =
   | { kind: "totalPowerOf"; of: ObjRef }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
   | { kind: "movedLinkedThisWay" }
+  /** "The greatest power among creature cards put into your graveyard this way" (Discerning Taste): of the rest a look at the top of the library put there, as they are in the graveyard; 0 with none. */
+  | { kind: "movedThisWayGreatestPower" }
   /** "For each of those cards that are still exiled" (Dragonhawk): the cards the creating ability exiled, filled in when its delayed trigger is made (CR 400.7). */
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
@@ -538,6 +540,8 @@ export interface TargetSpec {
   doubleFaced?: true;
   /** "An artifact card with a mana ability" (Moonsilver Key): an activated or triggered one (CR 605.1). */
   manaAbility?: true;
+  /** "Artifacts without mana abilities" (Midnight Arsonist): neither an activated nor a triggered one (CR 605.1). */
+  noManaAbility?: true;
   /** "That has an activated ability with {T} in its cost" (Magewright's Stone): a mana ability or another, its own or granted; tapping other permanents doesn't count (rulings). */
   tapAbility?: true;
   /** "With an activated ability that isn't a mana ability" (Tsabo's Web, Ravager Wurm): its own or granted (CR 605.1a). */
@@ -809,6 +813,8 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesCardTypeWith?: number[];
+  /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
+  sharesCardTypeAmong?: string[];
   /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesNoCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
@@ -1816,7 +1822,7 @@ export type StaticCondition =
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Draw a card if its power is 3 or greater" about a trigger's subject (Tribute to the World Tree): as it is now, or as it last existed (CR 608.2h). */
   /** `greatest`: "if its power is greater than each other creature's power" (Selvala, Heart of the Wilds), creatures on the battlefield now. */
-  | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number; greatest?: true }
+  | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number; greatest?: true; /** "If that creature's power is greater than ~'s" (Pelt Collector): than this permanent's, as it last existed if it's gone. */ greaterThanSource?: true }
   /** "If you're the defending player" (Kazuul, Tyrant of the Cliffs): the trigger's subject is still attacking you, a planeswalker you control or a battle you protect (CR 506.2). */
   | { kind: "subjectAttackingYou" }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
@@ -2525,6 +2531,8 @@ export type Effect =
       exileAtYourNextUpkeep?: true;
       /** With `counters`: only if it enters as a creature (Recommission, CR 614.12). */
       countersIfCreature?: true;
+      /** With `counters`: only if it enters with this subtype (Heroic Return's "If a Hero enters this way", CR 614.12). */
+      countersIfSubtype?: string;
       /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
       counters?: Record<string, number>;
       /** "With one fewer revival counter on it" (Nine-Lives Familiar): as many of that kind as it had as it last existed on the battlefield, plus `plus`. */
@@ -2587,7 +2595,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -3278,7 +3286,7 @@ export type Effect =
   /** Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn." (Player.nextDrawExiles) */
   | { type: "nextDrawExile"; who: PlayerRef }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
-  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
+  | { type: "orderTop"; who: PlayerRef; n: Amount; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
    * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
    * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
@@ -3527,7 +3535,7 @@ export type Effect =
    * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
    * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
    */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; /** "Where X is the number of card types the discarded card has" (Mount Velus Manticore): its X, the card types (CR 205.2a) of the card the "you may discard" discarded. */ xDiscardedTypes?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "You may discard one or more land cards. When you do, return up to that many target ..." (Loamcrafter Faun): its X is how many were discarded. */ xDiscarded?: true; /** "When you reveal a creature card this way, ..., where X is the mana value of that card" (Yuna's Whistle): only if the revealUntil before found a card (ResolvingState.revealedUntilMv), its X that card's mana value. */ xRevealedMv?: true; /** "Exile the top card of your library. You may play that card this turn. When you exile a (nonland) card this way, ..., where X is that card's mana value" (Cait Sith, Fortune Teller; Hidetsugu, Devouring Chaos): only if the impulse before exiled a card (ResolvingState.exiledTop), a nonland one for "nonland", its X that card's mana value. */ xExiledMv?: "any" | "nonland"; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; /** "When you discard a nonland card this way, ~ deals damage equal to that card's mana value" (Fiery Encore): its X, the mana value of the card discarded. */ xDiscardedMv?: true; /** "Where X is the number of card types the discarded card has" (Mount Velus Manticore): its X, the card types (CR 205.2a) of the card the "you may discard" discarded. */ xDiscardedTypes?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "You may discard one or more land cards. When you do, return up to that many target ..." (Loamcrafter Faun): its X is how many were discarded. */ xDiscarded?: true; /** "When you reveal a creature card this way, ..., where X is the mana value of that card" (Yuna's Whistle): only if the revealUntil before found a card (ResolvingState.revealedUntilMv), its X that card's mana value. */ xRevealedMv?: true; /** "Exile the top card of your library. You may play that card this turn. When you exile a (nonland) card this way, ..., where X is that card's mana value" (Cait Sith, Fortune Teller; Hidetsugu, Devouring Chaos): only if the impulse before exiled a card (ResolvingState.exiledTop), a nonland one for "nonland", its X that card's mana value. */ xExiledMv?: "any" | "nonland"; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
@@ -3971,7 +3979,7 @@ export type SpellCondition =
   | { kind: "atRandom" }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
-  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string; /** "If a white creature dies this way" (Cinder Cloud): of that color as it last existed. */ color?: Color }
+  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If a permanent you controlled or a token was destroyed this way" (Break the Spell): either one. */ youOrToken?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string; /** "If a white creature dies this way" (Cinder Cloud): of that color as it last existed. */ color?: Color }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true; /** "If you sacrifice an Island this way" (Serendib Djinn): one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
@@ -4051,7 +4059,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" | /** The Last Ronin's Technique (CR 702.190a). */ "sneak" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" | "prowl" | /** The Last Ronin's Technique (CR 702.190a). */ "sneak" | /** Sandman's Quicksand: cast using mayhem from the graveyard (CR 702.187b; GameObject.castVia). */ "mayhem" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition; /** "If you control a white permanent other than that creature or ~" (Sorin, Ravenous Neonate): the condition's subject (`otherThanSubject`) is this object, not the trigger's. */ subject?: ObjRef }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
@@ -4340,6 +4348,7 @@ export type TriggerEvent =
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
   | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)
   | "eachDrawStep" // At the beginning of each player's draw step
+  | "selfTransforms" // "When equipped creature transforms" (Neglected Heirloom): the creature it's attached to transformed (CR 701.27)
   | "selfTransformsInto" // "When ~ transforms into ~" (CR 701.27e): it transformed or converted into this face
   | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
@@ -4819,6 +4828,8 @@ export interface TriggeredAbility {
   group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
   attacksMostLife?: boolean;
+  /** "Whenever equipped creature attacks the monarch" (The Spear of Bashenga): the monarch as it attacks, not a planeswalker. */
+  attacksMonarch?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
   /** "Whenever ~ attacks a battle" (Thrashing Frontliner, CR 310.5). */
@@ -5035,6 +5046,8 @@ export interface ActivatedAbility {
   anyPlayer?: true;
   /** With `anyPlayer`: "Only ~'s owner may activate this ability" (Personal Incarnation): its owner, whoever controls it. */
   ownerOnly?: true;
+  /** With `anyPlayer`: "Only your opponents may activate this ability" (Clergy of the Holy Nimbus): an opponent of its controller. */
+  opponentsOnly?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
@@ -5664,6 +5677,8 @@ export interface CompiledCard {
    * replacement effect (CR 614.1a).
    */
   libraryInsteadOfDying?: "top" | "bottom";
+  /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
+  regeneratesInsteadOfDestroyed?: true;
   exileInsteadOfDying?: {
     self?: true;
     /** A granted "If this creature would die, exile it instead" (Can't Stay Away) beside its own one about others (cards.ts withGranted). */

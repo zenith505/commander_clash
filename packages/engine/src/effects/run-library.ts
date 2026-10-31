@@ -724,6 +724,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "orderTop": {
       // Each targeted player's library, one at a time (only one player can be named here).
       const r = s.resolving!;
+      // Fateseal (CR 701.29a): "an opponent's library", the opponent chosen as it resolves (CR 608.2d); with one left, no
+      // question; with none, nothing happens.
+      if (e.fateseal && r.chosen?.player === undefined) {
+        const opps = opponents(s, ctx.controller);
+        if (!opps.length) return;
+        if (opps.length === 1) r.chosen = { ...r.chosen, player: opps[0]! };
+        else {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent whose library to fateseal" };
+          return "paused";
+        }
+      }
       const owner = players(s, e.who, ctx)[0];
       if (owner === undefined) return;
       const lib = player(s, owner);
@@ -1602,7 +1613,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
         // "For each card put into your graveyard this way" (Dihada): those that got there.
-        if (s.resolving) s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;
+        if (s.resolving) {
+          s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;
+          s.resolving.movedLinkedIds = rest.filter((id) => s.objects[id]?.zone === "graveyard");
+        }
       } else if (e.rest === "keep") {
         // They stay on top, in the order they were in.
       } else if (e.rest === "hand") {

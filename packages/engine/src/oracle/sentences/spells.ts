@@ -347,6 +347,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "scry", n: amt(m[2]!), who }] : null;
   }
+  // Mesmeric Sliver: "fateseal 1" (CR 701.29a): look at the top N cards of an opponent's library, chosen as it resolves,
+  // and put any number of them on the bottom, the rest on top, as a scry of their library.
+  if ((m = new RegExp(`^(?:you )?[Ff]ateseal ${NUM}$`).exec(s))) return [{ type: "orderTop", who: { ref: "chosenPlayer" }, n: num(m[1]!), mayBottom: true, fateseal: true }];
   // "Discover 4" (CR 701.57a): exile until a nonland card with mana value 4 or less, cast it free or put it into your hand.
   // "Discover X, where X is its toughness": X is worked out as the instruction starts (body.ts defineX).
   if ((m = /^(?:[Yy]ou )?[Dd]iscover (\d+|X)$/.exec(s))) return [{ type: "discover", n: amt(m[1]!) }];
@@ -377,6 +380,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const [a, b] = ctx.targets;
     const creature = (t: TargetSpec | undefined) => t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Creature" && !t.optional && !t.divided;
     return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "fight", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
+  }
+  // Beastie Beatdown: "Choose target creature you control and target creature an opponent controls. ... The creature you
+  // control deals damage equal to its power to the creature an opponent controls": the two targets, no damage if either is
+  // illegal (rulings).
+  if (/^The creature you control deals damage equal to its power to the creature an opponent controls$/.test(s)) {
+    const [a, b] = ctx.targets;
+    const creature = (t: TargetSpec | undefined) => t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Creature" && !t.optional && !t.divided && !t.many;
+    return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "bite", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
   }
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
     // "Choose target creature an opponent controls. ... Target creature you control fights that creature" (Time to Feed):

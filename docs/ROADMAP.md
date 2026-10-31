@@ -1,7 +1,7 @@
 # Roadmap
 
-28,513 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,179 of
+28,534 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,178 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3604,27 +3604,78 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   for special actions), Quarantine Field (X targets from its counters), Shivan Sand-Mage and Timebender (suspended cards as
   targets), Emrakul's Evangel (sacrificing any number as a cost), Ancestral Knowledge, Ral and the Implicit Maze (the
   Spellgorger Weird token), plus Awe Strike, Pulsemage Advocate, Aphetto Dredging and text-changing cards.
+- Round B60 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000, plus All Suns'
+  Dawn from the list below): "have base power and toughness 3/3 and lose all creature types" (Curse of Conformity),
+  "then return it to the battlefield under your control tapped and attacking" (The Neutrinos; the attacked player or
+  planeswalker is chosen as it returns, during combat only, CR 506.3d), "Whenever you cast your fourth noncreature spell
+  each turn" (The Fantasticar), "Choose target creature card in your graveyard that was put there from the battlefield
+  this turn. Return it to the battlefield tapped" (Othelm), "Whenever equipped creature attacks the monarch" (The Spear of
+  Bashenga) and "Whenever that creature attacks the monarch this turn" (Okoye), "add {R} at the beginning of your next
+  main phase this turn" (Conduit of Storms), "doesn't untap during its controller's untap step for as long as ~ remains
+  on the battlefield" (Neko-Te, Origin of Iron Man, Somnophore), Book Equipment tokens (Moira Brown; Book, Heartwood and
+  Vibranium are artifact types, CR 205.3g), "~ doesn't have defender" and "~ is blue" as activation conditions (Surge
+  Engine), "For each color, return up to one target card of that color" (All Suns' Dawn: five targets, never the same
+  card twice, CR 115.3), "another target permanent that shares one of those types with it" (Legerdemain), "return a
+  nonland permanent you own" (Phenomenon Investigators), "When equipped creature transforms, transform this Equipment"
+  (Neglected Heirloom), "Then if there are three or more cards exiled with ~, transform it" (Profane Procession),
+  "transform up to one other target double-faced artifact you control" (Tetzin's The Golden-Gear Colossus),
+  "enchanted permanent's controller sacrifices ..., then that player loses 1 life" (Strangling Grasp: still that player
+  after the enchanted permanent is gone), fateseal N (Mesmeric Sliver, Spin into Myth: the opponent is chosen as it
+  resolves, CR 701.29a), "If ~ would be destroyed, regenerate it" and "Only your opponents may activate this ability"
+  (Clergy and Knight of the Holy Nimbus; the UI offers the ability on an opponent's permanent only). +23 (28,512 of
+  31,936).
+- Out after round B60 (looked at, not done): Mossbridge Troll (tapping creatures with total power 10 as a cost), Faces of
+  the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (a mana value limit from its power on
+  a delayed cast trigger), The Fugitive Doctor and Filigree Racer (flashback or jump-start granted until end of turn),
+  Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
+  of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (a choice of two
+  cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder, Sigardian Zealot,
+  Rhuk, Alpha Brawl, Brain in a Jar, Sita Varma, Munda and Hans Eriksson.
+- Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
+  end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
+  this way, it enters with two additional +1/+1 counters" (Heroic Return; the same condition lets Confront the Assault
+  be cast, not Commander-legal), "if that creature's power is greater than ~'s" on an enters-or-dies trigger (Pelt
+  Collector: a creature that died is compared as it last existed), "if it's the second creature spell you cast this
+  turn" (Vengevine), "Whenever an opponent gains life" from the graveyard (Punishing Fire), "Untap any number of target
+  creatures. Prevent all combat damage ... to and dealt by those creatures" (Energy Arc), "You gain 2 life if a Lesson
+  card is milled this way" (Sparring Dummy), "When you discard a nonland card this way, ~ deals damage equal to that
+  card's mana value" (Fiery Encore, and Summon: Kujata's chapter III to each opponent), "that player mills a card. Then
+  they create X ... where X is the milled card's mana value" (Infernal Genesis), "the greatest power among creature
+  cards put into your graveyard this way" (Discerning Taste), "Whenever you cast a creature spell during an opponent's
+  turn" (Breath of the Sleepless), "If a permanent you controlled or a token was destroyed this way" (Break the Spell),
+  "The creature you control deals damage equal to its power to the creature an opponent controls" (Beastie Beatdown, a
+  one-sided fight), "you may have target noncreature artifact you control become a 0/0 artifact creature. If you do"
+  (Workshop Elders), "that creature's controller gains control of ~" (Contested War Zone), "Until end of turn, target
+  creature gets +6/+6 and gains trample, and all creatures able to block it this turn do so" (Revenge of the Hunted),
+  "It's still a Cave land" and "the number of other Caves you control plus the number of Cave cards in your graveyard
+  is three or greater" (Cavernous Maw), "copy that spell and you may choose new targets for the copy" (Mica, Reader of
+  Ruins), "for each player, ~ deals 1 damage to that player unless they pay {B} or {3}" (Lim-Dûl's Hex: each in turn
+  order, CR 101.4), "up to X target artifacts without mana abilities" (Midnight Arsonist; triggered mana abilities
+  count, CR 605.1b), "If this spell's mayhem cost was paid" (Sandman's Quicksand, CR 702.187b). +23, 22 of them
+  Commander-legal (28,534 of 31,936).
+- Out after round B61 (looked at, not done): Nullstone Gargoyle (the first noncreature spell each turn by any player),
+  Grimdancer (a choice of two counters from three), Cuombajj Witches and Trial of Agony (an opponent chooses a target),
+  Magus of the Abyss (a target "of their choice": the upkeep player chooses it), Abuelo's Awakening (a returned
+  artifact that's also a 1/1 Spirit creature with X more counters), Faith's Shield (fateful hour: you and your
+  permanents gain protection), Chandra's Phoenix (damage dealt by a red instant or sorcery spell or red planeswalker you
+  control), Heart-Shaped Herb, Meticulous Excavation (unearth check), Culmination of Studies, Psychotic Episode,
+  Skeletal Swarming, Lochmere Serpent.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B59 took the easier ones up to about 15,000 but left some of that range unread: about 150
-  there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc and Vengevine;
-  `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
-  Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
+  19,700 up (rounds B54 to B61 took the easier ones up to about 15,000 but left some of that range unread: about 130
+  there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
+  already in ROADMAP and HISTORY), then the lists below.
+  Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
-  Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond
-  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, All
-  Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
-  Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
-  Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from
-  Below, Demonfire, Drain Life, Desolation, War Tax, Urza's Sylex,
-  Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
-  Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips
-  included): Sandman's Quicksand (mayhem), Aeon Engine, Workshop Elders, Turtle Van, Haunting Imitation, The Fugitive
-  Doctor, Shifting Shadow, Abuelo's Awakening, Prince of Thralls, Eriette, Gastal Thrillroller, Manifold Insights, Take
-  Out the Trash, Glorfindel, Renegade Krasis, Discerning Taste, Fortune's Favor, Curse of Inertia, Trial of Agony,
-  Dreamshaper Shaman, Nefarious Lich, Cavernous Maw, Triarch Stalker, Fishing Pole, Chandra's Phoenix, Infernal
-  Vessel, Regna's Sanction, Nullstone Gargoyle, Faith's Shield, Kathril, Lochmere Serpent, Words of Wilding,
-  Grimdancer, Breath of the Sleepless, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli, Break the Spell,
-  Midnight Arsonist; then on up from 13,200.
+  Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Spinal Embrace, Song of Inspiration, Countersculpt,
+  Order of Succession, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Devouring Greed, Infernal
+  Tutor, Sadistic Sacrament, Kalitas, Drain Power, Purity, Cloudkill, Volcano Hellion, Bridge from Below, Demonfire,
+  Drain Life, Desolation, War Tax, Urza's Sylex, Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Soul
+  Exchange.
+  Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
+  included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
+  Eriette, Gastal Thrillroller, Manifold Insights, Take Out the Trash, Glorfindel, Renegade Krasis, Fortune's Favor,
+  Curse of Inertia, Dreamshaper Shaman, Nefarious Lich, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's
+  Sanction, Kathril, Words of Wilding, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

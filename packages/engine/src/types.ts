@@ -2186,6 +2186,8 @@ export interface Resolving {
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
   /** The life its loseLife instructions took off life totals so far: "if no life is lost this way" (Blitzwing, Cruel Tormentor). */
   lifeLost?: number;
+  /** "Enchanted permanent's controller", the first time it was read (Strangling Grasp: still "that player" once the permanent is sacrificed, CR 608.2h). */
+  hostControllerWas?: PlayerId;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   /**

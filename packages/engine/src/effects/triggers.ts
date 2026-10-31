@@ -971,6 +971,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentGainsLife" && eventPlayerFits(s, o, t, ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+    // Punishing Fire: "Whenever an opponent gains life, you may pay {R}. If you do, return ~ from your graveyard to your
+    // hand": it triggers only while it's in its owner's graveyard (CR 113.6m, rulings).
+    fromGraveyards((o, owner) => owner !== ev.player && add(o, owner, (e, t) => e === "opponentGainsLife" && eventPlayerFits(s, o, t, ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
   } else if (ev.type === "diceRolled") {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
@@ -1237,6 +1240,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTransformsInto");
+    // Neglected Heirloom: "When equipped creature transforms": the Equipment attached to it as it transformed.
+    addHosted(o, (e) => e === "selfTransforms");
     // "Whenever a permanent you control transforms into a Phyrexian" (CR 701.27e): the permanent, as it is now, is the subject.
     for (const id of s.battlefield) {
       const w = obj(s, id);
@@ -1345,11 +1350,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return { player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid, opponent: opp && !a.attackingPermanent, opponentOrPlaneswalker: opp && a.attackingPermanent?.battleController === undefined };
     };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever ~ or equipped creature attacks" (Tanuki Transplanter): about ~ itself here, the subject.
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
-    addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // Okoye: "Whenever that creature attacks the monarch this turn": a delayed trigger about this creature (CR 603.7c).
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfAttacks" && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined), o);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.

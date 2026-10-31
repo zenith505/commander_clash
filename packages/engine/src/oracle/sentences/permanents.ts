@@ -218,8 +218,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
-  // control": a permanent that isn't a transforming one doesn't (CR 701.27c).
-  if ((m = /^[Tt]ransform ((?:up to one )?target .+)$/.exec(s))) {
+  // control", "up to one other target double-faced artifact you control" (The Golden-Gear Colossus): a permanent that
+  // isn't a transforming one doesn't (CR 701.27c).
+  if ((m = /^[Tt]ransform ((?:up to one (?:other )?)?target .+|another target .+)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "transform", what }] : null;
   }
@@ -1155,6 +1156,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).
   if (/^[Ii]ts controller gains control of ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "targetController", index: ctx.lastObjectTarget } }];
+  // Contested War Zone: "Whenever a creature deals combat damage to you, that creature's controller gains control of ~":
+  // the trigger's creature's controller, as it last existed if it's gone (CR 608.2h), for the rest of the game (layer 2).
+  if (/^[Tt]hat creature's controller gains control of ~$/.test(s) && !ctx.spell && (ctx.subject || ctx.subjectIt) && !ctx.targets.length)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "subjectController" } }];
   // Pumpkin Bombs: "... to target opponent. They gain control of ~": that target player, for the rest of the game.
   if (/^(?:They gain|That player gains) control of ~$/.test(s) && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many && !ctx.targets[ctx.lastPlayerTarget]!.optional)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "target", index: ctx.lastPlayerTarget } }];
@@ -1484,6 +1489,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
     const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
+  }
+  // Legerdemain: "Exchange control of target artifact or creature and another target permanent that shares one of those
+  // types with it": an artifact or creature type in common, as they're chosen and again as it resolves (rulings, CR
+  // 701.12b).
+  if (/^[Ee]xchange control of target artifact or creature and another target permanent that shares one of those types with it$/.test(s)) {
+    const a = addTarget(ctx, { kind: "object", types: ["Artifact", "Creature"], text: "target artifact or creature" });
+    const b = addTarget(ctx, { kind: "object", types: [], distinctFrom: [a], sharesCardTypeWith: [a], sharesCardTypeAmong: ["Artifact", "Creature"], text: "another target permanent that shares one of those types with it" });
+    return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
   }
   // "Exchange control of two target creatures" (Switcheroo), "... two target lands" (Shifting Borders), "... two other
   // target creatures controlled by different players" (Kitsune, Dragon's Daughter); "Exchange control of ~ and target

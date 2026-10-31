@@ -1570,6 +1570,13 @@ export function parseTargetPhrase(
     extra.manaAbility = true;
     p = p.slice(0, manaAb.index);
   }
+  // Midnight Arsonist: "target artifacts without mana abilities": neither an activated nor a triggered one (CR 605.1,
+  // rulings).
+  const noManaAb = / without mana abilities$/.exec(p);
+  if (noManaAb && !manaAb) {
+    extra.noManaAbility = true;
+    p = p.slice(0, noManaAb.index);
+  }
   // Oblivion Stone: "each nonland permanent without a fate counter on it": any kind of counter.
   // Coiling Stalker: "target creature you control that doesn't have a +1/+1 counter on it": the same.
   // Hindervines: "creatures with no +1/+1 counters on them": the same.
@@ -1954,6 +1961,10 @@ export function parseTargetPhrase(
       } else if (w === "non-outlaw") {
         if (alts.length > 1 || notSubtypes.length) return null;
         notSubtypes.push(...OUTLAW_TYPES);
+      } else if (w === "double-faced") {
+        // Tetzin, Gnome Champion: "another double-faced artifact you control" (CR 712.1).
+        if (alts.length > 1 || extra.doubleFaced) return null;
+        extra.doubleFaced = true;
       } else if (w === "suspected") {
         // "Suspected creature" (CR 701.60).
         if (alts.length > 1 || extra.suspected) return null;

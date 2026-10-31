@@ -847,6 +847,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   // Hazoret, Godseeker: "~ can't attack or block unless you have max speed" (CR 702.179e: speed 4).
   if (text === "you have max speed") return { kind: "maxSpeed" };
+  // Heroic Return: "~ costs {2} less to cast if a creature is attacking you": attacking you, not a planeswalker you control
+  // (CR 506.3).
+  if (text === "a creature is attacking you") return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingYou", text: "creatures attacking you" } } }, min: 1 };
   // Thoughtbound Primoc: "if a player controls more Wizards than each other player", Ghazbán Ogre: "has more life",
   // Sokenzan Renegade: "has more cards in hand": one player with the most, none tied (rulings).
   if ((m = /^a player (?:controls more ([A-Za-z]+)|has more (life|cards in hand)) than each other player$/.exec(text))) {
@@ -886,6 +889,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const a = parseStaticCondition(`you control a ${m[1]} creature`, st);
     const b = parseStaticCondition(`you control a non-${m[1]} creature`, st);
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
+  // Cavernous Maw: "Activate only if the number of other Caves you control plus the number of Cave cards in your graveyard
+  // is three or greater": counted as it's activated.
+  if ((m = new RegExp(`^(the number of .+ plus the number of .+) is ${NUM} or greater$`).exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[2]!) } : null;
   }
   // ED-E, Lonesome Eyebot: "if the number of attacking creatures is greater than the number of quest counters on ~".
   if ((m = /^the number of (.+) is greater than the number of (.+)$/.exec(text))) {
@@ -1426,8 +1435,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Balan, Wandering Knight: "~ has double strike as long as two or more Equipment are attached to it": to itself.
   if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "self") return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Equipment"] } }, min: num(m[1]!) };
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
-  if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
-    return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
+  // Surge Engine: "Activate only if ~ doesn't have defender", "Activate only if ~ is blue": its keywords and colors now
+  // (CR 602.5b), however it lost or got them (rulings).
+  if ((m = /^~ (has|doesn't have) (defender|flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text))) {
+    const has: StaticCondition = { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[2]!)], text: m[2]! } };
+    return m[1] === "has" ? has : { kind: "not", cond: has };
+  }
+  if ((m = /^~ is (white|blue|black|red|green)$/.exec(text)) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: m[1]! } };
   // Manor Gargoyle: "~ has indestructible as long as it has defender": its keywords as the layers so far left them, so
   // an effect that takes defender away comes first (CR 613.8a).
   if ((m = /^it has (defender|flying)$/.exec(text)) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
@@ -1860,6 +1874,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
   }
+  // Curse of Conformity: "have base power and toughness 3/3 and lose all creature types" (layers 4 and 7b; a changeling
+  // loses its creature types too, rulings).
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+) and lose all creature types$/.exec(rest)))
+    return [{ kind: "loseCreatureTypes" }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }];
   // Archon of the Wild Rose: "have base power and toughness 4/4 and have flying" (layers 6 and 7b).
   if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+) and ((?:has|have) [a-z ,]+)$/.exec(rest))) {
     const more = parseStaticMods(m[3]!);

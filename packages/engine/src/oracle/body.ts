@@ -462,7 +462,10 @@ const checkableMay = (e: Effect): boolean =>
   (e.type === "attach" && e.what.ref === "target" && !e.what.n && !e.source) ||
   // "You may have ~ become a copy of another target creature you control until end of turn ... If you do, ..." (Gogo,
   // Mysterious Mime): done if it and that target are both still there.
-  (e.type === "becomeCopy" && e.what.ref === "self" && e.of.ref === "target" && !e.of.n && e.duration === "endOfTurn");
+  (e.type === "becomeCopy" && e.what.ref === "self" && e.of.ref === "target" && !e.of.n && e.duration === "endOfTurn") ||
+  // Innocuous Researcher: "you may untap all lands you control. If you do, ...": choosing to is doing it, tapped lands
+  // or not (an instruction about "all" is done even when it finds nothing to change).
+  (e.type === "untap" && e.what.ref === "each" && e.what.filter?.kind === "object" && e.what.filter.controller === "you");
 
 /**
  * What a card name chosen as it resolves is for, from the instructions after it (bots, see NamePurpose): to find in your
@@ -9985,6 +9988,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "returnAllFromGraveyard", who: { ref: "you" }, filter, toHand: true, milled: true });
       continue;
     }
+    // Seek Thrills: "Mill seven cards. Then put all cards that have an Adventure from among the milled cards into your
+    // hand": every one of them, no choice (an adventurer card has an Adventure in the graveyard too, rulings).
+    if (/^(?:Then )?[Pp]ut all cards that have an Adventure from among (?:them|the milled cards|the cards milled this way) into your hand$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "mill" || prev.who.ref !== "you") return null;
+      effects.push({ type: "chooseFromGraveyard", n: 99, milled: true, all: true, filter: { kind: "card", hasAdventure: true, text: "card that has an Adventure" } });
+      continue;
+    }
     const fromMilled =
       // Nashi, Searcher in the Dark: "You may put any number of legendary and/or enchantment cards from among them into your hand".
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
@@ -10586,6 +10597,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mods = parseBecomes(`a ${theyAreAll[1]} ${theyAreAll[2]} in addition to its other colors and types`);
       if (prev?.type !== "returnAllFromGraveyard" || prev.toHand || !mods || prev.alsoMods) return null;
       prev.alsoMods = mods;
+      continue;
+    }
+    // Tune Up: "Return target artifact card from your graveyard to the battlefield. If it's a Vehicle, it becomes an artifact
+    // creature": the permanent it became, from then on (no duration, CR 611.2a), keeping its other types (CR 205.1b).
+    if (/^If it's a Vehicle, it becomes an artifact creature$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n || prev.alsoMods) return null;
+      prev.alsoMods = [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }];
+      prev.alsoModsIfSubtype = "Vehicle";
       continue;
     }
     // Retched Wretch: "return it to the battlefield under its owner's control and it loses all abilities": the permanent

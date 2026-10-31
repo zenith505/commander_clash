@@ -302,6 +302,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length : 0;
     }
+    case "linkedExiledPT": {
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!src) return 0;
+      return (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []).reduce((n, l) => {
+        const o = s.objects[l.id];
+        if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== l.zc || o.faceDown) return n;
+        const ch = characteristics(s, o);
+        return ch.types.includes("Creature") ? n + Math.max(0, ch[c.stat]) : n;
+      }, 0);
+    }
     case "movedLinkedThisWay":
       return s.resolving?.movedLinked ?? 0;
     case "movedThisWayGreatestPower":
@@ -1114,6 +1124,8 @@ function describeCount(c: Count): string {
       return "#counters removed";
     case "linkedExiled":
       return "#cards exiled with it";
+    case "linkedExiledPT":
+      return `the exiled creature card's ${c.stat}`;
     case "movedLinkedThisWay":
       return "#cards put into graveyards";
     case "movedThisWayGreatestPower":

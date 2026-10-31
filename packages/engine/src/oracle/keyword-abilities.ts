@@ -411,8 +411,14 @@ export function parseCostKeyword(
     return plainMana(m[2]!) && sac ? { alt: { kind: "emerge", mana: m[2]!, costs: [sac] } } : "fail";
   }
   if (/^Emerge\b/.test(line)) return "fail";
-  // Freerunning [cost] (CR 702.173a); "Freerunning—Return a blue creature ..." and {X} costs aren't modeled.
+  // Freerunning [cost] (CR 702.173a); {X} costs aren't modeled.
   if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
+  // "Freerunning—Return a blue creature you control to its owner's hand." (Escape Detection): a freerunning cost that isn't
+  // mana (CR 702.173a, 118.8), paid instead of the mana cost.
+  if ((m = /^Freerunning—(Return an? [a-z]+ creature you control to its owner's hand)\.?$/.exec(line))) {
+    const cost = parseAdditionalCost(m[1]!.replace(/^R/, "r"));
+    return cost?.kind === "returnToHand" ? { alt: { kind: "freerunning", mana: "", costs: [cost], text: m[1]!.replace(/^R/, "r") } } : "fail";
+  }
   if (/^Freerunning\b/.test(line)) return "fail";
   // Surge [cost] (CR 702.117a): if you've cast another spell this turn (no teammates here); spectacle [cost] (702.137a):
   // if an opponent lost life this turn. Alternative costs, so not with an {X} the mana cost doesn't have.
@@ -893,10 +899,10 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.60a; each instance triggers separately (702.60b).
       out.triggers.push({ event: "selfCast", body: rippleBody(Number(m[1])) });
     }
-    else if ((m = /^affinity for ((?:artifact |snow )?\w+)$/i.exec(p))) {
+    else if ((m = /^affinity for ((?:artifact |snow |historic )?\w+)$/i.exec(p))) {
       // CR 702.41a: "This spell costs {1} less to cast for each [text] you control." "Affinity for artifact creatures" (Urza,
       // Chief Artificer): each artifact creature. Razor Golem: "Affinity for Plains"; Icebreaker Kraken: "Affinity for snow
-      // lands".
+      // lands". "Affinity for historic permanents" (Banish to Another Universe): artifacts, legendaries and Sagas (CR 700.6).
       const spec = parseTargetPhrase(m[1] === "Plains" ? "Plains" : m[1]!.split(" ").map(singular).join(" "));
       if (spec?.kind !== "object") return null;
       out.affinity.push({ ...spec, controller: "you", text: `${m[1]} you control` });
@@ -1349,6 +1355,19 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         discardSelf: true,
         body: { targets: [], effects: [{ type: "search", filter: { kind: "card", manaValue: { min: mv, max: mv }, text: `card with mana value ${mv}` }, n: 1, upTo: false, reveal: true, dest: { zone: "hand" } }], text: `Search your library for a card with mana value ${mv}, reveal it, put it into your hand, then shuffle.` },
         text: `Transmute ${m[1]}`,
+      });
+    } else if ((m = /^transfigure ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+      // CR 702.71a: "[Cost], Sacrifice this permanent: Search your library for a creature card with the same mana value as
+      // this permanent and put it onto the battlefield. Then shuffle your library. Activate only as a sorcery." Only on the
+      // battlefield (rulings), its mana value as it was sacrificed: its printed one, or the copied one for a copy.
+      const mv = d.cmc;
+      out.activated.push({
+        manaCost: m[1]!,
+        tap: false,
+        sacrificeSelf: true,
+        sorcerySpeed: true,
+        body: { targets: [], effects: [{ type: "search", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], manaValue: { min: mv, max: mv }, text: `creature card with mana value ${mv}` }, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" } }], text: `Search your library for a creature card with mana value ${mv}, put it onto the battlefield, then shuffle.` },
+        text: `Transfigure ${m[1]}`,
       });
     } else if ((m = /^([a-z]+(?: [a-z]+)?)cycling ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.29e: "[Type]cycling [cost]" means "[Cost], Discard this card: Search your library for a

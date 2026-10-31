@@ -741,6 +741,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = t?.kind === "stack" && ctx.legal[e.index] ? s.stack.find((x) => x.id === t.id) : undefined;
       if (!item || item.controller === ctx.controller) return;
       item.controller = ctx.controller;
+      item.controlTaken = true;
       const o = item.objectId ? s.objects[item.objectId] : undefined;
       if (o) o.controller = ctx.controller;
       invalidateCharacteristics(s);
@@ -1082,7 +1083,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d) && (u.minMv === undefined || (!item.copy && spellMv(d, item.x) >= u.minMv)));
+    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d) && (u.minMv === undefined || (!item.copy && spellMv(d, item.x) >= u.minMv)) && (!u.castOnly || (!item.copy && !item.controlTaken)));
   });
 }
 

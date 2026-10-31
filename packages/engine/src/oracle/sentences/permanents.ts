@@ -1438,6 +1438,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what?.ref === "each" ? parseChanges(m[2]!) : null;
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
+  // Awakening of Vitu-Ghazi: "It becomes a legendary 0/0 Elemental creature with haste named Vitu-Ghazi. It's still a land.":
+  // the target, with no duration (rulings); its name is just the new one (rulings, layer 3 setName, CR 613.1c).
+  if ((m = /^(It|[Tt]arget [a-z ]+?) becomes (a legendary \d+\/\d+ [A-Z][a-z]+ creature(?: with [a-z, ]+)?) named ([A-Z][A-Za-z'-]+(?: [A-Z][A-Za-z'-]+)*)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" && !what.n ? parseChanges(`becomes ${m[2]!}`) : null;
+    return what && mods ? [{ type: "continuous", what, mods: [...mods, { kind: "setName", name: m[3]! }], duration: "game" }] : null;
+  }
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
   // "Put four +1/+1 counters on target noncreature artifact. It becomes a 0/0 Bird creature" (Case of the Filched Falcon): the target.

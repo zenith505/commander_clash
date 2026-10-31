@@ -2795,7 +2795,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   for (const offer of offering ? [undefined, offering.id] : [undefined])
     for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
       for (const buyback of buybacks)
-        for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length) && !(k.length && bb.kicker?.extraCosts && (!kickCosts || buyback)))) {
+        for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length) && !(k.length && bb.kicker?.extraCosts && (!kickCosts || buyback || k.length > 1)))) {
           const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
           const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).

@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches, spellMatches } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -543,7 +543,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // Sanguine Praetor, Endemic Plague: the sacrificed creature as it last existed; none matches without one.
     const sacked = ref.sacrificedKin ? (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1)) : undefined;
     if (ref.sacrificedKin && !sacked) return [];
-    const filter = ref.sacrificedKin === "manaValue" ? { ...filter1, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter1;
+    // Golden Argosy: "each creature that crewed it this turn" (CR 702.122d), the source as the object it was.
+    const { crewedSource, ...filter2 } = filter1;
+    const filter = ref.sacrificedKin === "manaValue" ? { ...filter2, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter2;
     const sackedTypes = ref.sacrificedKin === "creatureType" ? (sacked!.allCreatureTypes ? ("all" as const) : new Set((sacked!.subtypes ?? []).filter((x) => CREATURE_TYPES.has(x)))) : undefined;
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
@@ -552,7 +554,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
     const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
     const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o));
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o) && (!crewedSource || saddledSource(s, o.id, ctx.sourceId, ctx.sourceZc, "crewedBy")));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);

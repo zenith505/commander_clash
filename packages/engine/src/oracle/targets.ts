@@ -1095,6 +1095,13 @@ export function parseTargetPhrase(
     const t = orToken[1]!.charAt(0).toUpperCase() + orToken[1]!.slice(1);
     return { kind: "object", types: [], anyOf: [{ kind: "object", types: [t], text: orToken[1]! }, { kind: "object", types: [], token: true, text: "token" }], text: phrase.trim() };
   }
+  // Celestial Gatekeeper: "Bird and/or Cleric permanent cards from your graveyard": a permanent card (CR 110.4b) with
+  // either creature type.
+  const subPermanent = /^([A-Z][a-z]+) (?:and\/)?or ([A-Z][a-z]+) permanent (cards? from your graveyard)$/.exec(phrase.trim());
+  if (subPermanent && CREATURE_TYPES.has(subPermanent[1]!) && CREATURE_TYPES.has(subPermanent[2]!)) {
+    const head = parseTargetPhrase(`${subPermanent[1]} or ${subPermanent[2]} ${subPermanent[3]}`, opts);
+    return head?.kind === "card" && !head.types?.length && head.subtypes?.length === 2 ? { ...head, types: [...PERMANENT_TYPES], text: `target ${phrase.trim()}` } : null;
+  }
   // Rob the Hoard: "artifact, enchantment, or legendary card from your graveyard": a card that's any of them.
   const typesOrLegendary = /^(artifact|creature|enchantment|instant|sorcery|land|planeswalker), (artifact|creature|enchantment|instant|sorcery|land|planeswalker), or legendary card( from (?:your|a) graveyard)$/.exec(phrase.trim());
   if (typesOrLegendary) {
@@ -1401,6 +1408,12 @@ export function parseTargetPhrase(
   if (saddled) {
     extra.saddledSource = true;
     p = p.slice(0, saddled.index);
+  }
+  // Getaway Car: "target creature that crewed it this turn" (CR 702.122d), the same for crewing.
+  const crewed = / that crewed (?:it|~) this turn$/.exec(p);
+  if (crewed) {
+    extra.crewedSource = true;
+    p = p.slice(0, crewed.index);
   }
   // Witch-king of Angmar: "a creature of their choice that dealt combat damage to you this turn".
   const dealtYou = / that dealt combat damage to you this turn$/.exec(p);

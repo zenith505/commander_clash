@@ -180,7 +180,8 @@ export function parseGrants(text: string): Modification[] | null {
     // Provoke too (CR 702.39b): "All Sliver creatures have provoke" (Hunter Sliver). Extort too, each instance triggering
     // on its own (CR 702.101b): "Other creatures you control have extort" (Pontiff of Blight).
     // Mentor too (CR 702.134a): "Enchanted creature gets +2/+2 and has mentor" (Nyxborn Unicorn).
-    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort|mentor)$/i.test(w)) {
+    // Battle cry too (CR 702.91b): "gains battle cry until end of turn" (Reckless Pyrosurfer).
+    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort|mentor|battle cry)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }

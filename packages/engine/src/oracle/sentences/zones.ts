@@ -343,8 +343,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
-  // Gandalf, White Rider: "fifth from the top".
-  if (ctx.selfCard && (m = /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library (third|fifth) from the top$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] as "third" | "fifth" }];
+  // Gandalf, White Rider: "fifth from the top". Screaming Swarm: "second from the top".
+  if (ctx.selfCard && (m = /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library (second|third|fifth) from the top$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] as "second" | "third" | "fifth" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
   // library, then that library is shuffled (CR 701.24c).

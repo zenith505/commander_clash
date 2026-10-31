@@ -293,6 +293,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : keyword === "Forecast" ? { kind: "during", window: "upkeep", turn: "you" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
   let costLess: ActivatedAbility["costLess"];
+  let costMore: ActivatedAbility["costMore"];
   let costLessIf: ActivatedAbility["costLessIf"];
   // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
   let inYard = false;
@@ -328,6 +329,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
+      found = true;
+    }
+    // Loreseeker's Stone: "This ability costs {1} more to activate for each card in your hand": generic mana added as it's
+    // activated (CR 602.2b, 601.2f).
+    const more = / This ability costs \{(\d+)\} more to activate for each ([^.]+)\.$/.exec(effectText);
+    if (more && !costMore) {
+      const c = parseCount(more[2]!, null, true);
+      if (!c) return "fail";
+      costMore = { ...c, times: (c.times ?? 1) * Number(more[1]) };
+      effectText = effectText.slice(0, more.index);
       found = true;
     }
     // Baru, Wurmspeaker: "This ability costs {X} less to activate, where X is the greatest power among Wurms you control":
@@ -390,6 +401,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (/ Activate only once and only [^.]+\.$/.test(effectText) && !onceEver && !keyword) {
       onceEver = true;
       effectText = effectText.replace(/ Activate only once and only ([^.]+)\.$/, " Activate only $1.");
+      found = true;
+    }
+    // Thought Shucker: "Activate only if there are seven or more cards in your graveyard and only once": once ever, and
+    // only then (CR 602.5b).
+    if (/ Activate only if [^.]+ and only once\.$/.test(effectText) && !onceEver && !keyword) {
+      onceEver = true;
+      effectText = effectText.replace(/ and only once\.$/, ".");
       found = true;
     }
     // In the Trenches: "Activate only as a sorcery and only once." Both (CR 602.5b), once for as long as it's that object.
@@ -457,7 +475,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
-  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature)?)|Put ~ from your graveyard into your library third from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature)?)|Put ~ from your graveyard into your library (?:second|third) from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).
@@ -509,6 +527,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // object the ability names.
   if (/^Remove \w+ [^,:]*counters? from ~$/.test(costs)) effectText = effectText.replace(/^Return it to its owner's hand\.$/, "Return ~ to its owner's hand.");
   const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ")
+    // Migloz, Maze Crusher: "{1}, Remove an oil counter from ~: It gains vigilance and menace until end of turn": with
+    // nothing else named before it, "it" is the permanent whose ability this is.
+    .replace(/^It (?=(?:gets|gains) [^.]*until end of turn\.$)/, returnsSelf || inYard || fromHand ? "It " : "~ ")
     // Blademane Baku: "For each counter removed, ~ gets +2/+0 until end of turn" after "Remove X ki counters from ~".
     .replace(/^For each counter removed, (~ gets [+-]\d+\/[+-]\d+ until end of turn)\.$/, removeCounters?.x ? "$1 for each counter removed this way." : "$&").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ ").replace(/^(Untap ~\. Put an? [^.]+ counter on) it\.$/, "$1 ~."), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
@@ -563,6 +584,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(xMin ? { xMin } : {}),
     ...(xIs ? { xIs } : {}),
     ...(costLess ? { costLess } : {}),
+    ...(costMore ? { costMore } : {}),
     ...(costLessIf ? { costLessIf } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),

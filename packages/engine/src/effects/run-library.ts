@@ -608,8 +608,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // you scry" triggers anyway (701.22d, 701.25d).
         if (!cards.length) {
           if (n > 0) {
-            noteScried(s, p.id);
-            fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+            const first = noteScried(s, p.id, e.type);
+            fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0, ...(first ? { firstSurveil: true as const } : {}) });
           }
           return;
         }
@@ -627,8 +627,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
-      noteScried(s, p.id);
-      fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
+      const first = noteScried(s, p.id, e.type);
+      fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size, ...(first ? { firstSurveil: true as const } : {}) });
       return;
     }
     case "revealDrawn": {
@@ -1833,10 +1833,15 @@ function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec
   return { ...rest, subtypes: kin.length ? kin : ["(none)"] };
 }
 
-/** Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn". */
-function noteScried(s: GameState, player: PlayerId) {
+/**
+ * Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn", and how many times
+ * each surveilled (TurnLog.surveilled): true for a player's first surveil this turn.
+ */
+function noteScried(s: GameState, player: PlayerId, how: "scry" | "surveil"): boolean {
   const log = (s.turnLog ??= {});
-  if ((log.scried ??= []).includes(player)) return;
+  const first = how === "surveil" && ((log.surveilled ??= {})[player] = (log.surveilled[player] ?? 0) + 1) === 1;
+  if ((log.scried ??= []).includes(player)) return first;
   log.scried.push(player);
   invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)
+  return first;
 }

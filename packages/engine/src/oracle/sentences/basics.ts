@@ -306,6 +306,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // Tomb Blade: "that player loses life equal to the number of creatures they control unless they sacrifice a creature of
+  // their choice": counted once they haven't (CR 608.2h), that player's own.
+  if ((m = /^that player loses life equal to the number of ([a-z ]+?) they control unless they (.+)$/.exec(s)) && ctx.eventPlayer) {
+    const options = parsePunisherOptions(m[2]!, ctx);
+    const n = parseCount(`the number of ${m[1]} that player controls`, ctx);
+    if (!options || !n || typeof n !== "object" || !("count" in n) || n.count.kind !== "permanents" || n.count.whose?.ref !== "eventPlayer") return null;
+    return [{ type: "punisher", who: { ref: "eventPlayer" }, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n }] }];
+  }
   // The Long Reach of Night: "Each opponent sacrifices a creature of their choice unless they discard a card": each
   // chooses in APNAP order (a punisher); one with no card in hand can't choose to discard.
   if ((m = /^(.+?) sacrifices? an? ([a-z]+) of their choice unless (?:they|that player) discards? a card$/.exec(s))) {

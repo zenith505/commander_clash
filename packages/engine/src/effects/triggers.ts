@@ -174,7 +174,7 @@ export type TriggerSourceEvent =
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
-  | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number }
+  | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number; /** A surveil that was the player's first this turn (TurnLog.surveilled). */ firstSurveil?: true }
   /** A player clashed (CR 701.30a), whether or not they started it; `won`, whether they won it (701.30d). */
   | { type: "clashed"; player: PlayerId; won: boolean }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
@@ -281,7 +281,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -1045,7 +1045,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   } else if (ev.type === "scried") {
     const kind = ev.how === "scry" ? "youScry" : "youSurveil";
-    const watch = (o: GameObject) => add(o, ev.player, (e) => e === kind || e === "youScryOrSurveil", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.n });
+    // Whispering Snitch: "Whenever you surveil for the first time each turn", counting surveils before it was on the
+    // battlefield.
+    const watch = (o: GameObject) => add(o, ev.player, (e, t) => (e === kind && (!t.firstEachTurn || !!ev.firstSurveil)) || e === "youScryOrSurveil", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.n });
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) watch(obj(s, id));
     // "Whenever you surveil, if ~ is in your graveyard" (Blood Operative): its owner's.
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
@@ -1922,7 +1924,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
-        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !tr.targeted?.onlyYou && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
     // Surrak, Elusive Hunter: "or a creature spell you control" (TriggeredAbility.targeted.orSpell): a spell the item
@@ -2019,6 +2021,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
         if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
+        // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
+        // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
+        if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;
         // Herald of Anafenza: "Whenever you activate ~'s outlast ability": this object's own.
         if (a.ownOutlast && (!ev.outlast || ev.source?.snapshot.id !== o.id || (ev.source.snapshot.zoneChanges ?? 0) !== (o.zoneChanges ?? 0))) return false;
         if (a.equipped) {

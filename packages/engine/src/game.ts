@@ -7083,7 +7083,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets);
+  const more = (ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets)) + (ab.costMore ? Math.max(0, evalAmount(s, ab.costMore, { controller: pid, sourceId: o.id })) : 0);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -7293,8 +7293,10 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} puts ${put === 1 ? "a" : put} ${ab.putCounters.counter} counter${put === 1 ? "" : "s"} on ${d.name}.`);
   }
   // A loyalty cost puts on or removes loyalty counters (CR 606.4); counters put on as a cost aren't doubled (rulings).
+  let loyaltyRemoved: number | undefined;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+    loyaltyRemoved = Math.max(0, -change);
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
     (o.activatedThisTurn ??= []).push(LOYALTY_USED);
     if (objIsType(s, o, "Planeswalker")) p.loyaltyTurn = s.turn; // The Chain Veil
@@ -7380,8 +7382,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   s.stack.push(item);
   // The creatures tapped for a saddle cost saddled it (CR 702.171c), whether or not the ability resolves.
-  if (ab.saddle && tapCreatures?.length) {
-    const list = (((s.turnLog ??= {}).saddledBy ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
+  // The creatures tapped for a crew cost crewed it (CR 702.122d), the same way.
+  if (ab.crew !== undefined && tapCreatures?.length) {
+    const list = (((s.turnLog ??= {})[ab.saddle ? "saddledBy" : "crewedBy"] ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
     for (const c of tapCreatures) if (!list.includes(`${c}@${obj(s, c).zoneChanges ?? 0}`)) list.push(`${c}@${obj(s, c).zoneChanges ?? 0}`);
   }
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
@@ -7399,7 +7402,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

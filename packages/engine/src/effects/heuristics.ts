@@ -1,6 +1,6 @@
 import { allEffects, refCovers } from "../abilities";
 import type { AbilityBody, Amount, Modification } from "../abilities";
-import { toughness } from "../cards";
+import { lethalLeft } from "../cards";
 import { halve } from "../amounts";
 import { compileGranted } from "../oracle";
 import type { GameObject, GameState, ObjectId } from "../types";
@@ -145,7 +145,7 @@ export function damageTo(body: AbilityBody, i: number, x = 0): number {
   return n;
 }
 
-export const lethalDamage = (s: GameState, o: GameObject) => Math.max(0, toughness(s, o) - o.damage);
+export const lethalDamage = (s: GameState, o: GameObject) => lethalLeft(s, o);
 
 /**
  * A rough value for an amount before the game works it out, for bots and previews: X as `x`,

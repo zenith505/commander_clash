@@ -213,7 +213,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
   // Wand of the Worldsoul: "The next spell you cast this turn has convoke" (CR 702.51), the same way.
-  if (s === "The next spell you cast this turn has convoke") return [{ type: "nextSpellImprovise", convoke: true }];
+  // Flockchaser Phantom: "Whenever ~ attacks, the next spell you cast this turn has convoke": the same, in a trigger.
+  if (/^[Tt]he next spell you cast this turn has convoke$/.test(s)) return [{ type: "nextSpellImprovise", convoke: true }];
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
@@ -456,8 +457,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
   // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
-  // the attacking creature (the trigger's subject).
-  if ((m = /^((?:up to one )?target .+?) blocks it this combat if able$/i.exec(s)) && ctx.subjectIt) {
+  // the attacking creature (the trigger's subject). Tolsimir, Midnight's Light: "blocks that Wolf this combat if able".
+  if ((m = /^((?:[Uu]p to one )?[Tt]arget .+?) blocks (?:it|that [A-Z][a-z]+) this combat if able$/.exec(s)) && ctx.subjectIt && (/ blocks it /.test(s) || CREATURE_TYPES.has(/ blocks that ([A-Z][a-z]+) /.exec(s)?.[1] ?? ""))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
   }
@@ -528,6 +529,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef = { ref: "target", index: i };
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
+  // Tamiyo's Compleation (rewritten in body.ts): the enchanted permanent, if it's an Equipment as this resolves (CR 701.3d).
+  if (s === "Unattach enchanted permanent if it's an Equipment") return [{ type: "unattach", what: { ref: "attached" }, ifEquipment: true }];
   // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
   // Fulgent Distraction: "Tap two target creatures, then unattach all Equipment from them": from both.
   if ((m = /^Unattach all Equipment from (target creature|them)$/.exec(s))) {
@@ -902,7 +905,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
   // Resourceful Defense: "... put those counters on target permanent you control", the same way.
   // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
-  if ((m = /^Put those counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft) {
+  // Buzzard-Wasp Colony: "Whenever another creature you control dies, if it had counters on it, put its counters on ~": the
+  // same ("its" is the creature that died).
+  if ((m = /^Put (?:those|its) counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
@@ -1115,6 +1120,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).
   if (/^[Ii]ts controller gains control of ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "targetController", index: ctx.lastObjectTarget } }];
+  // Pumpkin Bombs: "... to target opponent. They gain control of ~": that target player, for the rest of the game.
+  if (/^(?:They gain|That player gains) control of ~$/.test(s) && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many && !ctx.targets[ctx.lastPlayerTarget]!.optional)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "target", index: ctx.lastPlayerTarget } }];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
   // this resolves (CR 611.2c), until the cleanup step (514.2).
@@ -1145,6 +1153,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
     return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host, eachKind: true }];
   }
+  // Denry Klin, Editor in Chief: "put the same number of each kind of counter on that creature" as ~ has, after "if ~ has
+  // counters on it": each kind ~ has as it resolves, that many (CR 122.1).
+  if (ctx.subject && /^[Pp]ut the same number of each kind of counter on that creature$/.test(s)) return [{ type: "counters", what: { ref: "subject" }, counter: "+1/+1", n: 0, copyFrom: { ref: "self" } }];
   if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;
@@ -1460,8 +1471,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,
-  // card and creature types are replaced; its supertypes stay (rulings).
-  if ((m = /^(target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
+  // card and creature types are replaced; its supertypes stay (rulings). "Up to one other target creature" (Lizard,
+  // Connors's Curse) the same.
+  if ((m = /^((?:up to one )?(?:other )?target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];

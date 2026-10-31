@@ -135,6 +135,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "notAttacking" && o.attacking !== undefined) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.foughtThisTurn && o.foughtTurn !== s.turn) return false;
   if (spec.combat === "blockedThisTurn" && o.blockedTurn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
@@ -532,6 +533,8 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
   if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && hasName(src.name, s.objects[id]!.chosen?.name ?? "\u0000") && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
   // Serra's Emissary: from sources of the chosen card type, its controller's own too.
   if (src?.types && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youProtectedFromChosenType && src.types!.includes(s.objects[id]!.chosen?.cardType ?? "\u0000"))) return true;
+  // Gor Muldrak: "You ... have protection from Salamanders", from such sources, its controller's own too.
+  if (src && s.battlefield.some((id) => { const kw = controllerOf(s, s.objects[id]!) === pid ? abilitiesOf(s, s.objects[id]!).youProtectionFrom : undefined; return !!kw && protectedFrom([kw], src); })) return true;
   if (from === undefined || from === pid) return false;
   if (protectedFromPlayer(gained, from, holder)) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");

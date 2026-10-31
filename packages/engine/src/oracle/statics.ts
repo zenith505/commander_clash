@@ -330,7 +330,9 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // Relic Golem's "unless an opponent has eight or more cards in their graveyard"): the restriction applies while the
   // condition is false (a "not" condition, see below).
   // Marauding Maulhorn: "~ attacks each combat if able unless you control a creature named Advocate of the Beast".
-  else if ((m = /^(~ attacks each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
+  // Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able unless
+  // you control a creature named Silver Surfer, ~'s Herald" (that name kept as written by normalizeSelf).
+  else if ((m = /^(~ attacks (?:an opponent with the most life among your opponents )?each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
@@ -419,7 +421,7 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { targetDiscountAny: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -471,6 +473,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast"; Infectious Curse: "Spells you cast that
   // target enchanted player cost {1} less to cast": Aura spells and spells with other targets too, not abilities (rulings).
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscount: Number(m[1]) };
+  // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast": any player's (rulings).
+  if ((m = /^Spells that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscountAny: Number(m[1]) };
   if ((m = /^Spells you cast that target enchanted player cost \{(\d+)\} less to cast$/.exec(text))) return { castTargetEnchantedPlayerLess: Number(m[1]) };
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
   if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {
@@ -1123,6 +1127,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you were the monarch as the turn began$/.test(text)) return { kind: "monarch", asTurnBegan: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
+  if (/^that player attacked you during their last turn$/.test(text)) return { kind: "eventPlayerAttackedYou" };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
@@ -1197,6 +1202,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
   if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };
+  // Tolsimir, Midnight's Light: "if ~ attacked this combat": declared as an attacker in this combat (CR 508.1), even if
+  // it's been removed from combat since.
+  if (/^~ attacked this combat$/.test(text)) return { kind: "self", is: "attackedThisCombat" };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
@@ -1855,6 +1863,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const mv = { count: { kind: "affectedManaValue" as const } };
     return [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: mv, toughness: mv }];
   }
+  // The Flesh Is Weak: "Creatures you control with +1/+1 counters on them are artifacts in addition to their other types"
+  // (layer 4, CR 613.1d, 205.1b).
+  if (rest === "are artifacts in addition to their other types") return [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }];
   // Ygra, Eater of All: "are Food artifacts in addition to their other types and have "..."" (an artifact type and the
   // artifact type in layer 4, CR 613.1d, 205.1b; the ability in layer 6).
   if ((m = /^are ([A-Z][a-z]+) artifacts in addition to their other types(?:,? and ((?:has|have) .+))?$/.exec(rest)) && subtypeSet(m[1]!) === "Artifact") {
@@ -2172,6 +2183,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   if (/^can block only creatures with flying$/.test(rest)) return [{ kind: "blocksOnlyFlyers" }];
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
+  if (/^attacks? an opponent with the most life among your opponents each combat if able$/.test(rest)) return [{ kind: "mustAttackMostLife" }];
   // "Blocks each combat if able" (CR 509.1c): the same requirement as "blocks this turn if able", every turn. "Attacks or
   // blocks each combat if able" is both: one that changes sides after attacking must block too (Relentless Raptor rulings).
   if (/^blocks? each combat if able$/.test(rest)) return [{ kind: "mustBlock" }];
@@ -2384,6 +2396,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const st = parseStaticLine(`Land creatures ${landSurge[1]}.`);
     return st && !st.condition ? { ...st, text: line } : null;
   }
+  // Depala, Pilot Exemplar: "Each Vehicle you control gets +1/+1 as long as it's a creature": Vehicle creatures (crewed,
+  // CR 301.7b), worked out as the bonus applies in layer 7c (CR 613.4c).
+  const vehicleSurge = /^Each Vehicle you control gets ([+-]\d+)\/([+-]\d+) as long as it's a creature$/.exec(text);
+  if (vehicleSurge)
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], subtypes: ["Vehicle"], text: "Vehicle creature you control" } }, mods: [{ kind: "modifyPT", power: Number(vehicleSurge[1]), toughness: Number(vehicleSurge[2]) }], text: line };
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the
@@ -2727,7 +2744,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|are artifacts in addition to their other types|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

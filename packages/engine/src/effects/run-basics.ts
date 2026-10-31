@@ -52,8 +52,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${p.name} will skip all combat phases of their next turn.`);
           continue;
         }
-        for (let i = 0; i < e.n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
-        log(s, `${p.name} will skip their next ${e.n > 1 ? `${e.n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
+        const n = amountNow(s, e.n, ctx);
+        if (n <= 0) continue;
+        for (let i = 0; i < n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
+        log(s, `${p.name} will skip their next ${n > 1 ? `${n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
       }
       return;
     }
@@ -812,6 +814,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         noteExcess(s, to(d), excessOver(lethal.get(`${d.src.id}>${to(d)}`)!, d.dealt), true);
       }
       for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+      for (const f of pairs.flat()) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       return;
     }
     case "fight":
@@ -865,6 +868,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
       if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
+      // Boxing Ring: "a creature that fought this turn", even one that's dealt no damage (CR 701.14b).
+      for (const f of [a, b]) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       fireEvent(s, { type: "fought", ids: fighters.map((f) => f.id), controllers: fighters.map((f) => f.controller) });
       return;
     }

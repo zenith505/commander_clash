@@ -677,7 +677,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "mostCreatures": {
       const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), ref.lands ? "Land" : "Creature")).length;
-      const most = Math.max(0, ...livingPlayers(s).map(n));
+      const most = ref.fewest ? Math.min(...livingPlayers(s).map(n)) : Math.max(0, ...livingPlayers(s).map(n));
       return apnap(s, livingPlayers(s).filter((p) => n(p) === most));
     }
     case "uniqueMost": {
@@ -867,11 +867,11 @@ export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefi
  * later if X's count does (CR 608.2h, 611.2c).
  */
 /** Of `keywords`, the ones (or their "hexproof from" variants, CR 702.11d) a creature `pid` controls has. */
-function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string[] {
+function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[], where: true | "graveyard" = true): string[] {
   const out = new Set<string>();
-  for (const id of s.battlefield) {
+  for (const id of where === "graveyard" ? s.players[pid]!.graveyard : s.battlefield) {
     const o = s.objects[id]!;
-    if (!objIsType(s, o, "Creature") || controllerOf(s, o) !== pid) continue;
+    if (!objIsType(s, o, "Creature") || (where !== "graveyard" && controllerOf(s, o) !== pid)) continue;
     for (const k of characteristics(s, o).keywords) if (keywords.some((w) => k === w || (w === "Hexproof" && k.startsWith("Hexproof from ")))) out.add(k);
   }
   return [...out];
@@ -909,9 +909,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
       : // Wall of Tombstones: the number is locked in as the effect resolves (CR 608.2h).
         m.kind === "setToughness"
       ? { ...m, toughness: evalAmount(s, m.toughness, c) }
-      : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
+      : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included;
+        // Bleeding Effect: the ones creature cards in its controller's graveyard have.
         m.kind === "addKeywords" && m.sharedAmongYours
-        ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }
+        ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords, m.sharedAmongYours) }
         : // "Gains protection from the color of your choice": the color chosen as it resolved; "the card type of your choice"
         // (Pippin), the card type.
         m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF) || m.keywords.includes(CHOSEN_TYPE_PROTECTION))

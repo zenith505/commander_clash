@@ -153,6 +153,8 @@ export interface Characteristics {
   ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
+  /** Galactus, Devourer of Worlds: "attacks an opponent with the most life among your opponents each combat if able" (those players worked out as attackers are declared, game.ts mustAttackPlayers). */
+  mustAttackMostLife?: true;
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
   /**
@@ -737,6 +739,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = evalAmount(s, cond.amount, ctx);
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx)) && (cond.parity === undefined || Math.abs(n % 2) === (cond.parity === "odd" ? 1 : 0));
     }
+    case "eventPlayerAttackedYou": {
+      // O-Kagachi: the trigger's player attacked you during their most recent turn (this one if it's theirs).
+      const p = eventPlayer !== undefined ? s.players[eventPlayer] : undefined;
+      const last = p && (s.activePlayer === eventPlayer ? p.lastTurnBegan : p.turnBegan);
+      return !!p && last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you);
+    }
     case "monarch":
       if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;
       if (cond.none) return s.monarch === undefined;
@@ -1006,6 +1014,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
       return cond.not ? !cast : cast;
     }
+    case "subjectFromYourGraveyard": {
+      // A card can only be in its owner's graveyard; "you cast it": the spell's controller, who controls the permanent.
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.owner === you && (!!sub.enteredFromGraveyard || (!!sub.castFromGraveyard && sub.controller === you));
+    }
     case "subjectWasCast": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.wasCast;
@@ -1214,6 +1227,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "attackedOrBlockedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0);
       if (cond.is === "attackedOrBlockedThisTurn") return src.declaredInCombat?.turn === s.turn;
+      // Only the active player's creatures attack, and nobody else's block in that combat: declared this combat and
+      // attacked this turn is attacked this combat.
+      if (cond.is === "attackedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0) && src.attacked?.turn === s.turn;
       if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
@@ -1229,6 +1245,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "cast") return src.zone === "battlefield" && !!src.wasCast;
+      if (cond.is === "sneakThisTurn") return src.zone === "battlefield" && src.castAlt === "sneak" && src.enteredTurn === s.turn;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
@@ -1599,6 +1616,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       c.attacksIfAble = true;
+      return;
+    case "mustAttackMostLife":
+      c.mustAttackMostLife = true;
       return;
     case "mustAttackPlayer":
       if (m.player === "chosen" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;

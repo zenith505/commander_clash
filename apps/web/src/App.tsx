@@ -132,6 +132,7 @@ import {
   entersRulesOf,
   crewPower,
   potentialAttackers,
+  walkersFreeToAttack,
   attackedName,
   returnCandidates,
   beholdCandidates,
@@ -1229,6 +1230,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pending?.kind === "declareAttackers") {
       // An opponent's planeswalker can be attacked instead of the player (CR 506.2, 508.1b).
       if (aim && attackablePlaneswalker(o.id)) {
+        // Not also the seat around it, whose click would make this an attack on the player.
+        e?.stopPropagation();
         setAttacks({ ...attacks, [aim]: { defender: defenderOf(o.id), planeswalker: o.id } });
         setAim(null);
         return;
@@ -4823,8 +4826,16 @@ function Controls({
     const bound = potentialAttackers(s, HUMAN).flatMap((o) => {
       const able = characteristics(s, o).mustAttack.filter((d) => opponents(s, HUMAN).includes(d) && free(o, d));
       const a = attacks[o.id];
-      return able.length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
+      return able.length && !walkersFreeToAttack(s, o).length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
     });
+    // Gideon: "attacks ~ if able" (CR 508.1d), when it isn't goaded or bound to a player as well (the engine weighs those).
+    const toWalker = potentialAttackers(s, HUMAN).flatMap((o) => {
+      const ws = walkersFreeToAttack(s, o);
+      const a = attacks[o.id];
+      if (!ws.length || characteristics(s, o).goadedBy.length || characteristics(s, o).mustAttack.length || (a?.planeswalker && ws.includes(a.planeswalker))) return [];
+      return [`${cardOf(s, o.id).name} must attack ${ws.map((w) => cardOf(s, w).name).join(" or ")} if able: click it, then ${ws.length === 1 ? "that planeswalker" : "one of them"}.`];
+    });
+    bound.unshift(...toWalker);
     // "Can't attack alone" (CR 506.5).
     const ids = Object.keys(attacks);
     // Ghostly Prison and the like: what attacking costs, paid from your lands as you declare (CR 508.1g-i).

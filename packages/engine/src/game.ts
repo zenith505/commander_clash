@@ -2338,6 +2338,47 @@ export function mustAttackPlayers(s: GameState, o: GameObject): PlayerId[] {
   return [...new Set([...c.mustAttack, ...opps.filter((p) => player(s, p).life === most)])];
 }
 
+/**
+ * The planeswalkers creature `o` has to attack if able this turn (Gideon, Battle-Forged; Gideon Jura; CR 508.1d): still the
+ * objects they were and still planeswalkers. Gideon Jura's applies to whatever creatures that player controls as attackers
+ * are declared (rulings).
+ */
+export function walkersToAttack(s: GameState, o: GameObject): ObjectId[] {
+  if (!s.attackWalkerNextTurn) return [];
+  const ctl = controllerOf(s, o);
+  return [
+    ...new Set(
+      s.attackWalkerNextTurn
+        .filter((r) => r.turn === s.turn && (r.id !== undefined ? r.id === o.id && (o.zoneChanges ?? 0) === r.zc : r.player === ctl))
+        .filter((r) => s.objects[r.pw]?.zone === "battlefield" && (s.objects[r.pw]!.zoneChanges ?? 0) === r.pwZc && objIsType(s, obj(s, r.pw), "Planeswalker"))
+        .map((r) => r.pw),
+    ),
+  ];
+}
+
+/**
+ * The planeswalkers of walkersToAttack that `o` can attack now without a cost (CR 508.1d: nothing obliges paying one):
+ * an opponent's, attackable (CR 508.1b), with nothing stopping it.
+ */
+export function walkersFreeToAttack(s: GameState, o: GameObject): ObjectId[] {
+  const pid = controllerOf(s, o);
+  return walkersToAttack(s, o).filter((pw) => {
+    const d = controllerOf(s, obj(s, pw));
+    return opponents(s, pid).includes(d) && attackablePermanentProblem(s, pid, d, pw) === null && !attackProblem(s, o, d, true, pw) && !attackTaxPer(s, d, true, o.id) && !characteristics(s, o).ownAttackCosts.length;
+  });
+}
+
+/**
+ * How many of creature `o`'s requirements about whom it attacks (CR 508.1d) attacking `d` (or its planeswalker `pw`)
+ * obeys: each goad's "a player other than" (CR 701.15b), encore's player, Gideon's planeswalker. Attacking at all obeys
+ * "attacks if able" whichever it is, so those aren't counted.
+ */
+export function attackTargetScore(s: GameState, o: GameObject, d: PlayerId, pw?: ObjectId): number {
+  const by = characteristics(s, o).goadedBy;
+  if (pw !== undefined) return walkersToAttack(s, o).includes(pw) ? 1 : 0;
+  return by.filter((g) => g !== d).length + (mustAttackPlayers(s, o).includes(d) ? 1 : 0);
+}
+
 /** A permanent that says players can't draw cards (Maralen of the Mornsong), if there is one. */
 export function cantDraw(s: GameState, pid: PlayerId): ObjectId | undefined {
   void pid;
@@ -3067,6 +3108,14 @@ function startNextTurn(s: GameState, skipping = false) {
     // Done with, or about an object that has left (a new object, CR 400.7).
     s.cantAttackNextTurn = s.cantAttackNextTurn.filter((b) => s.objects[b.id]?.zone === "battlefield" && (s.objects[b.id]!.zoneChanges ?? 0) === b.zc && !(b.player === ap.id && s.turn > b.since));
     if (!s.cantAttackNextTurn.length) s.cantAttackNextTurn = undefined;
+  }
+  // Gideon's "attacks ~ during its controller's next turn if able": this turn is that turn for the creature's controller
+  // now (rulings) or for the targeted opponent, while the planeswalker and the creature are the objects they were.
+  if (s.attackWalkerNextTurn) {
+    const same = (id: ObjectId | undefined, zc: number | undefined) => id === undefined || (s.objects[id]?.zone === "battlefield" && (s.objects[id]!.zoneChanges ?? 0) === zc);
+    s.attackWalkerNextTurn = s.attackWalkerNextTurn.filter((r) => r.turn === undefined && same(r.pw, r.pwZc) && same(r.id, r.zc));
+    for (const r of s.attackWalkerNextTurn) if (s.turn > r.since && (r.id !== undefined ? controllerOf(s, obj(s, r.id)) : r.player) === ap.id) r.turn = s.turn;
+    if (!s.attackWalkerNextTurn.length) s.attackWalkerNextTurn = undefined;
   }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
@@ -9229,19 +9278,30 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
   const limit = combatLimit(s, "attack");
   if (attacks.length > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`);
-  const shirking = potentialAttackers(s, p.id).find(
-    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]) && opps.some((d) => free(o, d)),
-  );
-  const required = potentialAttackers(s, p.id).filter((o) => characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)));
+  // Gideon's "attacks ~ if able" is a requirement to attack too, when that planeswalker can be attacked (rulings).
+  const walkers = new Map(potentialAttackers(s, p.id).map((o) => [o.id, walkersFreeToAttack(s, o)] as const));
+  const mustAttack = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d))) || !!walkers.get(o.id)?.length;
+  const shirking = potentialAttackers(s, p.id).find((o) => mustAttack(o) && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
+  const required = potentialAttackers(s, p.id).filter(mustAttack);
+  const shirks = (o: GameObject) => (characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)) ? `${defOf(s, o).name} attacks each combat if able` : `${defOf(s, o).name} must attack ${walkers.get(o.id)!.map((w) => nameOf(s, w)).join(" or ")} if able`);
   if (attacks.length >= limit) {
-    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(`${defOf(s, shirking!).name} attacks each combat if able`);
-  } else if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
+    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
+  } else if (shirking && opps.length) throw new RulesError(shirks(shirking));
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
+  // One that has to attack a planeswalker (Gideon) as well obeys as many of all its requirements as it can (CR 508.1d):
+  // each goad, encore's player and the planeswalker count one each (attackTargetScore).
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    const ws = walkers.get(o.id) ?? [];
+    if (!ws.length) continue;
+    const best = Math.max(1, ...opps.filter((d) => free(o, d)).map((d) => attackTargetScore(s, o, d)));
+    if (attackTargetScore(s, o, a.defender, a.planeswalker) < best) throw new RulesError(`${defOf(s, o).name} must attack ${ws.map((w) => nameOf(s, w)).join(" or ")} if able`);
+  }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     const by = characteristics(s, o).goadedBy;
-    if (!by.length) continue;
+    if (!by.length || walkers.get(o.id)?.length) continue;
     const obeyed = (d: PlayerId) => by.filter((g) => g !== d).length;
     const best = Math.max(0, ...opps.filter((d) => free(o, d) || d === a.defender).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
@@ -9251,7 +9311,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
   for (const o of potentialAttackers(s, p.id)) {
     const able = mustAttackPlayers(s, o).filter((d) => opps.includes(d) && free(o, d));
-    if (!able.length) continue;
+    if (!able.length || walkers.get(o.id)?.length) continue;
     const a = attacks.find((x) => x.attacker === o.id);
     if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
   }
@@ -9292,6 +9352,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     kinds[`${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
   }
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds };
+  // Declared as attackers in this combat; not ones put onto the battlefield attacking (Kytheon rulings, CR 508.4).
+  p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
   p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };

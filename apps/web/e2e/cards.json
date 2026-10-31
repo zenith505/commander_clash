@@ -7285,6 +7285,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7340dbcb-4b26-4038-be8c-a89e76294221",
+  "name": "Gideon Jura",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Gideon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Gideon"
+  ],
+  "oracleText": "+2: During target opponent's next turn, creatures that player controls attack Gideon Jura if able.\n−2: Destroy target tapped creature.\n0: Until end of turn, Gideon Jura becomes a 6/6 Human Soldier creature that's still a planeswalker. Prevent all damage that would be dealt to him this turn.",
+  "loyalty": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "e01",
+  "releasedAt": "2017-06-16",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9432e87-38f6-4889-8f07-ae7cd045e532",
   "name": "Gilgamesh, Master-at-Arms",
   "manaCost": "{4}{R}{R}",

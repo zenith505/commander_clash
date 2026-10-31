@@ -2339,6 +2339,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
+    .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Paralyze: "that player may pay {4}. If the player does, untap the creature.": the enchanted creature.
     .replace(/^(At the beginning of the upkeep of enchanted creature's controller, that player may pay (?:\{[^}]+\})+\. If the player does, untap) the creature\.$/, "$1 enchanted creature.")
     // Awaken the Sky Tyrant: "When a source an opponent controls deals damage to you, sacrifice ~. ...": each time, the
@@ -3633,7 +3635,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // you control a Dwarf". Drop of Honey: "When there are no creatures on the battlefield": anyone's; it's sacrificed even if
   // one is back by the time it resolves (rulings).
   // Last Laugh: "When no creatures are on the battlefield" is the same.
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
+  // Garruk Relentless: "When ~ has two or fewer loyalty counters on him, transform him": "him" is ~ (CR 603.8).
+  const stLine = line.replace(/^(When ~ has [a-z ]+ counters) on ~, (transform ~\.)$/, "$1 on it, $2");
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
   if (st) {
     const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

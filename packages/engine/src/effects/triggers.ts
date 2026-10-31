@@ -176,6 +176,7 @@ export type TriggerSourceEvent =
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   | { type: "gaveGift"; player: PlayerId }
+  | { type: "cumulativeUpkeepPaid"; id: ObjectId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -232,6 +233,8 @@ export type TriggerSourceEvent =
   | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
   /** Creatures dealt combat damage to this player in one combat damage step, whoever controls them (Witch-king of Angmar). */
   | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[]; controllers: PlayerId[] }
+  /** Combat damage was dealt to a planeswalker `player` controlled (Vengeful Pharaoh), once for each planeswalker. */
+  | { type: "combatDamagedPlaneswalker"; id: ObjectId; player: PlayerId }
   | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
@@ -1027,6 +1030,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "cumulativeUpkeepPaid") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepPaid");
   } else if (ev.type === "gaveGift") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1395,6 +1401,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Norn's Decree: once for each opponent whose creatures dealt it (CR 603.2c), that opponent being "that opponent".
       for (const c of ev.controllers) if (c !== ev.player) add(o, ev.player, (e) => e === "opponentCreaturesDealCombatDamageToYou", undefined, undefined, undefined, undefined, undefined, undefined, { player: c });
     }
+    // Vengeful Pharaoh: a card in that player's graveyard (CR 113.6m).
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e) => e === "combatDamageToYouOrYourPlaneswalker"));
+  } else if (ev.type === "combatDamagedPlaneswalker") {
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e) => e === "combatDamageToYouOrYourPlaneswalker"));
   } else if (ev.type === "creaturesDamagedPlayers") {
     // Nelly Borca: an opponent's creatures dealt combat damage to one or more of the watcher's opponents; that opponent
     // is "the controller of those creatures".

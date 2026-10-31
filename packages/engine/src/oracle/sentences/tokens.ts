@@ -137,7 +137,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // artifacts and/or creatures you control."" (Thousand Moons Smithy): no printed power and toughness, the quoted
   // characteristic-defining ability sets them (CR 604.3, 613.4a).
   // 'With reach and "..."' (Wrenn and Seven): keywords too.
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (.+?) creature tokens? with (?:([a-z, ]+?),? and )?"(~'s power and toughness are each equal to [^"]+)"$`).exec(s))) {
+  // Consuming Blob: '"This token's power is equal to ... and its toughness is equal to that number plus 1."', the same.
+  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (.+?) creature tokens? with (?:([a-z, ]+?),? and )?"(~'s power (?:and toughness are each|is) equal to [^"]+)"$`).exec(s))) {
     const token = parseToken(0, 0, m[2]!, `${m[3] ? `${m[3]} and ` : ""}"${m[4]!}"`);
     return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
   }

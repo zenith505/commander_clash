@@ -1510,7 +1510,12 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
-        if (max > 0 && !(min === max && options.length === max)) {
+        // Getaway Barrel: a random one of those that match, no choice (rng.ts).
+        if (e.pickRandom && max > 0 && options.length > max) {
+          const pool = [...options];
+          shuffle(s, pool);
+          sc.found = pool.slice(0, max);
+        } else if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
@@ -1521,7 +1526,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           return "paused";
         }
         // Nothing to choose: all of them, or (one for each) as many as fit.
-        sc.found = e.oneOfEach ? options.reduce<ObjectId[]>((a, id) => (oneOfEachFits(e.oneOfEach!, [...a, id].map((x) => defOf(s, obj(s, x)))) ? [...a, id] : a), []) : options.slice(0, max);
+        else sc.found = e.oneOfEach ? options.reduce<ObjectId[]>((a, id) => (oneOfEachFits(e.oneOfEach!, [...a, id].map((x) => defOf(s, obj(s, x)))) ? [...a, id] : a), []) : options.slice(0, max);
       }
       const looked = sc.looked;
       let found = (sc.found ?? []).filter((id) => looked.includes(id));

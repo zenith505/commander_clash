@@ -5,6 +5,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
+import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
@@ -894,7 +895,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
       const countered = e.thenSource ? s.stack.find((x) => x.id === t.id) : undefined;
-      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      // Thranduil's Decree: a permanent spell (CR 110.4b), by its types on the stack.
+      const exileIt = e.exile && (!e.exileIfPermanent || (() => {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        return !!o && characteristics(s, o).types.some((ty) => PERMANENT_TYPES.includes(ty));
+      })());
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
       // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
       const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;

@@ -366,6 +366,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (o?.zone === "battlefield") fireEvent(s, { type: "crewed", id: o.id });
       return;
     }
+    case "cumulativeUpkeepPaid": {
+      // Hibernation's End: its cumulative upkeep was paid (CR 702.24a), while it's still on the battlefield.
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (o?.zone === "battlefield") fireEvent(s, { type: "cumulativeUpkeepPaid", id: o.id });
+      return;
+    }
     case "gaveGift":
       // A gift was given (CR 702.174c), whatever it gave.
       fireEvent(s, { type: "gaveGift", player: ctx.controller });

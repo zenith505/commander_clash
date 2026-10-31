@@ -44,6 +44,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up|Forecast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up" | "Forecast") : undefined;
   // "Remove five quest counters from ~ and sacrifice it" (Quest for the Holy Relic): two costs, paid in any order (CR 601.2h).
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:").replace(/(^|, )(Remove [^,:]+? counters? from ~) and exile it:/, "$1$2, Exile ~:")
+    // Magosi, the Waterveil: "Remove an eon counter from ~ and return it to its owner's hand": the same, two costs.
+    .replace(/(^|, )(Remove [^,:]+? counters? from ~) and return it to its owner's hand:/, "$1$2, Return ~ to its owner's hand:")
     // Geistflame Reservoir: "Remove any number of charge counters from ~: It deals that much damage to any target": how
     // many is announced as it's activated (CR 602.2b, 601.2h), an X (none included).
     .replace(/(^|, )Remove any number of ([a-z]+) counters from ~: It deals that much damage to any target\.$/, "$1Remove X $2 counters from ~: ~ deals X damage to any target.")
@@ -485,7 +487,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
   // Sandman, Shifting Scoundrel: "Return ~ and target land card from your graveyard to the battlefield tapped."
   // Slimefoot and Squee: "Return this card and up to one other target creature card from your graveyard ...".
-  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library third from the top|Put ~ from your graveyard on top of your library)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ and (?:up to one other )?target [a-z]+ card from your graveyard to the battlefield(?: tapped)?|Return ~ from your graveyard to (?:your hand|the battlefield(?:(?: tapped)?(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on (?:it|~))?| attached to target creature(?: you control(?: with power \d+ or less)?)?)?)|Put ~ from your graveyard into your library third from the top|Put ~ from your graveyard on top of your library|Put ~ from your graveyard onto the battlefield transformed)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).

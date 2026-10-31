@@ -22,6 +22,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
   // Collision Course: "the number of permanents you control that are creatures and/or Vehicles".
   p = p.replace(/^the number of permanents you control that are (creatures|artifacts) or (Vehicles)$/, "the number of $1 or $2 you control");
+  // Ral Zarek, Guest Lecturer: "where X is the number of coins that came up heads", after uncalled flips (see body.ts).
+  if (!each && /^the number of coins that came up heads$/i.test(p) && ctx?.uncalledFlips) return { count: { kind: "flipsWon", heads: true } };
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|that card|~)$/, "$2's $1");
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
@@ -37,6 +39,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const b = a && parseCount(m[2]!, ctx);
     return a && b && Object.keys(a).length === 1 && Object.keys(b).length === 1 ? { count: { kind: "difference", of: [a.count, b.count] } } : null;
   }
+  // Seize the Storm: "the number of cards with flashback you own in exile": face-up cards with a printed flashback.
+  if (!each && /^the number of cards with flashback you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Flashback"], text: "card with flashback" } } };
+  // Cosmogoyf: "the number of cards you own in exile": face down or not, wherever ~ is (its rulings: it counts itself in
+  // exile, CR 604.3).
+  if (!each && /^the number of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" } } };
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
   // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named
@@ -639,6 +646,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(?:the number of )?([a-z]+ )?cards? in your graveyard that (?:was|were) put there from the battlefield this turn$/i.exec(p))) {
     const spec = m[1] ? parseTargetPhrase(`${m[1].trim()} card from a graveyard`, { chosen: true }) : { kind: "card" as const, types: [], notTypes: [], notColors: [], text: "card" };
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
+  }
+  // Risen Executioner: "each other creature card in your graveyard": not ~ itself (it's on the stack as its cost is
+  // determined, CR 601.2a, 601.2f).
+  if (each && (m = /^other ([a-z]+) card in your graveyard$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[1]} card from a graveyard`, { chosen: true });
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, notSource: true, text: `other ${m[1]} card` } }) : null;
   }
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's. "Creature cards in defending player's
   // graveyard" (Animus of Night's Reach): the player its attack trigger is about.

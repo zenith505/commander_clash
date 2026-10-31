@@ -112,6 +112,7 @@ import {
   landsAllowed,
   landUntappedOffer,
   creatureTypesOf,
+  mustAttackPlayers,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -431,7 +432,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.dig?.lifeEach) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, 2, Math.floor((player(s, pid).life - 10) / pend.dig.lifeEach)))) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
@@ -838,6 +839,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
+    // Friend or foe (Pir's Whim): a friend is the bot itself, every other player a foe.
+    if (pend.kind === "chooseOption" && pend.what === "word" && pend.options.join() === "friend,foe") return [{ type: "chooseOption", player: pid, choice: pend.of === pid ? "friend" : "foe" }];
     if (pend.kind === "chooseOption" && pend.what === "word") return [{ type: "chooseOption", player: pid, choice: chooseWord(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
@@ -3048,6 +3051,19 @@ function chooseCounterMove(s: GameState, pid: PlayerId, options: ObjectId[], tot
   });
   const best = evasive.sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0];
   return best ? { [best]: total } : {};
+}
+
+/** Sensational Spider-Man: as many as it may (each is a card drawn), off its own permanents first, then the least worthy. */
+function chooseCounterRemoval(s: GameState, pid: PlayerId, options: ObjectId[], total: number, has: Record<ObjectId, number>): Record<ObjectId, number> {
+  const order = [...options].sort((a, b) => Number(controllerOf(s, obj(s, b)) === pid) - Number(controllerOf(s, obj(s, a)) === pid) || worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+  const parts: Record<ObjectId, number> = {};
+  let left = total;
+  for (const id of order) {
+    const k = Math.min(left, has[id] ?? 0);
+    if (k > 0) parts[id] = k;
+    left -= k;
+  }
+  return parts;
 }
 
 function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
@@ -5521,7 +5537,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     if (atPlayer(owner) >= player(s, owner).life) continue;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
       .filter((a) => hit(obj(s, a.attacker), pw) > 0)
       .sort((a, b) => hit(obj(s, a.attacker), pw) - hit(obj(s, b.attacker), pw));
@@ -5556,7 +5572,7 @@ function attackBattles(s: GameState, pid: PlayerId, attacks: { attacker: ObjectI
     const guard = b.protector!;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && !x.tapped && objIsType(s, x, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), guard))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !mustAttackPlayers(s, obj(s, a.attacker)).length && !attackProblem(s, obj(s, a.attacker), guard))
       .filter((a) => atPlayer(a.defender) < player(s, a.defender).life)
       .filter((a) => blockers.every((x) => blockProblem(s, x, obj(s, a.attacker), guard)))
       .filter((a) => hit(obj(s, a.attacker), b) > 0)
@@ -5614,7 +5630,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   });
   // A token that has to attack a particular opponent (encore) attacks them if it can (CR 508.1d).
   for (const o of potentialAttackers(s, pid)) {
-    const d = characteristics(s, o).mustAttack.find((x) => opps.includes(x) && !attackProblem(s, o, x));
+    const d = mustAttackPlayers(s, o).find((x) => opps.includes(x) && !attackProblem(s, o, x));
     if (d === undefined) continue;
     attacks = [...attacks.filter((a) => a.attacker !== o.id), { attacker: o.id, defender: d }];
   }

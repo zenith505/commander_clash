@@ -282,13 +282,14 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
     const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
     if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
-    // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm). Simian Sling:
+    // "~ or equipped creature": "it" could be either. Ogre-Head Helm: "you may sacrifice it. If you do, ...": whichever dealt
+    // the damage, the equipped creature and not the Helm if it did (rulings). Simian Sling:
     // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
     // (rulings), the subject either way.
     // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
     // whichever attacked, as the ability resolves or as it last existed (rulings). Chainflail Centipede: "it gets +2/+0
     // until end of turn": whichever attacked.
-    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)));
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)) || (event === "selfAttacks" && /^it gets \+\d+\/\+\d+ until end of turn\.?$/.test(text)) || (event === "selfDealsCombatDamageToPlayer" && /^you may sacrifice it\. If you do, (?:(?!\b(?:it|its|that creature)\b)[^.])+\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
@@ -1007,14 +1008,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
   // Clement, the Worrywort: "return up to one target creature you control with lesser mana value": less than the entering
   // permanent's, as the target is chosen (TargetSpec.bound, settled in triggerBody).
+  // Boxing Ring: "it fights up to one target creature you don't control with the same mana value": equal to it, the same way.
   const lesser = / with lesser mana value\b/.test(bodyText);
+  const same = !lesser && /^it fights up to one target creature you don't control with the same mana value\.$/.test(bodyText);
   if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "");
+  if (same) bodyText = bodyText.replace(/ with the same mana value\b/, "");
   let body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
-  if (lesser) {
+  if (lesser || same) {
     const [t, ...more] = body.targets;
     if (!t || more.length || t.kind !== "object" || t.bound || t.manaValue) return "fail";
-    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+    body = { ...body, targets: [{ ...t, bound: lesser ? { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } } : { key: "manaValue", at: "exact", amount: { count: { kind: "manaValue", of: { ref: "subject" } } } }, text: `${t.text} with ${lesser ? "lesser" : "the same"} mana value` }] };
   }
   const kind = m[1]!.toLowerCase();
   return {
@@ -1058,6 +1062,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
   }
+  // One with the Kami: "Whenever enchanted creature or another modified creature you control dies, ...": the creature the
+  // Aura was attached to as it died, whoever controlled it, or a modified creature you controlled (CR 700.9, 603.10a); one
+  // trigger either way.
+  const orModified = /^Whenever enchanted creature or another modified creature you control dies, (.+)$/.exec(line);
+  if (orModified) {
+    const t = parseDiesTrigger(`Whenever a modified creature you control dies, ${orModified[1]}`);
+    if (!t || t === "fail" || !t.dies || t.dies.other || t.dies.orSelf || t.dies.attached) return "fail";
+    return { ...t, dies: { ...t.dies, orAttached: true } };
+  }
   if (selfHad) {
     const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]}`);
     if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
@@ -1096,6 +1109,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
+  // Last Laugh: "Whenever a permanent other than ~ is put into a graveyard from the battlefield" is "another permanent".
+  line = line.replace(/^Whenever a permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another permanent is put into a graveyard from the battlefield, ");
   // Stormfront Riders: "Whenever ~ or another creature is returned to your hand from the battlefield": one you own goes to
   // its owner's hand (CR 404.2), a token too before it ceases to exist (rulings). Justice, Vance Astrovik: "Whenever another
   // nonland permanent you control is returned to its owner's hand": from the battlefield, the only place a permanent is.
@@ -2273,6 +2288,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
+    // Siege Dragon: "Whenever ~ attacks, if defending player controls no Walls, it deals 2 damage to each creature without
+    // flying that player controls": "it" is ~ and "that player" the defending player.
+    .replace(/^(Whenever ~ attacks, if defending player controls no [A-Z][a-z]+s), it deals (\d+) damage to each ([a-z ]+?) that player controls\.$/, "$1, ~ deals $2 damage to each $3 defending player controls.")
     // Writ of Passage: "Whenever enchanted creature attacks, if its power is 2 or less, ...": "its" is the enchanted creature's.
     .replace(/^(Whenever enchanted creature attacks), if its (power|toughness) is /, "$1, if enchanted creature's $2 is ")
     // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal
@@ -2541,6 +2559,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // does (rulings on Mr. House and Netherese Puzzle-Ward). Ignored rolls never happened (706.6).
   const rolls = /^Whenever you roll one or more dice, (.+)$/.exec(line);
   if (rolls) {
+    // Farideh, Devil's Chosen: "... If any of those results was 10 or higher, draw a card.": the highest die of that roll.
+    const anyOf = /^(.+?)\. If any of those results was (\d+) or higher, (.+)$/.exec(rolls[1]!);
+    if (anyOf) {
+      const first = parseBody(`${anyOf[1]}.`, {});
+      const then = parseBody(anyOf[3]!, {});
+      if (!first || !then || first.targets.length || then.targets.length) return "fail";
+      return { event: "youRollDice", body: { targets: [], effects: [...first.effects, { type: "if", cond: { kind: "rollIn", min: Number(anyOf[2]), eventMax: true }, effects: then.effects }], text: rolls[1]! } };
+    }
     const body = parseBody(rolls[1]!, {});
     return body ? { event: "youRollDice", body } : "fail";
   }
@@ -2760,6 +2786,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (inYardReturn) {
     const t = parseTrigger(`${inYardReturn[1]}, you may return ~ from your graveyard to your hand.`);
     return t && t !== "fail" && t.zone === "graveyard" && t.event === "batch" && t.batch?.milled ? t : "fail";
+  }
+  // Prized Amalgam: works only in the graveyard (CR 113.6m), with an intervening if about the creature that entered (CR
+  // 603.4); the delayed trigger returns this card only if it's still there, the same object (rulings, CR 400.7).
+  if (line === "Whenever a creature enters, if it entered from your graveyard or you cast it from your graveyard, return ~ from your graveyard to the battlefield tapped at the beginning of the next end step.") {
+    const t = parseTrigger("Whenever a creature enters, draw a card.");
+    if (!t || t === "fail" || t.event !== "permanentEnters") return "fail";
+    const text = "return ~ from your graveyard to the battlefield tapped at the beginning of the next end step.";
+    return { ...t, zone: "graveyard", ifCond: { kind: "subjectFromYourGraveyard" }, body: { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, tapped: true }], text: "return ~ from your graveyard to the battlefield tapped" }], text } };
   }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
@@ -3205,6 +3239,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(youTurn[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
     return filter?.kind === "object" && body ? { event: "permanentTurnedFaceUp", tappedFilter: filter, turnedByYou: true, body } : "fail";
   }
+  // Norn's Inquisitor: "Whenever a permanent you control transforms into a Phyrexian, ...": it transformed or converted,
+  // either way, and is a Phyrexian right after (CR 701.27e, rulings); it's the subject.
+  const transformsInto = /^Whenever a permanent you control transforms into an? ([A-Z][a-z]+), (.+)$/.exec(line);
+  if (transformsInto) {
+    const filter = parseTargetPhrase(`${transformsInto[1]} permanent you control`);
+    const body = parseBody(transformsInto[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
+    return filter?.kind === "object" && filter.subtypes?.length === 1 && body ? { event: "permanentTransformsInto", tappedFilter: filter, body } : "fail";
+  }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);
   if (mutates) {
@@ -3457,9 +3499,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // or greater", Endangered Armodon: "When you control a creature with toughness 2 or less", Goblins of the Flarg: "When
   // you control a Dwarf". Drop of Honey: "When there are no creatures on the battlefield": anyone's; it's sacrificed even if
   // one is back by the time it resolves (rulings).
-  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
+  // Last Laugh: "When no creatures are on the battlefield" is the same.
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
-    const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }

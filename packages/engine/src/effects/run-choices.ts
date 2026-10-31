@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
@@ -347,7 +347,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.mayQueue) {
         // Someone who can't do it isn't asked (CR 101.3): "put two +1/+1 counters on a creature they control" with none.
         const need = e.need;
+        // Maralen of the Mornsong: nobody can choose to draw or to have another player draw (rulings).
+        const onlyDraws = e.effects.length > 0 && e.effects.every((x) => x.type === "draw");
         const can = (pid: PlayerId) =>
+          !(onlyDraws && cantDraw(s, pid)) &&
           (!e.pay || canPayNow(s, pid, e.pay)) &&
           (!need ||
             (need.zone === "battlefield"
@@ -582,8 +585,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? !!s.resolving!.choseThisWay?.length !== !!e.cond.not
           : e.cond.kind === "selfHere"
           ? objects(s, { ref: "self" }, ctx).some((o) => {
-              const c = e.cond as { yours?: true; controlledByTarget?: number };
+              const c = e.cond as { yours?: true; controlledByTarget?: number; controlledByEventPlayer?: true };
               const t = c.controlledByTarget !== undefined ? ctx.targets[c.controlledByTarget] : undefined;
+              if (c.controlledByEventPlayer) return ctx.event?.player !== undefined && controllerOf(s, o) === ctx.event.player;
               return c.controlledByTarget !== undefined ? t?.kind === "player" && controllerOf(s, o) === t.id : !c.yours || controllerOf(s, o) === ctx.controller;
             })
           : e.cond.kind === "libraryHas"
@@ -623,7 +627,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "rollIn"
             ? e.cond.aboveEvent
               ? ((r) => r !== undefined && (r > (ctx.event?.amount ?? 0) || r >= ((e.cond as { min?: number }).min ?? Infinity)))(s.resolving!.rolled?.result)
-              : rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
+              : rollIn(e.cond, e.cond.eventMax ? ctx.event?.rollMax : e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"
@@ -634,6 +638,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !s.resolving!.item.copy && ((from) => (e.cond.kind === "castFromGraveyard" && e.cond.notHand ? !!from && from !== "hand" : from === (e.cond.kind === "castFromGraveyard" && e.cond.hand ? "hand" : e.cond.kind === "castFromGraveyard" && e.cond.exile ? "exile" : "graveyard")))(s.objects[s.resolving!.item.objectId ?? ""]?.castFrom)
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
+            : e.cond.kind === "costOrPaid"
+            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.costOrPaid === e.cond.index
             : e.cond.kind === "evidence"
             ? evidenceCollected(s, ctx)
             : e.cond.kind === "treasure"
@@ -716,6 +722,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.spellCountered
             : e.cond.kind === "targetPlayerIsYou"
             ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && t.id === ctx.controller)(ctx.targets[e.cond.index])
+            : e.cond.kind === "targetWarped"
+            ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "object" && ["warp", "grantedWarp"].includes(s.objects[t.id]?.castAlt ?? ""))(ctx.targets[e.cond.index])
+            : e.cond.kind === "targetPlayerLostLife"
+            ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && (s.lostLifeThisTurn ?? []).includes(t.id))(ctx.targets[e.cond.index])
             : e.cond.kind === "targetWasYours"
             ? targetWasYours(s, ctx, e.cond.index)
             : e.cond.kind === "teamwork"
@@ -731,7 +741,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "sacrificedColor"
             ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
             : e.cond.kind === "sacrificedSubtype"
-            ? ((k) => !!k && (!!k.allCreatureTypes || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))(ctx.sacrificed?.[0])
+            ? ((k, c) => !!k && (!!k.allCreatureTypes || [c.subtype, ...(c.orSubtypes ?? [])].some((t) => !!k.subtypes?.includes(t))))(ctx.sacrificed?.[0], e.cond)
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "activatedTimes"
@@ -954,6 +964,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may discard two cards. If you do, ..." (Thrilling Discovery): discarding fewer isn't doing it (CR 609.3).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && typeof e.n === "number" && e.n > 1 && !e.upTo && player(s, ctx.controller).hand.length < e.n) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
+    if (e.type === "draw" && cantDraw(s, ctx.controller)) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
     // "You may mill three cards" (Druidic Ritual): not with fewer cards in your library (CR 701.17b, rulings).

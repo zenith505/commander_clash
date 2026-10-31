@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -375,12 +375,17 @@ export function normalizeSelf(d: CardDef): string {
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
   const short = ofThe ?? first ?? regnal ?? comma;
+  // Galactus, Devourer of Worlds: "a creature named Silver Surfer, Galactus's Herald" is another card's name with the short
+  // name in it.
+  if (short && short !== full) t = t.replace(new RegExp(`(\\bnamed )([A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*, ${esc(short)}'s [A-Z][\\w'-]*)`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
     // Not "each Garruk you control" in Garruk, Cursed Huntsman: there it's the planeswalker type (CR 205.3j).
     const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an) )" : "";
-    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
+    // Lizard, Connors's Curse: "becomes a green Lizard creature" is the creature type its short name also is (CR 205.3m).
+    const shortTyped = CREATURE_TYPES.has(short) ? "(?! creatures?\\b)" : "";
+    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -465,7 +470,7 @@ function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
 
 /** The ability words (CR 207.2c), before a line of an instant or sorcery. */
 const SPELL_ABILITY_WORD = new RegExp(
-  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
+  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council", "Will of the Planeswalkers"].join("|")}) — `,
 );
 
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
@@ -622,7 +627,9 @@ export function compile(d: CardDef): CompiledCard {
         }
         // Let's Play a Game: "Delirium — Choose one. If there are four or more card types among cards in your graveyard,
         // choose one or more instead.": checked as the modes are chosen while it's cast (CR 601.2b), one to all of them.
-        const anyIf = isSpell ? /^(?:Delirium — )?Choose one\. If (there are four or more card types among cards in your graveyard), choose one or more instead\.$/.exec(l.trim()) : null;
+        // Wail of the Forgotten: "Descend 8 — Choose one. If there are eight or more permanent cards in your graveyard as you
+        // cast ~, choose one or more instead." the same (descend N is an ability word, rulings).
+        const anyIf = isSpell ? /^(?:Delirium — |Descend 8 — )?Choose one\. If (there are four or more card types among cards in your graveyard|there are eight or more permanent cards in your graveyard)(?: as you cast ~)?, choose one or more instead\.$/.exec(l.trim()) : null;
         if (anyIf) {
           both = "control";
           bothIf = `?${anyIf[1]}`;
@@ -872,6 +879,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (manaAb) {
+      // "Named ~" in what it counts (Powerstone Shard): this card's name (CR 201.5).
+      if (manaAb.produces.kind === "fixed" && manaAb.produces.count?.named === "~") manaAb.produces = { ...manaAb.produces, count: { ...manaAb.produces.count, named: d.name, text: manaAb.produces.count.text.replace(/~/g, d.name) } };
       out.mana.push(manaAb);
       continue;
     }
@@ -1003,7 +1012,8 @@ export function compile(d: CardDef): CompiledCard {
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
     // "Protection from spells and from permanents that were cast this turn" (Emrakul, the World Anew): the same, two.
     // "Protection from blue, from black, and from red" (Oversoul of Dusk): three.
-    const kwLine = line.replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
+    // Nevinyrral, Urborg Tyrant: "Hexproof from artifacts, creatures, and enchantments": three (CR 702.11d, 702.11f).
+    const kwLine = line.replace(/^(Hexproof) from (artifacts|creatures|enchantments|instants|planeswalkers|sorceries), (artifacts|creatures|enchantments|instants|planeswalkers|sorceries),? and (artifacts|creatures|enchantments|instants|planeswalkers|sorceries)$/, "$1 from $2, hexproof from $3, hexproof from $4").replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;
@@ -1254,6 +1264,15 @@ export function compile(d: CardDef): CompiledCard {
     if (counterChoice) {
       if (out.entersCounterChoice || counterChoice[2] === counterChoice[3]) out.unsupported.push(raw);
       else out.entersCounterChoice = { counters: [counterKind(counterChoice[2]!), counterKind(counterChoice[3]!)], ...(counterChoice[1] === "escapes" ? { escaped: true as const } : {}) };
+      continue;
+    }
+    // Denry Klin, Editor in Chief: "~ enters with your choice of a +1/+1, first strike, or vigilance counter on it": one of
+    // three, the same way.
+    const counterChoice3 = new RegExp(`^~ enters with your choice of an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on it\\.$`).exec(line);
+    if (counterChoice3) {
+      const kinds = counterChoice3.slice(1, 4).map((k) => counterKind(k!));
+      if (out.entersCounterChoice || new Set(kinds).size !== 3) out.unsupported.push(raw);
+      else out.entersCounterChoice = { counters: kinds };
       continue;
     }
     // Corrupted Shapeshifter, Primal Plasma, Primal Clay: "As ~ enters, it becomes your choice of a 3/3 creature with
@@ -2211,6 +2230,17 @@ export function compile(d: CardDef): CompiledCard {
       out.skipsExtraTurns = skipExtra[1] === "a player" ? "all" : "opponents";
       continue;
     }
+    // Zilortha, Strength Incarnate: every check of lethal damage on your creatures uses power (CR 120.6, 704.5g, rulings).
+    if (line === "Lethal damage dealt to creatures you control is determined by their power rather than their toughness.") {
+      out.lethalByPower = true;
+      continue;
+    }
+    // Maralen of the Mornsong: no player draws, for any reason (rulings); Mornsong Aria: nor gains life (CR 119.7).
+    if (line === "Players can't draw cards." || line === "Players can't draw cards or gain life.") {
+      out.playersCantDraw = true;
+      if (line.endsWith("or gain life.")) out.cantGainLife = "all";
+      continue;
+    }
     const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
     if (noGain) {
       out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
@@ -2383,6 +2413,15 @@ export function compile(d: CardDef): CompiledCard {
       for (const st of youAndSt) out.statics.push({ ...st!, text: line });
       continue;
     }
+    // Gor Muldrak, Amphinologist: "You and permanents you control have protection from Salamanders." (CR 702.16b, 702.16e):
+    // you have it, and the permanents get it from a static ability.
+    const youAndProt = /^You and permanents you control have protection from ([A-Z][a-z]+)\.$/.exec(line);
+    const youAndProtSt = youAndProt && creatureTypeOfPlural(youAndProt[1]!) && !out.youProtectionFrom ? parseStatic(`Permanents you control have protection from ${youAndProt[1]}.`) : null;
+    if (youAndProt && youAndProtSt) {
+      out.youProtectionFrom = `Protection from ${youAndProt[1]}`;
+      out.statics.push({ ...youAndProtSt, text: line });
+      continue;
+    }
     // Serra's Emissary: "You and creatures you control have protection from the chosen card type." (CR 702.16a, 702.16b).
     if (line === "You and creatures you control have protection from the chosen card type." && out.entersChoose?.some((c) => c.what === "cardType") && !out.youProtectedFromChosenType) {
       const st = parseStatic("Creatures you control have hexproof.");
@@ -2532,8 +2571,31 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${lifeAlt[1]} spell` }))(spec), once: true, yourTurn: true, life: true };
       continue;
     }
+    // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
+    // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
+    const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);
+    if (onceFree) {
+      const spec = parseTargetPhrase(`${onceFree[1]} card from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${onceFree[1]} spell` }))(spec), once: true, yourTurn: true, fromHand: true };
+      continue;
+    }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
+      continue;
+    }
+    // Weftwalking: the same alternative cost of nothing (CR 118.9), for every player's first spell during their own turn.
+    if (line === "The first spell each player casts during each of their turns may be cast without paying its mana cost.") {
+      out.payZero = { eachPlayerFirst: true };
+      continue;
+    }
+    // Aluren: the same alternative cost of nothing for any player (CR 118.9), its creature spells matched by their printed
+    // mana value with X at 0 (rulings), and only a spell cast this way may be cast as though it had flash (rulings).
+    const aluren = /^Any player may cast creature spells with mana value (\d+) or less without paying their mana costs and as though they had flash\.$/.exec(line);
+    if (aluren) {
+      const spec = parseTargetPhrase(`creature card with mana value ${aluren[1]} or less from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `creature spell with mana value ${aluren[1]} or less` }))(spec), anyPlayer: true, flash: true };
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
@@ -2653,7 +2715,9 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
-    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line);
+    // Auriok Steelshaper: "Equip costs you pay cost {1} less." is the older wording of the same (CR 702.6a: equip is an
+    // activated ability, its cost the equip cost).
+    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line.replace(/^Equip costs you pay cost (\{\d+\}) less\.$/, "Equip abilities you activate cost $1 less to activate."));
     if (equipLess) {
       (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
       continue;
@@ -2697,6 +2761,15 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveConvoke ??= []).push({ filter: f, ...(giveConvoke[2] ? { fromExile: true as const } : {}), text: line });
+      continue;
+    }
+    // Peri Brown: "The first historic spell you cast each turn has convoke": only the first one of that kind (CR 702.51a).
+    // The Fifteenth Doctor: "The first nonartifact spell you cast each turn has improvise" (CR 702.126a), the same way.
+    const firstConvoke = /^The first ([a-z]+) spell you cast each turn has (convoke|improvise)\.$/.exec(line);
+    if (firstConvoke) {
+      const f = parseTargetPhrase(`${firstConvoke[1]} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else ((firstConvoke[2] === "convoke" ? (out.spellsHaveConvoke ??= []) : (out.spellsHaveImprovise ??= [])) as { filter: TargetSpec; firstEachTurn?: true; text: string }[]).push({ filter: { ...f, text: `${firstConvoke[1]} spell` }, firstEachTurn: true, text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
@@ -3099,6 +3172,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
+      continue;
+    }
+    // Gibbering Descent: "Hellbent — Skip your upkeep step if you have no cards in hand.": checked as the step would start
+    // (rulings, CR 614.10); the step is replaced, so nothing in it happens.
+    if (stripAbilityWord(line) === "Skip your upkeep step if you have no cards in hand.") {
+      out.skipUpkeepIfHellbent = true;
       continue;
     }
     if (line === "Players skip their untap steps.") {
@@ -3913,6 +3992,15 @@ export function compile(d: CardDef): CompiledCard {
       out.perTargetCost = [...(out.perTargetCost ?? []), { opponents: perTarget[1] !== "you", n: Number(perTarget[2]) * (perTarget[3] === "less" ? -1 : 1) }];
       continue;
     }
+    // Geistlight Snare: "~ costs {1} less to cast if you control a Spirit. It also costs {1} less to cast if you control an
+    // enchantment.": two reductions, each on its own condition (rulings: {2} less with both).
+    const alsoLess = /^(~ costs \{\d+\} less to cast if [^.]+)\. It also (costs \{\d+\} less to cast if [^.]+)\.$/.exec(line);
+    if (alsoLess) {
+      const both = [parseCostChange(`${alsoLess[1]}.`), parseCostChange(`~ ${alsoLess[2]}.`)];
+      if (both.every((c) => c && c !== "fail" && "lessIf" in c)) for (const c of both) out.costLessIf = [...(out.costLessIf ?? []), (c as { lessIf: NonNullable<CompiledCard["costLessIf"]>[number] }).lessIf];
+      else out.unsupported.push(raw);
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -3923,6 +4011,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
+      else if ("targetDiscountAny" in cost) out.targetDiscountAny = (out.targetDiscountAny ?? 0) + cost.targetDiscountAny;
       else if ("castTargetEnchantedPlayerLess" in cost) out.castTargetEnchantedPlayerLess = (out.castTargetEnchantedPlayerLess ?? 0) + cost.castTargetEnchantedPlayerLess;
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;
@@ -4234,8 +4323,9 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step|your first main phase)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
-      // and turning it face up isn't entering (CR 708.8), so one or the other.
-      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up), (.+)$/.exec(line) ??
+      // and turning it face up isn't entering (CR 708.8), so one or the other. Shield Mare: "... or becomes the target of a
+      // spell or ability an opponent controls".
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       // "When ~ enters and whenever it deals combat damage to a player, create a Blood token." (Ivora, Insatiable Heir)
       /^When ~ enters and whenever it (attacks while saddled|attacks|deals combat damage to a player), (.+)$/.exec(line) ??
@@ -4466,7 +4556,7 @@ export function compile(d: CardDef): CompiledCard {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
     const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes";
+    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes" || cond?.kind === "graveyardPermanents";
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
@@ -4788,7 +4878,10 @@ function linkExile(out: CompiledCard) {
     // Nautiloid Ship: "exile target player's graveyard" is the one exile instruction too.
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" | "exileGraveyard" }> => (e.type === "exile" && !e.until) || e.type === "exileGraveyard");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    // Endless Horizons: "search your library for any number of Plains cards, exile them" as its one exile instruction.
+    const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
+    else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
@@ -4954,6 +5047,15 @@ function checkCastingLinks(out: CompiledCard) {
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
   if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
+  // Lethal Throwdown: "If the modified creature was sacrificed" needs the spell's "... or sacrifice a modified creature"
+  // way to pay its additional cost, the one it's about.
+  const modSacIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costOrPaid","index":-1');
+  if (modSacIn([out.triggers, out.statics, out.activated])) bad = true;
+  if (modSacIn(out.spell)) {
+    const ways = (out.costOr ?? []).flatMap((o, i) => (o.cost?.kind === "sacrifice" && o.cost.filter.kind === "object" && o.cost.filter.status === "modified" ? [i] : []));
+    if (ways.length !== 1) bad = true;
+    else out.spell = JSON.parse(JSON.stringify(out.spell).replaceAll('"kind":"costOrPaid","index":-1', `"kind":"costOrPaid","index":${ways[0]}`));
+  }
   // "If the exiled card is a snow land" needs an activated ability's "Exile the top card of your library" cost.
   const exIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costExiledIs"');
   if (exIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => exIn(ab) && ab.costs?.filter((c) => c.kind === "mill" && c.exile && c.n === 1).length !== 1)) bad = true;
@@ -5129,7 +5231,8 @@ function joinModes(lines: string[]): string[] {
     const prev = out[out.length - 1];
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
-    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead)?\.$/i.test(prev);
+    // Glorfindel, Dauntless Rescuer: "..., choose one and ~ gets +1/+1 until end of turn." too.
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
     else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);

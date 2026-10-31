@@ -142,6 +142,14 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   // Smuggler Captain: nothing was noted in a draft, so nothing is found (TargetSpec.drafted, oracle/draft.ts).
   if (DRAFTED_NAME.test(phrase)) return { kind: "card", drafted: true, text: phrase };
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
+  // Rootless Yew: "a creature card with power or toughness 6 or greater": either one (anyOf).
+  const pOrT = /^(.+ card) with power or toughness (\d+) or greater$/.exec(p);
+  if (pOrT) {
+    const base = parseSearchFilter(pOrT[1]!, count);
+    if (!base || base.anyOf) return null;
+    const n = Number(pOrT[2]);
+    return { ...base, anyOf: [{ kind: "card", power: { min: n }, text: `power ${n} or greater` }, { kind: "card", toughness: { min: n }, text: `toughness ${n} or greater` }], text: p };
+  }
   // Pyre of Heroes: "a creature card that shares a creature type with the sacrificed creature and has mana value equal to
   // 1 plus that creature's mana value": the sacrificed creature as it last existed (rulings).
   const kin = /^(.+ card) that shares a creature type with the sacrificed creature and has (mana value equal to .+)$/.exec(p);

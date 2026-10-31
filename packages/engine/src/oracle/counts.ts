@@ -775,6 +775,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
   // "It" is the object itself only where nothing else can be "it" (not "whenever you cast a spell").
+  // Wildgrowth Archaic: "whenever you cast a creature spell, ... where X is the number of colors of mana spent to cast
+  // it": that spell's.
+  if (/^colou?rs? of mana spent to cast it$/i.test(p) && ctx?.castSpell && !ctx.selfIt && !ctx.spell) return count({ kind: "colorsSpent", of: { ref: "castSpell" } });
   if ((m = /^colou?rs? of mana spent to cast (~|it)$/i.exec(p)) && (m[1] === "~" || ctx === null || ctx.selfIt || ctx.spell)) return count({ kind: "colorsSpent" });
   // "For each mana from a Treasure spent to cast it" (CR 106.3): the spell's, or its permanent's enters trigger's (compile
   // checks it's one of those).

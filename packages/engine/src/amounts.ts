@@ -556,8 +556,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "spentWas":
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
-    case "colorsSpent":
+    case "colorsSpent": {
+      if (c.of?.ref === "castSpell") {
+        // As it was cast (CR 601.2h), while it's still that spell on the stack.
+        const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+        const o = item?.objectId !== undefined ? s.objects[item.objectId] : undefined;
+        return o && o.zone === "stack" ? (o.colorsSpent?.length ?? 0) : 0;
+      }
       return ctx.colorsSpent ?? 0;
+    }
     case "colorsOf": {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;

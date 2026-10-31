@@ -429,7 +429,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (thatAre && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: [], subtypes: [thatAre[1]!], text: thatAre[1]! } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
-  const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
+  // Huatli, Warrior Poet: "Creatures dealt damage this way can't block this turn": the same.
+  const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x) ?? /^(creature)s dealt damage this way$/i.exec(x);
   if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
   // "~ and up to one other target creature can't be blocked this turn" (Martha Jones), "~ and another target creature each
   // get +1/+0": the source while it's still there (CR 611.2c), and the one target, other than the source.
@@ -1612,9 +1613,10 @@ export function parseTargetPhrase(
   const inWith = / in (your|a|an opponent's) graveyard( with mana value (?:\d+|x)(?: or (?:greater|less))?)$/i.exec(p);
   if (inWith) p = `${p.slice(0, inWith.index)}${inWith[2]} in ${inWith[1]} graveyard`;
   // "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester), "... from anywhere this turn".
-  const putThere = / (?:from|in) (?:your|a|an opponent's) graveyard( that was put there (?:from anywhere )?this turn| that was put there from their library this turn| that was milled this turn| that (?:was|were) put there from the battlefield this turn)$/.exec(p);
+  const putThere = / (?:from|in) (?:your|a|an opponent's) graveyard( that was put there (?:from anywhere )?this turn| that was put there from their library this turn| that was milled this turn| that (?:was|were) put there from the battlefield this turn| that wasn't put there this combat)$/.exec(p);
   if (putThere) {
-    if (/from their library/.test(putThere[1]!)) extra.fromLibraryThisTurn = true;
+    if (/this combat/.test(putThere[1]!)) extra.notPutThereThisCombat = true;
+    else if (/from their library/.test(putThere[1]!)) extra.fromLibraryThisTurn = true;
     else if (/from the battlefield/.test(putThere[1]!)) extra.fromBattlefieldThisTurn = true;
     else if (/milled/.test(putThere[1]!)) extra.milledThisTurn = true;
     else extra.putThereThisTurn = true;

@@ -353,6 +353,7 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
  */
 function fromGraveyardMatches(s: GameState, how: NonNullable<TriggeredAbility["ifFromGraveyard"]>, entering: GameObject, you: PlayerId): boolean {
   if (how === "any") return !!entering.enteredFromGraveyard;
+  if (how === "anyOrCast") return !!entering.enteredFromGraveyard || (!!entering.castFromGraveyard && controllerOf(s, entering) === you);
   if (entering.owner !== you) return false;
   if (how === "castYours") return !!entering.castFromGraveyard && controllerOf(s, entering) === you;
   return !!entering.enteredFromGraveyard || (how === "yoursOrCast" && !!entering.castFromGraveyard && controllerOf(s, entering) === you);
@@ -871,7 +872,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
-      if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
+      // "Defending player" in a "becomes blocked" trigger: the player it's attacking (CR 506.2), the event player.
+      if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o, undefined, undefined, undefined, event === "creatureBecomesBlocked" ? { player: o.attacking } : undefined);
       // "Whenever a creature blocks this turn, ..." (Noxious Assault): a delayed trigger (CR 603.7b).
       if (event === "creatureBlocks") fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === event && fits(t, o, ctrl), triggers, undefined, o));
       // Righteous Indignation: "Whenever a creature blocks a black or red creature": once for each one it blocks (CR 509.3b).
@@ -1750,7 +1752,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
-    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy) && !(t.toEnchanted && w.attachedToPlayer !== ev.player), undefined, undefined, o, undefined, undefined, undefined, info);
+    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy) && !(t.toOwner && ev.player !== o.owner) && !(t.toEnchanted && w.attachedToPlayer !== ev.player), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
     // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
     // the watcher's controller (its own controller's watchers saw it above).
@@ -1758,7 +1760,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const wc = controllerOf(s, w);
       // Brood Sliver's "to a player": to the watcher's controller too.
-      if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && !(t.toEnchanted && w.attachedToPlayer !== ev.player) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && !(t.toOwner && ev.player !== o.owner) && !(t.toEnchanted && w.attachedToPlayer !== ev.player) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Whenever a Vehicle you control deals combat damage to a player, you may return this card from your graveyard to
@@ -1945,7 +1947,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
-        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !tr.targeted?.onlyYou && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !tr.targeted?.onlyYou && !tr.targeted?.once && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
     // Surrak, Elusive Hunter: "or a creature spell you control" (TriggeredAbility.targeted.orSpell): a spell the item
@@ -1973,7 +1975,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
         if (wc !== pid) continue;
-        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orYou && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orYou && !tr.targeted.once && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+      }
+    }
+    // Leyline of Combustion: "you and/or at least one permanent you control" (TriggeredAbility.targeted.once): once for
+    // the spell or ability, however many of its targets are the watcher's controller or permanents they control (rulings).
+    if (item) {
+      const by = item.controller;
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        const hits = (item.targets ?? []).some((t) =>
+          t.kind === "player" ? !ev.only && t.id === wc : t.kind === "object" && (!ev.only || ev.only.includes(t.id)) && !!s.objects[t.id] && s.objects[t.id]!.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === wc);
+        if (!hits) continue;
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.once && (!tr.targeted.spell || item.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
       }
     }
   } else if (ev.type === "exploits") {

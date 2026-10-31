@@ -38,6 +38,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
   }
+  // Showstopping Surprise: "Choose target creature you control. Turn it face up if it's face down": the target, turned face
+  // up with no cost paid (CR 708.8) if it's face down; a face-up one stays as it is.
+  if (/^[Tt]urn it face up if it's face down$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many) return [{ type: "turnFaceUp", what: { ref: "target", index: ctx.lastObjectTarget } }];
   // Staff Room: "turn that creature face up or put a +1/+1 counter on it", its controller's choice as it resolves (CR
   // 608.2d). A face-down instant or sorcery card can't be turned face up (rulings), so that option does nothing then.
   if ((fu = /^[Tt]urn (that creature) face up or (put an? \+1\/\+1 counter on it)$/.exec(s)) && ctx.subject) {

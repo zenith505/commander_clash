@@ -222,7 +222,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
 const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage"]);
-const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body"]);
+const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
@@ -1479,6 +1479,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(Create an? \d+\/\d+) ([A-Z][a-z]+) creature token that's ((?:white|blue|black|red|green), (?:white|blue|black|red|green),? and (?:white|blue|black|red|green))\./g, "$1 $3 $2 creature token.");
   // Michelangelo, On the Scene: "When ~ dies, return ~ to your hand": a card goes only to its owner's hand (CR 400.3).
   text = text.replace(/^([Rr])eturn ~ to your hand\.$/, "$1eturn ~ to its owner's hand.");
+  // Storrev, Devkarin Lich: "return to your hand target creature or planeswalker card in your graveyard that wasn't put
+  // there this combat": the usual order.
+  text = text.replace(/^return to your hand (target [a-z ]+ card) in your graveyard (that wasn't put there this combat)\.$/, "return $1 from your graveyard $2 to your hand.");
   // Primal Order: "... the number of nonbasic lands they control", the same; Cold Snap's "snow lands they control".
   text = text.replace(/^(~ deals damage to that player equal to the number of (?:nonbasic |snow )?[A-Za-z]+) they control\.$/, "$1 that player controls.");
   // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
@@ -2256,6 +2259,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Volatile Rig: "When ~ dies, flip a coin. If you lose the flip, it deals 4 damage to each creature and each player": it
   // is ~, as it last existed (CR 608.2h).
   text = text.replace(/^([Ff]lip a coin\. If you lose the flip, )it (deals \d+ damage to each creature and each player\.)$/, "$1~ $2");
+  // Ashling the Pilgrim: "remove all +1/+1 counters from ~, and it deals that much damage to each creature and each
+  // player": "that much" is the number of counters removed (rulings), "it" ~.
+  text = text.replace(/(remove all \+1\/\+1 counters from ~), and it deals that much damage to (each creature and each player)(\.?)$/, "$1, then ~ deals damage to $2 equal to the number of counters removed this way$3");
   // Favored Hoplite: "put a +1/+1 counter on ~ and prevent all damage that would be dealt to it this turn": two instructions.
   text = text.replace(/\b([Pp]ut an? \+1\/\+1 counter on ~) and prevent all damage that would be dealt to it this turn\./, "$1. Prevent all damage that would be dealt to ~ this turn.");
   // Gomazoa: putting cards on top of libraries that are then shuffled is shuffling them in (see zones.ts).
@@ -4367,6 +4373,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Cheering Crowd: "At the beginning of each player's first main phase, that player may put a +1/+1 counter on ~. If
+    // they do, they add {C} for each counter on it.": their choice (CR 101.4), then their mana, counted as it resolves.
+    if (ctx.eventPlayer && !ctx.spell && /^[Tt]hat player may put a \+1\/\+1 counter on ~$/.test(s) && /^If they do, they add \{C\} for each counter on it\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push(
+        { type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "put a +1/+1 counter on ~" },
+        { type: "if", cond: { kind: "theyChose" }, effects: [{ type: "addMana", mana: "{C}", times: { count: { kind: "counters", counter: "any", of: { ref: "self" } } }, who: { ref: "eventPlayer" } }] },
+      );
+      si++;
+      continue;
+    }
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     // Mtenda Lion, Shrouded Serpent: "Whenever ~ attacks, defending player may pay {U}": the player it's attacking (CR 506.2).
@@ -5189,6 +5205,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const prevBounce = responderMay?.type === "may" && !responderMay.pay && responderMay.effects.length === 1 ? responderMay.effects[0] : undefined;
     if (/^(?:[Tt]hen p|P)ut a number of \+1\/\+1 counters equal to that creature's power on ~$/.test(s) && prevBounce?.type === "pick" && prevBounce.action === "bounce" && prevBounce.n === 1 && !ctx.spell) {
       effects.push({ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "bouncedThisWayPower" } } });
+      continue;
+    }
+    // Bounty of the Luxa: "remove all flood counters from ~. If no counters were removed this way, put a flood counter on ~
+    // and draw a card. Otherwise, add {C}{G}{U}.": how many the removal took off as it resolved (none if ~ has left the
+    // battlefield, rulings).
+    const noneRemoved = effects.at(-1)?.type === "removeCounters" ? /^If no counters were removed this way, (.+)$/.exec(s) : null;
+    if (noneRemoved) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(noneRemoved[1]!), ctx);
+      const oth = /^Otherwise, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const otherwise = oth ? parseOne(capital(oth[1]!), ctx) : undefined;
+      if (!then || (oth && !otherwise) || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, max: 0 }, effects: then, ...(otherwise ? { otherwise } : {}) });
+      if (oth) si++;
       continue;
     }
     // Mister Hyde, Monster Within: "Remove a counter from a creature you control. If you do, draw a card.": a creature of

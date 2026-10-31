@@ -388,7 +388,7 @@ export type Count =
   /** "Where X is that excess damage" after "if that creature was dealt excess damage this turn" (CR 120.10). */
   | { kind: "eventExcess" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
-  | { kind: "colorsSpent" }
+  | { kind: "colorsSpent"; /** Wildgrowth Archaic: "the number of colors of mana spent to cast it" in a cast trigger: that spell's (CR 601.2h). */ of?: { ref: "castSpell" } }
   /** "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine): as it is, or as it was cast if it's gone. */
   | { kind: "castSpellColors" }
   /** "Create that many" after "a spell with one or more blue mana symbols in its mana cost" (Namor the Sub-Mariner): that spell's mana symbols of the color (hybrid ones once each). */
@@ -611,6 +611,8 @@ export interface TargetSpec {
   manaCostIn?: string[];
   /** "Target spell with {X} in its mana cost" (Frontline Medic; CR 107.3). */
   xInCost?: true;
+  /** "A spell ... without {X} in its mana cost" (Titans' Nest): no {X} in its mana cost (an {X} in another cost doesn't count, rulings). */
+  noXInCost?: true;
   /**
    * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
@@ -667,6 +669,8 @@ export interface TargetSpec {
   attachedToYou?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
   putThereThisTurn?: true;
+  /** "Target creature card in your graveyard that wasn't put there this combat" (Storrev, Devkarin Lich): not put there in the current combat phase (GameObject.toGraveyardCombat; rulings: from anywhere, for any reason). */
+  notPutThereThisCombat?: true;
   /** "... that was put there from their library this turn" (Captain N'ghathrod), "... that was milled this turn" (Tato Farmer): GameObject.fromLibraryTurn, milledTurn. */
   fromLibraryThisTurn?: true;
   milledThisTurn?: true;
@@ -804,6 +808,8 @@ export interface TargetSpec {
   sharesTypeWithSacrificed?: true;
   /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
   sharesTypeWithSubject?: true;
+  /** "A creature of their choice that's blocking it" (Labyrinth Raptor): blocking the trigger's subject as the pick resolves (CR 509.1h); none once the subject has left combat or the battlefield (CR 506.4). Only a "pick" checks it. */
+  blockingSubject?: true;
   /**
    * Cloudstone Curio: "another permanent you control that shares a permanent type with it": not the trigger's subject,
    * and sharing a permanent type with it as it is, or last was, on the battlefield (CR 608.2h), checked as it resolves.
@@ -4612,7 +4618,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** With `orYou`: "Whenever you and/or at least one permanent you control becomes the target ..." (Leyline of Combustion): once for each spell or ability that targets any of them, however many (rulings). */ once?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -4877,7 +4883,7 @@ export interface TriggeredAbility {
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
   /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
-  ifFromGraveyard?: "any" | "yours" | /** "If it entered from your graveyard or you cast it from your graveyard". */ "yoursOrCast" | /** "If it was cast from your graveyard" (Rocket-Powered Goblin Glider). */ "castYours";
+  ifFromGraveyard?: "any" | "yours" | /** "If it entered from your graveyard or you cast it from your graveyard". */ "yoursOrCast" | /** "If that creature entered from a graveyard or you cast it from a graveyard" (Breathless Knight): anyone's graveyard. */ "anyOrCast" | /** "If it was cast from your graveyard" (Rocket-Powered Goblin Glider). */ "castYours";
   /** "When ~ enters from your hand" (Thousand-Faced Shadow): it came from its owner's hand (CR 603.6a). */
   ifFromHand?: true;
   /** "When ~ enters untapped" (Mystic Sanctuary): only if it entered untapped, part of the trigger event. */
@@ -4932,6 +4938,8 @@ export interface TriggeredAbility {
   firstUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
+  /** "Whenever a creature deals combat damage to its owner" (The Beast, Deathless Prince): only to the dealing creature's owner. */
+  toOwner?: true;
   /** "Deals combat damage to enchanted player" (Curse of Stalked Prey): the player this Aura enchants. */
   toEnchanted?: true;
   /** Its X is the number of times its permanent was kicked (Marshal's Anthem), not the spell's X. */

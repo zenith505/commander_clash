@@ -1362,6 +1362,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(\. If you do, put an? [^.]+ counters? on ~) and it gains ([a-z]+) until end of turn\./, "$1 and ~ gains $2 until end of turn.");
   // First Day of Class: "put a +1/+1 counter on it and it gains haste until end of turn": the same, about "it".
   text = text.replace(/^(put a \+1\/\+1 counter on it) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
+  // Spore Cloud: "Each attacking creature and each blocking creature doesn't untap during its controller's next untap
+  // step": both groups as it resolves (CR 611.2c), as two instructions.
+  text = text.replace(/\bEach attacking creature and each blocking creature doesn't untap during its controller's next untap step\./, "Each attacking creature doesn't untap during its controller's next untap step. Each blocking creature doesn't untap during its controller's next untap step.");
+  // Sigil of Myrkul: "put a +1/+1 counter on target creature you control and it gains deathtouch until end of turn": the
+  // same, about the target.
+  text = text.replace(/^([Pp]ut a \+1\/\+1 counter on target creature you control) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
   text = text.replace(/^[Mm]ill (two|three|four|five) cards, then you may put (an? [a-z]+(?: or [a-z]+)? card) from among the milled cards on top of your library\./, "Mill $1 cards. You may put $2 from among the milled cards on top of your library.");
   // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
   // turn": the same as two sentences, "those creatures" the same group.
@@ -1417,6 +1423,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Moonlight Hunt: "Choose target creature you don't control. Each creature you control that's a Wolf or a Werewolf deals
   // damage equal to its power to that creature.": each of them to that target, all at once.
   text = text.replace(/^Choose (target creature you don't control)\. (Each creature you control that's an? [A-Z][a-z]+ or an? [A-Z][a-z]+) deals damage equal to its power to that creature\.$/, "$2 deals damage equal to its power to $1.");
+  // Arc Spitter's grant: "~ deals 1 damage to target creature that's blocking it": "it" is ~, the only object named.
+  text = text.replace(/^~ deals (\d+) damage to target creature that's blocking it\.$/, "~ deals $1 damage to target creature blocking ~.");
+  // Case of the Gateway Express: "choose target creature you don't control. Each creature you control deals 1 damage to
+  // that creature.": each of them a source of its own damage, all at once (CR 120.3), to that target.
+  text = text.replace(/^[Cc]hoose (target creature you don't control)\. (Each creature you control) deals (\d+) damage to that creature\.$/, "$2 deals $3 damage to $1.");
   // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
   // resolves (CR 608.2c).
   text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
@@ -3760,6 +3771,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "bouncedThisWay", subtype: bounced[1]!, another: true }, effects: inner });
       continue;
     }
+    // Greenbelt Rampager: "pay {E}{E}. If you can't, return ~ to its owner's hand and you get {E}.": paid whenever it can
+    // be, with no choice (rulings), and the rest only when it can't.
+    const mustEnergy = /^[Pp]ay ((?:\{E\})+)$/.exec(s);
+    const energyCant = mustEnergy && /^If you can't, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (mustEnergy && energyCant) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(energyCant[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "may", effects: [], pay: { energy: mustEnergy[1]!.length / 3 }, must: true, otherwise: inner, text: `pay ${mustEnergy[1]}` });
+      si++;
+      continue;
+    }
     // Egon, God of Death: "exile two cards from your graveyard. If you can't, sacrifice ~ and draw a card": with fewer than
     // two there, none are exiled and the rest happens instead (rulings).
     const yardExile = new RegExp(`^[Ee]xile ${NUM} cards from your graveyard$`).exec(s);
@@ -4165,6 +4188,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(`${another[1]!} to target player other than that player`, ctx);
       if (!fx) return null;
       effects.push(...fx);
+      si++;
+      continue;
+    }
+    // Gravestorm: "target opponent may exile a card from their graveyard. If that player doesn't, you may draw a card.":
+    // they decide first (one with an empty graveyard can't), then you, if they didn't (CR 101.4).
+    const yardMay = /^([Tt]arget opponent) may exile a card from their graveyard$/.exec(s);
+    const yardYou = yardMay && /^If (?:they|that player|the player) (?:doesn't|don't), you may (draw a card)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (yardMay && yardYou) {
+      const who = parsePlayer(yardMay[1]!.toLowerCase(), ctx);
+      if (who?.ref !== "target") return null;
+      ctx.mayNow = true;
+      const inner = parseOne(capital(yardYou[1]!), ctx);
+      ctx.mayNow = false;
+      if (inner?.length !== 1 || inner[0]!.type !== "draw") return null;
+      const card: TargetSpec = { kind: "card", text: "card" };
+      effects.push(
+        { type: "eachMay", who, effects: [{ type: "chooseFromGraveyard", who, n: 1, dest: "exile" }], need: { zone: "graveyard", filter: card }, text: "exile a card from your graveyard" },
+        { type: "if", cond: { kind: "theyChose", not: true }, effects: [{ type: "may", effects: inner, text: yardYou[1]! }] },
+      );
       si++;
       continue;
     }
@@ -7447,6 +7489,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Thoughtpicker Witch: "Look at the top two cards of target opponent's library, then exile one of them.": you choose
+    // the one exiled; the other stays on top (one card, no order to choose).
+    if (yourLook && yourLook[1] === "two" && /^Exile one of them\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: yourLook[2] === "target opponent", text: yourLook[2]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "exile", rest: "keep", reveal: false, library: { ref: "target", index } });
+      si++;
+      continue;
+    }
     // Sealed Fate: "Look at the top X cards of target opponent's library. Exile one of those cards and put the rest back on
     // top of that player's library in any order.": you choose the card and the order (rulings).
     const xLook = !dig && ctx.spell ? /^[Ll]ook at the top X cards of (target player|target opponent)'s library$/.exec(s) : null;
@@ -9848,7 +9899,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const ifControl = created ? /^if (you control [^,]+), (.+)$/.exec(whenText) : null;
       const ifControlCond = ifControl ? parseStaticCondition(ifControl[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
       if (ifControl && !ifControlCond) return null;
-      const reflexive = reflexiveBody(ifHas ? ifHas[3]! : ifControl ? ifControl[2]!.replace(/^(?:he|she) deals /, "~ deals ") : whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned, discTypes);
+      // "Mill a card. When you do, if there are four or more creature cards in your graveyard, ..." (Sigil of Myrkul): an
+      // intervening "if" too, checked once the card is milled and again as the reflexive ability resolves (rulings).
+      const ifMilled = milled ? /^if (there are [^,]+ in your graveyard), (.+)$/.exec(whenText) : null;
+      const ifMilledCond = ifMilled ? parseStaticCondition(ifMilled[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+      if (ifMilled && !ifMilledCond) return null;
+      const reflexive = reflexiveBody(ifHas ? ifHas[3]! : ifControl ? ifControl[2]!.replace(/^(?:he|she) deals /, "~ deals ") : ifMilled ? ifMilled[2]! : whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned, discTypes);
       if (!reflexive) return null;
       if (discTypes) {
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive, xDiscardedTypes: true }] });
@@ -9884,6 +9940,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (sacSelf) {
         effects.pop();
         effects.push({ type: "if", cond: { kind: "selfHere", yours: true }, effects: [prev, { type: "reflexive", body: reflexive }] });
+        continue;
+      }
+      if (milled && ifMilledCond) {
+        effects.pop();
+        reflexive.effects = [{ type: "if", cond: { kind: "state", cond: ifMilledCond }, effects: reflexive.effects }];
+        effects.push({ type: "if", cond: { kind: "libraryHas", n: prev.n as number }, effects: [prev, { type: "if", cond: { kind: "state", cond: ifMilledCond }, effects: [{ type: "reflexive", body: reflexive }] }], otherwise: [prev] });
         continue;
       }
       if (milled) {
@@ -11624,6 +11686,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const other = parseCount(`${twoPlayers[1]}s that player controls`, ctx);
       if (!first || !other) return null;
       effects.push({ type: "draw", who: { ref: "you" }, n: first }, { type: "draw", who: { ref: "you" }, n: other });
+      continue;
+    }
+    // Cybernetica Datasmith: "Target player draws a card. Another target player creates a 4/4 colorless Robot artifact
+    // creature token ...": two different target players (CR 115.3).
+    const anotherCreates = /^Another target player (creates .+)$/.exec(s);
+    const prevDraw = effects[effects.length - 1];
+    if (anotherCreates && prevDraw?.type === "draw" && prevDraw.who.ref === "target" && ctx.lastPlayerTarget === prevDraw.who.index && ctx.targets.length === 1) {
+      const second = addTarget(ctx, { kind: "player", text: "another target player", distinctFrom: [ctx.lastPlayerTarget] });
+      ctx.lastPlayerTarget = second;
+      const fx = parseOne(`That player ${anotherCreates[1]!}`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "createToken" || fx[0]!.who?.ref !== "target" || fx[0]!.who.index !== second) return null;
+      effects.push(...fx);
       continue;
     }
     // Cruel Entertainment: each of two different target players (CR 115.3) controls the other during the other's next turn

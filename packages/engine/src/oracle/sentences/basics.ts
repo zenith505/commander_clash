@@ -983,8 +983,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Then discard two cards unless you discard a creature card" (Mystic Meditation, Thirst for Knowledge): a card of
   // that kind, or two cards. With none of that kind, two cards (rulings).
-  if ((m = new RegExp(`^(?:[Tt]hen )?[Dd]iscard (two|three|\\d+) cards unless you discard (an? .+? card)$`).exec(s))) {
-    const filter = parseSearchFilter(m[2]!.replace(/^an? /, ""));
+  // Steamcore Scholar: "unless you discard an instant or sorcery card or a creature card with flying": a card of either
+  // kind (anyOf).
+  if ((m = new RegExp(`^(?:[Tt]hen )?[Dd]iscard (two|three|\\d+) cards unless you discard (an? .+? card(?: with \\w+)?)$`).exec(s))) {
+    const kinds = m[2]!.split(/ or (?=an? \w)/).map((k) => parseSearchFilter(k.replace(/^an? /, "")));
+    const filter = kinds.length === 1 ? kinds[0] : kinds.every((k) => k && !k.anyOf) ? { kind: "card" as const, anyOf: kinds as TargetSpec[], text: m[2]!.replace(/^an? /, "") } : null;
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, filter }], otherwise: [{ type: "discard", who: { ref: "you" }, n: num(m[1]!) }], keep: true, text: `Discard ${m[2]} rather than ${m[1]} cards` }];
   }
@@ -1356,6 +1359,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(`each ${m[1]}`, ctx);
     const recipient = what && isGroup(what) ? parseDamageRecipient(m[2]!, ctx) : null;
     return recipient ? [{ type: "eachDealsDamage", what: what!, amount: 0, ownPower: true, recipient }] : null;
+  }
+  // Case of the Gateway Express: "Each creature you control deals 1 damage to target creature you don't control": each one
+  // its own source, all at once, to the one target (none if it's an illegal target, CR 608.2b).
+  if ((m = new RegExp(`^[Ee]ach creature you control deals ${NUM} damage to (target creature you don't control)$`).exec(s))) {
+    const what = parseObject("each creature you control", ctx);
+    const recipient = what && isGroup(what) ? parseDamageRecipient(m[2]!, ctx) : null;
+    return recipient?.ref === "target" && !recipient.n ? [{ type: "eachDealsDamage", what: what!, amount: num(m[1]!), recipient }] : null;
   }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
   if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {

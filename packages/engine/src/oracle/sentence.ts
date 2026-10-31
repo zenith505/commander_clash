@@ -365,7 +365,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (list !== undefined) return list;
   // "When that creature dies this turn, you draw a card" (A Good Day to Die): a delayed trigger (sentences/permanents.ts),
   // not a draw with a long subject.
-  if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
+  if (/^When (?:that creature|the permanent you don't control) dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
   // "When you next cast a spell with {X} in its mana cost this turn, you draw a card ..." (Brass Infiniscope): a delayed
   // trigger (sentences/spells.ts), not a draw with a long subject.
   if (/^When you next cast /.test(s)) return parseSpellsSentence(s, ctx) ?? null;

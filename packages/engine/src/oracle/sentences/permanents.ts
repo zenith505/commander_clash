@@ -385,12 +385,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // token"), when the instruction isn't about the spell.
   // Desperate Measures: "Target creature gets +1/-1 until end of turn. When it dies under your control this turn, draw two
   // cards": the same, only if it dies while its controller is the spell's (ev.controller, as it last existed).
-  if ((m = /^When (?:that creature|it) dies( under your control)? this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !(ctx.spell && /~/.test(m[2]!)) && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[2]!) && (/^When that/.test(s) || ctx.targets.length === ctx.lastObjectTarget + 1)) {
+  // Devouring Tendrils: "When the permanent you don't control dies this turn": the target that names it, the last one.
+  if ((m = /^When (?:that creature|it|the permanent you don't control) dies( under your control)? this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && (!/^When the permanent/.test(s) || (ctx.targets[ctx.lastObjectTarget]?.controller === "opponent" && /you don't control$/.test(ctx.targets[ctx.lastObjectTarget]!.text))) && !ctx.targets[ctx.lastObjectTarget]?.many && !(ctx.spell && /~/.test(m[2]!)) && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[2]!) && (/^When that/.test(s) || ctx.targets.length === ctx.lastObjectTarget + 1)) {
     // Not one that targets (Fatal Fissure's earthbend): that target would be chosen as the trigger is put on the stack.
     const of = ctx.lastObjectTarget;
     const before = ctx.targets.length;
     const inner = parseSentence(capital(m[2]!), ctx);
-    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}) }] : null;
+    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}), ...(/^When the permanent/.test(s) ? { anyPermanent: true as const } : {}) }] : null;
   }
   // Virulent Wound: "When that creature dies this turn, its controller gets a poison counter": the player who controlled
   // it as it last existed on the battlefield (CR 603.10a, 608.2h).
@@ -564,7 +565,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
     // Tangle: "Each attacking creature doesn't untap during its controller's next untap step": those attacking as it
     // resolves (CR 611.2c).
-    const attackers = /^each attacking creature$/i.test(m[1]!);
+    // Spore Cloud: "each blocking creature" the same.
+    const attackers = /^each (?:attacking|blocking) creature$/i.test(m[1]!);
     return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what, ...(m[2] ? { n: 2 } : {}) }] : null;
   }
   // Sleep: "Tap all creatures target player controls. Those creatures don't untap during that player's next untap step":
@@ -649,7 +651,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Get Out: "Return one or two target creatures and/or enchantments you own to your hand": targets you own (CR 108.3),
   // to their owner's hand, yours.
   // Obelisk of Undoing: "Return target permanent you both own and control to your hand": yours both ways (CR 108.3-4).
-  if ((m = /^Return ((?:one or two |up to (?:one|two|three) )?target (?!.*\bspells?\b).+?) you (both own and control|own) to your hand$/.exec(s))) {
+  // Leave: "Return any number of target permanents you own to your hand" the same.
+  if ((m = /^Return ((?:one or two |up to (?:one|two|three) |any number of )?target (?!.*\bspells?\b).+?) you (both own and control|own) to your hand$/.exec(s))) {
     const before = ctx.targets.length;
     const both = m[2] !== "own";
     const fx = parseSentence(`Return ${m[1]}${both ? " you control" : ""} to their owners' hands`, ctx);
@@ -1480,6 +1483,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
+  // "Target artifact or creature becomes an artifact creature with base power and toughness 5/5 and gains flying" (Iron
+  // Man, Futurist Paragon; Tezzeret the Schemer's emblem): with no duration, for as long as it stays on the battlefield
+  // (CR 611.2a, 400.7; rulings), keeping its other types (rulings on Tezzeret, Agent of Bolas).
+  if ((m = /^(target (?:artifact|artifact or creature|artifact you control)) (becomes an artifact creature with base power and toughness \d+\/\d+(?: and gains [a-z]+)?)$/i.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    const mods = what?.ref === "target" && !what.n ? parseChanges(m[2]!) : null;
+    if (what && mods?.some((x) => x.kind === "setPT")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "Up to one other target creature loses all abilities" (Abigale, Eloquent First-Year): with no duration, for as long as
   // it stays on the battlefield (CR 611.2a, 400.7; rulings), an effect with a timestamp, so abilities it gains later stay.

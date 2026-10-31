@@ -272,6 +272,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down
   // (CR 701.40a). "For each card manifested this way" counts them.
   // "Manifest a card from your hand" (Scroll of Fate): you.
+  // "Cloak a card from your hand" (Vannifar, Evolved Enigma): the same, cloaked (CR 701.58a).
+  if (/^Cloak a card from your hand$/.test(s)) {
+    ctx.manifested = true;
+    return [{ type: "putFromHand", who: { ref: "you" }, may: false, manifest: 1, cloak: true }];
+  }
   if ((m = new RegExp(`^(?:(.+?) (?:each )?manifests?|[Mm]anifest) (a card|${NUM} cards) from (their|your) hands?$`).exec(s))) {
     if (!m[1] && m[4] !== "your") return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : undefined;
@@ -464,6 +469,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // then the Equipment is attached if it can be (CR 701.3b); it stays unattached otherwise (rulings).
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield and then attach it to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }];
+  // Ratonhnhaké꞉ton: "return target Equipment card from your graveyard to the battlefield, then attach it to that token":
+  // it returns, then it's attached to the token the ability is about if it can be; otherwise it stays unattached (rulings).
+  if (ctx.subjectIt && /^Return target Equipment card from your graveyard to the battlefield and then attach it to that token$/.test(s)) {
+    const what = parseObject("target Equipment card from your graveyard", ctx, true);
+    return what?.ref === "target" ? [{ type: "putOntoBattlefield", what }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }] : null;
+  }
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
   // battlefield" (Corpse Dance), "put the top creature card of defending player's graveyard onto the battlefield under
   // your control" (Bone Dancer), "Put the top card of your graveyard on the bottom of your library" (Soldevi Digger),
@@ -1251,13 +1262,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
+    // Underworld Sentinel: "When ~ dies, put all cards exiled with it onto the battlefield": under the control of the
+    // ability's controller, who puts them there (its rulings).
+    if (/^Put all cards exiled with (?:it|~) onto the battlefield$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "battlefield" }];
     if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?$/i.exec(s)))
       return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}) }];
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
-    if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
+    // Endless Horizons: "put a card you own exiled with ~ into your hand": the same.
+    if (/^(?:Return a card you own exiled with ~ to|Put a card you own exiled with ~ into) your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
     if (/^Return all cards exiled with ~ to their owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
     // Currency Converter: one of them, chosen as it resolves.

@@ -1228,6 +1228,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
+          // Endless Horizons: linked to the source as it is (CR 607.2a).
+          if (to.linked && to.zone === "exile" && obj(s, id).zone === "exile" && ctx.sourceId && exiledFor(pid) === undefined) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.
           if (to.faceDown && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
             obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down", at };

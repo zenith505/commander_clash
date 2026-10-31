@@ -1031,7 +1031,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const othersAll = other && /^creatures$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that fought this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   // "Each other creature you control that's a Cat, Elemental, Nightmare, Dinosaur, or Beast" (Kaheera, the Orphanguard):
@@ -1107,6 +1107,12 @@ export function parseTargetPhrase(
   if (drafted) {
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
+  }
+  // Ice Cream Kitty: "Sacrifice another creature or token": a permanent that's either (a token of any type too).
+  const orToken = /^(artifact|creature|enchantment|land) or token$/.exec(phrase.trim());
+  if (orToken) {
+    const t = orToken[1]!.charAt(0).toUpperCase() + orToken[1]!.slice(1);
+    return { kind: "object", types: [], anyOf: [{ kind: "object", types: [t], text: orToken[1]! }, { kind: "object", types: [], token: true, text: "token" }], text: phrase.trim() };
   }
   // Rob the Hoard: "artifact, enchantment, or legendary card from your graveyard": a card that's any of them.
   const typesOrLegendary = /^(artifact|creature|enchantment|instant|sorcery|land|planeswalker), (artifact|creature|enchantment|instant|sorcery|land|planeswalker), or legendary card( from (?:your|a) graveyard)$/.exec(phrase.trim());
@@ -1439,6 +1445,12 @@ export function parseTargetPhrase(
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
   }
+  // Boxing Ring: "a creature that fought this turn" (CR 701.14).
+  const fought = / that fought this turn$/.exec(p);
+  if (fought) {
+    extra.foughtThisTurn = true;
+    p = p.slice(0, fought.index);
+  }
   // Sizzling Barrage: "target creature that blocked this turn".
   const blockedTurn = / that blocked this turn$/.exec(p);
   if (blockedTurn && !extra.combat) {
@@ -1512,7 +1524,8 @@ export function parseTargetPhrase(
   }
   // Oblivion Stone: "each nonland permanent without a fate counter on it": any kind of counter.
   // Coiling Stalker: "target creature you control that doesn't have a +1/+1 counter on it": the same.
-  const without = / (?:without|that doesn't have) an? ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
+  // Hindervines: "creatures with no +1/+1 counters on them": the same.
+  const without = / (?:(?:without|that doesn't have) an?|with no) ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
   if (without) {
     extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();

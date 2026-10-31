@@ -44,6 +44,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up|Forecast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up" | "Forecast") : undefined;
   // "Remove five quest counters from ~ and sacrifice it" (Quest for the Holy Relic): two costs, paid in any order (CR 601.2h).
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:").replace(/(^|, )(Remove [^,:]+? counters? from ~) and exile it:/, "$1$2, Exile ~:")
+    // Magosi, the Waterveil: "Remove an eon counter from ~ and return it to its owner's hand": the same, two costs.
+    .replace(/(^|, )(Remove [^,:]+? counters? from ~) and return it to its owner's hand:/, "$1$2, Return ~ to its owner's hand:")
     // Geistflame Reservoir: "Remove any number of charge counters from ~: It deals that much damage to any target": how
     // many is announced as it's activated (CR 602.2b, 601.2h), an X (none included).
     .replace(/(^|, )Remove any number of ([a-z]+) counters from ~: It deals that much damage to any target\.$/, "$1Remove X $2 counters from ~: ~ deals X damage to any target.")

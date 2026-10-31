@@ -383,7 +383,9 @@ export function normalizeSelf(d: CardDef): string {
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
     // Not "each Garruk you control" in Garruk, Cursed Huntsman: there it's the planeswalker type (CR 205.3j).
     const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an) )" : "";
-    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
+    // Lizard, Connors's Curse: "becomes a green Lizard creature" is the creature type its short name also is (CR 205.3m).
+    const shortTyped = CREATURE_TYPES.has(short) ? "(?! creatures?\\b)" : "";
+    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -877,6 +879,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (manaAb) {
+      // "Named ~" in what it counts (Powerstone Shard): this card's name (CR 201.5).
+      if (manaAb.produces.kind === "fixed" && manaAb.produces.count?.named === "~") manaAb.produces = { ...manaAb.produces, count: { ...manaAb.produces.count, named: d.name, text: manaAb.produces.count.text.replace(/~/g, d.name) } };
       out.mana.push(manaAb);
       continue;
     }
@@ -1008,7 +1012,8 @@ export function compile(d: CardDef): CompiledCard {
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
     // "Protection from spells and from permanents that were cast this turn" (Emrakul, the World Anew): the same, two.
     // "Protection from blue, from black, and from red" (Oversoul of Dusk): three.
-    const kwLine = line.replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
+    // Nevinyrral, Urborg Tyrant: "Hexproof from artifacts, creatures, and enchantments": three (CR 702.11d, 702.11f).
+    const kwLine = line.replace(/^(Hexproof) from (artifacts|creatures|enchantments|instants|planeswalkers|sorceries), (artifacts|creatures|enchantments|instants|planeswalkers|sorceries),? and (artifacts|creatures|enchantments|instants|planeswalkers|sorceries)$/, "$1 from $2, hexproof from $3, hexproof from $4").replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;
@@ -2745,6 +2750,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveConvoke ??= []).push({ filter: f, ...(giveConvoke[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
+    // Peri Brown: "The first historic spell you cast each turn has convoke": only the first one of that kind (CR 702.51a).
+    // The Fifteenth Doctor: "The first nonartifact spell you cast each turn has improvise" (CR 702.126a), the same way.
+    const firstConvoke = /^The first ([a-z]+) spell you cast each turn has (convoke|improvise)\.$/.exec(line);
+    if (firstConvoke) {
+      const f = parseTargetPhrase(`${firstConvoke[1]} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else ((firstConvoke[2] === "convoke" ? (out.spellsHaveConvoke ??= []) : (out.spellsHaveImprovise ??= [])) as { filter: TargetSpec; firstEachTurn?: true; text: string }[]).push({ filter: { ...f, text: `${firstConvoke[1]} spell` }, firstEachTurn: true, text: line });
+      continue;
+    }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
     if (line === "Spells you cast from exile have convoke.") {
       (out.spellsHaveConvoke ??= []).push({ filter: { kind: "spell", text: "spell" }, fromExile: true, text: line });
@@ -3145,6 +3159,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
+      continue;
+    }
+    // Gibbering Descent: "Hellbent — Skip your upkeep step if you have no cards in hand.": checked as the step would start
+    // (rulings, CR 614.10); the step is replaced, so nothing in it happens.
+    if (stripAbilityWord(line) === "Skip your upkeep step if you have no cards in hand.") {
+      out.skipUpkeepIfHellbent = true;
       continue;
     }
     if (line === "Players skip their untap steps.") {
@@ -3951,6 +3971,15 @@ export function compile(d: CardDef): CompiledCard {
       out.perTargetCost = [...(out.perTargetCost ?? []), { opponents: perTarget[1] !== "you", n: Number(perTarget[2]) * (perTarget[3] === "less" ? -1 : 1) }];
       continue;
     }
+    // Geistlight Snare: "~ costs {1} less to cast if you control a Spirit. It also costs {1} less to cast if you control an
+    // enchantment.": two reductions, each on its own condition (rulings: {2} less with both).
+    const alsoLess = /^(~ costs \{\d+\} less to cast if [^.]+)\. It also (costs \{\d+\} less to cast if [^.]+)\.$/.exec(line);
+    if (alsoLess) {
+      const both = [parseCostChange(`${alsoLess[1]}.`), parseCostChange(`~ ${alsoLess[2]}.`)];
+      if (both.every((c) => c && c !== "fail" && "lessIf" in c)) for (const c of both) out.costLessIf = [...(out.costLessIf ?? []), (c as { lessIf: NonNullable<CompiledCard["costLessIf"]>[number] }).lessIf];
+      else out.unsupported.push(raw);
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -3961,6 +3990,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
+      else if ("targetDiscountAny" in cost) out.targetDiscountAny = (out.targetDiscountAny ?? 0) + cost.targetDiscountAny;
       else if ("castTargetEnchantedPlayerLess" in cost) out.castTargetEnchantedPlayerLess = (out.castTargetEnchantedPlayerLess ?? 0) + cost.castTargetEnchantedPlayerLess;
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;
@@ -4242,8 +4272,9 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step|your first main phase)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
-      // and turning it face up isn't entering (CR 708.8), so one or the other.
-      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up), (.+)$/.exec(line) ??
+      // and turning it face up isn't entering (CR 708.8), so one or the other. Shield Mare: "... or becomes the target of a
+      // spell or ability an opponent controls".
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       // "When ~ enters and whenever it deals combat damage to a player, create a Blood token." (Ivora, Insatiable Heir)
       /^When ~ enters and whenever it (attacks while saddled|attacks|deals combat damage to a player), (.+)$/.exec(line) ??
@@ -4796,7 +4827,10 @@ function linkExile(out: CompiledCard) {
     // Nautiloid Ship: "exile target player's graveyard" is the one exile instruction too.
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" | "exileGraveyard" }> => (e.type === "exile" && !e.until) || e.type === "exileGraveyard");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    // Endless Horizons: "search your library for any number of Plains cards, exile them" as its one exile instruction.
+    const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
+    else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
@@ -4962,6 +4996,15 @@ function checkCastingLinks(out: CompiledCard) {
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
   if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
+  // Lethal Throwdown: "If the modified creature was sacrificed" needs the spell's "... or sacrifice a modified creature"
+  // way to pay its additional cost, the one it's about.
+  const modSacIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costOrPaid","index":-1');
+  if (modSacIn([out.triggers, out.statics, out.activated])) bad = true;
+  if (modSacIn(out.spell)) {
+    const ways = (out.costOr ?? []).flatMap((o, i) => (o.cost?.kind === "sacrifice" && o.cost.filter.kind === "object" && o.cost.filter.status === "modified" ? [i] : []));
+    if (ways.length !== 1) bad = true;
+    else out.spell = JSON.parse(JSON.stringify(out.spell).replaceAll('"kind":"costOrPaid","index":-1', `"kind":"costOrPaid","index":${ways[0]}`));
+  }
   // "If the exiled card is a snow land" needs an activated ability's "Exile the top card of your library" cost.
   const exIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costExiledIs"');
   if (exIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => exIn(ab) && ab.costs?.filter((c) => c.kind === "mill" && c.exile && c.n === 1).length !== 1)) bad = true;

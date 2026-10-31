@@ -1345,7 +1345,7 @@ line blocks.
    "its starting loyalty is 1" on a token copy and "Remove a number of loyalty counters equal to that card's mana value"
    (Jace, Mirror Mage); "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian: a card
    with its own miracle triggers twice); "Lands you control and land cards you own that aren't on the battlefield are
-   Deserts" (Dune Chanter). +15 (28,646 of 31,936).
+   Deserts" (Dune Chanter). +15 (28,662 of 31,936 with B64).
    Out after round 227 (looked at, not done): Sigarda, Host of Herons ("Spells and abilities your opponents control
    can't cause you to sacrifice permanents": every effect sacrifice, edict, "may sacrifice" and "unless you sacrifice"
    option would need to know who controls the source, while costs, mana abilities and the legend rule stay allowed,

@@ -93,6 +93,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Blood Tyrant: "Whenever a player loses the game": the same, since a player who loses leaves the game with every object
   // they own and control (CR 800.4a), so the permanent with this ability is never theirs by then.
   [/^Whenever a player loses the game, (.+)$/, "anotherPlayerLosesGame"],
+  [/^When enchanted player loses the game, (.+)$/, "enchantedPlayerLosesGame"],
   // CR 731.1: the change from one to the other, not the first time it becomes day or night (rulings on The Celestus).
   [/^Whenever day becomes night or night becomes day, (.+)$/, "dayNightChanges"],
   // CR 701.30: "Whenever you clash" is any clash you take part in, started by you or an opponent (rulings).
@@ -2206,6 +2207,14 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
 
 /** "Whenever a creature you control exploits a nontoken creature" (CR 702.110b): the exploited creature is the subject. */
 function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Profaner of the Dead: "When ~ exploits a creature, return to their owners' hands all creatures your opponents control
+  // with toughness less than the exploited creature's toughness": the exploited creature (the trigger's subject) as it
+  // last existed on the battlefield (rulings).
+  const self = /^When ~ exploits a creature, return to their owners' hands all (creatures your opponents control) with (power|toughness) less than the exploited creature's \2\.$/.exec(line);
+  if (self) {
+    const body = parseBody(`return all ${self[1]} with ${self[2]} less than that creature's ${self[2]} to their owners' hands.`, { subject: true });
+    return body ? { event: "selfExploits", body } : "fail";
+  }
   const m = /^Whenever a creature you control exploits an? (.+?), (.+)$/.exec(line);
   if (!m) return null;
   const filter = m[1] === "creature" ? undefined : parseTargetPhrase(m[1]!);
@@ -2993,7 +3002,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   // Reaper of Night: "Whenever ~ attacks, if defending player has two or fewer cards in hand": the player it attacks (or
   // the planeswalker's controller, CR 506.2), as for Septic Rats.
-  const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? new RegExp(`^defending player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
+  // Quest for the Nihil Stone: "if that player has no cards in hand and ~ has two or more quest counters on it": both.
+  const handAnd = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^(that player has .+? cards in hand) and (~ has .+ counters? on it)$/.exec(intervening[2]!) : null;
+  const handAndCond = handAnd ? parseStaticCondition(handAnd[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+  if (handAnd && !handAndCond) return "fail";
+  const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(handAnd ? handAnd[1]! : intervening[2]!) : intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? new RegExp(`^defending player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
   // "Whenever ~ attacks, if its toughness is 3 or less" (Young Hero Role): its own power or toughness as it triggers and resolves.
   const ptIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? new RegExp(`^(?:its|~'s) (power|toughness) is ${NUM} or (less|greater)$`).exec(intervening[2]!) : null;
@@ -3071,7 +3084,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
   const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
   const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
-  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : subjCounterCond ? subjCounterCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : subjCounterCond ? subjCounterCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? (handAnd ? (handAndCond ? { kind: "allOf" as const, conds: [{ kind: "eventPlayerHand" as const, ...handCond }, handAndCond] } : null) : ({ kind: "eventPlayerHand", ...handCond } as const)) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -3875,6 +3888,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (pwDefending) text = text.replace(/\bdefending player controls\b/g, "that player controls");
       // Field-Tested Frying Pan's grant: "~ gets +X/+X until end of turn, where X is the amount of life you gained": that much.
       if (event === "youGainLife" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^(.*\bX\b.*), where X is the amount of life you gained\.$/, (_, body: string) => `${body.replace(/\bX\b/g, "that much")}.`);
+      // Cradle of Vitality: "put a +1/+1 counter on target creature for each 1 life you gained": one counter per life of
+      // that one life-gaining event (rulings), as "that many".
+      if (event === "youGainLife") text = text.replace(/\bput a \+1\/\+1 counter on (target creature) for each 1 life you gained\.$/, "put that many +1/+1 counters on $1.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).

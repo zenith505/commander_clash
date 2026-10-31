@@ -391,6 +391,11 @@ export function mayExhaustAgain(s: GameState, pid: PlayerId): boolean {
  * mana abilities too; cards in other zones (cycling, unearth) aren't stopped (rulings).
  */
 export function abolisherBan(s: GameState, pid: PlayerId, o: GameObject): string | null {
+  // City of Solitude: no activated abilities during another player's turn, of anything anywhere (rulings).
+  if (pid !== s.activePlayer) {
+    const city = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).activateOnlyOwnTurn);
+    if (city) return `${characteristics(s, obj(s, city)).name}: players can activate abilities only during their own turns`;
+  }
   if (o.zone !== "battlefield" || pid === s.activePlayer || !["Artifact", "Creature", "Enchantment"].some((t) => objIsType(s, o, t))) return null;
   const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === s.activePlayer && abilitiesOf(s, obj(s, id)).opponentsCantActivateYourTurn);
   return src ? `${characteristics(s, obj(s, src)).name}: opponents can't activate abilities of artifacts, creatures or enchantments during ${player(s, s.activePlayer).name}'s turn` : null;

@@ -876,6 +876,8 @@ export interface StackItem {
   /** An activated loyalty ability (CR 606.3), for "target loyalty ability of a planeswalker". */
   loyalty?: true;
   controller: PlayerId;
+  /** Another player gained control of this spell (Commandeer): its controller didn't cast it (Cunning Nightbonder's rulings). */
+  controlTaken?: true;
   description: string;
   /** For a triggered ability: the spell or ability on the stack that triggered it ("that spell", ward). */
   cause?: string;

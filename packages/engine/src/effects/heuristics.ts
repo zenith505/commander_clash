@@ -63,6 +63,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "getRad" || e.type === "exileGraveyard" || e.type === "cantCast" || e.type === "cantPlayLands" || e.type === "exileNamed" || e.type === "skip" || e.type === "noUntapNext") && e.who.ref === "target") mark(e.who.index, e.who.n);
     // "Exile the top X cards of target opponent's library. You may ... cast spells from among" (Gix): an opponent's cards.
     if (e.type === "castFromAmong" && e.who.ref === "target") mark(e.who.index);
+    // "Put it onto the battlefield attached to target player" (Bitterheart Witch): a Curse, for an opponent.
+    if (e.type === "search" && e.dest.attachToPlayer?.ref === "target") mark(e.dest.attachToPlayer.index);
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);

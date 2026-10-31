@@ -390,6 +390,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = { ref: "blockHistory" as const, of, blocked: true as const, ...(m[1] === "blocked or were blocked by" ? { blockers: true as const } : {}) };
     return [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what }], text: `destroy all creatures that ${m[1]} it this turn` }];
   }
+  // Heat Stroke: "At end of combat, destroy each creature that blocked or was blocked this turn": every creature still on
+  // the battlefield that was declared as a blocker this turn or that a blocker was declared to block (CR 509.1), whatever
+  // has happened since (TurnLog.blocks).
+  if (/^[Dd]estroy each creature that blocked or was blocked this turn$/.test(s)) return [{ type: "destroy", what: { ref: "blockHistory", of: { ref: "self" }, anyone: true, blockers: true, blocked: true } }];
   // Erosion (as the host-controller trigger reads it): "destroy enchanted land unless that player pays {1} or 1 life": that
   // player decides as it resolves (CR 608.2d); the land as the Aura last existed if it has left (CR 608.2h).
   if ((m = /^[Dd]estroy (enchanted (?:land|artifact|creature)) unless that player (pays .+)$/.exec(s))) {
@@ -430,6 +434,24 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[2]!, ctx);
     if (fx?.length !== 1 || fx[0]!.type !== "destroy" || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: "Let ~ destroy it" }];
+  }
+  // Skullcage (at the beginning of each opponent's upkeep): "~ deals 2 damage to that player unless they have exactly three
+  // or exactly four cards in hand": the hand counted as it resolves, not as it triggers (rulings).
+  if ((m = /^(~ deals \d+ damage to that player) unless they have exactly (\w+) or exactly (\w+) cards in hand$/.exec(s)) && ctx.eventPlayer && num(m[3]!) === num(m[2]!) + 1) {
+    const fx = parseSentence(m[1]!, ctx);
+    const amount = parseCount("cards in that player's hand", ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "damage" || !amount) return null;
+    return [{ type: "if", cond: { kind: "amountNow", amount, min: num(m[2]!), max: num(m[3]!) }, effects: [], otherwise: fx }];
+  }
+  // Dwarven Driller: "Destroy target land unless its controller has ~ deal 2 damage to them", Blazing Salvo: "~ deals 3
+  // damage to target creature unless that creature's controller has ~ deal 5 damage to them": that permanent's controller
+  // decides as it resolves (CR 608.2d), as it last existed if it has left (608.2h).
+  if ((m = /^([Dd]estroy target land|~ deals \d+ damage to target creature) unless (?:its|that creature's) controller (has ~ deal \d+ damage to them)$/.exec(s)) && (/^[Dd]estroy/.test(m[1]!) || /that creature's/.test(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(capital(m[1]!), ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (fx?.length !== 1 || (fx[0]!.type !== "destroy" && fx[0]!.type !== "damage") || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: fx[0]!.type === "destroy" ? "Let ~ destroy it" : `Let ~ ${m[1]!.replace(/^~ deals (\d+) damage to target creature$/, "deal $1 damage to it")}` }];
   }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).

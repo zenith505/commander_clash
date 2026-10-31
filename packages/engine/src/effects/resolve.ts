@@ -470,6 +470,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const them = s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
     return ref.andSelf ? [me, ...them] : them;
   }
+  if (ref.ref === "blockHistory" && ref.anyone) {
+    const all = new Set((s.turnLog?.blocks ?? []).flatMap((b) => [b.blocker, b.attacker]));
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => all.has(`${o.id}@${o.zoneChanges ?? 0}`));
+  }
   if (ref.ref === "blockHistory") {
     const at = blockHistoryAt(s, ref, ctx);
     if (!at) return [];

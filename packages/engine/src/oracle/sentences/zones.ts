@@ -516,6 +516,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const f2 = parseSearchFilter(m[2]!);
     return f1 && f2 ? [{ type: "chooseFromGraveyard", n: 1, upTo: true, filter: f1 }, { type: "chooseFromGraveyard", n: 1, upTo: true, filter: f2 }] : null;
   }
+  // Uncle's Musings: "Return up to X permanent cards from your graveyard to your hand, where X is the number of colors of
+  // mana spent to cast ~": chosen as it resolves, as many as that (replaced in body.ts), not targeted.
+  if ((m = /^[Rr]eturn up to X (.+?) from your graveyard to your hand$/.exec(s)) && ctx.whereX && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
+    const filter = parseSearchFilter(m[1]!.replace(/ and\/or /g, " or "));
+    if (!filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 0, nAmount: { count: { kind: "x" } }, upTo: true, filter }];
+  }
   // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
   // and/or sorcery cards ...": chosen as it resolves, not targeted.
   if ((m = /^[Rr]eturn (an?|one|two|three|up to one|up to two|up to three) (.+?) from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
@@ -863,7 +870,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
   // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
   if ((m = /^(~'s owner|[Tt]hat player|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
-    const who = parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
+    // Divine Gambit: "Exile target artifact, creature, or enchantment an opponent controls. That player may put ...": the
+    // target's controller, as it last existed (CR 608.2h).
+    const lastTarget = ctx.lastObjectTarget !== undefined ? ctx.targets[ctx.lastObjectTarget] : undefined;
+    const theirs = /^That player$/.test(m[1]!) && ctx.spell && ctx.targets.length === 1 && lastTarget?.kind === "object" && lastTarget.controller === "opponent" && !lastTarget.many;
+    const who = theirs ? { ref: "targetController" as const, index: ctx.lastObjectTarget! } : parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;
     return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true }];
@@ -1220,6 +1231,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Exile (target .+|up to one (?:other )?target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
+  }
+  // Consulate Crackdown: "exile all artifacts your opponents control until ~ leaves the battlefield", Temporary Lockdown:
+  // "exile each nonland permanent with mana value 2 or less ...": the permanents there as it resolves, all returned
+  // together when ~ leaves (CR 610.3); a token exiled this way ceases to exist (CR 704.5d).
+  if ((m = /^Exile ((?:all|each) .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`Exile ${m[1]}`, ctx);
+    const ex = fx?.length === 1 && fx[0]!.type === "exile" ? fx[0]! : undefined;
+    if (!ex || ex.until || ex.linked || ex.youMay || ex.ownerMay || !isGroup(ex.what) || ctx.targets.length !== before) return null;
+    return [{ ...ex, until: "sourceLeaves" }];
   }
   // Palace Jailer: "exile target creature an opponent controls until an opponent becomes the monarch": it returns when one
   // of your opponents next becomes the monarch, whatever happens to the source (rulings, CR 610.3).

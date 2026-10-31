@@ -69,7 +69,20 @@ export function parseEntersChoice(line: string): EntersChoice | null {
  * as it's attacking". An ability word in front ("Metalcraft —", "Descend 4 —") has no rules meaning
  * (CR 207.2c); the condition is spelled out after it.
  */
+/**
+ * Threshold granting "Whenever a nontoken creature is put into your graveyard from the battlefield" (Decaying Soil): a
+ * leaves-the-battlefield trigger looks back in time (CR 603.10a), so the creature that makes seven doesn't trigger it
+ * (rulings), but the granted ability is read from the graveyard as it is after the event. Not supported.
+ */
+function lookBackGrant(st: StaticAbility | null): StaticAbility | null {
+  return st?.condition?.kind === "graveyardAtLeast" && st.mods.some((m) => m.kind === "addAbility" && /^Whenever .*(?:\bdies\b|put into [a-z']+ graveyard from the battlefield)/.test(m.text)) ? null : st;
+}
+
 export function parseConditionalStatic(line: string): StaticAbility | null {
+  return lookBackGrant(parseConditionalStatic0(line));
+}
+
+function parseConditionalStatic0(line: string): StaticAbility | null {
   // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
   // long as it has one" (checked as the untap step begins, CR 502.3).
   // Steel Dromedary: "if it has a +1/+1 counter on it"; Alirios, Enraptured: "if you control a Reflection".
@@ -1506,6 +1519,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Barren Glory: "if you control no permanents other than ~ and have no cards in hand": both.
+  if ((m = /^you control no permanents other than ~( and have no cards in hand)?$/.exec(text))) {
+    const a = parseStaticCondition("you don't control another permanent", st);
+    const b = m[1] ? parseStaticCondition("you have no cards in hand", st) : a;
+    return a && b ? (m[1] ? { kind: "allOf", conds: [a, b] } : a) : null;
+  }
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   if ((m = /^you control no other (artifact|creature|land|enchantment)s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the
@@ -2183,7 +2202,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
 
 export function parseStatic(line: string): StaticAbility | null {
   const st = parseStaticLine(line) ?? parseTransform(line);
-  if (st) return st;
+  if (st) return lookBackGrant(st);
 
   // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
   // says the same as "gets ... and has first strike". So does Runechanter's Pike's "has first strike and gets +X/+0,

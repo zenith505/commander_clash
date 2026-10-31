@@ -239,6 +239,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!a || a.times || a.plus || a.half || a.negate || filter?.kind !== "card") return null;
     return { count: { kind: "greater", of: [a.count, { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...filter, text: m[2]!.replace(/cards$/, "card") }, greatestPower: true }] } };
   }
+  // Freelance Muscle: "the greatest power and/or toughness among other creatures you control": the greatest of all those
+  // powers and toughnesses, 0 with none.
+  if (!each && (m = /^the greatest power or toughness among (.+)$/.exec(p))) {
+    const a = parseCount(`the greatest power among ${m[1]}`, ctx);
+    const b = parseCount(`the greatest toughness among ${m[1]}`, ctx);
+    if (!a || !b || a.times || a.plus || a.half || a.negate || b.times || b.plus || b.half || b.negate) return null;
+    return { count: { kind: "greater", of: [a.count, b.count] } };
+  }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.

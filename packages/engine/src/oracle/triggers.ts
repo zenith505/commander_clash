@@ -1109,8 +1109,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
   // existed (CR 603.10a).
   if (!attached) {
-    // "Whenever another creature you own dies, return it to your hand" (Athreos): your card, so its owner's hand.
-    if (/ you own$/.test(m![2]!)) bodyText = bodyText.replace(/^return it to your hand\b/, "return it to its owner's hand");
+    // "Whenever another creature you own dies, return it to your hand" (Athreos): your card, so its owner's hand. Sigil of
+    // the New Dawn: "you may pay {1}{W}. If you do, return that card to your hand", the same.
+    if (/ you own$/.test(m![2]!)) bodyText = bodyText.replace(/^return it to your hand\b/, "return it to its owner's hand").replace(/^(you may pay [^.]+\. If you do, )return that card to your hand\.$/, "$1return that card to its owner's hand.");
     bodyText = bodyText.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
     if (/ an opponent controls$/.test(m![2]!)) bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   }

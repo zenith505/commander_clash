@@ -522,6 +522,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           (s.resolving!.exiledCards ??= []).push(id);
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
+          // Covetous Urge: "You may cast that card for as long as it remains exiled" (not a land: "cast").
+          if (e.youMay) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
           // "It becomes plotted" (CR 702.170c): cast without paying its mana cost on a later turn (702.170d).
           if (e.plot) {

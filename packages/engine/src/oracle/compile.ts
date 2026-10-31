@@ -3715,6 +3715,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: counterKind(ewcIfTwo[3]!), n: num(ewcIfTwo[2]!), if: cond, also: { counter: counterKind(ewcIfTwo[5]!), n: num(ewcIfTwo[4]!) } };
       continue;
     }
+    // Sheriff of Safe Passage: "~ enters with a +1/+1 counter on it plus an additional +1/+1 counter on it for each other
+    // creature you control": one more than that count, counted as it enters.
+    line = line.replace(/^~ enters with a \+1\/\+1 counter on it plus an additional \+1\/\+1 counter on it for each other creature you control\.$/, "~ enters with X +1/+1 counters on it, where X is one plus the number of other creatures you control.");
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?)| unless (you've cast another (?:white|blue|black|red|green) spell this turn))?\\.$`).exec(line);
     if (ewc) {

@@ -1164,7 +1164,7 @@ export type ObjRef =
    * turn with `of` as it was then (TurnLog.blocks), even if they're no longer blocking (rulings), each still that object.
    * `at`: `of` as a delayed trigger remembers it.
    */
-  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true }
+  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -3198,6 +3198,8 @@ export type Effect =
       gainToughness?: true;
       /** Never Happened: "a nonland card from that player's graveyard or hand": one card from either zone (action "exile"). */
       orGraveyard?: true;
+      /** Covetous Urge: "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell": the ability's controller may (action "exile"). */
+      youMay?: { anyType?: true };
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */

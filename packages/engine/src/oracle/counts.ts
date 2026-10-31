@@ -924,7 +924,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^creatures you control that share a creature type with it$/i.test(p) && ctx?.subjectIt) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: p }, sharesTypeWithSubject: true, includeSubject: true });
   // "Whenever ~ attacks, it gets +2/+0 until end of turn for each other attacking Goblin" (Goblin Piledriver): "other"
   // is the permanent itself, so only in its own abilities.
-  if ((m = /^other (attacking|blocking) (.+)$/i.exec(p)) && ctx?.selfIt) {
+  // Márton Stromgald: "for each attacking creature other than ~", the same count.
+  if ((m = /^other (attacking|blocking) (.+)$/i.exec(p) ?? /^(attacking|blocking) (\w+) other than ~$/i.exec(p)) && ctx?.selfIt) {
     const spec = parseTargetPhrase(`${m[1]} ${m[2]!.split(/\s+/).map(singularWord).join(" ")}`);
     return spec?.kind === "object" && (spec.types?.length || spec.subtypes?.length) ? count({ kind: "permanents", filter: { ...spec, text: p }, other: true }) : null;
   }

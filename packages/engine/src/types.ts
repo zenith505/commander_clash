@@ -1429,6 +1429,8 @@ export interface TurnLog {
    * `id@zoneChanges`, each creature as `id@zoneChanges` (The Gitrog, Ravenous Ride: "a creature that saddled it this turn").
    */
   saddledBy?: Record<string, string[]>;
+  /** The same for crewing each Vehicle this turn (CR 702.122d: tapped to pay its crew cost; Getaway Car). */
+  crewedBy?: Record<string, string[]>;
   /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
   endSteps?: number;
   /** The players who drew in this turn's draw step for "you draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem). */
@@ -1465,7 +1467,7 @@ export interface TurnLog {
   noncombatDamage?: Record<number, number>;
   /** Players who scried or surveilled this turn (Proctor of Potential). */
   scried?: PlayerId[];
-  /** Players who surveilled this turn (Darkblade Agent). */
+  /** Players who surveilled this turn (Darkblade Agent; Whispering Snitch's "for the first time each turn"). */
   surveilled?: PlayerId[];
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;

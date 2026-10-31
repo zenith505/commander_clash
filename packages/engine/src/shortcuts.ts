@@ -414,6 +414,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     cycled: Object.fromEntries(Object.entries(t.cycled ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
     // Erdwal Illuminator: only the first investigation each turn matters.
     investigated: Object.fromEntries(Object.entries(t.investigated ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
+    // Whispering Snitch: only the first surveil each turn matters.
     creatureCounterPutters: t.creatureCounterPutters,
     damagedCreature: t.damagedCreature && [...t.damagedCreature].sort(),
   };

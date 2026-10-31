@@ -63,7 +63,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
   // the source (see pickOptions, isLegalTarget).
-  if (spec.bound || spec.saddledSource || spec.drafted || spec.targetsSource) return false;
+  if (spec.bound || spec.saddledSource || spec.crewedSource || spec.drafted || spec.targetsSource) return false;
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
@@ -618,7 +618,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   // A mutating creature spell's target has the same owner as the spell (CR 702.140a).
   if (spec.ownerIs !== undefined && o.owner !== spec.ownerIs) return false;
   // "That saddled it this turn" needs the source: checked with it (lesserPowerOk).
-  const { saddledSource: _, ...rest } = spec;
+  const { saddledSource: _, crewedSource: _c, ...rest } = spec;
   return spec.kind === "object" && objectMatches(s, rest, o, controller, true, src);
 }
 
@@ -943,10 +943,10 @@ export function linkedCards(s: GameState, sourceId: ObjectId | undefined, zc?: n
  * "A creature that saddled it this turn" (CR 702.171c): tapped for the source's saddle cost this turn, as the object it
  * was then (CR 400.7); "it" the source as it is now or, after it left the battlefield, as it last was.
  */
-function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
+export function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | undefined, sourceZc?: number, log: "saddledBy" | "crewedBy" = "saddledBy"): boolean {
   const src = sourceId ? s.objects[sourceId] : undefined;
   const zc = sourceZc ?? (src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[sourceId!]?.zc);
-  const by = sourceId && zc !== undefined ? (s.turnLog?.saddledBy?.[`${sourceId}@${zc}`] ?? []) : [];
+  const by = sourceId && zc !== undefined ? (s.turnLog?.[log]?.[`${sourceId}@${zc}`] ?? []) : [];
   const o = s.objects[id];
   return !!o && by.includes(`${id}@${o.zoneChanges ?? 0}`);
 }
@@ -954,6 +954,8 @@ function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | undefine
 export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
   // Giant Beaver: "target creature that saddled it this turn".
   if (spec.saddledSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc)) return false;
+  // Getaway Car: "target creature that crewed it this turn".
+  if (spec.crewedSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc, "crewedBy")) return false;
   // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
   if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
   if (spec.blockedBySource && t.kind === "object") {
@@ -1145,6 +1147,10 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;
     return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => saddledSource(s, id, sourceId, sourceZc));
+  }
+  if (e.filter.crewedSource) {
+    const { crewedSource: _, ...filter } = e.filter;
+    return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => saddledSource(s, id, sourceId, sourceZc, "crewedBy"));
   }
   // Without an action: permanents to sacrifice (a sacrifice option or payment), which can't include one that "can't be sacrificed" (CR 701.21).
   const sacrificing = !e.action || e.action === "sacrifice";

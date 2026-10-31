@@ -625,10 +625,12 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   // Unsettled Mariner: "Whenever you or a permanent you control becomes the target of a spell or ability an opponent
   // controls, counter that spell or ability unless its controller pays {1}." Once for you and once for each permanent it
   // targets, however many times (rulings).
-  const mariner = /^Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays (\{\d+\})\.$/.exec(line);
+  // Amulet of Safekeeping: "Whenever you become the target of ...": you only.
+  const mariner = /^Whenever you (or a permanent you control becomes|become) the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays (\{\d+\})\.$/.exec(line);
   if (mariner) {
-    const unless = { cost: mariner[1]! };
-    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[1]}.` } };
+    const unless = { cost: mariner[2]! };
+    const onlyYou = mariner[1] === "become";
+    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
   }
   // Surrak, Elusive Hunter: "Whenever a creature you control or a creature spell you control becomes the target of a spell
   // or ability an opponent controls, draw a card": once for each of them it targets, a spell on the stack too.
@@ -948,6 +950,12 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
   // whoever's turn it is (counting losses before it was on the battlefield).
   // Erdwal Illuminator: "Whenever you investigate for the first time each turn, ...", counting investigations before it
   // was on the battlefield.
+  // Whispering Snitch: "Whenever you surveil for the first time each turn, ...", the same.
+  const firstSurveil = /^Whenever you surveil for the first time each turn, (.+)$/.exec(line);
+  if (firstSurveil) {
+    const body = parseBody(firstSurveil[1]!);
+    return body ? { event: "youSurveil", firstEachTurn: true, body } : "fail";
+  }
   const firstInvestigate = /^Whenever you investigate for the first time each turn, (.+)$/.exec(line);
   if (firstInvestigate) {
     const body = parseBody(firstInvestigate[1]!);
@@ -2046,6 +2054,16 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(outlast[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", ownOutlast: true }, body } : "fail";
   }
+  // Way of the Paradox: "Whenever you activate a loyalty ability, ..."; Keral Keep Disciples: "... of a Chandra
+  // planeswalker"; Way of the Mind Sculptor: "..., if you removed two or more loyalty counters to activate it, ..." (CR
+  // 606.3-4). The event player is you.
+  const loyal = /^Whenever you activate a loyalty ability(?: of an? ([A-Z][a-z]+) planeswalker)?, (?:if you removed (two|three|four|five) or more loyalty counters to activate it, )?(.+)$/.exec(line);
+  if (loyal) {
+    const of = loyal[1] ? parseTargetPhrase(`${loyal[1]} planeswalker`) : undefined;
+    const body = parseBody(loyal[3]!, { activatedAbility: true });
+    if (!body || (loyal[1] && (of?.kind !== "object" || !of.subtypes?.includes(loyal[1])))) return "fail";
+    return { event: "abilityActivated", activates: { by: "you", loyalty: true, ...(of ? { of } : {}), ...(loyal[2] ? { loyaltyRemoved: num(loyal[2]) } : {}) }, body };
+  }
   // Neerdiv, Devious Diver (as compile.ts splits it): "Whenever you activate an ability of a card in your graveyard":
   // mana abilities too, as nothing says otherwise.
   const yard = /^Whenever you activate an ability of a card in your graveyard, (.+)$/.exec(line);
@@ -2448,12 +2466,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // the event, checked as it attacks only (rulings), not an intervening if.
   // Pugnacious Hammerskull: "while you don't control another Dinosaur", the same (rulings).
   // Burning Sun Cavalry: "Whenever ~ attacks or blocks while you control a Dinosaur", the same for both events.
+  // The Chief Warg: "Ferocious — Whenever you attack while you control a creature with power 4 or greater, ...": the same,
+  // for "whenever you attack".
   // Hand That Feeds (delirium): "Whenever ~ attacks while there are four or more card types among cards in your
   // graveyard", the same.
-  const attacksWhile = /^Whenever ~ (attacks|attacks or blocks) while (you (?:don't )?control .+?|there are (?:four|five|six) or more card types among cards in your graveyard), (.+)$/.exec(line);
+  const attacksWhile = /^Whenever (~ attacks|~ attacks or blocks|you attack) while (you (?:don't )?control .+?|there are (?:four|five|six) or more card types among cards in your graveyard), (.+)$/.exec(line);
   if (attacksWhile) {
     const cond = parseActivateCondition(attacksWhile[2]!);
-    const t = cond && parseTrigger(`Whenever ~ ${attacksWhile[1]}, ${attacksWhile[3]}`);
+    const t = cond && parseTrigger(`Whenever ${attacksWhile[1]}, ${attacksWhile[3]}`);
     return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
   // Bristlebane Battler, Moonshadow: "Whenever ... while this creature has a -1/-1 counter on it, ...": a condition on the
@@ -3811,6 +3831,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      // Brood of Cockroaches: "When ~ is put into your graveyard from the battlefield, at the beginning of the next end step,
+      // you lose 1 life and return ~ to your hand": one delayed trigger doing both (rulings), about the card in the
+      // graveyard now; if it has left there by then, it stays where it went (CR 400.7).
+      const brood = event === "selfToGraveyard" && /^When ~ is put into your graveyard/.test(line) ? /^at the beginning of the next end step, you lose (\d+) life and return ~ to your hand\.$/.exec(text) : null;
+      if (brood) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "loseLife", who: { ref: "you" }, n: Number(brood[1]) }, { type: "bounce", what: { ref: "subjectCard" } }], text: `you lose ${brood[1]} life and return ~ to your hand` }], text };
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
         const [tg, ...more] = body.targets;

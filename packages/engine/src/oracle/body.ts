@@ -336,6 +336,8 @@ const checkableMay = (e: Effect): boolean =>
   // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
   // exiling or discarding your hand, Herigast).
   (e.type === "exileFaceDown" && e.from === "hand") ||
+  // Gallia of the Endless Dance: "you may discard a card at random. If you do, ...": done with any card in hand.
+  (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.filter) ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   // "You may discard two cards. If you do, draw three cards." (Thrilling Discovery): only with that many cards in hand.
   (e.type === "discard" && e.who.ref === "you" && typeof e.n === "number" && e.n > 1 && !e.random && !e.filter && !e.upTo) ||
@@ -1355,6 +1357,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // battlefield tapped under your control": choosing the target is targeting it (CR 115.1), so the same as Adarkar
   // Valkyrie's "When target creature ... dies this turn, return that card ..." (sentences/permanents.ts).
   text = text.replace(/^Choose (another target artifact creature you control)\. When that creature dies this turn, return it to the battlefield tapped under your control\.$/, "When $1 dies this turn, return that card to the battlefield tapped under your control.");
+  // Mukotai Soulripper: "you may sacrifice another artifact or creature. If you do, put a +1/+1 counter on ~ and it gains
+  // menace until end of turn": "it" is ~, the object named just before, not the sacrificed one.
+  text = text.replace(/(\. If you do, put an? [^.]+ counters? on ~) and it gains ([a-z]+) until end of turn\./, "$1 and ~ gains $2 until end of turn.");
   // First Day of Class: "put a +1/+1 counter on it and it gains haste until end of turn": the same, about "it".
   text = text.replace(/^(put a \+1\/\+1 counter on it) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
   text = text.replace(/^[Mm]ill (two|three|four|five) cards, then you may put (an? [a-z]+(?: or [a-z]+)? card) from among the milled cards on top of your library\./, "Mill $1 cards. You may put $2 from among the milled cards on top of your library.");
@@ -1573,6 +1578,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
+  // Goblin Razerunners: "you may have ~ deal damage equal to the number of +1/+1 counters on it to target player or
+  // planeswalker": "it" is ~, the only object named.
+  text = text.replace(/^(you may have ~ deal damage equal to the number of [+-]\d\/[+-]\d counters on) it (to [^.]+)\.$/, "$1 ~ $2.");
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
@@ -1700,6 +1708,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nissa's Pilgrimage: "..., reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then
   // shuffle." is Cultivate's search.
   text = text.replace(/^(Search your library for up to \w+ [^.]+? cards, reveal those cards), and (put one [^.]+? and the rest into your hand)\. Then shuffle\./, "$1, $2, then shuffle.");
+  // Peregrination: "..., reveal those cards, and put one onto the battlefield tapped and the other into your hand. Shuffle,
+  // then scry 1." The same search, then the scry.
+  text = text.replace(/^(Search your library for up to two basic land cards, reveal those cards), and (put one onto the battlefield tapped and the other into your hand)\. Shuffle, then (scry \d+)\./, (_, a: string, b: string, c: string) => `${a}, ${b}, then shuffle. ${capital(c)}.`);
   // Jarad's Orders: "Search your library for up to two creature cards and reveal them. Put one into your hand and the
   // other into your graveyard. Then shuffle." Viewpoint Synchronization: "... up to three basic land cards and reveal
   // them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle." One search each.
@@ -10771,7 +10782,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // The Destined Black Mage: "~ deals 1 damage to each opponent. If you have a full party, it deals 3 damage to each
       // opponent instead": the same players.
       // Shower of Coals: "~ deals 4 damage to each of those permanents and/or players instead": the same up to three targets.
-      const moreDamage = /^(?:it|~) deals (\d+) damage(?: to (that creature|that player|that permanent or player|it|each opponent|each of those permanents and\/or players))?$/i.exec(t);
+      // Crater's Claws: "~ deals X plus 2 damage instead if ...": X paid as it was cast, plus 2.
+      const moreDamage = /^(?:it|~) deals (\d+|X plus \d+) damage(?: to (that creature|that player|that permanent or player|it|each opponent|each of those permanents and\/or players))?$/i.exec(t);
+      if (moreDamage && /^X/.test(moreDamage[1]!) && !ctx.spell) return null;
       const prevDamage0 = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
       const several = (to: Extract<Effect, { type: "damage" }>["to"]) => to.ref === "anyTarget" && "n" in to && (to.n ?? 1) > 1;
       const prevDamage = prevDamage0 && (moreDamage?.[2] === "each opponent") === (prevDamage0.to.ref === "eachOpponent") && (moreDamage?.[2] === "each of those permanents and/or players") === several(prevDamage0.to) ? prevDamage0 : null;
@@ -10783,7 +10796,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const b = a && parseOne(andDeals![2]!, ctx);
         return a && b ? [...a, ...b] : null;
       };
-      const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: num(moreDamage[1]!), ...(unpreventable ? { unpreventable: true as const } : {}) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : andDeals ? both() : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: /^X plus/.test(moreDamage[1]!) ? { count: { kind: "x" as const }, plus: Number(moreDamage[1]!.slice(7)) } : num(moreDamage[1]!), ...(unpreventable ? { unpreventable: true as const } : {}) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : andDeals ? both() : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
@@ -10808,7 +10821,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Furnace Punisher: "unless they control two or more basic lands": the trigger's player.
     const theyControl = unlessState && ctx.eventPlayer ? /^(?:they control|that player controls) (.+)$/.exec(unlessState[2]!) : null;
     const theirCond = theyControl ? parseStaticCondition(`you control ${theyControl[1]}`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
-    const unlessCond = theirCond ? (theirCond.kind === "control" && theirCond.who === "you" && !theirCond.other ? { ...theirCond, who: "eventPlayer" as const } : null) : unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Crimson Honor Guard: "unless they control a commander".
+    const unlessCond = theirCond ? (theirCond.kind === "control" && theirCond.who === "you" && !theirCond.other ? { ...theirCond, who: "eventPlayer" as const } : theirCond.kind === "controlCommander" && !theirCond.own ? { ...theirCond, eventPlayer: true as const } : null) : unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (unlessState && unlessCond) {
       const inner = parseOne(unlessState[1]!, ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;

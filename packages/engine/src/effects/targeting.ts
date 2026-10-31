@@ -910,6 +910,11 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (ofPlayer?.kind === "player" && ofPlayer.id !== o.owner) return false;
   const byPlayer = spec.controlledByTarget === undefined ? undefined : chosen[spec.controlledByTarget];
   if (byPlayer?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) !== byPlayer.id)) return false;
+  // Searing Blaze: the earlier target a planeswalker, its controller's (as it last existed, if it has left: rulings, the
+  // creature is still dealt its damage).
+  const byWalker = byPlayer?.kind === "object" ? s.objects[byPlayer.id] : undefined;
+  const walkerController = byWalker && (byWalker.zone === "battlefield" ? controllerOf(s, byWalker) : (s.lastKnown?.[byWalker.id]?.controller ?? byWalker.owner));
+  if (byWalker && (o.zone !== "battlefield" || controllerOf(s, o) !== walkerController)) return false;
   // Another target's controller: on the battlefield its controller now, otherwise as it last existed there (rulings on
   // Run Away Together).
   const ctl = (x: GameObject) => (x.zone === "battlefield" ? controllerOf(s, x) : (s.lastKnown?.[x.id]?.controller ?? x.owner));

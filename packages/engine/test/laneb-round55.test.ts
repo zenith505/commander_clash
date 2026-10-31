@@ -100,6 +100,8 @@ const ironMan = () => card("Iron Man, Futurist Paragon", "Legendary Artifact Cre
 const tezzeretAgentOfBolas = () => card("Tezzeret, Agent of Bolas", "Legendary Planeswalker — Tezzeret", "{2}{U}{B}", { cmc: 4, colors: ["B", "U"], loyalty: "3", oracleText: "+1: Look at the top five cards of your library. You may reveal an artifact card from among them and put it into your hand. Put the rest on the bottom of your library in any order.\n−1: Target artifact becomes an artifact creature with base power and toughness 5/5.\n−4: Target player loses X life and you gain X life, where X is twice the number of artifacts you control." });
 const tezzeretTheSchemer = () => card("Tezzeret the Schemer", "Legendary Planeswalker — Tezzeret", "{2}{U}{B}", { cmc: 4, colors: ["B", "U"], loyalty: "5", oracleText: "+1: Create a colorless artifact token named Etherium Cell with \"{T}, Sacrifice this token: Add one mana of any color.\"\n−2: Target creature gets +X/-X until end of turn, where X is the number of artifacts you control.\n−7: You get an emblem with \"At the beginning of combat on your turn, target artifact you control becomes an artifact creature with base power and toughness 5/5.\"" });
 
+const searingBlaze = () => card("Searing Blaze", "Instant", "{R}{R}", { cmc: 2, colors: ["R"], keywords: ["Landfall"], oracleText: "Searing Blaze deals 1 damage to target player or planeswalker and 1 damage to target creature that player or that planeswalker's controller controls.\nLandfall — If you had a land enter the battlefield under your control this turn, Searing Blaze deals 3 damage to that player or planeswalker and 3 damage to that creature instead." });
+
 // Test cards.
 const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
 const bearC = (name = "Plain Bear", p = 2, t = 2) => vanilla(name, "Creature — Bear", "{1}{G}", 2, p, t, { colors: ["G"] });
@@ -121,11 +123,12 @@ const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | 
 };
 const kw = (s: GameState, id: string, k: string) => objHasKeyword(s, s.objects[id]!, k);
 const abilityIndex = (s: GameState, id: ObjectId, re: RegExp) => abilitiesOf(s, s.objects[id]!).activated.findIndex((a) => re.test(a.text));
+const destroyPw = () => card("Test Pw Murder", "Instant", "{1}{B}", { cmc: 2, colors: ["B"], oracleText: "Destroy target planeswalker." });
 const types = (s: GameState, id: string) => characteristics(s, s.objects[id]!).types;
 
 describe("Lane B round 55", () => {
   it("are fully supported", () => {
-    supported(steamcoreScholar(), thoughtpickerWitch(), greenbeltRampager(), soulsOfTheFaultless(), gravestorm(), sigilOfMyrkul(), sporeCloud(), caseOfTheGatewayExpress(), cyberneticaDatasmith(), arcSpitter(), devouringTendrils(), leaveChance(), nahiriStormOfStone(), ironMan(), tezzeretTheSchemer(), tezzeretAgentOfBolas());
+    supported(steamcoreScholar(), thoughtpickerWitch(), greenbeltRampager(), soulsOfTheFaultless(), gravestorm(), sigilOfMyrkul(), sporeCloud(), caseOfTheGatewayExpress(), cyberneticaDatasmith(), arcSpitter(), devouringTendrils(), leaveChance(), nahiriStormOfStone(), ironMan(), tezzeretTheSchemer(), tezzeretAgentOfBolas(), searingBlaze());
   });
 
   it("Steamcore Scholar: discard an instant, a sorcery or a creature card with flying, or else two cards", () => {
@@ -438,6 +441,39 @@ describe("Lane B round 55", () => {
     s = settle(s);
     expect(types(s, t)).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
     expect(pt(s, t)).toBe("5/5");
+  });
+
+  it("Searing Blaze: 1 damage to a player and to a creature that player controls; 3 each with landfall", () => {
+    for (const landfall of [false, true]) {
+      const { s: s0, ap, opp, ids } = setup([searingBlaze(), card("Test Wastes", "Land", "", { oracleText: "{T}: Add {C}." })]);
+      const victim = putOnBattlefield(s0, opp, bearC("Victim", 4, 4));
+      const [o2] = s0.turnOrder.filter((p) => p !== ap && p !== opp);
+      const elsewhere = putOnBattlefield(s0, o2!, bearC("Elsewhere", 4, 4));
+      let s = s0;
+      if (landfall) s = act(s, { type: "playLand", player: ap, objectId: ids[1]! });
+      poolOnly(s, ap, { R: 2 });
+      // The creature must be that player's.
+      expect(planCast(s, ap, ids[0]!, [ply(opp), tgt(elsewhere)])).toBeNull();
+      s = settle(castNow(s, ap, ids[0]!, [ply(opp), tgt(victim)]));
+      expect(life(s, opp), `landfall ${landfall}`).toBe(landfall ? 37 : 39);
+      expect(s.objects[victim]!.damage).toBe(landfall ? 3 : 1);
+    }
+  });
+
+  it("Searing Blaze: a planeswalker and a creature its controller controls; the creature is still hit if the planeswalker is gone", () => {
+    const { s: s0, ap, opp, ids } = setup([searingBlaze(), destroyPw()]);
+    onlyHand(s0, ap, ids);
+    const w = putOnBattlefield(s0, opp, walker());
+    s0.objects[w]!.counters.loyalty = 3;
+    const victim = putOnBattlefield(s0, opp, bearC("Victim", 4, 4));
+    const mine = putOnBattlefield(s0, ap, bearC("Mine", 4, 4));
+    poolOnly(s0, ap, { R: 2, B: 1, C: 1 });
+    expect(planCast(s0, ap, ids[0]!, [tgt(w), tgt(mine)])).toBeNull();
+    let s = castNow(s0, ap, ids[0]!, [tgt(w), tgt(victim)]);
+    // In response, the planeswalker is destroyed.
+    s = settle(castNow(s, ap, ids[1]!, [tgt(w)]));
+    expect(zone(s, w)).toBe("graveyard");
+    expect(s.objects[victim]!.damage).toBe(1);
   });
 
   it("Tezzeret, Agent of Bolas: −1 makes an artifact a 5/5 artifact creature for good; an Equipment comes off (rulings)", () => {

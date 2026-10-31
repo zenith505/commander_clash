@@ -35,6 +35,11 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const who = parsePlayer(orPw[1]!, ctx);
     return who && (who.ref === "chosenPlayer" || who.ref === "eventPlayer" || who.ref === "enchantedPlayer") ? { ref: "playerOrPlaneswalker", who } : null;
   }
+  // Searing Blaze's "that player or planeswalker": the earlier "target player or planeswalker".
+  if (/^that player or planeswalker$/i.test(p)) {
+    const i = ctx.targets.findIndex((t) => t.kind === "any" && t.types?.length === 1 && t.types[0] === "Planeswalker" && /^target (?:player|opponent) or planeswalker$/.test(t.text));
+    return i >= 0 && ctx.targets.filter((t) => t.kind === "any").length === 1 ? { ref: "anyTarget", index: i } : null;
+  }
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // Needle Drop: "any target that was dealt damage this turn" (a player, creature, planeswalker or battle, CR 115.4).
   if (/^any target that was dealt damage this turn$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", dealtDamageThisTurn: true, text: p.toLowerCase() }) };
@@ -661,6 +666,16 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonland permanent" };
     const amount: AmountExpr = { count: { kind: "greatestManaValue", filter, least: true } };
     return { ref: "target", index: addTarget(ctx, { ...filter, bound: { key: "manaValue", at: "most", amount }, text: `target ${m[1]!}` }) };
+  }
+  // Searing Blaze: "target creature that player or that planeswalker's controller controls": controlled by the player the
+  // earlier "target player or planeswalker" is, or by that planeswalker's controller (TargetSpec.controlledByTarget).
+  const byAny = !cards && / that player or that planeswalker's controller controls$/i.exec(m[1]!);
+  if (byAny) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    const spec = parseTargetPhrase(m[1]!.slice(0, byAny.index), { target: true });
+    if (t?.kind !== "any" || !t.types?.includes("Planeswalker") || t.types.length !== 1 || spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound) return null;
+    return { ref: "target", index: addTarget(ctx, { ...spec, controlledByTarget: i, text: `target ${m[1]!}` }) };
   }
   // Keeper of the Dead, The Fall of Kroog: "Choose target opponent. Destroy target land that player controls.": controlled
   // by the player an earlier target chose, as it's chosen and as it resolves (CR 608.2b; TargetSpec.controlledByTarget).

@@ -771,7 +771,7 @@ export interface TargetSpec {
   inGraveyardOfControllerOf?: number[];
   /** "Target player shuffles up to three target cards from their graveyard" (Memory's Journey): owned by this player target. */
   inGraveyardOfTarget?: number;
-  /** "Choose target opponent ... Destroy target nonblack creature that player controls" (Keeper of the Dead): controlled by this player target. */
+  /** "Choose target opponent ... Destroy target nonblack creature that player controls" (Keeper of the Dead): controlled by this player target. A planeswalker target ("target player or planeswalker", Searing Blaze): by its controller. */
   controlledByTarget?: number;
   /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
   differentControllerFrom?: number[];

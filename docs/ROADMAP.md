@@ -1,7 +1,7 @@
 # Roadmap
 
-28,489 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
+28,513 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,179 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1237,6 +1237,31 @@ line blocks.
    Temptation (an attack requirement on opponents); Hedron Matrix (a per-object amount in a static); Voracious Dragon
    (types of the devoured creatures); Jurin, Leading the Charge; Incite Rebellion; Ajani Unrelenting. Sosuke, Dragon's
    Prey, Dire Downdraft and Nullmage Advocate were left to Lane B, whose templates cover them.
+   Round 223 (fresh cards from rank 15,000 on): "You may reveal this card from your opening hand. If you do, at the
+   beginning of the first upkeep / your first upkeep / your first main phase of the game, ..." as a delayed trigger
+   (CR 103.6b, 603.7; a new opening-hand reveal prompt after the Leyline one; each card revealed triggers on its own;
+   the bot reveals all but a Providence that would lower its life): the Chancellors of the Dross, Forge, Spires and
+   Tangle, Sphinx of Foresight, Providence, Devourer of Destiny ("Exile the rest"); "begin the game with ~ on the
+   battlefield" (Quicksilver, Brash Blur); "Then if that creature has power 4 or greater, it gains" (Strider, Ranger
+   of the North); "deals 2 damage to target player and gains indestructible" (Ellie, Vengeful Hunter); "is dealt
+   damage for the first time each turn" (Hercules, Olympian Hero); "a creature other than ~ is exiled from the
+   battlefield" (Captain Marvel, Shooting Star); "whenever you attack with one or more Gods and whenever a God dies"
+   (Kratos, Stoic Father); "X can't be greater than the amount of life you gained this turn" (Shanna, Purifying
+   Blade); "choose a color, then create ... for each permanent of that color" (Rith, the Awakener); "planeswalker
+   types among planeswalkers you control" (Tam, the Possibility); "up to two target creatures and up to two target
+   lands" (Nissa, Genesis Mage); "a Warrior you control deals combat damage to a creature" (Sosuke, Son of Seshiro);
+   "assign his combat damage as though he weren't blocked" (Wolverine, Claws Out); "as long as an opponent has cast a
+   spell this turn" (Captain Mar-Vell, Space-Born, CR 102.3); "Remove ten oil counters from among permanents you
+   control and sacrifice ~" (The Filigree Sylex); "X can't be 0" in every mode (Marath, Will of the Wild); "Whenever ~
+   enters or another nontoken Human you control dies" (Jerren, Corrupted Bishop); "Whenever one or more players
+   sacrifice one or more creatures ... only once each turn" (Evin, Waterdeep Opportunist). +24 (28,513 of 31,936).
+   Out after round 223 (looked at, not done): Contested War Zone ("that creature's controller gains control of ~" after
+   a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (remove one
+   or more +1/+1 counters as a variable cost); Chancellor of the Annex (the first spell each opponent casts); Kaima,
+   the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind
+   (replacing the next draw this turn); Become the Pilot (can't be blocked unless attacking its owner); Nemesis Phoenix
+   (returned tapped and attacking from the graveyard); Battletide Alchemist ("you may prevent X of that damage" for any
+   player).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

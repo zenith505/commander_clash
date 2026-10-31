@@ -1046,6 +1046,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+?) and that's tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
   // Echoing Assault: "... The token enters tapped and attacking that player." after "Whenever you attack a player".
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
+  // Moira, Urborg Haunt: "return to the battlefield target creature card in your graveyard that was put there from the
+  // battlefield this turn": the same as "return target ... to the battlefield", in the usual word order.
+  text = text.replace(/^([Rr]eturn) to the battlefield (target [a-z ]+? card in your graveyard(?: that was put there from the battlefield this turn)?)\.$/, "$1 $2 to the battlefield.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
   text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Captain N'ghathrod: "choose target artifact or creature card in an opponent's graveyard that was put there from their
@@ -7977,7 +7980,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // much is the X paid, and "it" the source.
         const paidText = payFirst.payX?.color ? whenPaid[1]!.replace(/^it deals that much damage\b/, "~ deals X damage") : whenPaid[1]!;
         if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
-        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx);
+        // Numa, Joraga Chieftain: "distribute X +1/+1 counters among any number of target Elves": the X paid, divided as
+        // the reflexive ability is put on the stack (CR 603.12, 601.2d).
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && /^distribute X /.test(paidText));
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -8146,7 +8151,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
     // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
-    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
+    // Numa, Joraga Chieftain: "you may pay {X}{X}": the X paid twice (CR 107.3).
+    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{X\})?(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
     if (mayPayX) {
       // "The amount of life you gained": what the "whenever you gain life" event gave (CR 119.9).
       const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;

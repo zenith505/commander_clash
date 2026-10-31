@@ -1419,6 +1419,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Players who can't become the monarch this turn (Jared Carthalion, True Heir). */
+  cantBecomeMonarch?: PlayerId[];
   /**
    * Blocks declared this turn (CR 509.1), banding's included (CR 702.22h): each blocker and the attacker it blocked as
    * `id@zoneChanges` (Venomous Breath's "creatures that blocked or were blocked by it this turn").
@@ -2156,6 +2158,8 @@ export interface Resolving {
   excessToCreatures?: number;
   /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
   tappedThisWay?: number;
+  /** How many creatures its goad affected ("for each creature goaded this way", Kaima). */
+  goadedThisWay?: number;
   /** Cards a putFromHand with `manifest` put onto the battlefield face down: "for each card manifested this way". */
   manifestedThisWay?: number;
   /** Join forces: the total amount of mana all players paid ("where X is the total amount of mana paid this way"). */

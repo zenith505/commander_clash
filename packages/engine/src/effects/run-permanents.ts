@@ -1297,6 +1297,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).
       const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId));
       if (s.resolving) s.resolving.affected = affected.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
+      if (s.resolving && e.mods.some((m) => m.kind === "goad")) s.resolving.goadedThisWay = affected.length;
       if (!affected.length) return;
       const mods = fixMods(s, e.mods, ctx);
       // "For as long as ~ remains tapped" (CR 611.2b): if that's already over, the effect does nothing. An activated

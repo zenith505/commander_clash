@@ -988,6 +988,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // Archon of the Wild Rose: "other creatures you control that are enchanted by Auras you control": yours, with an Aura of
   // yours on it.
   p = p.replace(/^((?:all |each )?(?:other )?)(creatures) (you control) that are enchanted by Auras you control$/i, "$1aura-yours-enchanted $2 $3");
+  // Kaima, the Fractured Calm: "each creature your opponents control that's enchanted by an Aura you control".
+  p = p.replace(/^((?:all |each )?)(creatures?) (your opponents control) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2 $3");
   // "Each permanent you control that's a creature or Vehicle" (Ao, the Dawn Sky): each creature or Vehicle you control.
   p = p.replace(/^((?:all |each )?)permanents? you control that(?:'s| is| are|'re) (?:an? )?creatures? or (?:an? )?Vehicles?$/i, "$1creature or Vehicle you control");
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.

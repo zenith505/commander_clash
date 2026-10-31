@@ -541,6 +541,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
+    case "cantBecomeMonarch":
+      for (const pid of players(s, e.who, ctx)) {
+        const no = ((s.turnLog ??= {}).cantBecomeMonarch ??= []);
+        if (!no.includes(pid)) no.push(pid);
+        log(s, `${player(s, pid).name} can't become the monarch this turn.`);
+      }
+      return;
     case "becomeDayNight":
       setDayNight(s, e.v === "switch" ? (s.dayNight === "night" ? "day" : "night") : e.v);
       return;
@@ -895,6 +902,11 @@ export function monarchTrigger(s: GameState, index: number, subject?: GameObject
 export function becomeMonarch(s: GameState, pid: PlayerId) {
   const p = player(s, pid);
   if (p.lost || s.monarch === pid) return;
+  // Jared Carthalion: a player who can't become the monarch this turn doesn't, and the monarch stays the monarch (rulings).
+  if (s.turnLog?.cantBecomeMonarch?.includes(pid)) {
+    log(s, `${p.name} can't become the monarch this turn.`);
+    return;
+  }
   s.cards[MONARCH.oracleId] ??= MONARCH;
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"

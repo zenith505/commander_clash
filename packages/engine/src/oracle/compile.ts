@@ -2955,6 +2955,19 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveKeywords ??= []).push({ filter: f, keyword: giveKw[2] === "lifelink" ? "Lifelink" : "Deathtouch" });
       continue;
     }
+    // Lo and Li, Twin Tutors: "Noble creatures you control and Lesson spells you control have lifelink": both, the
+    // creatures as a static ability (CR 604.2), the spells as Soulfire Grand Master's above.
+    const bothKw = /^([A-Z][a-z]+ creatures you control) and ([A-Z][a-z]+) spells you control have (lifelink|deathtouch)\.$/.exec(line);
+    if (bothKw) {
+      const st = parseStatic(`${bothKw[1]} have ${bothKw[3]}.`);
+      const f = parseTargetPhrase(`${bothKw[2]!.toLowerCase()} spell`);
+      if (!st || f?.kind !== "spell") out.unsupported.push(raw);
+      else {
+        out.statics.push({ ...st, text: line });
+        (out.spellsHaveKeywords ??= []).push({ filter: f, keyword: bothKw[3] === "lifelink" ? "Lifelink" : "Deathtouch" });
+      }
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;

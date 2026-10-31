@@ -169,6 +169,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the number of cards drawn this way$/i.test(p)) return { count: { kind: "drawnThisWay" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
+  if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
   if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };

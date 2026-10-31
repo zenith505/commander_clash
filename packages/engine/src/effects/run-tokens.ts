@@ -12,6 +12,7 @@ import { controllerOf, invalidateCharacteristics } from "../layers";
 import { objectMatches } from "./targeting";
 import { defMv } from "../faces";
 import { compileCard } from "../oracle";
+import { manaValue, parseManaCost } from "../mana";
 
 /**
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
@@ -495,10 +496,10 @@ function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }
 
 export function tokenDef(t: TokenSpec): CardDef {
   return {
-    oracleId: `token:${t.named ? "named:" : ""}${t.legendary ? "legendary:" : ""}${t.snow ? "snow:" : ""}${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
+    oracleId: `token:${t.manaCost ? `cost${t.manaCost}:` : ""}${t.named ? "named:" : ""}${t.legendary ? "legendary:" : ""}${t.snow ? "snow:" : ""}${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
     name: t.named ? t.name : `${t.name} Token`,
-    manaCost: "",
-    cmc: 0,
+    manaCost: t.manaCost ?? "",
+    cmc: t.manaCost ? manaValue(parseManaCost(t.manaCost)) : 0,
     typeLine: `${t.legendary ? "Legendary " : ""}${t.snow ? "Snow " : ""}Token ${t.types.join(" ")}${t.subtypes.length ? ` — ${t.subtypes.join(" ")}` : ""}`,
     supertypes: [...(t.legendary ? ["Legendary"] : []), ...(t.snow ? ["Snow"] : []), "Token"],
     types: t.types,

@@ -1889,6 +1889,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}), ...(first ? { first: true as const } : {}) };
     yourTurn = !!m[3] && !first;
     rest = m[4]!;
+  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into graveyards from anywhere, (.+)$/.exec(line))) {
+    // Dennick, Pious Apparition: anyone's cards (not tokens, CR 111.1), into their owners' graveyards, once for each event.
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "toGraveyard", ...(filter ? { filter } : {}) };
+    rest = m[2]!;
   } else if ((m = /^Whenever (a player|an opponent) mills one or more (?:(.+?) )?cards, (.+)$/.exec(line))) {
     // Zellix, Sanity Flayer: cards a mill instruction put there (CR 701.17a), once for each player who milled them. "An
     // opponent" (Lo and Li): cards from an opponent's library.
@@ -2642,10 +2648,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (once) {
     // "Whenever a counter is put on a creature you control, ..." (Hollowmurk Siege): once for each counter, but only the
     // first of them each turn does anything, so it's the same as "one or more counters".
-    // Mikey & Leo, Chaos & Order: "Whenever you put a counter on a creature you control, ...": the same.
+    // Mikey & Leo, Chaos & Order: "Whenever you put a counter on a creature you control, ...": the same. Ant-Man, Colony
+    // Commander: "Whenever you put a +1/+1 counter on a creature" (any creature, of that kind): the same.
     // Cloaked Cadet: "Whenever one or more +1/+1 counters are put on one or more Humans you control": once for each Human
     // they're put on, only the first each turn doing anything (rulings: one card however many).
-    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a counter on (a creature you control|another creature you control), /, "Whenever you put one or more counters on $1, "));
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|a creature), /, "Whenever you put one or more $1counters on $2, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only
@@ -3419,6 +3426,20 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${monarchAttacked[1]} attacks, ${monarchAttacked[2]!.replace(/\bthat player\b/g, "defending player")}`);
     if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.attacksPlayer || t.ifCond) return "fail";
     return { ...t, attacksMonarch: true };
+  }
+  // Namor, Atlantean King: "Whenever ~ attacks a player who has more life than you, other creatures you control attacking
+  // that player get +2/+0 until end of turn": a player (not a planeswalker) with more life than its controller as it
+  // attacks (part of the event, not an intervening "if", CR 603.4); the creatures attacking that player as it resolves.
+  const moreLife = /^Whenever ~ attacks a player who has more life than you, (.+)$/.exec(line);
+  if (moreLife) {
+    const rest = moreLife[1]!.replace(/\bother creatures you control attacking that player\b/, "other attacking creatures you control");
+    const t = parseTrigger(`Whenever ~ attacks a player, ${rest}`);
+    if (!t || t === "fail" || t.event !== "selfAttacks" || !t.attacksPlayer || t.activeIf || t.ifCond || t.attacksMostLife) return "fail";
+    if (/\bthat player\b/.test(rest)) return "fail";
+    if (rest === moreLife[1]) return { ...t, attacksMoreLife: true };
+    const [e, ...more] = t.body.effects;
+    if (more.length || e?.type !== "continuous" || e.what.ref !== "each" || e.what.filter.combat !== "attacking") return "fail";
+    return { ...t, attacksMoreLife: true, body: { ...t.body, effects: [{ ...e, what: { ...e.what, filter: { ...e.what.filter, attackingWhom: "eventPlayer", text: "other creatures you control attacking that player" } } }], text: moreLife[1]! } };
   }
   const mostLife = /^Whenever (~|equipped creature) attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
   if (mostLife && (mostLife[1] === "~" || mostLife[2]!.startsWith("the player"))) {

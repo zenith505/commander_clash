@@ -549,7 +549,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.sacrificedKin && !sacked) return [];
     // Golden Argosy: "each creature that crewed it this turn" (CR 702.122d), the source as the object it was.
     const { crewedSource, ...filter2 } = filter1;
-    const filter = ref.sacrificedKin === "manaValue" ? { ...filter2, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter2;
+    const filter3 = ref.sacrificedKin === "manaValue" ? { ...filter2, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter2;
+    // Namor, Atlantean King: "other creatures you control attacking that player": the trigger's player.
+    const filter = filter3.attackingWhom === "eventPlayer" && ctx.event?.player !== undefined ? { ...filter3, attackingWhom: ctx.event.player } : filter3;
     const sackedTypes = ref.sacrificedKin === "creatureType" ? (sacked!.allCreatureTypes ? ("all" as const) : new Set((sacked!.subtypes ?? []).filter((x) => CREATURE_TYPES.has(x)))) : undefined;
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
@@ -993,6 +995,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "doublePlayerCounters":
     case "emblem":
     case "becomeMonarch":
+    case "cantBecomeMonarch":
     case "becomeDayNight":
     case "extraLandThisTurn":
     case "ringTempts":

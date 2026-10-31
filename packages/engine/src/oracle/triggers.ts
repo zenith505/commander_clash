@@ -1184,7 +1184,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Return to your hand target artifact card in your graveyard with lesser mana value" (Scrap Trawler, Orah, Havi): less
   // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
   // Colfenor, the Last Yew: "with lesser toughness": the same, as the creature last existed on the battlefield (rulings).
-  const lesserKey = attached ? undefined : / with lesser (mana value|toughness)\b/.exec(bodyText)?.[1];
+  // (Death's Oasis's "with lesser mana value than the creature that died" isn't a target: body.ts.)
+  const lesserKey = attached ? undefined : / with lesser (mana value|toughness)\b(?! than)/.exec(bodyText)?.[1];
   const lesser = lesserKey !== undefined;
   if (lesser) bodyText = bodyText.replace(/ with lesser (?:mana value|toughness)\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
   // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR

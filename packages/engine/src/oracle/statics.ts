@@ -2548,6 +2548,16 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (!CREATURE_TYPES.has(type)) return null;
     return { affects: areAlsoAffects, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
   }
+  // Mephidross Vampire: "Each creature you control is a Vampire in addition to its other creature types and has
+  // "Whenever this creature deals damage to a creature, put a +1/+1 counter on this creature."": layers 4 and 6, for
+  // the same creatures (CR 613.6), this one too.
+  const eachIsAndHas = /^Each creature you control is an? ([A-Z][a-z]+) in addition to its other creature types and has (.+)$/.exec(text);
+  if (eachIsAndHas) {
+    const affects = parseAffected("Creatures you control");
+    const more = parseStaticMods(`has ${eachIsAndHas[2]!}`);
+    if (affects?.kind !== "filter" || !more?.length || !CREATURE_TYPES.has(eachIsAndHas[1]!)) return null;
+    return { affects, mods: [{ kind: "addTypes", types: [], subtypes: [eachIsAndHas[1]!] }, ...more], text: line };
+  }
   // Don Andres, the Renegade: "Each creature you control but don't own gets +2/+2, has menace and deathtouch, and is a
   // Pirate in addition to its other types": layers 4, 6 and 7c, all for the creatures it controls then (layer 2 first).
   const notOwnedMore = /^Each creature you control but don't own (gets [+-]\d+\/[+-]\d+), has ([a-z ]+?),? and is an? ([A-Z][a-z]+) in addition to its other types$/.exec(text);

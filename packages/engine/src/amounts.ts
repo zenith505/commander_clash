@@ -353,6 +353,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
+    case "returnedToughness":
+      return s.resolving?.returnedToughness ?? 0;
     case "cardsExiledThisWay":
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
@@ -1021,6 +1023,8 @@ function describeCount(c: Count): string {
       return `the revealed card's ${c.stat ?? "mana value"}`;
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
+    case "returnedToughness":
+      return "its toughness";
     case "cardsExiledThisWay":
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":

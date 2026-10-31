@@ -326,6 +326,15 @@ export function parseCostKeyword(
         },
       };
     }
+    // Psychic Vortex: "Cumulative upkeep—Draw a card": a card drawn for each age counter, which can always be done (an
+    // empty library is a loss at the next state check, rulings), the draws replaced or not (rulings).
+    if (/^Cumulative upkeep—Draw a card\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, drawCost: true }], text: "Cumulative upkeep—draw a card: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you draw a card for each age counter on it." },
+        },
+      };
     const raw = m[1]!.replace(/^Pay /, "").replace(/^\{([WUBRG])\} or \{([WUBRG])\}$/, (x, a: string, b: string) => (a !== b ? `{${a}/${b}}` : x));
     const pay = parsePayCost(raw);
     if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "Sacrifice a creature", ...

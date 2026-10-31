@@ -1078,6 +1078,7 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
+  o.toGraveyardCombat = to === "graveyard" && inCombatPhase(s) ? { turn: s.turn, combat: s.combatsThisTurn ?? 0 } : undefined;
   o.fromLibraryTurn = to === "graveyard" && fromZone === "library" ? s.turn : undefined;
   o.fromBattlefieldTurn = to === "graveyard" && fromZone === "battlefield" ? s.turn : undefined;
   o.milledTurn = to === "graveyard" && fromZone === "library" && opts.milled ? s.turn : undefined;

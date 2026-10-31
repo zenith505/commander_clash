@@ -449,6 +449,9 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
     const what = mvOrX[1] ? "creature spells" : "spells";
     return { text: sentence, spells: { kind: "spell", ...(mvOrX[1] ? { types: ["Creature"] } : {}), anyOf: [{ kind: "spell", manaValue: { min: Number(mvOrX[2]) }, text: `mana value ${mvOrX[2]} or greater` }, { kind: "spell", xInCost: true, text: "with {X} in its mana cost" }], text: `${what} with mana value ${mvOrX[2]} or greater or with {X} in their mana costs` } };
   }
+  // Titans' Nest: "Spend this mana only to cast a spell that's one or more colors without {X} in its mana cost" (CR
+  // 105.2c, 107.3; rulings: an {X} in an additional or alternative cost doesn't stop it).
+  if (sentence === "Spend this mana only to cast a spell that's one or more colors without {X} in its mana cost.") return { text: sentence, spells: { kind: "spell", colorCount: "colored", noXInCost: true, text: "spells that are one or more colors without {X} in their mana costs" } };
   // "Only to cast a Dragon spell or an Omen spell" (Maelstrom of the Spirit Dragon): a spell with either subtype (an Omen
   // half is "Sorcery — Omen", CR 205.3k).
   const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence.replace(/^Spend this mana only to cast an? (\w+) spell or an? (\w+) spell\.$/, "Spend this mana only to cast $1 or $2 spells."));
@@ -458,7 +461,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   const level = /^(.+) or to gain a Class level$/.exec(m[1]!);
   if (level) only.classLevel = true;
   // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).
-  for (const part of (level ? level[1]! : m[1]!).split(/,? or (?:to )?(?=activate |cast )/)) {
+  // Woodland Weavemaster: "to cast Elf spells and activate abilities of Elf sources": either, as with "or" (CR 106.6).
+  for (const part of (level ? level[1]! : m[1]!).split(/,? or (?:to )?(?=activate |cast )|(?<=^cast [^,]+ spells) and (?=activate abilities of )/)) {
     let x: RegExpExecArray | null;
     // "Cast a spell of the chosen type" (Eclipsed Realms): any spell with that creature type (CR 205.3m).
     if (/^cast (?:a spell|spells) of the chosen type$/.test(part) && !only.spells) only.spells = { kind: "spell", chosen: "type", text: "spells of the chosen type" };

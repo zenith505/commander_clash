@@ -556,6 +556,14 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature you control blocks" (Noble Stand), "... with defender blocks" (Perimeter Captain): yours only.
   // Tetsuko Umezawa, Pursuer: "a creature an opponent controls with power or toughness 1 or less blocks".
   // Spined Sliver: "Whenever a Sliver becomes blocked, that Sliver gets ...": anyone's Sliver, "that Sliver" being it.
+  // Labyrinth Raptor: "Whenever a creature you control with menace becomes blocked, defending player sacrifices a creature
+  // of their choice that's blocking it": the player it attacks (CR 506.2) chooses one blocking it as this resolves.
+  const raptor = /^Whenever a (creature you control with [a-z]+) becomes blocked, defending player sacrifices a creature of their choice that's blocking it\.$/.exec(line);
+  if (raptor) {
+    const filter = parseTargetPhrase(raptor[1]!);
+    if (filter?.kind !== "object" || filter.controller !== "you" || !filter.keywords?.length) return "fail";
+    return { event: "creatureBecomesBlocked", subjectFilter: { ...filter, text: raptor[1]! }, body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], blockingSubject: true, text: "creature blocking it" }, n: 1, action: "sacrifice" }], text: "defending player sacrifices a creature of their choice that's blocking it." } };
+  }
   const anyones = /^Whenever an? ([A-Z][a-z]+) becomes blocked, (.+)$/.exec(line);
   const other = /^Whenever (an?) ((?:[a-z]+ )?creature(?: you control| an opponent controls)?(?: with [a-z]+| with power or toughness \d+ or less)?) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line) ?? (anyones && CREATURE_TYPES.has(anyones[1]!) ? ["", "a", anyones[1]!, anyones[2]!.replace(new RegExp(`\\bthat ${anyones[1]}\\b(?!'s)`, "g"), "it")] : null);
   if (other) {
@@ -636,6 +644,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const unless = { cost: mariner[2]! };
     const onlyYou = mariner[1] === "become";
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
+  }
+  // Leyline of Combustion: "Whenever you and/or at least one permanent you control becomes the target of a spell or
+  // ability an opponent controls, ~ deals 2 damage to that player": once for each spell or ability, however many of its
+  // targets are you or yours (rulings); "that player" is its controller.
+  const atLeastOne = /^Whenever you and\/or at least one permanent you control becomes the target of a spell or ability an opponent controls, (.+)$/.exec(line);
+  if (atLeastOne) {
+    if (/\b(?:it|its|that permanent|that spell or ability)\b/.test(atLeastOne[1]!)) return "fail";
+    const body = parseBody(atLeastOne[1]!, { eventPlayer: true });
+    return body ? { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, once: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body } : "fail";
   }
   // Surrak, Elusive Hunter: "Whenever a creature you control or a creature spell you control becomes the target of a spell
   // or ability an opponent controls, draw a card": once for each of them it targets, a spell on the stack too.
@@ -1331,6 +1348,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(anySliver[2]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
+  }
+  // The Beast, Deathless Prince: "Whenever a creature deals combat damage to its owner, untap ~ and draw a card": anyone's
+  // creature, only to the player who owns it (CR 108.3), once for each creature.
+  const toOwner = /^Whenever a creature deals combat damage to its owner, (.+)$/.exec(line);
+  if (toOwner) {
+    if (/\b(?:it|its|that creature|that player|its owner|its controller|that much|that many|X)\b/i.test(toOwner[1]!)) return "fail";
+    const body = parseBody(toOwner[1]!);
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, anyone: true }, toOwner: true, body };
   }
   // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature, destroy that creature. It can't be regenerated.":
   // anyone's Sliver; "that creature" is the creature dealt the damage.
@@ -2997,11 +3023,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ or another creature you control enters, if it entered from your graveyard or you cast it from your
   // graveyard, ..." (Grist, Voracious Larva; Prized Amalgam): how it entered can't change, so the intervening if (CR
   // 603.4) is part of the event: put onto the battlefield from its owner's graveyard, or a spell its owner cast from there.
-  // Breathless Knight: "if that creature entered from a graveyard or you cast it from a graveyard": anyone's graveyard.
-  const yardOrCast = /^(When(?:ever)? .+? enters), if it entered from your graveyard or you cast it from your graveyard, (.+)$/.exec(line);
+  // Breathless Knight: "if that creature entered from a graveyard or you cast it from a graveyard": any graveyard.
+  const yardOrCast = /^(When(?:ever)? .+? enters), if it entered from your graveyard or you cast it from your graveyard, (.+)$/.exec(line) ?? /^(When(?:ever)? .+? enters), if that creature entered from (a) graveyard or you cast it from a graveyard, (.+)$/.exec(line)?.filter((_, i) => i !== 2);
   if (yardOrCast) {
+    const any = / from a graveyard or you cast it from a graveyard, /.test(line);
     const t = parseTrigger(`${yardOrCast[1]!}, ${yardOrCast[2]!}`);
-    return !t || t === "fail" || (t.event !== "selfEnters" && t.event !== "permanentEnters") || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "yoursOrCast" };
+    return !t || t === "fail" || (t.event !== "selfEnters" && t.event !== "permanentEnters") || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: any ? "anyOrCast" : "yoursOrCast" };
   }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
@@ -3268,7 +3295,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Botanical Brawler: "Whenever one or more +1/+1 counters are put on another permanent you control, if it's the first
   // time +1/+1 counters have been put on that permanent this turn, ...": counters put on it earlier this turn count, even
   // before Botanical Brawler was on the battlefield (rulings).
-  const firstOn = !youPut && !firstTime ? /^(Whenever one or more \+1\/\+1 counters are put on another permanent you control), if it's the first time \+1\/\+1 counters have been put on that permanent this turn, /.exec(line) : null;
+  // Stalwart Successor: "Whenever one or more counters are put on a creature you control, if it's the first time counters
+  // have been put on that creature this turn, ...": any kind, the same way.
+  const firstOn = !youPut && !firstTime ? (/^(Whenever one or more \+1\/\+1 counters are put on another permanent you control), if it's the first time \+1\/\+1 counters have been put on that permanent this turn, /.exec(line) ?? /^(Whenever one or more counters are put on a creature you control), if it's the first time counters have been put on that creature this turn, /.exec(line)) : null;
   // Bioessence Hydra: "Whenever one or more loyalty counters are put on planeswalkers you control": once for each
   // planeswalker they're put on (an entering one's too, rulings), "that many" those put on it.
   const put = youPut ?? /^Whenever one or more (\+1\/\+1 |loyalty )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control|an? [A-Z][a-z]+ you control|planeswalkers you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);

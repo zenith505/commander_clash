@@ -226,6 +226,8 @@ export interface GameObject {
   enteredTurn?: number;
   /** Turn number it was last put into a graveyard ("a card from a graveyard that was put there this turn", Abyssal Harvester). */
   toGraveyardTurn?: number;
+  /** The combat phase it was last put into a graveyard in, if it was (GameState.combatsThisTurn): "a card ... that wasn't put there this combat" (Storrev, Devkarin Lich). */
+  toGraveyardCombat?: { turn: number; combat: number };
   /** The turn it was last put into a graveyard from a library ("put there from their library this turn", Captain
    * N'ghathrod), and by a mill instruction ("milled this turn", Tato Farmer, CR 701.17a). */
   fromLibraryTurn?: number;

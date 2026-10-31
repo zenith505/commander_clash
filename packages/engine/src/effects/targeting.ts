@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
-import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
+import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -120,6 +120,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
+  if (spec.noXInCost && parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
   // Security Bypass: "attacking alone": attacking with no other creature attacking (CR 506.5).
@@ -416,6 +417,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.xInCost && !parseManaCost(d.manaCost).hasX) return false;
+  if (spec.noXInCost && parseManaCost(d.manaCost).hasX) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
@@ -615,6 +617,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // One opponent's slot of "for each opponent, ... from that player's graveyard" (TargetSpec.perOpponent): their card.
     if (spec.controlledBy !== undefined && o.owner !== spec.controlledBy) return false;
     if (spec.putThereThisTurn && o.toGraveyardTurn !== s.turn) return false;
+    if (spec.notPutThereThisCombat && inCombatPhase(s) && o.toGraveyardCombat?.turn === s.turn && o.toGraveyardCombat.combat === (s.combatsThisTurn ?? 0)) return false;
     if (spec.fromLibraryThisTurn && o.fromLibraryTurn !== s.turn) return false;
     if (spec.milledThisTurn && o.milledTurn !== s.turn) return false;
     if (spec.fromBattlefieldThisTurn && o.fromBattlefieldTurn !== s.turn) return false;

@@ -22,7 +22,8 @@ function castWith(s: GameState, pid: PlayerId, id: string, mana: ManaType[], t: 
 
 describe("untap target creature and gain control of it", () => {
   it("parses", () => [threaten, conscription].forEach((d) => expect(isFullySupported(d), d.name).toBe(true)));
-  it("Spinal Embrace stays out: its sacrifice isn't modeled", () => expect(isFullySupported(spinal)).toBe(false));
+  // Its delayed sacrifice and life gain came in Lane B round B66 (tested in laneb-round66.test.ts).
+  it("Spinal Embrace is supported (since round B66)", () => expect(isFullySupported(spinal)).toBe(true));
 
   it("Threaten: untapped, yours with haste until end of turn", () => {
     const { s: s0, ap, ids, opp } = setup([threaten]);

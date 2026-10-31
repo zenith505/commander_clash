@@ -115,6 +115,11 @@ const esquireOfTheKing = () => card("Esquire of the King", "Creature — Human S
 const synchronizedEviction = () => card("Synchronized Eviction", "Instant", "{4}{U}", { cmc: 5, colors: ["U"], oracleText: "This spell costs {2} less to cast if you control at least two creatures that share a creature type.\nPut target nonland permanent into its owner's library second from the top." });
 const snowDevil = () => card("Snow Devil", "Enchantment — Aura", "{1}{U}", { cmc: 2, colors: ["U"], keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature has flying.\nEnchanted creature has first strike as long as it's blocking and you control a snow land." });
 
+const sugarCoat = () => card("Sugar Coat", "Enchantment — Aura", "{2}{U}", { cmc: 3, colors: ["U"], keywords: ["Enchant", "Flash"], oracleText: "Flash\nEnchant creature or Food\nEnchanted permanent is a colorless Food artifact with \"{2}, {T}, Sacrifice this artifact: You gain 3 life\" and loses all other card types and abilities." });
+const starportSecurity = () => card("Starport Security", "Artifact Creature — Robot Soldier", "{W}", { cmc: 1, colors: ["W"], power: "1", toughness: "1", oracleText: "{3}{W}, {T}: Tap another target creature. This ability costs {2} less to activate if you control a creature with a +1/+1 counter on it." });
+const sewerCrocodile = () => card("Sewer Crocodile", "Creature — Crocodile", "{5}{U}", { cmc: 6, colors: ["U"], power: "4", toughness: "6", oracleText: "{3}{U}: This creature can't be blocked this turn. This ability costs {3} less to activate if there are five or more mana values among cards in your graveyard." });
+const razorlashTransmogrant = () => card("Razorlash Transmogrant", "Artifact Creature — Zombie", "{2}", { cmc: 2, colors: [], power: "3", toughness: "1", oracleText: "This creature can't block.\n{4}{B}{B}: Return this card from your graveyard to the battlefield with a +1/+1 counter on it. This ability costs {4} less to activate if an opponent controls four or more nonbasic lands." });
+
 // Test cards.
 const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
 const bearC = (name = "Plain Bear", p = 2, t = 2) => vanilla(name, "Creature — Bear", "{1}{G}", 2, p, t, { colors: ["G"] });
@@ -145,7 +150,7 @@ const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | 
 
 describe("Lane B round 53", () => {
   it("are fully supported", () => {
-    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble(), rosecotKnight(), blossomPrancer(), contagiousVorrac(), pulsarSquadronAce(), inscribedTablet(), okibaSalvage(), mirkwoodNurturer(), mongrelPack(), esquireOfTheKing(), synchronizedEviction(), snowDevil());
+    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble(), rosecotKnight(), blossomPrancer(), contagiousVorrac(), pulsarSquadronAce(), inscribedTablet(), okibaSalvage(), mirkwoodNurturer(), mongrelPack(), esquireOfTheKing(), synchronizedEviction(), snowDevil(), sugarCoat(), starportSecurity(), sewerCrocodile(), razorlashTransmogrant());
   });
 
   it("Sheoldred's Restoration: returns the creature card; kicked you gain its mana value in life, unkicked you lose it", () => {
@@ -583,5 +588,50 @@ describe("Lane B round 53", () => {
     s = goUntil(s, (x) => x.step === "main2");
     expect(zone(s, attacker)).toBe("graveyard");
     expect(zone(s, host)).toBe("battlefield");
+  });
+
+  it("Sugar Coat: the creature becomes a colorless noncreature Food artifact with only the Food ability", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const host = putOnBattlefield(s0, opp, vanilla("Flying Bear", "Creature — Bear", "{1}{G}", 2, 2, 2, { colors: ["G"], keywords: ["Flying"], oracleText: "Flying" }));
+    const aura = putOnBattlefield(s0, ap, sugarCoat());
+    s0.objects[aura]!.attachedTo = host;
+    invalidateCharacteristics(s0);
+    const c = characteristics(s0, s0.objects[host]!);
+    expect([c.types, c.subtypes, c.colors]).toEqual([["Artifact"], ["Food"], []]);
+    expect(kw(s0, host, "Flying")).toBe(false);
+    s0.players[opp]!.manaPool = { ...s0.players[opp]!.manaPool, C: 2 };
+    // The opponent gets priority once the players before them pass.
+    let s = s0;
+    while (waitingOn(s) !== opp) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(run(s, planActivate(s, opp, host, 0, [])));
+    expect(zone(s, host)).toBe("graveyard");
+    expect(life(s, opp)).toBe(43);
+  });
+
+  it("costs less to activate if: Starport Security, Sewer Crocodile, Razorlash Transmogrant from the graveyard", () => {
+    for (const met of [true, false]) {
+      const { s: s0, ap, opp } = setup([]);
+      const guard = putOnBattlefield(s0, ap, starportSecurity());
+      const croc = putOnBattlefield(s0, ap, sewerCrocodile());
+      const zombie = toZone(s0, ap, razorlashTransmogrant(), "graveyard");
+      const victim = putOnBattlefield(s0, opp, bearC("Victim Bear"));
+      if (met) {
+        s0.objects[croc]!.counters = { "+1/+1": 1 };
+        for (const mv of [1, 2, 3, 4, 5]) toZone(s0, ap, card(`Test MV ${mv}`, "Sorcery", `{${mv}}`, { cmc: mv }), "graveyard");
+        for (let i = 0; i < 4; i++) putOnBattlefield(s0, opp, nonbasic());
+      }
+      poolOnly(s0, ap, { W: 1, C: 1 });
+      expect(!!planActivate(s0, ap, guard, 0, [tgt(victim)]), "Starport Security").toBe(met);
+      poolOnly(s0, ap, { U: 1 });
+      expect(!!planActivate(s0, ap, croc, 0, []), "Sewer Crocodile").toBe(met);
+      poolOnly(s0, ap, { B: 2 });
+      const plan = planActivate(s0, ap, zombie, 0, []);
+      expect(!!plan, "Razorlash Transmogrant").toBe(met);
+      if (plan) {
+        const s = settle(run(s0, plan));
+        expect(zone(s, zombie)).toBe("battlefield");
+        expect(counters(s, zombie)).toBe(1);
+      }
+    }
   });
 });

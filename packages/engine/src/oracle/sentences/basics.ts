@@ -543,6 +543,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !options || options.some((o) => !("pay" in o))) return null;
     return [{ type: "punisher", who, options, effects: fx }];
   }
+  // Lim-Dûl's Hex: "for each player, ~ deals 1 damage to that player unless they pay {B} or {3}": each player, in turn
+  // order, chooses whether to pay (CR 101.4); the same as "~ deals 1 damage to each player unless that player pays".
+  if ((m = new RegExp(`^[Ff]or each player, ~ deals ${NUM} damage to that player unless they (pay .+)$`).exec(s))) {
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!options) return null;
+    return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: [{ type: "damage", amount: num(m[1]!), to: { ref: "punished" } }] }];
+  }
   // "~ deals 5 damage to target opponent unless that player sacrifices a creature of their choice" (Demanding Dragon).
   if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she) ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
     if (/^It /.test(s) && !ctx.selfIt) return null;
@@ -1691,6 +1698,13 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
       const filter = pickFilter(m[1]!);
       if (filter?.kind !== "object") return null;
       out.push({ sacrifice: { ...filter, sourceHost: true, text: `enchanted ${m[1]}` } });
+    }
+    // Lim-Dûl's Hex: "unless they pay {B} or {3}": either mana payment.
+    else if ((m = /^pays? ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(part))) {
+      const a = parseUnlessPays(m[1]!, ctx);
+      const b = parseUnlessPays(m[2]!, ctx);
+      if (!a || !b) return null;
+      out.push({ pay: a }, { pay: b });
     }
     // Erosion: "unless that player pays {1} or 1 life": either payment.
     else if ((m = /^pays? ((?:\{\d+\})+) or (\d+) life$/.exec(part))) {

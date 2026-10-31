@@ -381,6 +381,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const creature = (t: TargetSpec | undefined) => t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Creature" && !t.optional && !t.divided;
     return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "fight", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
   }
+  // Beastie Beatdown: "Choose target creature you control and target creature an opponent controls. ... The creature you
+  // control deals damage equal to its power to the creature an opponent controls": the two targets, no damage if either is
+  // illegal (rulings).
+  if (/^The creature you control deals damage equal to its power to the creature an opponent controls$/.test(s)) {
+    const [a, b] = ctx.targets;
+    const creature = (t: TargetSpec | undefined) => t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Creature" && !t.optional && !t.divided && !t.many;
+    return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "bite", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
+  }
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
     // "Choose target creature an opponent controls. ... Target creature you control fights that creature" (Time to Feed):
     // "that creature" is the one named before this sentence's new target.

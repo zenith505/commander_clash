@@ -681,6 +681,8 @@ export function moveObject(
     counters?: Record<string, number>;
     /** "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist): judged as it would exist there (CR 614.12, rulings). */
     countersIfCreature?: Record<string, number>;
+    /** "If a Hero enters this way, it enters with two additional +1/+1 counters on it" (Heroic Return): judged the same way. */
+    countersIfSubtype?: { subtype: string; counters: Record<string, number> };
     /** "... and an additional loyalty counter on it if it's a planeswalker" (Semester's End): judged the same way. */
     countersIfPlaneswalker?: Record<string, number>;
     /** For a land that may enter untapped by paying life or revealing a card: that was done (CR 614.12). */
@@ -1144,7 +1146,7 @@ export function moveObject(
     o.sunburstGained = undefined;
     const bloodthirstGained = fromZone === "stack" ? (o.bloodthirstGained ?? 0) : 0;
     o.bloodthirstGained = undefined;
-    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1254,7 +1256,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
+type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; /** Counters only if it enters with that subtype (Heroic Return). */ countersIfSubtype?: { subtype: string; counters: Record<string, number> }; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1293,6 +1295,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
+  if (opts.countersIfSubtype && characteristics(s, o).subtypes.includes(opts.countersIfSubtype.subtype)) for (const [k, n] of Object.entries(opts.countersIfSubtype.counters)) add(k, n);
   // "And as a Mutant in addition to its other types" (Master Biomancer): a type it has from the moment it enters, for as
   // long as it's on the battlefield (CR 614.1c, 613.1d).
   const asTypes: string[] = [];

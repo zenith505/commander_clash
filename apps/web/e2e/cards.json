@@ -7809,6 +7809,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0144d9bb-d3cb-4c23-b133-6653d7c3a76d",
+  "name": "Grip of Amnesia",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell unless its controller exiles all cards from their graveyard.\nDraw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5a6bbc45-6cb8-40ff-9f7c-7b2c5713dd78",
   "name": "Griptide",
   "manaCost": "{3}{U}",

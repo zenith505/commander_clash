@@ -146,6 +146,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
   // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
+  // Corpse Cobble: "the total power of the sacrificed creatures", those sacrificed to cast the spell (compile checks it has
+  // that cost), as each last existed (CR 608.2h).
+  if (ctx?.costSacrificedX && /^the total power of the sacrificed creatures$/.test(p)) return { count: { kind: "costSacrificedTotalPower" } };
   // Reign of the Pit: "the total power of the creatures sacrificed this way".
   if (ctx && /^the total power of (?:the )?creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayTotalPower" } };
   // Vicious Betrayal: "for each creature sacrificed this way" after a cost that sacrifices any number is that cost's X (below).

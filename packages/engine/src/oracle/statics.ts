@@ -83,6 +83,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 }
 
 function parseConditionalStatic0(line: string): StaticAbility | null {
+  // War Balloon: "As long as this Vehicle has three or more fire counters on it, it's an artifact creature.": "it" is ~.
+  const itsVehicle = /^(As long as ~ has [^,]+ counters? on it), it's (an? artifact creature)\.$/.exec(line);
+  if (itsVehicle) return parseConditionalStatic0(`${itsVehicle[1]}, ~ is ${itsVehicle[2]}.`);
   // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
   // long as it has one" (checked as the untap step begins, CR 502.3).
   // Steel Dromedary: "if it has a +1/+1 counter on it"; Alirios, Enraptured: "if you control a Reflection".
@@ -582,6 +585,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       const f = parseTargetPhrase(`${card[1]} from a graveyard`);
       return f?.kind === "card" ? { lessIfTargets: { n: Number(m[1]), filter: f, ...(colored.length ? { colored } : {}) } } : "fail";
     }
+    // Dire Downdraft: "if it targets an attacking or tapped creature": a creature that's either.
+    if (m[3] === "an attacking or tapped creature") {
+      const [att, tap] = [parseTargetPhrase("attacking creature"), parseTargetPhrase("tapped creature")];
+      if (att?.kind !== "object" || tap?.kind !== "object") return "fail";
+      return { lessIfTargets: { n: Number(m[1]), filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: [att, tap], text: "attacking or tapped creature" }, ...(colored.length ? { colored } : {}) } };
+    }
     const filter = parseTargetPhrase(m[3]!.replace(/^an? /, ""));
     // "If it targets a blue spell" (Mystical Dispute), "a creature spell" (Out of Air): a spell on the stack.
     return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter, ...(colored.length ? { colored } : {}) } } : "fail";
@@ -965,6 +974,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
   if (/^(?:there are cards|a card is) exiled with (?:~|it)$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
+  // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, at least that many.
+  if ((m = new RegExp(`^there are ${NUM} or more cards exiled with ~$`).exec(text))) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: num(m[1]!) };
   // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's. "Whenever a player taps
   // a land for mana, if it's not that player's turn" (Price of Glory): the player who tapped it.
   if (/^it(?: isn't that player's|'s not their| isn't their|'s not that player's) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
@@ -2940,6 +2951,9 @@ function parseLandTypeStatic(text: string, line: string): StaticAbility | null {
     return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [m[1]!] }], text: line };
   if (/^Lands you control are every basic land type in addition to their other types$/.test(text))
     return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [...BASIC_TYPES] }], text: line };
+  // Nylea's Presence: "Enchanted land is every basic land type in addition to its other types": the land the Aura is on, with
+  // each type's mana ability (CR 305.7).
+  if (/^Enchanted land is every basic land type in addition to its other types$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: [], subtypes: [...BASIC_TYPES] }], text: line };
   if ((m = /^(Plains|Islands|Swamps|Mountains|Forests) don't untap during their controllers' untap steps$/.exec(text)))
     return { affects: { kind: "filter", types: ["Land"], subtypes: [BASIC_PLURAL[m[1]!]!] }, mods: [{ kind: "doesntUntap" }], text: line };
   return null;

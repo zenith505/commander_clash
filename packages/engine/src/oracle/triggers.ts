@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type CounterKind, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
+import { COUNTER, counterKind, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { ANY_COUNTER } from "../abilities";
@@ -2909,8 +2909,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Hulkling, Burgeoning Bruiser: "Whenever another creature you control enters, if it has greater power or toughness than
   // ~, put a +1/+1 counter on ~.": evolve's words (CR 702.100a), checked as it triggers and resolves (CR 603.4), but not
   // evolve, so ~ doesn't "evolve" (CR 702.100b).
-  if (/^Whenever another creature you control enters, if it has greater power or toughness than ~, put a \+1\/\+1 counter on ~\.?$/.test(line)) {
-    return { event: "anotherCreatureYouControlEnters", ifEvolves: true, body: { targets: [], effects: [{ type: "evolve", notKeyword: true }], text: line } };
+  // Evolving Adaptive: "if that creature has greater power or toughness than ~, put an oil counter on ~": the same check, an
+  // oil counter.
+  const evolveLike = /^Whenever another creature you control enters, if (?:it|that creature) has greater power or toughness than ~, put an? (\+1\/\+1|oil) counter on ~\.?$/.exec(line);
+  if (evolveLike) {
+    return { event: "anotherCreatureYouControlEnters", ifEvolves: true, body: { targets: [], effects: [{ type: "evolve", notKeyword: true, ...(evolveLike[1] === "oil" ? { counter: "oil" as const } : {}) }], text: line } };
   }
   // Ray of Frost: "When this Aura enters, if enchanted creature is red, tap it.": "it" is that creature.
   if (/^When ~ enters, if enchanted creature is (?:white|blue|black|red|green), tap it\.?$/.test(line)) {
@@ -2962,7 +2965,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Urborg Stalker: "if that player controls a nonblack, nonland permanent", Chrome Replicator: "if you control two or more
   // nonland, nontoken permanents with ...": each one both, the comma no clause break.
   // Sarulf, Realm Eater: "if ~ has one or more +1/+1 counters on it, you may remove all of them": its +1/+1 counters.
-  const removeThem = line.replace(/^(At the beginning of your upkeep, if ~ has one or more \+1\/\+1 counters on it), you may remove all of them\. /, "$1, you may remove all +1/+1 counters from ~. ");
+  // Tunnel Ignus: "Whenever a land enters under an opponent's control, if that player had another land enter ...": the
+  // same as "a land an opponent controls enters" (Confounding Conundrum below).
+  // Lightning Coils: "if ~ has five or more charge counters on it, remove all of them from it and create that many 3/1 red
+  // Elemental creature tokens with haste": all its charge counters, and a token for each one removed this way.
+  const removeAndCreate = line.replace(/^(At the beginning of your upkeep, if ~ has \w+ or more ([a-z]+) counters on it), remove all of them from it and create that many (.+?) tokens( with [a-z ]+)?\./, (_, head: string, kind: string, token: string, rest: string | undefined) => `${head}, remove all ${kind} counters from ~. Create a ${token.replace(/^(\d+\/\d+) /, "$1 ")} token${rest ?? ""} for each counter removed this way.`);
+  const removeThem = removeAndCreate.replace(/^Whenever a land enters under an opponent's control, (?=if that player had another land enter the battlefield under their control this turn, )/, "Whenever a land an opponent controls enters, ").replace(/^(At the beginning of your upkeep, if ~ has one or more \+1\/\+1 counters on it), you may remove all of them\. /, "$1, you may remove all +1/+1 counters from ~. ");
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(removeThem.replace(/^((?:When|Whenever|At)\b[^,]*, if [^,]*\bnon[a-z]+), (?=non[a-z]+ (?:permanents?|creatures?)\b)/, "$1 "));
   // "If it's attacking" is about the source only in an ability about the source itself.
   const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not (?:their|that player's) turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
@@ -3033,6 +3041,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // it triggers and resolves (CR 603.4), as it last existed if it's gone.
   const subjSize = intervening && /^Whenever (?:a|another) (?:nontoken )?creature (?:you control )?enters$/.test(intervening[1]!) ? /^that creature is (\d+)\/(\d+)$/.exec(intervening[2]!) : null;
   const subjSizeCond: StaticCondition | null = subjSize ? { kind: "allOf", conds: [{ kind: "subjectPT", stat: "power", min: Number(subjSize[1]), max: Number(subjSize[1]) }, { kind: "subjectPT", stat: "toughness", min: Number(subjSize[2]), max: Number(subjSize[2]) }] } : null;
+  // Ichorplate Golem: "Whenever a creature you control enters, if it has one or more oil counters on it, ...": the
+  // creature that entered, as it triggers and resolves (CR 603.4), as it last existed if it's gone.
+  const subjCounter = intervening && /^Whenever (?:a|another) (?:nontoken )?creature (?:you control )?enters$/.test(intervening[1]!) ? new RegExp(`^it has (?:one or more ${COUNTER} counters|an? ${COUNTER} counter) on it$`).exec(intervening[2]!) : null;
+  const subjCounterCond: StaticCondition | null = subjCounter ? { kind: "subjectCounter", counter: counterKind(subjCounter[1] ?? subjCounter[2]!) } : null;
   // "At the beginning of each player's upkeep, if that player controls a Plains" (Spiritual Sanctuary), "if there are four
   // or more basic land types among lands that player controls" (Mask of Intolerance): the active player's, as it triggers
   // and resolves (CR 603.4).
@@ -3043,7 +3055,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
   const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
   const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
-  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = otherLand ? ({ kind: "subjectControllerOtherLandEntered" } as const) : activeCond ? activeCond : subjSizeCond ? subjSizeCond : subjCounterCond ? subjCounterCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

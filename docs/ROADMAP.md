@@ -1,7 +1,7 @@
 # Roadmap
 
-28,534 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,178 of
+28,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,180 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1254,7 +1254,7 @@ line blocks.
    spell this turn" (Captain Mar-Vell, Space-Born, CR 102.3); "Remove ten oil counters from among permanents you
    control and sacrifice ~" (The Filigree Sylex); "X can't be 0" in every mode (Marath, Will of the Wild); "Whenever ~
    enters or another nontoken Human you control dies" (Jerren, Corrupted Bishop); "Whenever one or more players
-   sacrifice one or more creatures ... only once each turn" (Evin, Waterdeep Opportunist). +24 (28,513 of 31,936).
+   sacrifice one or more creatures ... only once each turn" (Evin, Waterdeep Opportunist). +24 (28,558 of 31,936 with Lane B B60 and B61).
    Out after round 223 (looked at, not done): Contested War Zone ("that creature's controller gains control of ~" after
    a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (remove one
    or more +1/+1 counters as a variable cost); Chancellor of the Annex (the first spell each opponent casts); Kaima,

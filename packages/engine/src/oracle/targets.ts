@@ -1263,6 +1263,14 @@ export function parseTargetPhrase(
     const rest = parseTargetPhrase(greater[1]!, opts);
     return rest?.kind === "object" && !rest.power && !rest.many ? { ...rest, greaterPowerThanSource: true, text: `${rest.text} with greater power` } : null;
   }
+  // Gyrus, Waker of Corpses: "target creature card with lesser power from your graveyard": than the source's power, or
+  // its last known power if it has left (as mentor's, CR 702.134a), against the card's power in the graveyard. Only a
+  // target: it's checked as targets are chosen and as the ability resolves (CR 608.2b).
+  const lesserCard = opts.target && /^(target )?([a-z]+ card) with lesser power (from your graveyard)$/i.exec(phrase.trim());
+  if (lesserCard) {
+    const rest = parseTargetPhrase(`${lesserCard[1] ?? ""}${lesserCard[2]} ${lesserCard[3]}`, opts);
+    return rest?.kind === "card" && !rest.power && !rest.many ? { ...rest, lesserPowerThanSource: true, text: `target ${phrase.trim().replace(/^target /i, "").toLowerCase()}` } : null;
+  }
   // Tsabo's Web: "land with an activated ability that isn't a mana ability", printed or granted (CR 605.1a).
   const nonMana = / with an activated ability that isn't a mana ability$/.exec(phrase.trim());
   if (nonMana) {

@@ -1115,6 +1115,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (modal[1] !== "one" || opts.spell) return null;
     return { ...body, modal: { ...body.modal!, ...(how === "at random" ? { random: true as const } : { unchosen: how.endsWith("this turn") ? ("turn" as const) : ("ever" as const) }) } };
   }
+  // Immard, the Stormcleaver: "put a charge counter on it or remove one from it. When you remove a counter this way,
+  // choose one — • ... • ...": one or the other as it resolves, removing only with one there to remove (CR 608.2d); the
+  // modal reflexive trigger only when a counter was removed, its mode chosen as it's put on the stack (CR 603.12, 700.2b).
+  const putOrRemove = /^[Pp]ut an? ([a-z]+) counter on (?:it|~) or remove one from (?:it|~)\. When you remove a counter this way, (choose one —\s*•[\s\S]+)$/.exec(text.trim());
+  if (putOrRemove && opts.selfIt) {
+    const modes = parseBody(`${putOrRemove[2]!.charAt(0).toUpperCase()}${putOrRemove[2]!.slice(1)}`, { selfIt: true });
+    const k = putOrRemove[1]!;
+    if (!modes?.modal || modes.targets.length) return null;
+    return {
+      targets: [],
+      effects: [{ type: "either", options: [[{ type: "counters", what: { ref: "self" }, counter: k, n: 1 }], [{ type: "removeCounters", what: { ref: "self" }, counter: k, n: 1, setsDid: true }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: modes }] }]], labels: [`Put a ${k} counter on ~`, `Remove a ${k} counter from ~`], onlyDoable: true }],
+      text: text.trim(),
+    };
+  }
   // Modes with text before them, or a kind of choice we don't support; but "You may pay {1}. When you do, choose one —
   // • ..." (Hylda of the Icy Crown) is a modal reflexive trigger, its modes chosen as it's put on the stack (CR 603.12).
   const reflexiveModes = /\bWhen you do, choose [^•.]*—\s*•/.exec(text);
@@ -2976,6 +2990,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Borborygmos and Fblthp: "then you may discard any number of land cards. When you discard one or more cards this way,
+    // ~ deals twice that much damage to target creature." Land cards only, none too (rulings); the reflexive trigger (CR
+    // 603.12) only if one or more were discarded, its target chosen then (rulings), twice as much damage as cards discarded.
+    const discardAnyLands = /^(?:[Tt]hen )?[Yy]ou may discard any number of ([a-z]+) cards$/.exec(s);
+    const discardTwice = discardAnyLands && /^When you discard one or more cards this way, ~ deals twice that much damage to (target [a-z]+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (discardAnyLands && discardTwice) {
+      const filter = parseSearchFilter(`${discardAnyLands[1]} card`);
+      const reflexive0 = filter ? reflexiveBody(`~ deals X damage to ${discardTwice[1]}`, ctx, false, false, true) : null;
+      if (!reflexive0 || !filter) return null;
+      const reflexive = { ...replaceX(reflexive0, { count: { kind: "x" }, times: 2 }), text: `~ deals twice that much damage to ${discardTwice[1]}.` };
+      effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true, filter });
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay" } }, min: 1 }, effects: [{ type: "reflexive", body: reflexive, xDiscarded: true }] });
+      si++;
+      continue;
+    }
     // Teferi, Who Slows the Sunset: "Choose up to one target artifact, up to one target creature, and up to one target
     // land. Untap the chosen permanents you control. Tap the chosen permanents you don't control." Each target by who
     // controls it as this resolves; an illegal one is left alone (rulings).
@@ -4201,6 +4230,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
     const youCast = youCast0 && (youCast0[2] !== "this turn" || effects[effects.length - 1]?.type === "exile") && (youCast0[1] === "cast" || (youCast0[2] !== "this turn" && !youCast0[3] && effects[effects.length - 1]?.type === "exile")) ? youCast0 : null;
+    // Mazzy, Truesword Paladin: "exile it. Until the end of your next turn, you may cast that card.": the card the Aura that
+    // went to the graveyard is there (CR 400.7), cast with its usual timing and costs (rulings).
+    const subjectExiled = effects[effects.length - 1];
+    if (youCast && untilNext && !untilNext[2] && youCast[1] === "cast" && subjectExiled?.type === "exile" && (subjectExiled.what.ref === "subject" || subjectExiled.what.ref === "subjectCard") && !subjectExiled.until && !subjectExiled.linked && !subjectExiled.ownerMay && !subjectExiled.youMay) {
+      subjectExiled.youMay = { nextTurn: true };
+      continue;
+    }
     if (youCast) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exile" || prev.linked || prev.ownerMay || prev.youMay || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
@@ -4530,6 +4566,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences[si + 1] = "Exile the top card of your library";
       continue;
     }
+    // Take Out the Trash: "If you control a Raccoon, you may discard a card. If you do, draw a card.": the condition checked
+    // as it resolves, then the choice and what depends on it, as written alone.
+    const ifCtlMay = /^If (you control an? [A-Z][a-z]+), you may (.+)$/.exec(s);
+    const ifCtlDo = ifCtlMay && /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (ifCtlMay && ifCtlDo) {
+      const cond = parseStaticCondition(ifCtlMay[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const inner = cond ? parseBody(`You may ${ifCtlMay[2]!}. If you do, ${ifCtlDo[1]!}.`) : null;
+      if (!cond || !inner || inner.targets.length || inner.modal || inner.effects[0]?.type !== "may") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond }, effects: inner.effects });
+      si++;
+      continue;
+    }
+    // Silver Surfer, Cosmic Voyager: "Return those cards to the battlefield ... at the beginning of the next end step. If a
+    // land enters this way, it enters tapped.": each returning land card, as it enters.
+    const flickered = effects[effects.length - 1];
+    if (/^If a land enters this way, it enters tapped$/.test(s) && flickered?.type === "flicker" && flickered.at === "nextEndStep" && !flickered.tapped) {
+      flickered.landsTapped = true;
+      continue;
+    }
+    // Feldon, Ronom Excavator: "Whenever ~ is dealt damage, exile that many cards from the top of your library. Choose one
+    // of them. Until the end of your next turn, you may play that card." Fire Giant's Fury: "... exile that many cards from
+    // the top of your library. Until the end of your next turn, you may play those cards." The trigger made "that many" X
+    // (the damage); read as "the top X cards", followed by a play permission.
+    if (/^[Ee]xile X cards from the top of your library$/.test(s) && /^(?:Choose one of them|Until the end of your next turn, you may play those cards|You may play those cards this turn)\.?$/.test(sentences[si + 1] ?? "")) s = "Exile the top X cards of your library";
     // "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party
     // Thrasher, Magmatic Channeler): only the chosen card may be played (Effect impulse `choose`).
     const exChoose = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library, then choose one of them$`).exec(s);
@@ -4543,7 +4603,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // You Find Some Prisoners: "Exile the top three cards of target opponent's library. Choose one of them. Until the end
     // of your next turn, you may play that card, and you may spend mana as though it were mana of any color to cast it."
     // The same from that library, a spell cast with mana of any type (CR 609.4b); the rest stay exiled (rulings).
-    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top ${NUM} cards of (your|target opponent's) library$`).exec(s);
+    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top ${NUMX} cards of (your|target opponent's) library$`).exec(s);
     const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))(, and you may spend mana as though it were mana of any color to cast it)?\.?$/.exec(sentences[si + 2] ?? "") : null;
     if (exChoose2 && playChosen) {
       const who = exChoose2[2] === "your" ? undefined : parsePlayer("target opponent", ctx);
@@ -10947,6 +11007,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         if (!first || first.some((x) => pauses(x))) return null;
         si++;
         effects.push({ type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: [...first, { type: "impulse", n: 1, until: "thisTurn" }] });
+        if (sacIt) delete ctx.sacrificedIt;
+        if (!defineX()) return null;
+        continue;
+      }
+      // Rotisserie Elemental: "Then you may sacrifice it. If you do, exile the top X cards of your library, where X is the
+      // number of skewer counters on ~. You may play those cards this turn." The exile and the permission both depend on
+      // the sacrifice; X is counted as it resolves, the sacrificed creature's counters as it last existed (CR 608.2h).
+      const exPlay = ifDid[1] === "do" && !choosePlay && /^You may play those cards this turn\.?$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top ${NUMX} cards of your library$`).exec(ifDid[2]!) : null;
+      if (exPlay && (exPlay[1] === "X") === !!where) {
+        si++;
+        effects.push({ type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: [{ type: "impulse", n: amt(exPlay[1]!), until: "thisTurn" }] });
         if (sacIt) delete ctx.sacrificedIt;
         if (!defineX()) return null;
         continue;

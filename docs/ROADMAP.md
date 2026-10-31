@@ -1,6 +1,6 @@
 # Roadmap
 
-28,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,631 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,182 of
 9,979 (92%).
 
@@ -3754,8 +3754,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum ("If it's legendary" in a dig,
   and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (total power X
   or less), Nazahn, Revered Bladesmith, Liliana, the Necromancer (creature cards from graveyards onto the battlefield).
+- Round B65 (the unlisted ones from EDHREC rank about 19,700 up, and Hollow One and Take Out the Trash from the B10 and
+  B11 lists): "Whenever ~ is dealt damage, exile that many cards from the top of your library. Choose one of them. Until
+  the end of your next turn, you may play that card" (Feldon, Ronom Excavator) and the same "exile that many cards" after
+  combat damage this turn (Fire Giant's Fury), "Then you may sacrifice it. If you do, exile the top X cards of your
+  library, where X is the number of skewer counters on ~" (Rotisserie Elemental: its counters as it last existed),
+  "Whenever ~ or an instant or sorcery spell you control deals damage to a player" (Syr Carah, the Bold: any player, you
+  too, once for each), "Whenever a creature attacking one of your opponents becomes blocked by two or more creatures"
+  (Seifer, Balamb Rival: anyone's creature), "Whenever an Aura you control is put into your graveyard from the
+  battlefield, exile it. Until the end of your next turn, you may cast that card" (Mazzy, Truesword Paladin), "Whenever
+  one or more creatures deal combat damage to you while you're the monarch, tap those creatures and put a stun counter
+  on each of them" (Tamiyo, Upriser Crowned), "you may discard any number of land cards. When you discard one or more
+  cards this way, ~ deals twice that much damage to target creature" (Borborygmos and Fblthp), "put a charge counter on
+  it or remove one from it. When you remove a counter this way, choose one —" (Immard, the Stormcleaver: removing only
+  with a counter there, CR 608.2d; the "or" choice now names the card instead of "~"), "If a land enters this way, it
+  enters tapped" after a flicker (Silver Surfer, Cosmic Voyager), "target creature card with lesser power from your
+  graveyard" (Gyrus, Waker of Corpses), "Discover X, where X is the mana value of the exiled card" (Ellie and Alan,
+  Paleontologists), "for each card you've cycled or discarded this turn" (Hollow One: cycling is a discard, CR
+  702.29a), "If you control a Raccoon, you may discard a card. If you do, draw a card" (Take Out the Trash). +14 (28,631
+  of 31,936).
+- Out after round B65 (looked at, not done): Kaya, Ghost Assassin ("Exile ~ or up to one target creature"), Syrix,
+  Carrier of the Flame ("if a creature card left your graveyard this turn", and casting it from the graveyard as a
+  trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
+  Tide of War ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt ("behold a Jace
+  or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
+  cards named ~"), Faces of the Past (creatures that share a creature type with it), Diaochan, Artful Beauty (a target
+  of an opponent's choice).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B64 took the easier ones up to about 15,000 but left some of that range unread: about 110
+  19,700 up (rounds B54 to B65 took the easier ones up to about 15,000 but left some of that range unread: about 110
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
@@ -3763,11 +3789,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Spinal Embrace, Song of Inspiration, Countersculpt,
   Order of Succession, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Devouring Greed, Infernal
   Tutor, Sadistic Sacrament, Kalitas, Drain Power, Purity, Cloudkill, Volcano Hellion, Bridge from Below, Demonfire,
-  Drain Life, Desolation, War Tax, Urza's Sylex, Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Soul
+  Drain Life, Desolation, War Tax, Urza's Sylex, Diabolic Servitude, Murktide Regent, Shared Fate, Soul
   Exchange.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
-  Eriette, Gastal Thrillroller, Manifold Insights, Take Out the Trash, Glorfindel, Renegade Krasis, Fortune's Favor,
+  Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
   Curse of Inertia, Dreamshaper Shaman, Nefarious Lich, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's
   Sanction, Kathril, Words of Wilding, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli; then on up from 13,200.
 

@@ -2612,7 +2612,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at`: "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -2625,7 +2625,7 @@ export type Effect =
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; /** Kept for Count "returnedToughness" (Vanish into Memory). */ toughnessThisWay?: true; /** "It gains haste" (Obzedat): for as long as it remains on the battlefield; "endOfTurn", until end of turn (Legion's Initiative). */ haste?: true | "endOfTurn"; counter?: CounterKind; /** One of each of these as well (Gilraen). */ counters?: CounterKind[]; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
+  | { type: "returnExiled"; under: "owner" | "you"; /** "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** Kept for Count "returnedToughness" (Vanish into Memory). */ toughnessThisWay?: true; /** "It gains haste" (Obzedat): for as long as it remains on the battlefield; "endOfTurn", until end of turn (Legion's Initiative). */ haste?: true | "endOfTurn"; counter?: CounterKind; /** One of each of these as well (Gilraen). */ counters?: CounterKind[]; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -4698,7 +4698,14 @@ export interface TriggeredAbility {
    */
   excess?: { filter: TargetSpec; noncombat?: true; oneOrMore?: true };
   /** For "spellYouControlDealsDamage": what spell, and dealt to an opponent (or a battle too, `orBattle`). */
-  spellDamage?: { filter: TargetSpec; orBattle?: true };
+  spellDamage?: {
+    filter: TargetSpec;
+    orBattle?: true;
+    /** "deals damage to a player" (Syr Carah): any player, you too, not only an opponent. */
+    anyPlayer?: true;
+    /** "Whenever ~ or an instant or sorcery spell you control deals damage" (Syr Carah): ~ dealing damage to a player too. */
+    orSelf?: true;
+  };
   /**
    * For "youRollDie": the die's result has to be at least `min` ("a 4 or higher"), or its natural result (CR 706.2) has
    * to be `natural` ("a natural 20"), or the die's highest one (`natural: "max"`).
@@ -4750,6 +4757,8 @@ export interface TriggeredAbility {
   blockFilter?: TargetSpec;
   /** "Whenever ~ blocks two or more creatures" (Lairwatch Giant): only if it blocks at least this many as blockers are declared. */
   blocksAtLeast?: number;
+  /** "Whenever a creature ... becomes blocked by two or more creatures" (Seifer, Balamb Rival): only with at least this many blockers as blockers are declared. */
+  blockedByAtLeast?: number;
   /**
    * For "dealsDamageToYou": a source that's a permanent fitting `subjectFilter` (the subject, "it", "that creature"), or
    * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its

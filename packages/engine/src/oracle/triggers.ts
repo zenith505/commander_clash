@@ -564,6 +564,16 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter?.kind !== "object" || filter.controller !== "you" || !filter.keywords?.length) return "fail";
     return { event: "creatureBecomesBlocked", subjectFilter: { ...filter, text: raptor[1]! }, body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], blockingSubject: true, text: "creature blocking it" }, n: 1, action: "sacrifice" }], text: "defending player sacrifices a creature of their choice that's blocking it." } };
   }
+  // Seifer, Balamb Rival: "Whenever a creature attacking one of your opponents becomes blocked by two or more creatures,
+  // that attacking creature gains deathtouch until end of turn": anyone's creature attacking that player (rulings), with
+  // two or more blockers as blockers are declared (CR 509.3c); "that attacking creature" is it.
+  const blockedByMany = /^Whenever an? (creature attacking one of your opponents) becomes blocked by (two|three) or more creatures, (.+)$/.exec(line);
+  if (blockedByMany) {
+    const filter = parseTargetPhrase(blockedByMany[1]!);
+    if (filter?.kind !== "object" || filter.combat !== "attackingOpponent" || /\b(?:it|its|that creature)\b/.test(blockedByMany[3]!)) return "fail";
+    const body = parseBody(blockedByMany[3]!.replace(/\bthat attacking creature\b/g, "it"), { subjectIt: true });
+    return body ? { event: "creatureBecomesBlocked", body, subjectFilter: { ...filter, text: blockedByMany[1]! }, blockedByAtLeast: num(blockedByMany[2]!) } : "fail";
+  }
   const anyones = /^Whenever an? ([A-Z][a-z]+) becomes blocked, (.+)$/.exec(line);
   const other = /^Whenever (an?) ((?:[a-z]+ )?creature(?: you control| an opponent controls)?(?: with [a-z]+| with power or toughness \d+ or less)?) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line) ?? (anyones && CREATURE_TYPES.has(anyones[1]!) ? ["", "a", anyones[1]!, anyones[2]!.replace(new RegExp(`\\bthat ${anyones[1]}\\b(?!'s)`, "g"), "it")] : null);
   if (other) {
@@ -1080,6 +1090,14 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or i
  * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
  */
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Mazzy, Truesword Paladin: "Whenever an Aura you control is put into your graveyard from the battlefield": one you both
+  // controlled and own (cards go to their owners' graveyards, CR 404.2), dying (CR 700.4).
+  const yoursCtl = /^(Whenever an? [A-Z][a-z]+) you control is put into your graveyard from the battlefield, (.+)$/.exec(line);
+  if (yoursCtl) {
+    const t = parseDiesTrigger(`${yoursCtl[1]} you own dies, ${yoursCtl[2]}`);
+    if (!t || t === "fail" || t.event !== "permanentDies" || t.dies?.filter?.kind !== "object" || t.dies.filter.owner !== "you" || t.dies.filter.controller) return "fail";
+    return { ...t, dies: { ...t.dies, filter: { ...t.dies.filter, controller: "you", text: t.dies.filter.text.replace(/ you own$/, " you own and control") } } };
+  }
   // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
   // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
   // Deathknell Berserker: "When ~ dies, if its power was 3 or greater, ...": the same, its power as it last existed.
@@ -2284,10 +2302,14 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
   }
   // Witch-king of Angmar: "Whenever one or more creatures deal combat damage to you, ...".
-  const hurt = /^Whenever one or more creatures deal combat damage to you, (.+)$/.exec(line);
+  // Tamiyo, Upriser Crowned: "... to you while you're the monarch, tap those creatures and put a stun counter on each of
+  // them": the monarch as the damage is dealt (a condition on the event, like Emberwilde Captain's), "those creatures" the
+  // ones that dealt it, as they are now (a creature that has left is a new object, CR 400.7).
+  const hurt = /^Whenever one or more creatures deal combat damage to you( while you're the monarch)?, (.+)$/.exec(line);
   if (hurt) {
-    const body = parseBody(hurt[1]!);
-    return body ? { event: "creaturesDealCombatDamageToYou", body } : "fail";
+    const those = /\bthose creatures\b/.test(hurt[2]!);
+    const body = parseBody(hurt[2]!, those ? { eventGroup: true } : {});
+    return body ? { event: "creaturesDealCombatDamageToYou", body, ...(hurt[1] ? { activeIf: { kind: "monarch" as const } } : {}) } : "fail";
   }
   // Norn's Decree: "Whenever one or more creatures an opponent controls deal combat damage to you, that opponent ...".
   const hurtBy = /^Whenever one or more creatures an opponent controls deal combat damage to you, (.+)$/.exec(line);
@@ -2941,6 +2963,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const excess = parseExcessTrigger(line);
   if (excess) return excess;
+  // Syr Carah, the Bold: "Whenever ~ or an instant or sorcery spell you control deals damage to a player": any player (you
+  // too), once for each player dealt damage (rulings), by ~ itself (combat or not) or by such a spell.
+  const selfOrSpell = /^Whenever ~ or an? (.+? spell) you control deals damage to a player, (.+)$/.exec(line);
+  if (selfOrSpell) {
+    const filter = parseTargetPhrase(selfOrSpell[1]!);
+    const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${selfOrSpell[2]![0]!.toUpperCase()}${selfOrSpell[2]!.slice(1)}`) : null;
+    return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, anyPlayer: true, orSelf: true }, body } : "fail";
+  }
   // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix).
   const spellDmg = /^Whenever an? (.+? spell) you control deals damage to an opponent( or battle)?, (.+)$/.exec(line);
   if (spellDmg) {

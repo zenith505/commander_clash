@@ -2255,6 +2255,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
+    // Siege Dragon: "Whenever ~ attacks, if defending player controls no Walls, it deals 2 damage to each creature without
+    // flying that player controls": "it" is ~ and "that player" the defending player.
+    .replace(/^(Whenever ~ attacks, if defending player controls no [A-Z][a-z]+s), it deals (\d+) damage to each ([a-z ]+?) that player controls\.$/, "$1, ~ deals $2 damage to each $3 defending player controls.")
     // Writ of Passage: "Whenever enchanted creature attacks, if its power is 2 or less, ...": "its" is the enchanted creature's.
     .replace(/^(Whenever enchanted creature attacks), if its (power|toughness) is /, "$1, if enchanted creature's $2 is ")
     // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal

@@ -537,6 +537,8 @@ export interface GameObject {
   sneak?: LastKnown;
   /** Cast using web-slinging (CR 702.188a), while a spell and as the permanent it became: the creature returned to pay for it, as it last existed. */
   webSlung?: LastKnown;
+  /** As a spell: which of its CompiledCard.costOr ways to pay was chosen (Lethal Throwdown). */
+  costOrPaid?: number;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
   bargained?: true;
   /** A token created by a resolving embalm ability (CR 702.128b). */

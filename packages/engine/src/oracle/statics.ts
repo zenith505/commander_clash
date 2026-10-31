@@ -406,7 +406,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { targetDiscountAny: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { lessEachColored: { color: Color; count: Amount } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -458,6 +458,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast"; Infectious Curse: "Spells you cast that
   // target enchanted player cost {1} less to cast": Aura spells and spells with other targets too, not abilities (rulings).
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscount: Number(m[1]) };
+  // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast": any player's (rulings).
+  if ((m = /^Spells that target ~ cost \{(\d+)\} less to cast$/.exec(text))) return { targetDiscountAny: Number(m[1]) };
   if ((m = /^Spells you cast that target enchanted player cost \{(\d+)\} less to cast$/.exec(text))) return { castTargetEnchantedPlayerLess: Number(m[1]) };
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
   if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {
@@ -1814,6 +1816,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const mv = { count: { kind: "affectedManaValue" as const } };
     return [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: mv, toughness: mv }];
   }
+  // The Flesh Is Weak: "Creatures you control with +1/+1 counters on them are artifacts in addition to their other types"
+  // (layer 4, CR 613.1d, 205.1b).
+  if (rest === "are artifacts in addition to their other types") return [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }];
   // Ygra, Eater of All: "are Food artifacts in addition to their other types and have "..."" (an artifact type and the
   // artifact type in layer 4, CR 613.1d, 205.1b; the ability in layer 6).
   if ((m = /^are ([A-Z][a-z]+) artifacts in addition to their other types(?:,? and ((?:has|have) .+))?$/.exec(rest)) && subtypeSet(m[1]!) === "Artifact") {
@@ -2686,7 +2691,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|are artifacts in addition to their other types|(?:is|are) all colors|are the chosen color|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|attacks? an opponent with the most life among your opponents each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect|flying and islandwalk))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

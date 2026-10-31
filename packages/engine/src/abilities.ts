@@ -974,6 +974,8 @@ export interface SearchDest {
   counters?: { counter: CounterKind; n: Amount };
   /** "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura that can't enchant the source stays in the library (rulings). */
   attachToSelf?: true;
+  /** "Search your library for any number of Plains cards, exile them" (Endless Horizons): the cards exiled are linked to the source, for its "a card you own exiled with ~" (CR 607.2a). */
+  linked?: true;
   /** "Exile the other with a silver counter on it" (Karn, Scion of Urza): a counter of this kind on each card exiled (CR 122.1). */
   counter?: CounterKind;
   /** "Put it onto the battlefield tapped under target player's control" (Yavimaya Dryad): that player controls it, the searcher still its owner's library's searcher. */
@@ -3001,7 +3003,7 @@ export type Effect =
    */
   | { type: "meld"; partnerType: "Creature" | "Land" | "Artifact"; attacking?: true }
   /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to; `ifAttachedToYours`: "if it's attached to a creature you control" (Stolen Uniform). */
-  | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true }
+  | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true; /** "If it's an Equipment, unattach it" (Tamiyo's Compleation): only an Equipment. */ ifEquipment?: true }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
   /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */
@@ -3957,7 +3959,7 @@ export type SpellCondition =
   /** "If the sacrificed creature was legendary" (Nasty End): the same, legendary as it last existed (CR 608.2h). */
   | { kind: "sacrificedLegendary" }
   /** "If the sacrificed creature was a Hamster" (Minsc & Boo): one of its creature types as it last existed. */
-  | { kind: "sacrificedSubtype"; subtype: string }
+  | { kind: "sacrificedSubtype"; subtype: string; /** "If an outlaw was sacrificed this way" (Boneyard Desecrator): any one of these too (CR 700.12). */ orSubtypes?: string[] }
   /** "If the sacrificed creature was red" (Lyzolda, the Blood Witch): one of its colors as it last existed (CR 608.2h). */
   | { kind: "sacrificedColor"; color: Color }
   /**
@@ -3972,6 +3974,8 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If the modified creature was sacrificed" (Lethal Throwdown): its additional cost was paid the CompiledCard.costOr way `index` (CR 601.2b); a copy wasn't cast. */
+  | { kind: "costOrPaid"; index: number }
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
   /** `exile`: "if ~ was cast from exile" (Delayed Blast Fireball) instead. A copy wasn't cast (CR 707.10). */
   /** `hand`: "if ~ was cast from your hand" (Transpose). */
@@ -5480,6 +5484,8 @@ export interface CastFromGraveyard {
   alt?: AltCostKind;
   /** "This spell costs {X} less to cast this way, where X is ..." (Visions of Glory): generic mana off when cast this way. */
   less?: Amount;
+  /** "If you pay {1} more to cast it for each other creature card in your graveyard" (Risen Executioner): generic mana on top when cast this way (CR 601.2f). */
+  more?: Amount;
   /** "If you do, ~ enters with a +1/+1 counter on it" (Undead Sprinter): counters the spell cast this way enters with (CR 614.1c). */
   entersWith?: { counter: CounterKind; n: number };
 }
@@ -6248,9 +6254,9 @@ export interface CompiledCard {
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
-  spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; text: string }[];
+  spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
-  spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
+  spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];
   /** "Spells you cast have delve" (Teval, Arbiter of Virtue), CR 702.66a: while they're cast and paid for. */
   spellsHaveDelve?: { filter: TargetSpec; text: string }[];
   /** "Your devotion to each color and each combination of colors is increased by one" (Altar of the Pantheon), CR 700.5: added to its controller's devotion to any color or colors. */
@@ -6406,6 +6412,8 @@ export interface CompiledCard {
   millMore?: ({ plus: number } | { twice: true })[];
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
+  /** "Skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10): its controller's upkeep doesn't happen while their hand is empty. */
+  skipUpkeepIfHellbent?: true;
   /** "Players skip their untap steps." (Stasis, CR 614.10): no player's untap step happens. */
   skipUntapSteps?: boolean;
   /** "You draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem): after that player's draw (rulings). */
@@ -6546,6 +6554,8 @@ export interface CompiledCard {
   targetTax?: number;
   /** "Spells your opponents cast that target ~ cost {1} less to cast" (Accursed Witch): generic mana, once per spell (rulings, CR 601.2f). */
   targetDiscount?: number;
+  /** "Spells that target ~ cost {2} less to cast" (Spellwild Ouphe): any player's spells, generic mana, once per spell however often it's targeted (rulings). */
+  targetDiscountAny?: number;
   /** "Spells you cast that target enchanted player cost {1} less to cast" (Infectious Curse): generic mana, once per spell (rulings). */
   castTargetEnchantedPlayerLess?: number;
   /** "Spells you cast that target a creature cost {2} less to cast" (Killian, Ink Duelist): generic mana only (CR 601.2f). */

@@ -1089,6 +1089,12 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Ice Cream Kitty: "Sacrifice another creature or token": a permanent that's either (a token of any type too).
+  const orToken = /^(artifact|creature|enchantment|land) or token$/.exec(phrase.trim());
+  if (orToken) {
+    const t = orToken[1]!.charAt(0).toUpperCase() + orToken[1]!.slice(1);
+    return { kind: "object", types: [], anyOf: [{ kind: "object", types: [t], text: orToken[1]! }, { kind: "object", types: [], token: true, text: "token" }], text: phrase.trim() };
+  }
   // Rob the Hoard: "artifact, enchantment, or legendary card from your graveyard": a card that's any of them.
   const typesOrLegendary = /^(artifact|creature|enchantment|instant|sorcery|land|planeswalker), (artifact|creature|enchantment|instant|sorcery|land|planeswalker), or legendary card( from (?:your|a) graveyard)$/.exec(phrase.trim());
   if (typesOrLegendary) {
@@ -1499,7 +1505,8 @@ export function parseTargetPhrase(
   }
   // Oblivion Stone: "each nonland permanent without a fate counter on it": any kind of counter.
   // Coiling Stalker: "target creature you control that doesn't have a +1/+1 counter on it": the same.
-  const without = / (?:without|that doesn't have) an? ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
+  // Hindervines: "creatures with no +1/+1 counters on them": the same.
+  const without = / (?:(?:without|that doesn't have) an?|with no) ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
   if (without) {
     extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();

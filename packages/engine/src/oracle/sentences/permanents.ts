@@ -213,7 +213,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
   // Wand of the Worldsoul: "The next spell you cast this turn has convoke" (CR 702.51), the same way.
-  if (s === "The next spell you cast this turn has convoke") return [{ type: "nextSpellImprovise", convoke: true }];
+  // Flockchaser Phantom: "Whenever ~ attacks, the next spell you cast this turn has convoke": the same, in a trigger.
+  if (/^[Tt]he next spell you cast this turn has convoke$/.test(s)) return [{ type: "nextSpellImprovise", convoke: true }];
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
@@ -526,6 +527,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef = { ref: "target", index: i };
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
+  // Tamiyo's Compleation (rewritten in body.ts): the enchanted permanent, if it's an Equipment as this resolves (CR 701.3d).
+  if (s === "Unattach enchanted permanent if it's an Equipment") return [{ type: "unattach", what: { ref: "attached" }, ifEquipment: true }];
   // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
   // Fulgent Distraction: "Tap two target creatures, then unattach all Equipment from them": from both.
   if ((m = /^Unattach all Equipment from (target creature|them)$/.exec(s))) {
@@ -893,7 +896,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
   // Resourceful Defense: "... put those counters on target permanent you control", the same way.
   // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
-  if ((m = /^Put those counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft) {
+  // Buzzard-Wasp Colony: "Whenever another creature you control dies, if it had counters on it, put its counters on ~": the
+  // same ("its" is the creature that died).
+  if ((m = /^Put (?:those|its) counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }

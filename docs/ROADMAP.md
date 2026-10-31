@@ -1,6 +1,6 @@
 # Roadmap
 
-28,646 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,662 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,946 of 4,988 (99%), top 10,000: 9,213 of
 9,979 (92%).
 
@@ -1316,7 +1316,7 @@ line blocks.
    a card with two or more card types" (Rendmaw, Creaking Nest); "you may copy that spell. The copy targets ~" (Ivy,
    Gleeful Spellthief); "Return that creature to its owner's hand at end of combat" after a creature put onto the
    battlefield from the top six (Arthur, Marigold Knight); "that doesn't have the same name as a token you control" (The
-   Apprentice's Folly). +16 (28,631 of 31,936).
+   Apprentice's Folly). +16 (28,647 of 31,936 with B64).
    Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (each poisoned opponent's face-down exiled card,
    playable with mana of any color); Firkraag, Cunning Instigator ("if that creature had to attack this combat");
    Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (every draw
@@ -3794,8 +3794,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   anywhere), Simic Manipulator and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated, Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute, Serum Powder,
   Delaying Shield, Immortal Coil, Fires of Mount Doom.
+- Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
+  card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
+  +1/+1 counter on a creature, ... This ability triggers only once each turn" (Ant-Man, Colony Commander), a Gingerbrute
+  token, a copy of the card Gingerbrute with its mana cost {1} (Ginger, Queen of Sweets, rulings; TokenSpec.manaCost),
+  "Whenever ~ attacks a player who has more life than you, other creatures you control attacking that player get
+  +2/+0" (Namor, Atlantean King: life compared as it attacks), "goad each creature your opponents control that's
+  enchanted by an Aura you control. Put a +1/+1 counter on ~ for each creature goaded this way" (Kaima, the Fractured
+  Calm), "Whenever one or more creature cards are put into graveyards from anywhere" (Dennick, Pious Apparition: anyone's
+  cards, not tokens), "Activate only if you have exactly zero or seven cards in hand" (The Biblioplex), "up to two
+  Cleric, Rogue, Warrior, Wizard, and/or Ally cards" (Tazri, Beacon of Unity), "Noble creatures you control and Lesson
+  spells you control have lifelink" (Lo and Li, Twin Tutors), "if no permanents left the battlefield this turn"
+  (Sarevok, Deathbringer), "You can't become the monarch this turn" (Jared Carthalion, True Heir: the monarch stays the
+  monarch, rulings) and "If damage would be dealt to ~ while you're the monarch, prevent that damage and put that many
+  +1/+1 counters on it", "you may pay {X}{X}. When you do, distribute X +1/+1 counters among any number of target Elves"
+  (Numa, Joraga Chieftain: X paid twice, CR 107.3), "If you sacrificed a creature this way, create ..." and "For each
+  opponent who didn't discard two nonland cards this way, you draw a card" (Garruk, Veiled Butcher), "loses all
+  abilities, and gains hexproof. It can't be blocked this turn" (Chromium, the Mutable), "put three +1/+1 counters on up
+  to one other target artifact or creature. If it isn't a creature, it becomes a 0/0 Mutant creature" (Pizza Face,
+  Gastromancer), "Put a +1/+1 counter on it for each Mount and/or Vehicle you control other than ~" (Spire Mechcycle).
+  +16 (28,631 of 31,936 with round 225).
+- Out after round B64 (looked at, not done): Toluz, Clever Conductor ("exile them" about the discarded cards as a
+  group), Shackles of Treachery (a granted trigger targeting Equipment attached to it), The Five Doctors and Say Its
+  Name (searching library and/or graveyard, or graveyard, hand and/or library), Cosmium Confluence (the same mode more
+  than once), Winter, Cursed Rider (exiling X cards as a cost), Melira, the Living Cure (poison replacement and a
+  delayed return), Mirkwood Trapper ("that player chooses an attacking creature"), Captain Marvel, Apex Avenger ("the
+  same number and kind of counters"), Storyweave (lore counters and the next enchantment creatures entering), Lodestone
+  Bauble (cards from one player's graveyard on top in any order), Ellywick Tumblestrum ("If it's legendary" in a dig,
+  and her emblem), Scythe Specter (the greatest mana value among the discarded cards), Moorland Rescuer (total power X
+  or less), Nazahn, Revered Bladesmith, Liliana, the Necromancer (creature cards from graveyards onto the battlefield).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B63 took the easier ones up to about 15,000 but left some of that range unread: about 110
+  19,700 up (rounds B54 to B64 took the easier ones up to about 15,000 but left some of that range unread: about 110
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported

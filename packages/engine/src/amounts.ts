@@ -423,6 +423,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "goadedThisWay":
+      return s.resolving?.goadedThisWay ?? 0;
     case "revealedUntilCount":
       return s.resolving?.revealedUntilCount ?? 0;
     case "joinForcesPaid":
@@ -660,6 +662,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       // Aclazotz: an opponent with no card to discard (CR 701.9b) didn't discard one.
+      if (c.discardedFewerNonland !== undefined) {
+        const nonland = (pid: PlayerId) => (s.resolving?.discardedAll ?? []).filter((id) => s.objects[id]?.owner === pid && !defOf(s, s.objects[id]!).types.includes("Land")).length;
+        return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && nonland(pid) < c.discardedFewerNonland!).length;
+      }
       if (c.discardedNone) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && !(s.resolving?.discarded?.[pid] ?? 0)).length;
       if (c.drewThisWay) return new Set(((s.resolving?.drawing ? s.resolving.drawnBefore : s.resolving?.drawnThisWay) ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
       // Summon: Yojimbo: opponents still in the game who control at least one such permanent now.
@@ -1109,6 +1115,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "goadedThisWay":
+      return "#goaded";
     case "joinForcesPaid":
       return c.whose ? "#mana they paid" : "#mana paid";
     case "manifestedThisWay":
@@ -1179,7 +1187,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.discardedFewerNonland ? ` who didn't discard ${c.discardedFewerNonland} nonland cards` : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":

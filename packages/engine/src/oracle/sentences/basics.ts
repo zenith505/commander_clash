@@ -1179,6 +1179,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  if (/^You can't become the monarch this turn$/i.test(s)) return [{ type: "cantBecomeMonarch", who: { ref: "you" } }];
   // "It becomes night" (Unnatural Moonrise): CR 731.1.
   if ((m = /^It becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
   // The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." (joined in body.ts): with neither, night.

@@ -6,7 +6,7 @@ import { allEffects } from "../../abilities";
 import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES, COLOR_WORDS } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
 import { parseSearchFilter } from "../search";
-import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
+import { CARD_TOKENS, INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
 import { parseSentence } from "../sentence";
 import { halfX, parseCount } from "../counts";
 import type { Ctx } from "../body";
@@ -15,6 +15,9 @@ import { canonicalKeyword, SUPPORTED_KEYWORDS } from "../../keywords";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+
+  // Ginger, Queen of Sweets: "create a Gingerbrute token": a copy of the card Gingerbrute (rulings).
+  if ((m = new RegExp(`^[Cc]reate an? (${Object.keys(CARD_TOKENS).join("|")}) token$`).exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: 1, token: CARD_TOKENS[m[1]!]! }];
 
   // Kaya, Geist Hunter: "Until end of turn, if one or more tokens would be created under your control, twice that many of
   // those tokens are created instead": a token doubler for the rest of the turn (CR 614.1a, 611.2a). (The body moves a

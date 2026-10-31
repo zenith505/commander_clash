@@ -67,6 +67,7 @@ export interface Ctx {
   costSacrificedX?: string;
   /** "Each opponent discards a card" came just before: "for each opponent who can't". */
   opponentsDiscarded?: boolean;
+  opponentsDiscardedTwo?: boolean;
   /** A "manifest N cards from their hands" instruction came before: "for each card manifested this way". */
   manifested?: boolean;
   /** Parley's "each player reveals the top card of their library" came before: "for each nonland card revealed this way". */
@@ -1048,6 +1049,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+?) and that's tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
   // Echoing Assault: "... The token enters tapped and attacking that player." after "Whenever you attack a player".
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
+  // Moira, Urborg Haunt: "return to the battlefield target creature card in your graveyard that was put there from the
+  // battlefield this turn": the same as "return target ... to the battlefield", in the usual word order.
+  text = text.replace(/^([Rr]eturn) to the battlefield (target [a-z ]+? card in your graveyard(?: that was put there from the battlefield this turn)?)\.$/, "$1 $2 to the battlefield.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
   text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Captain N'ghathrod: "choose target artifact or creature card in an opponent's graveyard that was put there from their
@@ -2662,6 +2666,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // gains indestructible until end of turn. Tap it.": "it" is ~, the one object named. ("It gains X until end of turn" alone
   // already reads as ~.)
   text = text.replace(/((?:^|: |\. )[Pp]ut (?:an?|\w+) [+-]\d\/[+-]\d counters? on ~\.) It (can't be blocked this turn|gains [a-z ]+ until end of turn(?=\. Tap it\.))\.(?: Tap it\.)?/, (all: string, put: string, rest: string) => `${put} ~ ${rest}.${/ Tap it\.$/.test(all) ? " Tap ~." : ""}`);
+  // Spire Mechcycle: "~ becomes an artifact creature. Put a +1/+1 counter on it for each Mount and/or Vehicle you control
+  // other than ~": "it" is ~, the count each permanent that's a Mount or a Vehicle other than ~.
+  text = text.replace(/((?:^|: |\. )~ becomes an artifact creature\.) Put an? (\+1\/\+1) counter on it for each ([A-Z][a-z]+) and\/or ([A-Z][a-z]+) you control other than ~\./, "$1 Put a $2 counter on ~ for each other $3 or $4 you control.");
+  // Chromium, the Mutable: "Until end of turn, ~ becomes a Human with base power and toughness 1/1, loses all abilities,
+  // and gains hexproof. It can't be blocked this turn.": "it" is ~, a separate effect of its own (not an ability it loses).
+  text = text.replace(/((?:^|: |\. )Until end of turn, ~ becomes [^.]+, loses all abilities, and gains [a-z]+\.) It can't be blocked this turn\./, "$1 ~ can't be blocked this turn.");
   // Captain Ripley Vance: "put a +1/+1 counter on ~, then it deals damage equal to its power to any target": "it" is ~, and
   // its power counts the new counter.
   text = text.replace(/(^|: |\. )[Pp]ut (an? [+-]\d\/[+-]\d counter) on ~, then it deals /, "$1Put $2 on ~. ~ deals ");
@@ -3909,6 +3919,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(`Return a permanent card from your graveyard to ${sacYou[2]}`, ctx);
       if (inner?.length !== 1 || inner[0]!.type !== "chooseFromGraveyard") return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay", you: true }, effects: [{ ...inner[0]!, upTo: true, notSacrificed: true }] });
+      continue;
+    }
+    // Garruk, Veiled Butcher: "Each player sacrifices a creature of their choice. If you sacrificed a creature this way,
+    // create a 4/4 green Beast creature token with trample": only if you did, after all the sacrifices (CR 101.4).
+    const sacYouThen = !sacYou ? /^If you sacrificed a creature this way, (create .+)$/.exec(s) : null;
+    if (sacYouThen && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "eachPlayer" && sacPrev.n === 1 && !sacPrev.unless && sacPrev.filter?.types?.join() === "Creature") {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(sacYouThen[1]!), ctx);
+      if (!inner || ctx.targets.length !== before || !inner.every((e) => e.type === "createToken")) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", you: true }, effects: inner });
       continue;
     }
     // "Return a land you control to its owner's hand. If another Desert was returned this way, surveil 1" (Arid Archway).
@@ -7404,7 +7424,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
       // toughness 2/2 until your next turn" (Azure Beastbinder): with no target chosen, the condition is false.
       const then = ifIts[3]!.replace(/^it also /, "it ");
-      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && (["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) || (prev.type === "if" && prev.cond.kind === "targetIs" && prev.cond.index === i)) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
+      // Pizza Face, Gastromancer: "put three +1/+1 counters on up to one other target artifact or creature. If it isn't a
+      // creature, it becomes a 0/0 Mutant creature ...": with no target chosen, nothing happens.
+      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous" || prev?.type === "counters") && !t.many && known && prev && (["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) || (prev.type === "if" && prev.cond.kind === "targetIs" && prev.cond.index === i)) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
         const fx = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
         // Thwip!: "If it's a Spider, you gain 2 life": about the target, an instruction that isn't (no "it" in it). Stand
         // United: "If it's an Ally, scry 2", the same (the scry pauses inside the "if", which keeps its answer).
@@ -8040,7 +8062,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // much is the X paid, and "it" the source.
         const paidText = payFirst.payX?.color ? whenPaid[1]!.replace(/^it deals that much damage\b/, "~ deals X damage") : whenPaid[1]!;
         if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
-        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx);
+        // Numa, Joraga Chieftain: "distribute X +1/+1 counters among any number of target Elves": the X paid, divided as
+        // the reflexive ability is put on the stack (CR 603.12, 601.2d).
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && /^distribute X /.test(paidText));
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -8209,7 +8233,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
     // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
-    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
+    // Numa, Joraga Chieftain: "you may pay {X}{X}": the X paid twice (CR 107.3).
+    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{X\})?(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
     if (mayPayX) {
       // "The amount of life you gained": what the "whenever you gain life" event gave (CR 119.9).
       const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;
@@ -13106,6 +13131,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.
     ctx.opponentsDiscarded = last?.type === "discard" && (last.who.ref === "eachOpponent" || last.who.ref === "eachPlayer") && last.n === 1 && !last.random && !last.filter;
+    // Garruk, Veiled Butcher: "Each opponent discards two cards. For each opponent who didn't discard two nonland cards this way".
+    ctx.opponentsDiscardedTwo = last?.type === "discard" && last.who.ref === "eachOpponent" && last.n === 2 && !last.random && !last.filter;
     if (last?.type === "amass") ctx.amassed = true;
     // "Exile target player's graveyard. For each artifact or land card exiled this way, ..." (Canoptek Scarab Swarm).
     if ((last?.type === "exileGraveyard" && !last.library && !last.until) || (last?.type === "exile" && !last.until && last.what.ref === "target" && ctx.targets[last.what.index]?.kind === "card")) ctx.exiledCards = true;

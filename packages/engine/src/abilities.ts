@@ -245,6 +245,8 @@ export type Count =
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
+  /** "For each creature goaded this way" (Kaima, the Fractured Calm): how many this resolution's goad affected (CR 701.15). */
+  | { kind: "goadedThisWay" }
   /**
    * Join forces: "the total amount of mana paid this way" (Minds Aglow). `whose`: only what these players paid, "the
    * amount of mana they paid this way" (Liege of the Hollows, PlayerRef eachOne).
@@ -508,7 +510,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "For each opponent who didn't discard two nonland cards this way" (Garruk, Veiled Butcher): those in the game who discarded fewer than this many nonland cards in this resolution. */ discardedFewerNonland?: number; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1411,6 +1413,8 @@ export interface TokenSpec {
   legendary?: true;
   /** "Colorless snow artifact tokens named Replicated Ring" (Replicating Ring): the snow supertype (CR 205.4g). */
   snow?: true;
+  /** A token that's a copy of a card (Ginger's Gingerbrute): that card's mana cost (CR 111.3, 707.2). */
+  manaCost?: string;
 }
 
 /**
@@ -1968,7 +1972,7 @@ export type StaticCondition =
   /** "If you cycled two or more cards this turn" (Spellpyre Phoenix): cards cycled this turn, before it was there too (rulings). */
   | { kind: "cycled"; n: number }
   /** Revolt: "if a permanent left the battlefield under your control this turn". */
-  | { kind: "revolt"; /** "If a creature left the battlefield under your control this turn" (Tale of Momo). */ creature?: true }
+  | { kind: "revolt"; /** "If a creature left the battlefield under your control this turn" (Tale of Momo). */ creature?: true; /** "If no permanents left the battlefield this turn" (Sarevok, Deathbringer): none at all, anyone's. */ none?: true }
   /** Void: "if a nonland permanent left the battlefield this turn or a spell was warped this turn". */
   | { kind: "void" }
   /**
@@ -3636,6 +3640,8 @@ export type Effect =
   | { type: "castTargetFree"; what: ObjRef; exileAfter?: true | "instantOrSorcery" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "You can't become the monarch this turn" (Jared Carthalion, True Heir): until the turn ends (TurnLog.cantBecomeMonarch). */
+  | { type: "cantBecomeMonarch"; who: PlayerRef }
   /** "It becomes night" (Unnatural Moonrise), "it becomes day" (CR 731.1): the daybound and nightbound permanents transform with it. */
   | { type: "becomeDayNight"; v: "day" | "night" | /** The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." */ "switch" }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
@@ -4884,6 +4890,8 @@ export interface TriggeredAbility {
   attacksMonarch?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
+  /** With `attacksPlayer`: "a player who has more life than you" (Namor, Atlantean King), as it attacks. */
+  attacksMoreLife?: true;
   /** "Whenever ~ attacks a battle" (Thrashing Frontliner, CR 310.5). */
   attacksBattle?: boolean;
   /** "Whenever ~ attacks for the first time each turn": only on its first attack this turn, as this object (Aurelia). */

@@ -1147,6 +1147,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "descended":
       return (s.descendedThisTurn ?? []).includes(you);
     case "revolt":
+      if (cond.none) return !s.permanentLeftThisTurn?.length;
       if (cond.creature) return (s.turnLog?.creaturesLeft?.[you] ?? 0) > 0;
       return (s.permanentLeftThisTurn ?? []).includes(you);
     case "void":

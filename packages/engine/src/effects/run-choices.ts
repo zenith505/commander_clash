@@ -90,8 +90,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
       if (e.payX && !e.payX.times && e.pay?.mana && sc.may === undefined) {
         if (sc.payX === undefined) {
-          const rest = manaValue(parseManaCost(e.pay.mana.replace("{X}", "")));
-          let cap = Math.min(availableMana(s, ctx.controller) - rest, e.payX.max ? amountNow(s, e.payX.max, ctx) : Infinity);
+          const rest = manaValue(parseManaCost(e.pay.mana.replaceAll("{X}", "")));
+          // Numa, Joraga Chieftain: "you may pay {X}{X}": X twice (CR 107.3), so at most half of what's left.
+          const xs = e.pay.mana.split("{X}").length - 1;
+          let cap = Math.min(Math.floor((availableMana(s, ctx.controller) - rest) / xs), e.payX.max ? amountNow(s, e.payX.max, ctx) : Infinity);
           // Mana of one color only (Leyline Tyrant): as much of it as the player could make.
           const color = e.payX.color;
           if (color) while (cap > 0 && !planMana(s, ctx.controller, parseManaCost(`{${color}}`.repeat(cap)))) cap--;
@@ -104,7 +106,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         } else if (sc.payX === "none") sc.may = false;
         else {
           const n = Number(sc.payX);
-          const pay = { ...e.pay, mana: e.pay.mana.replace("{X}", e.payX.color && n > 0 ? `{${e.payX.color}}`.repeat(n) : `{${n}}`) };
+          const pay = { ...e.pay, mana: e.pay.mana.replaceAll("{X}", e.payX.color && n > 0 ? `{${e.payX.color}}`.repeat(n) : `{${n}}`) };
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `pay ${describePay(pay)}`, source: src, pay };
           return "paused";
         }

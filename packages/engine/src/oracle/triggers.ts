@@ -1095,6 +1095,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
   }
+  // Captain Marvel, Shooting Star: "Whenever a creature other than ~ is exiled from the battlefield": another creature.
+  line = line.replace(/^(When(?:ever)?) an? (creature|permanent|artifact) other than ~ (dies|is exiled from the battlefield|is put into exile from the battlefield|leaves the battlefield), /, "$1 another $2 $3, ");
   // Psychomancer, Shard of the Void Dragon: "is put into a graveyard from the battlefield or is put into exile from the
   // battlefield" is dying or being put into exile from it (CR 700.4).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into a graveyard from the battlefield or is put into exile from the battlefield, /, "$1 dies or is put into exile, ");
@@ -1332,12 +1334,14 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature, destroy that creature. It can't be regenerated.":
   // anyone's Sliver; "that creature" is the creature dealt the damage.
-  const toCreature = /^Whenever a ([A-Z][a-z]+) deals combat damage to a creature, (.+)$/.exec(line);
+  // Sosuke, Son of Seshiro: "Whenever a Warrior you control deals combat damage to a creature": yours only.
+  const toCreature = /^Whenever a ([A-Z][a-z]+)( you control)? deals combat damage to a creature, (.+)$/.exec(line);
   if (toCreature && CREATURE_TYPES.has(toCreature[1]!)) {
-    if (/\b(?:its controller|that player|defending player|that much|that many|X)\b/i.test(toCreature[2]!)) return "fail";
-    const body = parseBody(toCreature[2]!, { subjectIt: true });
+    if (/\b(?:its controller|that player|defending player|that much|that many|X)\b/i.test(toCreature[3]!)) return "fail";
+    const body = parseBody(toCreature[3]!, { subjectIt: true });
     if (!body) return "fail";
-    return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [toCreature[1]!], text: toCreature[1]! }, anyone: true }, body };
+    const yours = toCreature[2] ? { controller: "you" as const } : {};
+    return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [toCreature[1]!], ...yours, text: `${toCreature[1]!}${toCreature[2] ?? ""}` }, anyone: true }, body };
   }
   // Quest for the Gemblades: "Whenever a creature you control deals combat damage to a creature, you may put a quest counter
   // on ~": once for each creature dealt it by each of yours (rulings), whatever the amount.
@@ -3688,6 +3692,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (dealtMin) {
     const t = parseTrigger(`Whenever ~ is dealt damage, ${dealtMin[2]}`);
     return !t || t === "fail" || t.event !== "selfIsDealtDamage" || t.minDamage ? "fail" : { ...t, minDamage: num(dealtMin[1]!) };
+  }
+  // Hercules, Olympian Hero: "Whenever ~ is dealt damage for the first time each turn": its first damage event this turn.
+  const dealtFirst = /^Whenever ~ is dealt damage for the first time each turn, (.+)$/.exec(line);
+  if (dealtFirst) {
+    const t = parseTrigger(`Whenever ~ is dealt damage, ${dealtFirst[1]}`);
+    return !t || t === "fail" || t.event !== "selfIsDealtDamage" ? "fail" : { ...t, firstDealtEachTurn: true };
   }
   const selfMin = /^Whenever ~ deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage, (.+)$/.exec(line);
   if (selfMin) {

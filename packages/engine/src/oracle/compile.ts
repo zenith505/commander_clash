@@ -538,6 +538,9 @@ export function compile(d: CardDef): CompiledCard {
       // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
       // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
       .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
+      // Evin, Waterdeep Opportunist: "Whenever one or more players sacrifice one or more creatures, ... This ability
+      // triggers only once each turn.": at most once a turn either way, on the first sacrifice of a creature (CR 603.2h).
+      .replace(/^Whenever one or more players sacrifice one or more creatures, ([^\n]+ This ability triggers only once each turn\.)$/m, "Whenever a player sacrifices a creature, $1")
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
@@ -2575,9 +2578,26 @@ export function compile(d: CardDef): CompiledCard {
       out.villainAgain = true;
       continue;
     }
-    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
+    // Quicksilver, Brash Blur: "... begin the game with him on the battlefield", his name for "it".
+    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield." || line === "If ~ is in your opening hand, you may begin the game with ~ on the battlefield.") {
       out.beginOnBattlefield = true;
       continue;
+    }
+    // The Chancellors, Sphinx of Foresight, Providence (CR 103.6b): revealed from the opening hand, a delayed trigger
+    // of the revealing player's (CR 603.7) at "the first upkeep" (the game's), "your first upkeep" or "your first main
+    // phase of the game".
+    const revealAt = /^You may reveal ~ from your opening hand\. If you do, at the beginning of (the first upkeep|your first upkeep|your first main phase of the game), (.+)$/.exec(line);
+    const revealAfter = /^You may reveal ~ from your opening hand\. If you do, (.+) at the beginning of (your first upkeep)\.$/.exec(line);
+    const reveal = revealAt ? { at: revealAt[1]!, rest: revealAt[2]! } : revealAfter ? { at: revealAfter[2]!, rest: revealAfter[1]! } : null;
+    if (reveal && !out.openingReveal) {
+      const { at, rest } = reveal;
+      const effect = /\.$/.test(rest) ? rest : `${rest}.`;
+      const t = parseTrigger(`At the beginning of your upkeep, ${effect}`);
+      // Only a plain trigger's instructions: no intervening "if" or other trigger condition to carry over.
+      if (t && t !== "fail" && t.event === "yourUpkeep" && Object.keys(t).every((k) => k === "event" || k === "body")) {
+        out.openingReveal = { when: at === "the first upkeep" ? "nextTurnUpkeep" : at === "your first upkeep" ? "yourNextUpkeep" : "yourNextFirstMain", body: t.body };
+        continue;
+      }
     }
     // Gemstone Caverns (CR 103.6a; the starting player is the one taking the first turn, 103.1).
     const caverns = /^If ~ is in your opening hand and you're not the starting player, you may begin the game with ~ on the battlefield with an? ([a-z]+) counter on it\. If you do, exile a card from your hand\.$/.exec(line);
@@ -4449,6 +4469,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
+      // Jerren, Corrupted Bishop: "Whenever ~ enters or another nontoken Human you control dies, ...": entering and another
+      // creature dying are never one event.
+      /^Whenever ~ enters or (another [^,]+? you control) dies, (.+)$/.exec(line) ??
       // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
       // Restless Revenant): a death and combat damage are never one event.
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
@@ -4486,7 +4509,10 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line) ??
       // The Shrines: "At the beginning of your upkeep and whenever you cast a black spell, put a charge counter on ~": a step
       // and a cast are never one event.
-      /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line);
+      /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line) ??
+      // Kratos, Stoic Father: "Whenever you attack with one or more Gods and whenever a God dies, ...": an attack and a
+      // death are never one event.
+      /^(Whenever you attack with one or more [A-Z][a-z]+s) and (whenever an? [A-Z][a-z]+ dies), (.+)$/.exec(line);
     // MACH-1, Swooping Scoundrel: "When ~ enters and whenever you gain life, surveil 1. This ability triggers only once each
     // turn.": one ability, so the two triggers share the once (CR 603.2h; keyed by the effect's text).
     const onceBoth = !!twice && /^When ~ enters and whenever [^,]+, [^."]+\. This ability triggers only once each turn\.$/.test(line);
@@ -4498,7 +4524,7 @@ export function compile(d: CardDef): CompiledCard {
       if (greaterThanMine) effect = greaterThanMine[1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
         ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
-        : /^At the beginning of your upkeep and whenever /.test(line)
+        : /^At the beginning of your upkeep and whenever /.test(line) || /^Whenever you attack with one or more [A-Z][a-z]+s and whenever /.test(line)
         ? [`${twice[1]}, ${effect}`, `W${twice[2]!.slice(1)}, ${effect}`]
         : /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
@@ -4544,6 +4570,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
+            : /^Whenever ~ enters or another [^,]+? you control dies, /.test(line)
+              ? [`When ~ enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : /^Whenever a creature dies or a creature card is put into a graveyard from a library, /.test(line)

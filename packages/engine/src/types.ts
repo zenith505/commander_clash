@@ -1545,6 +1545,8 @@ export interface TurnLog {
    */
   /** `amount`: how much (Burning-Eye Zubera: "if 4 or more damage was dealt to it this turn"). */
   damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number }[]>;
+  /** How many times each permanent (by "id@zoneChanges") was dealt damage this turn, one for each damage event (Hercules, Olympian Hero's "for the first time each turn"). */
+  timesDealtDamage?: Record<string, number>;
 }
 
 /**
@@ -1883,6 +1885,8 @@ export interface GameState {
   mulligans?: MulliganState | null;
   /** Players still to take actions with their opening hands, in turn order from the starting player (CR 103.6). */
   openingActions?: PlayerId[];
+  /** The current player's opening-hand step: choosing cards to reveal (CR 103.6b) after the ones to begin on the battlefield, or done. */
+  openingStage?: "reveal" | "done";
   /** A spell or ability partway through resolving, waiting on `pending` (see continueResolution). */
   resolving: Resolving | null;
   /**

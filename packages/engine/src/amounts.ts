@@ -935,6 +935,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return types.size;
     }
+    case "planeswalkerTypesAmong": {
+      // A planeswalker's subtypes are planeswalker types (CR 205.3j), but one that's also a creature has creature types too.
+      const types = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Planeswalker")) continue;
+        for (const t of ch.subtypes) if (!CREATURE_TYPES.has(t)) types.add(t);
+      }
+      return types.size;
+    }
     case "keywordsAmong": {
       const found = new Set<string>();
       for (const id of s.battlefield) {
@@ -1229,6 +1239,8 @@ function describeCount(c: Count): string {
       return "#basic land types";
     case "creatureTypesAmong":
       return "#creature types among your creatures";
+    case "planeswalkerTypesAmong":
+      return "#planeswalker types among your planeswalkers";
     case "keywordsAmong":
       return "#abilities among your creatures";
     case "colorsAmongPermanents":

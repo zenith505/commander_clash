@@ -1704,7 +1704,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      const first = (s.turnLog?.timesDealtDamage?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? 0) <= 1;
+      add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0) && (!t.firstDealtEachTurn || first)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {

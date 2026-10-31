@@ -364,6 +364,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Opening hand (CR 103.6a): each card that may begin on the battlefield, one of each name (Gemstone Caverns is
     // legendary, and each one costs a card from the hand).
+    // Opening hand (CR 103.6b): reveal the Chancellors, but not a Providence that would lower our life total (Commander
+    // starts at 40, CR 903.7).
+    if (pend.kind === "searchLibrary" && pend.opening && pend.reveal) {
+      const lowers = (id: ObjectId) => (compileCard(defOf(s, obj(s, id))).openingReveal?.body.effects ?? []).some((e) => e.type === "setLife" && !e.double && !e.lowest && !e.highest && !e.amount && e.n < s.players[pid]!.life);
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => !lowers(id)) }];
+    }
     if (pend.kind === "searchLibrary" && pend.opening) {
       const names = new Set<string>();
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];

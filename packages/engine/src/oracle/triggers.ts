@@ -997,14 +997,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
   // Clement, the Worrywort: "return up to one target creature you control with lesser mana value": less than the entering
   // permanent's, as the target is chosen (TargetSpec.bound, settled in triggerBody).
+  // Boxing Ring: "it fights up to one target creature you don't control with the same mana value": equal to it, the same way.
   const lesser = / with lesser mana value\b/.test(bodyText);
+  const same = !lesser && /^it fights up to one target creature you don't control with the same mana value\.$/.test(bodyText);
   if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "");
+  if (same) bodyText = bodyText.replace(/ with the same mana value\b/, "");
   let body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
-  if (lesser) {
+  if (lesser || same) {
     const [t, ...more] = body.targets;
     if (!t || more.length || t.kind !== "object" || t.bound || t.manaValue) return "fail";
-    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+    body = { ...body, targets: [{ ...t, bound: lesser ? { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } } : { key: "manaValue", at: "exact", amount: { count: { kind: "manaValue", of: { ref: "subject" } } } }, text: `${t.text} with ${lesser ? "lesser" : "the same"} mana value` }] };
   }
   const kind = m[1]!.toLowerCase();
   return {
@@ -1047,6 +1050,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !t.dies?.orSelf || !t.dies.filter.notSubtypes?.includes(selfWasnt[1]!)) return "fail";
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
+  }
+  // One with the Kami: "Whenever enchanted creature or another modified creature you control dies, ...": the creature the
+  // Aura was attached to as it died, whoever controlled it, or a modified creature you controlled (CR 700.9, 603.10a); one
+  // trigger either way.
+  const orModified = /^Whenever enchanted creature or another modified creature you control dies, (.+)$/.exec(line);
+  if (orModified) {
+    const t = parseDiesTrigger(`Whenever a modified creature you control dies, ${orModified[1]}`);
+    if (!t || t === "fail" || !t.dies || t.dies.other || t.dies.orSelf || t.dies.attached) return "fail";
+    return { ...t, dies: { ...t.dies, orAttached: true } };
   }
   if (selfHad) {
     const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]}`);

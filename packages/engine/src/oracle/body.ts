@@ -778,6 +778,20 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
 const LIVING_DEATH = /^Each player exiles all (creature|artifact) cards from their graveyard, then sacrifices all \1s they control, then /;
 
 /** Split `text` at each match of `re` (global) that isn't inside double quotes: a quoted ability is one piece. */
+// "Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your
+// graveyard." (Mulch): the dig for the second sentence, undefined when it isn't one, null when it fails.
+function revealPutAll(count: string, next: string): Effect | null | undefined {
+  // Marina Vendrell: "Put all enchantment cards from among them into your hand and the rest ..." the same.
+  const putAll = /^Put all (.+?) cards (?:revealed this way|from among them) into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(next.replace(/\.$/, ""));
+  if (!putAll) return undefined;
+  const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
+  const n = count === "X" ? X : num(count);
+  if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
+  const rest = putAll[2] === "into your graveyard" ? "graveyard" : "bottom";
+  // Every match is taken, however many.
+  return { type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(putAll[2]!) ? { random: true as const } : {}) };
+}
+
 function splitOutsideQuotes(text: string, re: RegExp): string[] {
   const out: string[] = [];
   let start = 0;
@@ -1018,6 +1032,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (!body) return null;
     return { ...body, modal: { ...body.modal!, modes: body.modal!.modes.map((m) => ({ ...m, effects: [...structuredClone(pump!.effects), ...m.effects] })) } };
   }
+  // Bumi, King of Three Trials: "choose up to X, where X is the number of Lesson cards in your graveyard —" (a triggered
+  // ability's): up to all the modes, each once (rulings), but no more than X, counted as it's put on the stack (CR 603.3c).
+  const upToX = !opts.spell && !opts.activated ? /^[Cc]hoose up to X, where X is ([^—•]+?) —\s*((?:•[^•]+)+)$/.exec(text.trim()) : null;
+  if (upToX) {
+    const maxCount = parseCount(upToX[1]!, null);
+    const body = maxCount && parseModal("any number", upToX[2]!, text.trim(), opts);
+    if (!body || usesX(body.modal!.modes)) return null;
+    return { ...body, modal: { ...body.modal!, maxCount } };
+  }
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -1245,6 +1268,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Herald of Ilharg: "~ deals damage equal to the number of counters on it to each opponent": "it" is ~.
   // Charging Cinderhorn: "Then ~ deals damage ...".
   text = text.replace(/(^|\. |, |\. Then )~ deals damage equal to the number of ((?:[+-]?[a-z0-9/+-]+ )?)counters on it to\b/g, "$1~ deals damage equal to the number of $2counters on ~ to");
+  // Depala, Pilot Exemplar: "reveal the top X cards of your library, put all Dwarf and Vehicle cards from among them into
+  // your hand, then put the rest on the bottom of your library in a random order": Mulch's reveal (see "Put all" below).
+  text = text.replace(/\b([Rr])eveal the top (X|two|three|four|five|six|seven|eight|nine|ten) cards of your library, put all ([^.,]+?) cards from among them into your hand, then put the rest on the bottom of your library in a random order\./, "$1eveal the top $2 cards of your library. Put all $3 cards from among them into your hand and the rest on the bottom of your library in a random order.");
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
@@ -1697,6 +1723,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sword of the Meek: "return ~ from your graveyard to the battlefield, then attach it to that creature": one sentence
   // (sentences/zones.ts), not split at ", then".
   text = text.replace(/\b([Rr]eturn ~ from your graveyard to the battlefield), then (attach it to that creature)\./, "$1 and then $2.");
+  // Ratonhnhaké꞉ton: "return target Equipment card from your graveyard to the battlefield, then attach it to that token":
+  // one sentence too (see zones.ts).
+  text = text.replace(/\b([Rr]eturn target Equipment card from your graveyard to the battlefield), then (attach it to that token)\./, "$1 and then $2.");
   // Dimir Keyrune: "~ becomes a 2/2 blue and black Horror artifact creature until end of turn and can't be blocked this
   // turn": two instructions about the same permanent.
   text = text.replace(/^(~ becomes an? [^.]+? until end of turn) and can't be blocked this turn\./, "$1. ~ can't be blocked this turn.");
@@ -2553,6 +2582,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // The Invincible Iron Man: "You may put an artifact card from your hand onto the battlefield. If it's an Equipment,
+    // attach it to ~": the card put, attached after it enters (CR 701.3a).
+    if (s === "If it's an Equipment, attach it to ~" && last?.type === "putFromHand" && !ctx.spell && !last.any && last.upTo === undefined && !last.who && !last.fromHandOf && !last.attachToSubject && !last.attachSelf && !last.orGraveyard && !last.attacking && !last.manifest) {
+      last.equipToSelf = true;
+      continue;
+    }
     // Zaffai, Thunder Conductor: "If that spell's mana value is 10 or greater, ~ deals 10 damage to an opponent chosen at
     // random.": the opponent picked at random as it resolves, only if the spell that triggered it has that mana value (X
     // as cast, rulings).
@@ -4619,15 +4654,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
-    // Marina Vendrell: "Put all enchantment cards from among them into your hand and the rest ..." the same.
-    const putAll = revealN && /^Put all (.+?) cards (?:revealed this way|from among them) into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-    if (revealN && putAll) {
-      const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
-      const n = revealN[1] === "X" ? X : num(revealN[1]!);
-      if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
-      const rest = putAll[2] === "into your graveyard" ? "graveyard" : "bottom";
-      // Every match is taken, however many.
-      effects.push({ type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(putAll[2]!) ? { random: true as const } : {}) });
+    const putAll = revealN ? revealPutAll(revealN[1]!, sentences[si + 1] ?? "") : undefined;
+    if (putAll === null) return null;
+    if (putAll) {
+      effects.push(putAll);
       si++;
       continue;
     }
@@ -7364,6 +7394,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // Depala, Pilot Exemplar: "you may pay {X}. If you do, reveal the top X cards of your library. Put all Dwarf and
+      // Vehicle cards from among them into your hand and the rest on the bottom ...": the whole reveal is paid for.
+      const revealPaid = new RegExp(`^reveal the top ${NUMX} cards of your library$`).exec(then[1]!);
+      const paidPutAll = revealPaid ? revealPutAll(revealPaid[1]!, sentences[si + 1] ?? "") : undefined;
+      if (paidPutAll === null) return null;
+      if (paidPutAll) {
+        effects.push({ type: "may", effects: [paidPutAll], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}. ${sentences[si + 1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
+        payFirst = null;
+        si++;
+        continue;
+      }
       // Skirk Drill Sergeant: "you may pay {2}{R}. If you do, reveal the top card of your library. If it's a Goblin
       // permanent card, put it onto the battlefield. Otherwise, put it into your graveyard.": the reveal and what's done
       // with the card, only if paid.
@@ -9476,6 +9517,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const countedTarget = prev?.type === "counters" && prev.what.ref === "target" && prev.what.index === 0 && ctx.targets.length === 1 && !ctx.targets[0]!.many && !ctx.targets[0]!.optional && typeof prev.n === "number" && prev.n > 0;
       const always = (whenDo === searched || countedTarget || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
       if (!rolled && !counted && !mayDo && !sacSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
+      // Ratonhnhaké꞉ton: "Create a 1/1 black Assassin creature token with menace. When you do, return target Equipment card
+      // from your graveyard to the battlefield, then attach it to that token": about the token created, which must still
+      // be there (CR 603.12, 400.7). With a token doubler it's about the first one created.
+      if (created && prev.n === 1 && si + 1 === sentences.length && /\bthat token\b/.test(whenDo[1]!) && !where) {
+        const reflexive = reflexiveBody(whenDo[1]!, ctx, false, true);
+        if (!reflexive) return null;
+        effects.push({ type: "reflexive", body: reflexive, about: "created" });
+        si = sentences.length;
+        continue;
+      }
       // Mount Velus Manticore: "you may discard a card. When you do, ~ deals X damage to any target, where X is the number
       // of card types the discarded card has": that card's, counted as the reflexive ability triggers (its X, CR 603.12).
       const discTypes = mayDo && where?.[2] === "the number of card types the discarded card has" && prev.effects.length === 1 && prev.effects[0]!.type === "discard" && prev.effects[0]!.n === 1 && prev.effects[0]!.who.ref === "you" && !prev.effects[0]!.random;
@@ -9633,6 +9684,60 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const counter = counterKind(ctlCtr[2]!);
       if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
       effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "control" }], duration: "game", whileCounter: counter });
+      continue;
+    }
+    // In Search of Greatness: "you may cast a permanent spell from your hand ... without paying its mana cost. If you don't,
+    // scry 1.": only if no spell was cast that way (declining, or having none to cast).
+    const dontCast = /^If you don't, (.+)$/.exec(s);
+    if (dontCast && last?.type === "castFromHand" && !last.setsDid && si === sentences.length - 1) {
+      const inner = parseOne(capital(dontCast[1]!), ctx);
+      if (!inner) return null;
+      last.setsDid = true;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      continue;
+    }
+    // Karai, Future of the Foot: "return target creature card from your graveyard to your hand. If her sneak cost was paid
+    // this turn, instead return that card to the battlefield.": where it goes chosen by whether this permanent was cast
+    // for its sneak cost this turn (CR 702.190a), as it resolves.
+    const sneakInstead = /^If (?:his|her|its|~'s) sneak cost was paid this turn, instead return that card to the battlefield$/.test(s);
+    if (sneakInstead) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || si !== sentences.length - 1 || effects.length !== 1 || prev?.type !== "bounce" || prev.what.ref !== "target" || ctx.targets[prev.what.index]?.kind !== "card" || ctx.targets[prev.what.index]?.owner !== "you") return null;
+      effects[0] = { type: "if", cond: { kind: "state", cond: { kind: "self", is: "sneakThisTurn" } }, effects: [{ type: "putOntoBattlefield", what: prev.what }], otherwise: [prev] };
+      continue;
+    }
+    // Zimone and Dina: "Draw a card. You may put a land card from your hand onto the battlefield tapped. If you control eight
+    // or more lands, repeat this process once.": the whole effect again (not the cost, rulings), if the condition holds
+    // after the first time.
+    const repeatIf = /^If (you control .+), repeat this process once$/.exec(s);
+    if (repeatIf && si === sentences.length - 1 && effects.length && !ctx.targets.length) {
+      const cond = parseStaticCondition(repeatIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || effects.some((e) => e.type === "if" || e.type === "may" || e.type === "reflexive")) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond }, effects: structuredClone(effects) });
+      continue;
+    }
+    // Sensational Spider-Man: "Then you may remove up to three stun counters from among all permanents. Draw cards equal to
+    // the number of stun counters removed this way.": any permanents' (rulings), chosen as it resolves (CR 608.2d), then
+    // that many cards.
+    const removeAmong = new RegExp(`^(?:[Yy]ou may r|R)emove up to ${NUM} ${COUNTER} counters from among all permanents$`).exec(s);
+    const drawRemoved = removeAmong ? new RegExp(`^Draw cards equal to the number of ${removeAmong[2]!.replace(/[+/]/g, "\\$&")} counters removed this way\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (removeAmong && drawRemoved) {
+      const counter = counterKind(removeAmong[2]!);
+      effects.push({ type: "distribute", counter, n: num(removeAmong[1]!), filter: { kind: "object", types: [], text: "permanents" }, remove: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "countersRemovedThisWay" } } });
+      si++;
+      continue;
+    }
+    // Mathas, Fiend Seeker: "Put a bounty counter on target creature an opponent controls. For as long as that creature has
+    // a bounty counter on it, it has "When this creature dies, each opponent draws a card and gains 2 life."": the ability
+    // granted to what the counter was just put on, for as long as it has one (CR 611.2b), even after the source leaves, and
+    // once however many counters were put (rulings). Its "each opponent" is its controller's, as it dies (rulings).
+    const grantCtr = new RegExp(`^For as long as that creature has an? ${COUNTER} counter on it, it has "([^"]+)"$`).exec(s);
+    if (grantCtr) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(grantCtr[1]!);
+      const grant = parseGrants(`"${grantCtr[2]!}"`);
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target" || grant?.length !== 1 || grant[0]!.kind !== "addAbility") return null;
+      effects.push({ type: "continuous", what: prev.what, mods: grant, duration: "game", whileCounter: counter });
       continue;
     }
     // Ultima, Origin of Oblivion: "Put a blight counter on target land. For as long as that land has a blight counter on it,
@@ -10713,6 +10818,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(`target ${targetReveals[1]}`, ctx);
       if (!filter || filter.kind !== "card" || !filter.types?.length || !who) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who, yours: true, ...(putYours[1] ? { tapped: true as const } : {}) });
+      si++;
+      continue;
+    }
+    // Reality Scramble: "Reveal cards from the top of your library until you reveal a card that shares a card type with
+    // that permanent. Put that card onto the battlefield and the rest on the bottom of your library in a random order.":
+    // the target's types as it last existed, once it's gone (CR 608.2h).
+    if (/^Reveal cards from the top of your library until you reveal a card that shares a card type with that permanent$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Put that card onto the battlefield and the rest on the bottom of your library in a random order" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && !ctx.targets[0]!.many) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" }, found: "battlefield", rest: "bottom", sharesTypeWith: 0 });
       si++;
       continue;
     }

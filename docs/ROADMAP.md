@@ -1,7 +1,7 @@
 # Roadmap
 
-28,136 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,162 of
+28,153 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,172 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -706,7 +706,7 @@ line blocks.
    may put ~ from your graveyard on top of your library" (Gate Colossus), "then if that creature has toughness 6 or
    greater" (Dormant Grove), "instant and sorcery spells you control have lifelink / deathtouch" (Heartflame Duelist,
    Pestilent Spirit). A browser test clicks through Let's Play a Game's mode menu with and without delirium.
-   Out after round 200 (looked at, not done): Thrasta (trample over planeswalkers isn't modeled), Enchanter's Bane (a
+   Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), Faerie Slumber Party (no record of who controlled the creatures
    returned this way), You Cannot Pass! (no record of which creatures blocked or were blocked by a legendary creature),
    Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (total mana value of
@@ -1152,6 +1152,34 @@ line blocks.
    Speaker (paying {E} for each mana of a permanent spell's cost); Yusri, Fortune's Flame (choose a number, flips lost,
    "if you won five flips", free casts for the turn); Party Dude ("Whenever one or more of your opponents are
    attacked"); Feather, the Redeemed; Maralen, Fae Ascendant.
+   Round 220: "each Vehicle you control gets +1/+1 as long as it's a creature" and a paid "reveal the top X cards, put
+   all Dwarf and Vehicle cards into your hand" (Depala, Pilot Exemplar); "If it's an Equipment, attach it to ~" after
+   a put from hand (The Invincible Iron Man, CR 701.3); "When you do, return target Equipment card ... then attach it
+   to that token" (Ratonhnhaké꞉ton, CR 603.12); "up to one other target creature loses all abilities and becomes a
+   green Lizard" (Lizard, Connors's Curse); "for as long as that creature has a bounty counter on it, it has ..."
+   (Mathas, Fiend Seeker); "enchanted creature or another modified creature you control dies" (One with the Kami, CR
+   700.9); "choose up to X, where X is ..." (Bumi, King of Three Trials: the most modes counted as it triggers, CR
+   603.3c); "remove up to three stun counters from among all permanents. Draw cards equal to the number removed" (Sensational
+   Spider-Man: the distribute picker's remove mode, e2e round220.spec.ts); "if you control eight or more lands, repeat
+   this process once" (Zimone and Dina); a fight "with the same mana value" and "a creature that fought this turn"
+   (Boxing Ring); "if her sneak cost was paid this turn, instead return that card to the battlefield" (Karai, Future of
+   the Foot); "If you don't, scry 1" after a free cast from hand (In Search of Greatness); "if ~ attacked this combat,
+   target creature an opponent controls blocks that Wolf this combat if able" (Tolsimir, Midnight's Light); "if that
+   player attacked you during their last turn" (O-Kagachi, Vengeful Kami); "cloak a card from your hand" (Vannifar,
+   Evolved Enigma, e2e round220.spec.ts); trample over planeswalkers (Thrasta, Tempest's Roar, CR 702.19c-e, in
+   dealCombatDamage); "reveal ... until you reveal a card that shares a card type with that permanent" (Reality
+   Scramble). +17 (28,153 of 31,936).
+   Smaller gaps from round 220: Ratonhnhaké꞉ton's reflexive return is about the first token only when a token doubler
+   makes more; Karai's "her sneak cost was paid this turn" needs Karai still on the battlefield as the same object; the
+   Iron Man test runs its back face as a card of its own; bots choose Vannifar's mode like any modal trigger.
+   Out after round 220 (looked at, not done): Ghost of Ramirez DePietro (no record yet of a card discarded this turn,
+   only of cards put into a graveyard from a library); Reservoir Kraken ("any opponent may tap an untapped creature they
+   control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
+   instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
+   this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (a Tarmogoyf token isn't a predefined token);
+   Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
+   creature); Yidris, Maelstrom Wielder (cascade on spells cast from hand for the turn); Animal Friend (a quoted
+   ability that refers to its source); Hive Mind.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

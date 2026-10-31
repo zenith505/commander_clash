@@ -785,6 +785,32 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // creatures anyone controls.
       const self = e.move ? objects(s, { ref: "self" }, ctx).find((o) => o.zone === "battlefield") : undefined;
       if (e.move && !self) return;
+      // Sensational Spider-Man: "remove up to three stun counters from among all permanents": any permanents that have one
+      // that can come off them (Fear of Sleep Paralysis), anyone's (rulings).
+      if (e.remove) {
+        const has = Object.fromEntries(s.battlefield.flatMap((id) => (objectMatches(s, e.filter, obj(s, id), ctx.controller, false) && removableCounters(s, obj(s, id), e.counter) > 0 ? [[id, removableCounters(s, obj(s, id), e.counter)] as const] : [])));
+        const removable = Object.keys(has);
+        if (n <= 0 || !removable.length) return;
+        const parts = sc.distributed;
+        if (!parts) {
+          s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options: removable, what: e.filter.text, remove: true, has };
+          return "paused";
+        }
+        let removed = 0;
+        for (const id of removable) {
+          const o = obj(s, id);
+          const k = Math.min(parts[id] ?? 0, removableCounters(s, o, e.counter));
+          if (k <= 0) continue;
+          const had = o.counters[e.counter] ?? 0;
+          o.counters[e.counter] = had - k;
+          removed += k;
+          invalidateCharacteristics(s);
+          log(s, `${characteristics(s, o).name} loses ${k} ${e.counter} counter${k > 1 ? "s" : ""}.`);
+          if (had === k) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
+        }
+        r.countersRemoved = (r.countersRemoved ?? 0) + removed;
+        return;
+      }
       const options = s.battlefield.filter((id) => (e.move ? id !== self!.id && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false)));
       if (n <= 0 || !options.length) return;
       let parts = sc.distributed;

@@ -1094,6 +1094,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you were the monarch as the turn began$/.test(text)) return { kind: "monarch", asTurnBegan: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
+  if (/^that player attacked you during their last turn$/.test(text)) return { kind: "eventPlayerAttackedYou" };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
@@ -1168,6 +1169,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
   if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };
+  // Tolsimir, Midnight's Light: "if ~ attacked this combat": declared as an attacker in this combat (CR 508.1), even if
+  // it's been removed from combat since.
+  if (/^~ attacked this combat$/.test(text)) return { kind: "self", is: "attackedThisCombat" };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
@@ -2334,6 +2338,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const st = parseStaticLine(`Land creatures ${landSurge[1]}.`);
     return st && !st.condition ? { ...st, text: line } : null;
   }
+  // Depala, Pilot Exemplar: "Each Vehicle you control gets +1/+1 as long as it's a creature": Vehicle creatures (crewed,
+  // CR 301.7b), worked out as the bonus applies in layer 7c (CR 613.4c).
+  const vehicleSurge = /^Each Vehicle you control gets ([+-]\d+)\/([+-]\d+) as long as it's a creature$/.exec(text);
+  if (vehicleSurge)
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], subtypes: ["Vehicle"], text: "Vehicle creature you control" } }, mods: [{ kind: "modifyPT", power: Number(vehicleSurge[1]), toughness: Number(vehicleSurge[2]) }], text: line };
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the

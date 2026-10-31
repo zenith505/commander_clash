@@ -456,8 +456,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
   // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
-  // the attacking creature (the trigger's subject).
-  if ((m = /^((?:up to one )?target .+?) blocks it this combat if able$/i.exec(s)) && ctx.subjectIt) {
+  // the attacking creature (the trigger's subject). Tolsimir, Midnight's Light: "blocks that Wolf this combat if able".
+  if ((m = /^((?:[Uu]p to one )?[Tt]arget .+?) blocks (?:it|that [A-Z][a-z]+) this combat if able$/.exec(s)) && ctx.subjectIt && (/ blocks it /.test(s) || CREATURE_TYPES.has(/ blocks that ([A-Z][a-z]+) /.exec(s)?.[1] ?? ""))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
   }
@@ -1457,8 +1457,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,
-  // card and creature types are replaced; its supertypes stay (rulings).
-  if ((m = /^(target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
+  // card and creature types are replaced; its supertypes stay (rulings). "Up to one other target creature" (Lizard,
+  // Connors's Curse) the same.
+  if ((m = /^((?:up to one )?(?:other )?target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];

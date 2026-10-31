@@ -334,6 +334,8 @@ export type Count =
   | { kind: "attachedToHost"; subtypes: string[] }
   /** "For each creature type among creatures you control" (Valiant Changeling): each type once; a creature with changeling has them all (CR 205.3m, 702.73a). */
   | { kind: "creatureTypesAmong" }
+  /** "The number of planeswalker types among planeswalkers you control" (Tam, the Possibility): each planeswalker type once (CR 205.3j), as it's counted. */
+  | { kind: "planeswalkerTypesAmong" }
   /** "The number of abilities from among flying, first strike, ... found among creatures you control" (Odric, Blood-Cursed): each listed keyword once if any creature you control has it, a "hexproof from" counting as hexproof (rulings). */
   | { kind: "keywordsAmong"; keywords: string[] }
   /** Domain: "basic land type among lands you control". */
@@ -2053,7 +2055,7 @@ export type StaticCondition =
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
-  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number }
+  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number; /** "As long as an opponent has cast a spell this turn" (Captain Mar-Vell): spells cast by any one opponent. */ byOpponent?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
   | { kind: "colorsAmong"; n: number }
   /** "You've gained 5 or more life this turn": in total. */
@@ -4836,6 +4838,8 @@ export interface TriggeredAbility {
   firstAttack?: true;
   /** "Whenever ~ deals combat damage to a player for the first time each turn" (Raphael, Tag Team Tough): as this object (GameObject.combatHitTurn). */
   firstHit?: true;
+  /** "Whenever ~ is dealt damage for the first time each turn" (Hercules, Olympian Hero): only its first damage event this turn (TurnLog.timesDealtDamage). */
+  firstDealtEachTurn?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
@@ -6060,6 +6064,13 @@ export interface CompiledCard {
    * Caverns: only if you're not the starting player, with a counter on it, and "if you do, exile a card from your hand".
    */
   beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
+  /**
+   * "You may reveal ~ from your opening hand. If you do, at the beginning of the first upkeep, ..." (the Chancellors,
+   * CR 103.6b): revealing it makes a delayed triggered ability of the revealing player's (CR 603.7) with these
+   * instructions, at the first upkeep of the game ("nextTurnUpkeep"), their first upkeep ("yourNextUpkeep") or their
+   * first precombat main phase ("yourNextFirstMain"). Each one revealed makes its own (Chancellor of the Spires rulings).
+   */
+  openingReveal?: { when: "nextTurnUpkeep" | "yourNextUpkeep" | "yourNextFirstMain"; body: AbilityBody };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
   /** "If you would gain life while you have 5 or less life, ..." (Phial of Galadriel): `doubleLifeGain` only while this holds, as the life would be gained. */

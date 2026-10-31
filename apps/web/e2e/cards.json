@@ -3084,6 +3084,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8ce2a750-1137-4f8d-803c-9aac30db4193",
+  "name": "Chancellor of the Dross",
+  "manaCost": "{4}{B}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Phyrexian Vampire",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Vampire"
+  ],
+  "oracleText": "You may reveal this card from your opening hand. If you do, at the beginning of the first upkeep, each opponent loses 3 life, then you gain life equal to the life lost this way.\nFlying, lifelink",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "53231b31-fb3c-4b30-bfe9-0ee8e754247b",
   "name": "Chandra, Hope's Beacon",
   "manaCost": "{4}{R}{R}",

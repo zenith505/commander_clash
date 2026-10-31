@@ -1082,6 +1082,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
+  // Captain Mar-Vell, Space-Born: "As long as an opponent has cast a spell this turn".
+  if (/^an opponent has cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, byOpponent: true };
   // Rhino, Barreling Brute: "if you've cast a spell with mana value 4 or greater this turn": its mana value on the stack,
   // X included (CR 202.3e).
   if ((m = /^you've cast a spell with mana value (\d+) or greater this turn$/.exec(text))) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, mvAtLeast: Number(m[1]) };
@@ -2787,7 +2789,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).
   const unblocked = [{ kind: "unblockedDamage" }] as const;
-  if (/^You may have ~ assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "self" }, mods: [...unblocked], text: line };
+  // Wolverine, Claws Out: "You may have ~ assign ~'s combat damage as though ~ weren't blocked" (his name for "its").
+  if (/^You may have ~ assign (?:its|~'s) combat damage as though (?:it|~) weren't blocked$/.test(text)) return { affects: { kind: "self" }, mods: [...unblocked], text: line };
   if (/^Enchanted creature's controller may have it assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "attached" }, mods: [...unblocked], text: line };
   if (/^As long as ~ is attacking, for each creature you control, you may have that creature assign its combat damage as though it weren't blocked$/.test(text))
     return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [...unblocked], text: line, condition: { kind: "self", is: "attacking" } };

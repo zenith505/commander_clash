@@ -101,6 +101,7 @@ const tezzeretAgentOfBolas = () => card("Tezzeret, Agent of Bolas", "Legendary P
 const tezzeretTheSchemer = () => card("Tezzeret the Schemer", "Legendary Planeswalker — Tezzeret", "{2}{U}{B}", { cmc: 4, colors: ["B", "U"], loyalty: "5", oracleText: "+1: Create a colorless artifact token named Etherium Cell with \"{T}, Sacrifice this token: Add one mana of any color.\"\n−2: Target creature gets +X/-X until end of turn, where X is the number of artifacts you control.\n−7: You get an emblem with \"At the beginning of combat on your turn, target artifact you control becomes an artifact creature with base power and toughness 5/5.\"" });
 
 const searingBlaze = () => card("Searing Blaze", "Instant", "{R}{R}", { cmc: 2, colors: ["R"], keywords: ["Landfall"], oracleText: "Searing Blaze deals 1 damage to target player or planeswalker and 1 damage to target creature that player or that planeswalker's controller controls.\nLandfall — If you had a land enter the battlefield under your control this turn, Searing Blaze deals 3 damage to that player or planeswalker and 3 damage to that creature instead." });
+const littjaraKinseekers = () => card("Littjara Kinseekers", "Creature — Shapeshifter", "{3}{U}", { cmc: 4, colors: ["U"], power: "2", toughness: "4", keywords: ["Changeling"], oracleText: "Changeling (This card is every creature type.)\nWhen this creature enters, if you control three or more creatures that share a creature type, put a +1/+1 counter on this creature, then scry 1." });
 
 // Test cards.
 const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
@@ -128,7 +129,7 @@ const types = (s: GameState, id: string) => characteristics(s, s.objects[id]!).t
 
 describe("Lane B round 55", () => {
   it("are fully supported", () => {
-    supported(steamcoreScholar(), thoughtpickerWitch(), greenbeltRampager(), soulsOfTheFaultless(), gravestorm(), sigilOfMyrkul(), sporeCloud(), caseOfTheGatewayExpress(), cyberneticaDatasmith(), arcSpitter(), devouringTendrils(), leaveChance(), nahiriStormOfStone(), ironMan(), tezzeretTheSchemer(), tezzeretAgentOfBolas(), searingBlaze());
+    supported(steamcoreScholar(), thoughtpickerWitch(), greenbeltRampager(), soulsOfTheFaultless(), gravestorm(), sigilOfMyrkul(), sporeCloud(), caseOfTheGatewayExpress(), cyberneticaDatasmith(), arcSpitter(), devouringTendrils(), leaveChance(), nahiriStormOfStone(), ironMan(), tezzeretTheSchemer(), tezzeretAgentOfBolas(), searingBlaze(), littjaraKinseekers());
   });
 
   it("Steamcore Scholar: discard an instant, a sorcery or a creature card with flying, or else two cards", () => {
@@ -508,5 +509,19 @@ describe("Lane B round 55", () => {
     expect(pt(s, t)).toBe("5/5");
     s = goUntil(s, (x) => x.activePlayer !== ap && x.step === "main1");
     expect(pt(s, t)).toBe("5/5");
+  });
+
+  it("Littjara Kinseekers: with an Elf Warrior and an Elf Wizard, three share a type (rulings); with an Elf and a Bear, not", () => {
+    for (const elves of [true, false]) {
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, vanilla("Test Elf Warrior", "Creature — Elf Warrior", "{G}", 1, 1, 1, { colors: ["G"] }));
+      putOnBattlefield(s0, ap, elves ? vanilla("Test Elf Wizard", "Creature — Elf Wizard", "{U}", 1, 1, 1, { colors: ["U"] }) : bearC());
+      const k = toZone(s0, ap, littjaraKinseekers(), "hand");
+      poolOnly(s0, ap, { U: 1, C: 3 });
+      const s = settle(castNow(s0, ap, k));
+      expect(zone(s, k)).toBe("battlefield");
+      expect(counters(s, k), String(elves)).toBe(elves ? 1 : 0);
+      expect(pt(s, k)).toBe(elves ? "3/5" : "2/4");
+    }
   });
 });

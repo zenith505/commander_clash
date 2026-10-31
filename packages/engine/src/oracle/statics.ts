@@ -1564,9 +1564,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
   if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
   // Synchronized Eviction: "if you control at least two creatures that share a creature type": two or more of yours with
-  // one creature type in common.
-  if ((m = /^you control at least (two|three|four|five) creatures that share a creature type$/.exec(text)))
-    return { kind: "control", who: "you", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, min: num(m[1]!), sameCreatureType: true };
+  // one creature type in common. Littjara Kinseekers: "if you control three or more creatures that share a creature type".
+  if ((m = /^you control (?:at least (two|three|four|five)|(two|three|four|five) or more) creatures that share a creature type$/.exec(text)))
+    return { kind: "control", who: "you", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, min: num(m[1] ?? m[2]!), sameCreatureType: true };
   // Maze's Mantle: "if enchanted creature has toxic": any toxic N (CR 702.164a).
   if (text === "enchanted creature has toxic") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], toxic: true, text: "creature with toxic" } };
   // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that

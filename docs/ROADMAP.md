@@ -1,6 +1,6 @@
 # Roadmap
 
-28,472 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,489 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,177 of
 9,979 (91%).
 
@@ -1704,12 +1704,12 @@ line blocks.
      hidden library; a name from outside the game can't be chosen (it would do nothing here). The picker's first list
      shows only cards you've seen.
    - Still out: "if they can't" (Brain Pry), damage per revealed card (Thought Hemorrhage), "put all of them with that
-     name into your hand" (Desperate Research, Wood Sage, Tamiyo), Academic Probation's other mode, the chosen card
+     name into your hand" (Desperate Research, Wood Sage, Tamiyo), the chosen card
      from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect), Deadly Cover-Up, Deicide ("if the
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
-     cards from an opponent's hand (Dementia Sliver, Nebuchadnezzar), Isperia, Mindblaze, Liar's Pendulum, Lammastide
+     cards from an opponent's hand (Dementia Sliver, Nebuchadnezzar), Mindblaze, Liar's Pendulum, Lammastide
      Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
      (Aether Burst), Sound the Call.
    - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
@@ -3553,8 +3553,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Strife (a new choice for each player as it enters), Haktos the Unscarred (protection from each mana value but one), plus
   Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax, Hibernation's
   End, Jeskai Infiltrator and Flash Foliage.
+- Round B59 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "Until end of
+  turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (Mistcaller), "Double all damage that
+  creature sources you control would deal" (Absorbing Man and Titania), "Instant and sorcery spells you control have
+  rebound" (Cast Through Time), "target monocolored instant or sorcery card" (Maestros Confluence), "exile the top card
+  of your library. If it's a land card, create ... Otherwise, you may cast it until the end of your next turn" (Bruse
+  Tarl, Roving Rancher), "you may exile a card from a graveyard. If a creature card was exiled this way" (Deathbonnet
+  Sprout // Deathbonnet Hulk; "you may exile a card from a graveyard" no longer forces one), "each creature that doesn't
+  have first strike, double strike, vigilance, or haste", "attack with at least two creatures that have ..., and/or
+  haste" and "Choose a creature at random that attacked this turn. Destroy that creature" (Path of Mettle // Metzali,
+  Tower of Triumph), "gain control of enchanted permanent until end of turn. Untap that permanent" (Frenzied Fugue),
+  "each player starting with you may pay any amount of mana" (Mana-Charged Dragon), "Then you may reveal a Giant card
+  from your hand. When you do, ..." and "The next Giant spell you cast this turn costs {2} less" (Invasion of the
+  Giants), "Whenever you cast a spell with mana value 5 or greater this turn" as a chapter (Battle of Frost and Fire),
+  "That creature gains bushido 1 and becomes a Samurai in addition to its other creature types" (Sensei Golden-Tail, for
+  good), "It gains defender and becomes a colorless artifact ... Its activated abilities can't be activated" (Xathrid
+  Gorgon, for good), "a creature card with no abilities" (Fang-Druid Summoner), "If a card with the chosen name is
+  revealed this way" (Isperia the Inscrutable), "a multicolored instant or sorcery spell" (Cloven Casting), and a leading
+  "Until your next turn" now covers "..., and its activated abilities can't be activated" too (Academic Probation's
+  second mode; Dovin Baan's and Linvala, Shield of Sea Gate's abilities, whose other lines keep them out). A "When ~
+  enters, choose a card name" trigger no longer counts as the name a static or ban uses (Petrified Hamlet stays out). +17
+  (28,489 of 31,936).
+- Out after round B59 (looked at, not done): Djinn Illuminatus and Reiterating Bolt (replicate granted or paid with
+  energy), Heliod's Punishment (a granted ability that refers to its source), Creeping Peeper and Karfell Harbinger (mana
+  for special actions), Quarantine Field (X targets from its counters), Shivan Sand-Mage and Timebender (suspended cards as
+  targets), Emrakul's Evangel (sacrificing any number as a cost), Ancestral Knowledge, Ral and the Implicit Maze (the
+  Spellgorger Weird token), plus Awe Strike, Pulsemage Advocate, Aphetto Dredging and text-changing cards.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B58 took the easier ones up to about 15,000 but left some of that range unread: about 150
+  19,700 up (rounds B54 to B59 took the easier ones up to about 15,000 but left some of that range unread: about 150
   there are still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc and Vengevine;
   `npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported

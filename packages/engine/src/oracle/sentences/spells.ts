@@ -12,6 +12,7 @@ import { PREDEFINED_TOKENS } from "../tokens";
 import { parseSearchFilter } from "../search";
 import { parseCostChange } from "../statics";
 import { parsePunisherOptions } from "./basics";
+import { CREATURE_TYPES } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -58,7 +59,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // you cast this turn costs {X} less to cast, where X is ~'s power as this ability resolves" (Maelstrom Muse), "... for
   // each counter removed this way" (Mutated Cultist): a reduction to only the next such spell its controller casts this
   // turn, generic mana only (CR 601.2f, 118.7a; rulings), counted as it resolves.
-  if ((m = /^[Tt]he next ((?:instant or sorcery |noncreature |creature |artifact )?spell) you cast this turn costs \{(\d+|X)\} less to cast(?:, where X is (.+?)| for each (.+))?$/.exec(s)) && (m[2] === "X") === !!(m[3] || ctx.whereX)) {
+  // Invasion of the Giants: "The next Giant spell you cast this turn costs {2} less to cast": a spell with that creature type
+  // (a kindred one too, CR 205.3m).
+  if ((m = /^[Tt]he next ((?:instant or sorcery |noncreature |creature |artifact |[A-Z][a-z]+ )?spell) you cast this turn costs \{(\d+|X)\} less to cast(?:, where X is (.+?)| for each (.+))?$/.exec(s)) && (m[2] === "X") === !!(m[3] || ctx.whereX) && (!/^[A-Z]/.test(m[1]!) || CREATURE_TYPES.has(m[1]!.split(" ")[0]!))) {
     const what = m[1] === "spell" ? "Spells" : `${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1).replace(/ or /, " and ")}s`;
     const change = parseCostChange(`${what} you cast cost {${m[2] === "X" ? 1 : m[2]}} less to cast`);
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard || change.costMod.times || change.costMod.nth) return null;

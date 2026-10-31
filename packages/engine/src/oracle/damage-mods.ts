@@ -138,6 +138,9 @@ export function parseDamageMod(line: string): StaticAbility | null {
     .replace(/^Double all damage (equipped|enchanted) creature would deal$/, "If $1 creature would deal damage, it deals double that damage instead")
     // Wolverine, Best There Is: "Double all damage ~ would deal".
     .replace(/^Double all damage ~ would deal$/, "If ~ would deal damage, it deals double that damage instead")
+    // Absorbing Man and Titania: "Double all damage that creature sources you control would deal": each creature source's
+    // damage, as it would be dealt (CR 614.1a).
+    .replace(/^Double all damage that creature sources you control would deal$/, "If a creature source you control would deal damage, it deals double that damage instead")
     // Raphael, the Muscle: "Double all damage that creatures you control with counters on them would deal", each one's.
     .replace(/^Double all damage that creatures you control with counters on them would deal$/, "If a creature you control with a counter on it would deal damage, it deals double that damage instead");
   // Ojer Axonil: "If a red source you control would deal an amount of noncombat damage less than ~'s power to an opponent,

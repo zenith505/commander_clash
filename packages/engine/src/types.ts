@@ -1799,6 +1799,8 @@ export interface GameState {
   damagedThisTurn?: PlayerId[];
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): the turn it applies in (CR 614.1a). */
   exileDyingTurn?: number;
+  /** Mistcaller: the turn in which nontoken creatures that weren't cast are exiled instead of entering (CR 614.1a). */
+  exileUncastTurn?: number;
   /** "If a creature an opponent controls would die this turn, exile it instead" (Malicious Eclipse): whose opponents' creatures, and the turn. */
   exileDyingOpponents?: { turn: number; player: PlayerId }[];
   /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */

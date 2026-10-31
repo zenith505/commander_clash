@@ -505,6 +505,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "exileIfDies", what }] : null;
   }
   if (/^If a creature would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn" }];
+  // Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (CR 614.1a),
+  // Containment Priest's replacement for the rest of the turn, from any zone but the stack (rulings).
+  if (/^(?:Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead|If a nontoken creature would enter and it wasn't cast, exile it instead until end of turn)$/.test(s)) return [{ type: "exileUncastThisTurn" }];
   // Malicious Eclipse: "If a creature an opponent controls would die this turn, exile it instead": only those an opponent of
   // the spell's controller controls as they would die (CR 614.1a).
   if (/^If a creature an opponent controls would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn", opponentsOfYou: true }];
@@ -1099,6 +1102,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // (rulings). Layer 2.
   if ((m = /^(Gain|That player gains) control of enchanted creature$/.exec(s)) && !ctx.spell && (m[1] === "Gain" || ctx.clashOpp))
     return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "game", ...(m[1] === "Gain" ? {} : { giveTo: { ref: "clashOpponent" as const } }) }];
+  // Sensei Golden-Tail: "Put a training counter on target creature. That creature gains bushido 1 and becomes a Samurai in
+  // addition to its other creature types.": with no duration, for as long as it's that permanent (CR 611.2a); the counter
+  // only marks it (rulings).
+  // Xathrid Gorgon: "Put a petrification counter on target creature. It gains defender and becomes a colorless artifact in
+  // addition to its other types.": the same (rulings).
+  if ((m = /^(That creature|It) gains (bushido \d+|defender) and (becomes an? (?:[A-Z][a-z]+ in addition to its other creature types|colorless artifact in addition to its other types))$/.exec(s)) && ctx.activated) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    const mods = what?.ref === "target" ? parseChanges(`gains ${m[2]} and ${m[3]}`) : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Frenzied Fugue: "gain control of enchanted permanent until end of turn": the permanent it's attached to as this resolves
+  // (layer 2), until the turn ends.
+  if ((m = /^[Gg]ain control of enchanted (creature|permanent) until end of turn$/.exec(s)) && !ctx.spell)
+    return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "endOfTurn" }];
   // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
   // cleanup step of your next turn (CR 514.2, 611.2a).
   if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)

@@ -1734,16 +1734,19 @@ export function parseTargetPhrase(
     // Murasa Sproutling: "card with a kicker ability": kicker or multikicker, a variant of it (CR 702.33c), as printed.
     extra.anyOf = ["Kicker", "Multikicker"].map((k) => ({ kind: "object" as const, keywords: [k], text: k.toLowerCase() }));
     p = p.slice(0, m.index);
-  } else if ((m = /(?:^| )(with|without) ([a-z ]+?|[a-z]+(?:, [a-z]+)+, and\/or [a-z]+)( you control| you don't control| an opponent controls)?$/.exec(p))) {
+  } else if ((m = /(?:^| )(with|without) ([a-z ]+?|[a-z ]+(?:, [a-z ]+)+, and\/or [a-z ]+|[a-z ]+(?:, [a-z ]+)+, or [a-z ]+)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough. "With flying, deathtouch,
     // and/or lifelink" (Henrika, Infernal Seer): any of them.
-    const listed = m[1] === "with" ? /^((?:[a-z]+, )+)and\/or ([a-z]+)$/.exec(m[2]!) : null;
+    const listed = m[1] === "with" ? /^((?:[a-z ]+, )+)(?:and\/)?or ([a-z ]+)$/.exec(m[2]!) : null;
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
-    // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither.
-    const neither = m[1] === "without" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
+    // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither. Path of Mettle: "without first strike,
+    // double strike, vigilance, or haste": with none of them.
+    const neitherList = m[1] === "without" ? /^((?:[a-z ]+, )+)or ([a-z ]+)$/.exec(m[2]!) : null;
+    const neither = m[1] === "without" && !neitherList ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
+    const noneOf = neitherList ? [...neitherList[1]!.split(", ").filter(Boolean), neitherList[2]!] : neither ? [neither[1]!, neither[2]!] : undefined;
     const anyNames = listed ? [...listed[1]!.split(", ").filter(Boolean), listed[2]!] : either ? [either[1]!, either[2]!] : undefined;
-    const kws = anyNames ? anyNames.map((k) => keywordOf(k)) : neither ? [neither[1]!, neither[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
-    if (!kws || kws.some((k) => !k) || kws.length !== (anyNames ? anyNames.length : neither ? 2 : 1)) return null;
+    const kws = anyNames ? anyNames.map((k) => keywordOf(k)) : noneOf ? noneOf.map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (anyNames ? anyNames.length : noneOf ? noneOf.length : 1)) return null;
     if (anyNames) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
     else if (m[1] === "with") extra.keywords = kws as string[];
     else extra.notKeywords = kws as string[];
@@ -1998,7 +2001,9 @@ export function parseTargetPhrase(
       // A hyphenated creature type: "Assembly-Worker".
       else if (w.includes("-") && HYPHENATED.has(w)) subtypes.push(HYPHENATED.get(w)!);
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);
-      else if ((w === "multicolored" || w === "monocolored" || w === "colorless" || w === "colored") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
+      // "Monocolored instant or sorcery card" (Maestros Confluence): a leading one is for every alternative, as a leading
+      // supertype is (below), only before bare card types.
+      else if ((w === "multicolored" || w === "monocolored" || w === "colorless" || w === "colored") && !extra.colorCount && (alts.length === 1 || (alt === alts[0] && i === 0 && words.length === 2 && !!TYPE_WORDS[words[1]!] && alts.slice(1).every((a) => { const ws = a.trim().split(/\s+/); return ws.length === 1 && !!TYPE_WORDS[ws[0]!]; })))) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);
       else if (w === "permanent" && inGraveyard) types.push(...PERMANENT_TYPES); // "permanent card" (CR 110.4b)
       // "Green permanent spell": one that isn't an instant or a sorcery (CR 110.4a: those are the spells that become

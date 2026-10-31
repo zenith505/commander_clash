@@ -2894,6 +2894,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveSplitSecond ??= []).push(f);
       continue;
     }
+    // Cast Through Time: "Instant and sorcery spells you control have rebound" (CR 702.88a): checked as such a spell finishes
+    // resolving (rulings), so it applies only while it's on the battlefield then.
+    const giveRebound = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you control have rebound\.(?: \(.*\))?$/.exec(line);
+    if (giveRebound) {
+      const f = parseTargetPhrase(`${giveRebound[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell" || (f.types ?? []).some((x) => x !== "Instant" && x !== "Sorcery") || !f.types?.length) out.unsupported.push(raw);
+      else (out.spellsHaveRebound ??= []).push(f);
+      continue;
+    }
     // Soulfire Grand Master: "Instant and sorcery spells you control have lifelink"; Pestilent Spirit: "... have deathtouch".
     // Damage those spells deal while it's on the battlefield (CR 702.15b, 702.2b).
     const giveKw = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you control have (lifelink|deathtouch)\.$/.exec(line);
@@ -5084,6 +5093,9 @@ function checkCastingLinks(out: CompiledCard) {
   handExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
+  // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);
+  // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
+  if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName")) bad = true;
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // Sower of Discord's trigger is about the two players chosen as it entered, and only that.

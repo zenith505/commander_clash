@@ -1825,6 +1825,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (!e.repeatNonland || land) break;
         }
       return;
+    case "destroyRandom": {
+      // Metzali: chosen at random as it resolves, then destroyed (an indestructible one is chosen and survives, rulings).
+      const options = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      if (!options.length) return;
+      const id = options[Math.floor(nextRandom(s) * options.length)]!;
+      log(s, `${src} chooses ${nameOf(s, id)} at random.`);
+      destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+      return;
+    }
     case "keepRest":
       return keepRest(s, e, ctx, src);
     case "keepDestroyRest": {
@@ -2352,7 +2361,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!sc.found) {
           const cards = yards();
           if (!cards.length) return;
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true, ...(cards.some((id) => obj(s, id).zone === "exile") ? { exiled: true as const } : {}) };
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: e.upTo ? 0 : 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true, ...(cards.some((id) => obj(s, id).zone === "exile") ? { exiled: true as const } : {}) };
           return "paused";
         }
         const found = sc.found.filter((id) => yards().includes(id));
@@ -2375,6 +2384,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, id, "exile");
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
         }
+        // "If a creature card was exiled this way" (Deathbonnet Hulk): the card exiled.
+        if (!toField) s.resolving!.yardChosen = found.filter((id) => obj(s, id).zone === "exile");
         return;
       }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
@@ -2900,6 +2911,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `This turn, ${player(s, ctx.controller).name}'s permanents are exiled instead of being put into a graveyard, and return at the beginning of the next end step.`);
       return;
     }
+    case "exileUncastThisTurn":
+      s.exileUncastTurn = s.turn;
+      log(s, "Until end of turn, nontoken creatures that weren't cast are exiled instead of entering the battlefield.");
+      return;
     case "exileDyingThisTurn":
       if (e.opponentsOfYou) s.exileDyingOpponents = [...(s.exileDyingOpponents ?? []).filter((x) => x.turn === s.turn && x.player !== ctx.controller), { turn: s.turn, player: ctx.controller }];
       else s.exileDyingTurn = s.turn;

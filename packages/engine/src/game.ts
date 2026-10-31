@@ -753,8 +753,10 @@ export function moveObject(
   // (CR 614.12: a noncreature card entering as a creature too, rulings). A spell resolving was cast; a copy is a token.
   if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "stack" && fromZone !== "phasedOut" && fromZone !== "merged" && !o.isToken && !o.spellCopy) {
     const priest = s.battlefield.find((b) => b !== id && abilitiesOf(s, obj(s, b)).exileUncastCreatures);
-    if (priest && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown)) {
-      log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is exiled instead of entering: it wasn't cast (${characteristics(s, obj(s, priest)).name}).`);
+    // Mistcaller: the same until end of turn (CR 614.1a), whatever became of it.
+    const mist = s.exileUncastTurn === s.turn;
+    if ((priest || mist) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown)) {
+      log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is exiled instead of entering: it wasn't cast (${priest ? characteristics(s, obj(s, priest)).name : "this turn"}).`);
       to = "exile";
     }
   }

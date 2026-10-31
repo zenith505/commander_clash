@@ -5,7 +5,7 @@ import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { blightCost, parseAdditionalCost } from "./keyword-abilities";
 import { parseTargetPhrase, pickFilter } from "./targets";
-import { parseOnlyClauses } from "./statics";
+import { parseOnlyClauses, parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import type { ManaType } from "../types";
 
@@ -354,6 +354,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (lessTurn && !costLess && !costLessIf) {
       costLessIf = { n: Number(lessTurn[1]), cond: { kind: "yourTurn" } };
       effectText = effectText.slice(0, lessTurn.index);
+      found = true;
+    }
+    // Esquire of the King: "This ability costs {2} less to activate if you control a legendary creature", Thaumaton Torpedo:
+    // "if you attacked with a Spacecraft this turn": as the cost is worked out (CR 602.2b, 601.2f).
+    const lessIf = / This ability costs \{(\d+)\} less to activate if (?!it targets )([^.]+)\.$/.exec(effectText);
+    const lessCond = lessIf && !costLess && !costLessIf && !costLessIfTarget ? parseStaticCondition(lessIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (lessIf && lessCond) {
+      costLessIf = { n: Number(lessIf[1]), cond: lessCond };
+      effectText = effectText.slice(0, lessIf.index);
       found = true;
     }
     // Raft Security Officer: "This ability costs {1} less to activate if it targets a creature with power 3 or less": as the

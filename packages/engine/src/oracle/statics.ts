@@ -211,6 +211,14 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: m[2] ? "attackingAlone" : "attacking", text: m[2] ? "creature attacking alone" : "attacking creature" } } };
   }
+  // Snow Devil: "Enchanted creature has first strike as long as it's blocking and you control a snow land": both, the
+  // creature it's attached to blocking (CR 509.1g) and the land yours, as they are now.
+  if ((m = /^(Enchanted|Equipped) creature has ([a-z ]+) as long as it's blocking and (you control .+)$/.exec(text))) {
+    const st = parseStatic(`${m[1]} creature has ${m[2]}.`);
+    const yours = st && parseStaticCondition(m[3]!, st);
+    if (!st || st.condition || st.affects.kind !== "attached" || !yours) return null;
+    return { ...st, text: line, condition: { kind: "allOf", conds: [{ kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "blocking", text: "blocking creature" } }, yours] } };
+  }
   // Sword of the Paruns: "As long as equipped creature is tapped, tapped creatures you control get +2/+0": while the
   // creature it's attached to is tapped (or untapped), the rest applies; unattached, neither does.
   if ((m = /^As long as (enchanted|equipped) creature is (tapped|untapped), ((?:un)?tapped creatures you control get .+)$/.exec(text))) {
@@ -1536,6 +1544,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
   if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
+  // Synchronized Eviction: "if you control at least two creatures that share a creature type": two or more of yours with
+  // one creature type in common.
+  if ((m = /^you control at least (two|three|four|five) creatures that share a creature type$/.exec(text)))
+    return { kind: "control", who: "you", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, min: num(m[1]!), sameCreatureType: true };
   // Maze's Mantle: "if enchanted creature has toxic": any toxic N (CR 702.164a).
   if (text === "enchanted creature has toxic") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], toxic: true, text: "creature with toxic" } };
   // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that

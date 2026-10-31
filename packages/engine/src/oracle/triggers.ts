@@ -2863,6 +2863,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(line.replace(/tap it(\.?)$/, "tap enchanted creature$1"));
     return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
   }
+  // Mongrel Pack: "When ~ dies during combat, ...": only a death during a combat phase (CR 506.1).
+  const diesCombat = /^When ~ dies during combat, (.+)$/.exec(line);
+  if (diesCombat) {
+    const t = parseTrigger(`When ~ dies, ${diesCombat[1]!}`);
+    return !t || t === "fail" || t.event !== "selfDies" ? "fail" : { ...t, ifDiesInCombat: true };
+  }
   // Rose Noble: "Whenever you cast a Doctor spell or creature spell with doctor's companion": a spell that's either.
   const doctorOr = /^Whenever you cast a Doctor spell or creature spell with doctor's companion, (.+)$/.exec(line);
   if (doctorOr) {

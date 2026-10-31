@@ -4751,6 +4751,8 @@ export interface TriggeredAbility {
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
+  /** Mongrel Pack: "When ~ dies during combat": only if it dies during a combat phase (CR 506.1). */
+  ifDiesInCombat?: true;
   /** Fyndhorn Druid: "When ~ dies, if it was blocked this turn": it became blocked this turn as that object (CR 509.1h, 603.10a). */
   ifBlockedThisTurn?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */

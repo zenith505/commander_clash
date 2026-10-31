@@ -103,7 +103,18 @@ const ragamuffinRaptor = () => card("Ragamuffin Raptor", "Creature — Dinosaur"
 const wardscaleDragon = () => card("Wardscale Dragon", "Creature — Dragon", "{4}{W}{W}", { cmc: 6, colors: ["W"], power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nAs long as this creature is attacking, defending player can't cast spells." });
 const roseNoble = () => card("Rose Noble", "Legendary Creature — Human", "{3}{U}", { cmc: 4, colors: ["U"], power: "2", toughness: "3", keywords: ["Ward", "Doctor's companion"], oracleText: "Ward {2}\nWhenever you cast a Doctor spell or creature spell with doctor's companion, draw a card.\nDoctor's companion (You can have two commanders if the other is the Doctor.)" });
 
-// Test cards.
+const rosecotKnight = () => card("Rosecot Knight", "Creature — Human Knight", "{4}{W}", { cmc: 5, colors: ["W"], power: "3", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhen this creature enters, look at the top six cards of your library. You may reveal an artifact or enchantment card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, put a +1/+1 counter on this creature." });
+const blossomPrancer = () => card("Blossom Prancer", "Creature — Spirit", "{3}{G}{G}", { cmc: 5, colors: ["G"], power: "4", toughness: "4", keywords: ["Reach"], oracleText: "Reach\nWhen this creature enters, look at the top five cards of your library. You may reveal a creature or enchantment card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, you gain 4 life." });
+const contagiousVorrac = () => card("Contagious Vorrac", "Creature — Phyrexian Boar Beast", "{2}{G}", { cmc: 3, colors: ["G"], power: "3", toughness: "3", keywords: ["Proliferate"], oracleText: "When this creature enters, look at the top four cards of your library. You may reveal a land card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)" });
+const pulsarSquadronAce = () => card("Pulsar Squadron Ace", "Creature — Human Pilot", "{1}{W}", { cmc: 2, colors: ["W"], power: "1", toughness: "2", oracleText: "When this creature enters, look at the top five cards of your library. You may reveal a Spacecraft card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, put a +1/+1 counter on this creature." });
+const inscribedTablet = () => card("Inscribed Tablet", "Artifact", "{1}", { cmc: 1, colors: [], oracleText: "{1}, {T}, Sacrifice this artifact: Reveal the top five cards of your library. Put a land card from among them into your hand and the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, draw a card." });
+const okibaSalvage = () => card("Okiba Salvage", "Sorcery", "{4}{B}", { cmc: 5, colors: ["B"], oracleText: "Return target creature or Vehicle card from your graveyard to the battlefield. Then put two +1/+1 counters on that permanent if you control an artifact and an enchantment." });
+const mirkwoodNurturer = () => card("Mirkwood Nurturer", "Creature — Elf Ranger", "{2}{G/U}", { cmc: 3, colors: ["G", "U"], power: "3", toughness: "2", oracleText: "When this creature enters, return up to one other target permanent you control to its owner's hand. If you do, put a +1/+1 counter on this creature." });
+const mongrelPack = () => card("Mongrel Pack", "Creature — Dog", "{3}{G}", { cmc: 4, colors: ["G"], power: "4", toughness: "1", oracleText: "When this creature dies during combat, create four 1/1 green Dog creature tokens." });
+const esquireOfTheKing = () => card("Esquire of the King", "Creature — Human Soldier", "{W}", { cmc: 1, colors: ["W"], power: "1", toughness: "1", oracleText: "{4}{W}, {T}: Creatures you control get +1/+1 until end of turn. This ability costs {2} less to activate if you control a legendary creature." });
+const synchronizedEviction = () => card("Synchronized Eviction", "Instant", "{4}{U}", { cmc: 5, colors: ["U"], oracleText: "This spell costs {2} less to cast if you control at least two creatures that share a creature type.\nPut target nonland permanent into its owner's library second from the top." });
+const snowDevil = () => card("Snow Devil", "Enchantment — Aura", "{1}{U}", { cmc: 2, colors: ["U"], keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature has flying.\nEnchanted creature has first strike as long as it's blocking and you control a snow land." });
+
 // Test cards.
 const vanilla = (name: string, typeLine: string, cost: string, cmc: number, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, cost, { cmc, power: String(p), toughness: String(t), ...extra });
 const bearC = (name = "Plain Bear", p = 2, t = 2) => vanilla(name, "Creature — Bear", "{1}{G}", 2, p, t, { colors: ["G"] });
@@ -134,7 +145,7 @@ const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | 
 
 describe("Lane B round 53", () => {
   it("are fully supported", () => {
-    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble());
+    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble(), rosecotKnight(), blossomPrancer(), contagiousVorrac(), pulsarSquadronAce(), inscribedTablet(), okibaSalvage(), mirkwoodNurturer(), mongrelPack(), esquireOfTheKing(), synchronizedEviction(), snowDevil());
   });
 
   it("Sheoldred's Restoration: returns the creature card; kicked you gain its mana value in life, unkicked you lose it", () => {
@@ -418,5 +429,159 @@ describe("Lane B round 53", () => {
     expect(s.players[ap]!.hand.length).toBe(n0);
     s = settle(castNow(s, ap, ids[2]!));
     expect(s.players[ap]!.hand.length).toBe(n0 - 1);
+  });
+
+  /** Puts `defs` on top of `pid`'s library, the first on top. */
+  const onTop = (s: GameState, pid: PlayerId, defs: CardDef[]) => [...defs].reverse().map((d) => toZone(s, pid, d, "library")).reverse();
+  const enchantmentC = () => card("Test Glory", "Enchantment", "{1}{W}", { cmc: 2, colors: ["W"] });
+  const landC = (name = "Test Waste") => card(name, "Land", "", { oracleText: "{T}: Add {C}." });
+  const spacecraftC = () => card("Test Spacecraft", "Artifact — Spacecraft", "{3}", { cmc: 3, oracleText: "Station (Tap another creature you control: Put charge counters equal to its power on this Spacecraft. Station only as a sorcery. It's an artifact creature at 12+.)" });
+
+  it("didn't put a card into your hand: Rosecot Knight, Blossom Prancer, Pulsar Squadron Ace and Contagious Vorrac", () => {
+    const cases: [() => CardDef, Partial<Record<"W" | "G" | "C", number>>, () => CardDef, (s: GameState, me: PlayerId, self: string) => unknown, unknown, unknown][] = [
+      [rosecotKnight, { W: 1, C: 4 }, trinket, (s, _me, self) => counters(s, self), 0, 1],
+      [blossomPrancer, { G: 2, C: 3 }, enchantmentC, (s, me) => life(s, me), 40, 44],
+      [pulsarSquadronAce, { W: 1, C: 1 }, spacecraftC, (s, _me, self) => counters(s, self), 0, 1],
+    ];
+    for (const [def, pool, wanted, measure, took, skipped] of cases)
+      for (const take of [true, false]) {
+        const { s: s0, ap, ids } = setup([def()]);
+        poolOnly(s0, ap, pool);
+        const top = onTop(s0, ap, [bearC("Dull Bear"), wanted(), landC()]);
+        let s = settle(castNow(s0, ap, ids[0]!), at("searchLibrary", ap));
+        expect(s.pending, def().name).toMatchObject({ kind: "searchLibrary", cards: def === blossomPrancer ? [top[0], top[1]] : [top[1]] });
+        s = settle(act(s, { type: "searchLibrary", player: ap, found: take ? [top[1]!] : [] }));
+        expect(zone(s, top[1]!)).toBe(take ? "hand" : "library");
+        expect(measure(s, ap, ids[0]!), `${def().name} ${take}`).toBe(take ? took : skipped);
+      }
+    // Contagious Vorrac proliferates only when it took no land.
+    for (const take of [true, false]) {
+      const { s: s0, ap, ids } = setup([contagiousVorrac()]);
+      poolOnly(s0, ap, { G: 1, C: 2 });
+      const grown = putOnBattlefield(s0, ap, bearC("Grown Bear"));
+      s0.objects[grown]!.counters = { "+1/+1": 1 };
+      const top = onTop(s0, ap, [landC(), bearC("Dull Bear")]);
+      let s = settle(castNow(s0, ap, ids[0]!), at("searchLibrary", ap));
+      s = settle(act(s, { type: "searchLibrary", player: ap, found: take ? [top[0]!] : [] }));
+      expect(counters(s, grown)).toBe(take ? 1 : 2);
+    }
+  });
+
+  it("Inscribed Tablet: a land from the top five, or a card drawn when there is none", () => {
+    for (const land of [true, false]) {
+      const { s: s0, ap } = setup([]);
+      onlyHand(s0, ap, []);
+      const tablet = putOnBattlefield(s0, ap, inscribedTablet());
+      onTop(s0, ap, land ? [bearC("Dull Bear"), landC("Found Waste"), bearC("Dull Bear 2"), bearC("Dull Bear 3"), bearC("Dull Bear 4")] : [1, 2, 3, 4, 5, 6].map((i) => bearC(`Dull Bear ${i}`)));
+      const s = settle(run(s0, planActivate(s0, ap, tablet, 0, [])));
+      expect(zone(s, tablet)).toBe("graveyard");
+      expect(s.players[ap]!.hand.map((id) => nameOf(s, id))).toEqual(land ? ["Found Waste"] : ["Dull Bear 6"]);
+    }
+  });
+
+  it("Okiba Salvage: returns a creature or Vehicle card, with two counters if you control an artifact and an enchantment", () => {
+    for (const both of [true, false]) {
+      const { s: s0, ap, ids } = setup([okibaSalvage()]);
+      const vehicle = toZone(s0, ap, card("Test Wagon", "Artifact — Vehicle", "{2}", { cmc: 2, power: "3", toughness: "3", oracleText: "Crew 1" }), "graveyard");
+      putOnBattlefield(s0, ap, enchantmentC());
+      if (both) putOnBattlefield(s0, ap, trinket());
+      const s = settle(castNow(s0, ap, ids[0]!, [tgt(vehicle)]));
+      expect(zone(s, vehicle)).toBe("battlefield");
+      // The returned Vehicle is an artifact itself (rulings: it counts).
+      expect(counters(s, vehicle)).toBe(2);
+      if (!both) {
+        const t0 = setup([okibaSalvage()]);
+        const bear = toZone(t0.s, t0.ap, bearC("Dead Bear"), "graveyard");
+        putOnBattlefield(t0.s, t0.ap, enchantmentC());
+        const t = settle(castNow(t0.s, t0.ap, t0.ids[0]!, [tgt(bear)]));
+        expect(zone(t, bear)).toBe("battlefield");
+        expect(counters(t, bear)).toBe(0);
+      }
+    }
+  });
+
+  it("Mirkwood Nurturer: a counter only if it returned a permanent", () => {
+    for (const bounce of [true, false]) {
+      const { s: s0, ap, ids } = setup([mirkwoodNurturer()]);
+      const rock = putOnBattlefield(s0, ap, trinket());
+      let s = castNow(s0, ap, ids[0]!);
+      s = triggerTargets(s, ap, bounce ? [tgt(rock)] : [{ kind: "none" } as TargetChoice]);
+      s = settle(s);
+      expect(zone(s, rock)).toBe(bounce ? "hand" : "battlefield");
+      expect(counters(s, ids[0]!)).toBe(bounce ? 1 : 0);
+    }
+  });
+
+  it("Mongrel Pack: four Dogs only when it dies during combat", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const pack = putOnBattlefield(s0, ap, mongrelPack());
+    const other = putOnBattlefield(s0, ap, mongrelPack());
+    putOnBattlefield(s0, opp, bigC("Blocker Beast"));
+    // Outside combat: no Dogs.
+    let s = run(s0, planCast(s0, ap, toZone(s0, ap, bolt(), "hand"), [tgt(other)]));
+    s = settle(s);
+    expect(zone(s, other)).toBe("graveyard");
+    expect(tokensNamed(s, ap, "Dog")).toHaveLength(0);
+    s = attackWith(s, [pack], opp);
+    s = toBlocks(s);
+    const blocker = s.battlefield.find((id) => nameOf(s, id) === "Blocker Beast")!;
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: pack }] } as Action);
+    s = goUntil(s, (x) => x.step === "main2" && !x.stack.length && !x.triggerQueue.length && !x.pending);
+    expect(zone(s, pack)).toBe("graveyard");
+    expect(tokensNamed(s, ap, "Dog")).toHaveLength(4);
+  });
+
+  it("Esquire of the King: costs {2} less with a legendary creature", () => {
+    for (const legend of [true, false]) {
+      const { s: s0, ap } = setup([]);
+      const esquire = putOnBattlefield(s0, ap, esquireOfTheKing());
+      const bear = putOnBattlefield(s0, ap, bearC());
+      if (legend) putOnBattlefield(s0, ap, vanilla("Test Lord", "Legendary Creature — Human", "{2}{W}", 3, 2, 2, { colors: ["W"] }));
+      poolOnly(s0, ap, { W: 3 });
+      const plan = planActivate(s0, ap, esquire, 0, []);
+      if (!legend) {
+        expect(plan).toBeNull();
+        continue;
+      }
+      const s = settle(run(s0, plan));
+      expect(pt(s, bear)).toBe("3/3");
+    }
+  });
+
+  it("Synchronized Eviction: costs {2} less with two creatures that share a type; tucks second from the top", () => {
+    for (const share of [true, false]) {
+      const { s: s0, ap, opp, ids } = setup([synchronizedEviction()]);
+      putOnBattlefield(s0, ap, bearC("Bear One"));
+      putOnBattlefield(s0, ap, share ? bearC("Bear Two") : golem());
+      const victim = putOnBattlefield(s0, opp, bigC("Victim Beast"));
+      poolOnly(s0, ap, { U: 1, C: 2 });
+      const plan = planCast(s0, ap, ids[0]!, [tgt(victim)]);
+      if (!share) {
+        expect(plan).toBeNull();
+        continue;
+      }
+      const s = settle(run(s0, plan));
+      expect(zone(s, victim)).toBe("library");
+      expect(s.players[opp]!.library.indexOf(victim)).toBe(1);
+    }
+  });
+
+  it("Snow Devil: flying, and first strike while blocking if you control a snow land", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const host = putOnBattlefield(s0, opp, bearC("Devil Bear"));
+    const aura = putOnBattlefield(s0, opp, snowDevil());
+    s0.objects[aura]!.attachedTo = host;
+    putOnBattlefield(s0, opp, card("Snow-Covered Test", "Basic Snow Land — Island", "", { oracleText: "({T}: Add {U}.)" }));
+    invalidateCharacteristics(s0);
+    expect(kw(s0, host, "Flying")).toBe(true);
+    expect(kw(s0, host, "First strike")).toBe(false);
+    const attacker = putOnBattlefield(s0, ap, bearC("Attacking Bear"));
+    let s = attackWith(s0, [attacker], opp);
+    s = toBlocks(s);
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: host, attacker }] } as Action);
+    expect(kw(s, host, "First strike")).toBe(true);
+    s = goUntil(s, (x) => x.step === "main2");
+    expect(zone(s, attacker)).toBe("graveyard");
+    expect(zone(s, host)).toBe("battlefield");
   });
 });

@@ -1527,6 +1527,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
+  // Okiba Salvage: "Then put two +1/+1 counters on that permanent if you control an artifact and an enchantment": checked
+  // after it's returned (CR 608.2c), the permanent it became.
+  text = text.replace(/^(Return target [^.]+ card from your graveyard to the battlefield\.) Then put (\w+) \+1\/\+1 counters on that permanent if (you control an? [a-z]+ and an? [a-z]+)\.$/, "$1 If $3, put $2 +1/+1 counters on it.");
   // Force Away: "If you control a creature with power 4 or greater, you may draw a card. If you do, discard a card.": the
   // discard only after the draw you chose (CR 608.2c), the creature checked as this part resolves.
   text = text.replace(/(^|\. )(If you control a creature with power \d+ or greater, you may draw a card)\. If you do, discard a card\.$/, "$1$2, then discard a card.");
@@ -6616,7 +6619,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nurturing Pixie: "return up to one target non-Faerie, nonland permanent you control to its owner's hand. If a permanent
     // was returned this way, put a +1/+1 counter on ~.": only if one went to the hand (none chosen, or a commander put in
     // the command zone instead, CR 903.9b, and none was).
-    const permBack = /^If a permanent was returned this way, (.+)$/.exec(s);
+    // Mirkwood Nurturer: "return up to one other target permanent you control to its owner's hand. If you do, put a +1/+1
+    // counter on this creature": the same.
+    const permBack = /^If (?:a permanent was returned this way|you do), (.+)$/.exec(s);
     const permBounce = effects[effects.length - 1];
     if (permBack && permBounce?.type === "bounce" && permBounce.what.ref === "target" && !permBounce.what.n && ctx.targets[permBounce.what.index]?.kind === "object" && !ctx.spell) {
       const before = ctx.targets.length;
@@ -6644,6 +6649,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const tookDig = effects[effects.length - 1];
     if (/^If you didn't put a card into your hand this way, draw a card$/.test(s) && tookDig?.type === "dig" && tookDig.into === "hand" && tookDig.count === 1 && tookDig.upTo) {
       effects.push({ type: "if", cond: { kind: "digTook" }, effects: [], otherwise: [{ type: "draw", who: { ref: "you" }, n: 1 }] });
+      continue;
+    }
+    // Rosecot Knight: "If you didn't put a card into your hand this way, put a +1/+1 counter on ~", Blossom Prancer: "...,
+    // you gain 4 life", Inscribed Tablet's "Put a land card from among them into your hand" (none if there's none): the
+    // same, with no targets of its own.
+    const didntTake = /^If you didn't put a card into your hand this way, (.+)$/.exec(s);
+    if (didntTake && tookDig?.type === "dig" && tookDig.into === "hand" && tookDig.count === 1 && !tookDig.countX && !tookDig.countAll) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(didntTake[1]!), ctx);
+      if (!inner?.length || ctx.targets.length !== before || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "digTook" }, effects: [], otherwise: inner });
       continue;
     }
     // Reptilian Recruiter: "choose target creature. If that creature's power is 2 or less or if you control another Lizard,

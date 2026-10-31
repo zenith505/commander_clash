@@ -188,7 +188,9 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   }
   // Steel of the Godhead: "As long as enchanted creature is white, it gets +1/+1 and has lifelink": white among its colors
   // now (CR 105.2).
-  if ((m = /^As long as (enchanted|equipped) creature is (white|blue|black|red|green), it (gets|has) (.+)$/.exec(text))) {
+  // Ray of Frost: "As long as enchanted creature is red, it loses all abilities" (layer 6; rulings: abilities it gained
+  // later stay, by timestamp).
+  if ((m = /^As long as (enchanted|equipped) creature is (white|blue|black|red|green), it (gets|has|loses) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
@@ -998,6 +1000,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
+  // Imaginary Pet: "if you have a card in hand": one or more.
+  if (text === "you have a card in hand") return { kind: "handAtLeast", n: 1 };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
   // "One or fewer cards in hand" (Djeru and Hazoret): fewer than two.
   if ((m = new RegExp(`^you have ${NUM} or fewer cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) + 1, fewer: true };
@@ -1246,6 +1250,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent (?:has been|was) dealt noncombat damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true, noncombat: true };
   // Proctor of Potential: "if you've scried or surveilled this turn" (a scry of 0 is no scry, CR 701.22b, 701.25c).
   if (text === "you've scried or surveilled this turn") return { kind: "scriedThisTurn" };
+  if (text === "you've surveilled this turn") return { kind: "scriedThisTurn", surveil: true };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   // Mysterio's Mirage: "if you discarded a card this turn" is the same.
@@ -1526,7 +1531,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return a && b ? (m[1] ? { kind: "allOf", conds: [a, b] } : a) : null;
   }
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
-  if ((m = /^you control no other (artifact|creature|land|enchantment)s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
+  if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
+  // Bride's Gown: "an Equipment named Groom's Finery is attached to a creature you control": whoever controls that
+  // Equipment, "you" the controller of the source (rulings).
+  if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))
+    return { kind: "onBattlefield", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], named: m[1]!, attachedTo: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, text: `Equipment named ${m[1]} attached to a creature you control` }, min: 1 };
+  // Dust Stalker: "if you control no other colorless creatures".
+  if ((m = /^you control no other ((?:colorless )?(?:artifact|creature|land|enchantment))s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the
   // enchanted creature's controller, and creatures other than that one.
   if ((m = /^its controller controls no other (artifact|creature|land|enchantment)s$/.exec(text)) && st.affects.kind === "attached") {
@@ -1976,6 +1988,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Colossus of Akros: "it has trample and can attack as though it didn't have defender".
   if ((m = /^(has [a-z ]+?) and (can attack as though (?:it|they) didn't have defender)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second ? [...first, ...second] : null;
+  }
+  // Expedition Lookout: "~ can attack as though it didn't have defender and it can't be blocked".
+  if ((m = /^(can attack as though it didn't have defender) and it (can't be blocked)$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[2]!);
     return first && second ? [...first, ...second] : null;

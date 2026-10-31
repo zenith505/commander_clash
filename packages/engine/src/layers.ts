@@ -650,6 +650,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
     case "selfStill":
       return src.zone === cond.zone && (cond.zone === "battlefield" || src.owner === you) && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
+    case "selfCastNth": {
+      // The spell's place among all spells cast this turn (StackItem.castNth) is its place in castThisTurn.
+      const all = s.castThisTurn ?? [];
+      const nth = src.castNth;
+      return src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn && nth !== undefined && all[nth]?.player === you && all.slice(0, nth).filter((c) => c.player === you).length === cond.n - 1;
+    }
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
     case "selfInCommand":
@@ -925,7 +931,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return fits(s.players[you]?.life ?? 0);
     }
     case "scriedThisTurn":
-      return (s.turnLog?.scried ?? []).includes(you);
+      return (s.turnLog?.[cond.surveil ? "surveilled" : "scried"] ?? []).includes(you);
     case "discardedThisTurn":
       return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you) && (!cond.yours || d.player === you));
     case "opponentLostLife":

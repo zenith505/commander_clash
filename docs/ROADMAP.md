@@ -1,6 +1,6 @@
 # Roadmap
 
-28,264 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,296 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,174 of
 9,979 (91%).
 
@@ -3305,8 +3305,40 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer,
   Cathedral Membrane, Dimensional Infiltrator, Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
   Portcullis.
-- Next for Lane B, least played first: the unsupported ones from about 17,100 up (`npm run popular --
-  --least`), then the lists below.
+- Round B51 (cards no earlier round wrote down, least played first, EDHREC rank about 24,700 to 23,200):
+  "if you have a card in hand" (Imaginary Pet), "if you control no other colorless creatures" (Dust Stalker), "When a
+  creature you control attacks, sacrifice ~" (Spiritual Asylum), "Whenever ~ is dealt 3 or more damage" (Innocent
+  Bystander), threshold "instead destroy that land and ~ deals 1 damage to each creature and each player" (Rancid
+  Earth), "the damage already dealt to that player this turn" (Final Punishment), "Then return another target creature
+  ... unless its controller pays {1}" (Withdraw; the pay-or-else prompt now names what happens, also for Crystal Shard,
+  Erratic Portal, Excise, Plague Fiend and Rhystic Deluge), "Destroy any of them that are Walls" (Blow Your House Down),
+  "put a +1/+1 counter on it for each card in your hand. If you do, discard your hand" (Thought Gorger), "target
+  creature an opponent controls deals damage equal to its power to that player" (Dong Zhou, the Tyrant), "you may return
+  target creature ... if its power is less than this creature's power" (Sage-Eye Avengers), "if it was the second spell
+  you cast this turn" (Codespell Cleric: it must have been cast, and counted among your spells only), "for each color
+  among other artifacts you control" (Karn, Gilded Guardian), "destroy target permanent an opponent controls. They
+  create a Treasure token" (Vraska, the Cutting Glare), "You may cast that card until the end of your next turn"
+  (Scholar of Combustion), "If you do, you gain life equal to its mana value" for a graveyard target (Lagonna-Band
+  Storyteller), "~ gets +2/+1 and creatures you control gain haste" after a payment (Moku, Meandering Drummer), delirium
+  attack triggers (Hand That Feeds), "can attack as though it didn't have defender and it can't be blocked" (Expedition
+  Lookout), "Exile two other creature cards from your graveyard" as a cost (Despoiler of Souls), "if defending player
+  has two or fewer cards in hand" on attack (Reaper of Night), "It deals damage to you equal to its power" (Bind the
+  Monster), "discards a number of cards equal to the sacrificed creature's power" (Tormented Thoughts), "Choose one. X
+  is the number of spells you've cast this turn" (Gnostro, Voice of the Crags), "as long as an Equipment named ... is
+  attached to a creature you control" (Bride's Gown, Groom's Finery), "you may have ~'s base power and toughness become
+  4/2" (Mirkwood Meditator), "As long as you control enchanted creature ... Otherwise, it can't block" (Mishra's
+  Domination), "if enchanted creature is red" (Ray of Frost), "becomes blocked by one or more colorless creatures"
+  (Hedron Blade), "As long as you've surveilled this turn" (Darkblade Agent: surveil now tracked apart from scry),
+  "When a source an opponent controls deals damage to you, sacrifice ~" (Awaken the Sky Tyrant). +32 (28,296 of 31,936 with rounds 217 to 221).
+- Out after round B51 (looked at, not done): Backfire ("that much damage" from damage the enchanted creature dealt to
+  you), Equal Treatment and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
+  (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may
+  activate; changing a spell's only target), Necromancer's Magemark (a replacement for enchanted creatures you control),
+  Selective Snare (X targets of a chosen type), Roving Keep, Slab Hammer, Leonin Bola, Apathy, Death Match, Display of
+  Dominance, Addle, Soul Search, Thought Prison, Spara's Adjudicators and Masked Bandits (until cast from exile), plus
+  the many multi-line or new-mechanic cards in the same range.
+- Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
+  23,200 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

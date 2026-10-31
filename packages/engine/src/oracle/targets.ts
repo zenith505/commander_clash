@@ -418,6 +418,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // Winter Blast: "Tap X target creatures. ~ deals 2 damage to each of those creatures with flying."
   const withKw = /^each of those creatures with (flying|reach|trample|haste)$/i.exec(x);
   if (withKw && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: ["Creature"], keywords: [withKw[1]!.charAt(0).toUpperCase() + withKw[1]!.slice(1).toLowerCase()], text: `creature with ${withKw[1]!.toLowerCase()}` } };
+  // Blow Your House Down: "Up to three target creatures can't block this turn. Destroy any of them that are Walls.": only
+  // the targets of that subtype as it resolves.
+  const thatAre = /^any of them that are ([A-Z][a-z]+)s$/.exec(x);
+  if (thatAre && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: [], subtypes: [thatAre[1]!], text: thatAre[1]! } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);

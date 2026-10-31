@@ -1194,7 +1194,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 }
 
 /** "Lose 3 life" in the middle of a sentence, but not "Ana may draw a card". */
-const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+const lowerFirst = (t: string) => (/^(?:Lose|Take|Let) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
 function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number; losesSource?: true } {

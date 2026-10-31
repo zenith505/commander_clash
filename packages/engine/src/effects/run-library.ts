@@ -362,6 +362,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             const pool = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
             const n = nFor[pid] ?? 0;
             for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+            // Fall: the cards revealed, of which only those matching are discarded.
+            if (e.ofRevealed) {
+              if (picked.length) log(s, `${player(s, pid).name} reveals ${picked.map((id) => defOf(s, obj(s, id)).name).join(" and ")} at random from their hand.`);
+              return [pid, picked.filter((id) => printedMatches(e.ofRevealed!, defOf(s, obj(s, id))))];
+            }
             return [pid, picked];
           }),
         ));
@@ -451,7 +456,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.found) {
         // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
-        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        // Never Happened: the graveyard's cards too, after the hand's.
+        const pool = e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
+        const cards = pool.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
         s.resolving!.exiledFromHandCards = [];
         // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
@@ -460,10 +467,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const kind = e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
         const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
         return "paused";
       }
-      const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
+      const ids = sc.found.filter((id) => (obj(s, id).zone === "hand" || (e.orGraveyard && obj(s, id).zone === "graveyard")) && obj(s, id).owner === pid);
       s.resolving!.tookFromHand = ids.length;
       if (e.action === "name") {
         // Lobotomy: "you choose a card other than a basic land card from it. Search ... for all cards with the same name as
@@ -506,7 +513,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       else
         for (const id of ids) {
-          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand${me ? ` until ${src} leaves the battlefield` : ""}.`);
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s ${obj(s, id).zone}${me ? ` until ${src} leaves the battlefield` : ""}.`);
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (o.zone !== "exile") continue;

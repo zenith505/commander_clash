@@ -1413,6 +1413,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `Until ${e.duration === "endOfTurn" ? "end of turn" : `${player(s, ctx.controller).name}'s next turn`}, ${e.text} ${describeMods(s, e.mods, ctx.controller, true)}.`);
       return;
     }
+    case "cantAttackNextTurn": {
+      // Its controller as this resolves; their next turn, not this one (CR 500.1).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield") continue;
+        const pid = controllerOf(s, o);
+        (s.cantAttackNextTurn ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, player: pid, since: s.turn });
+        log(s, `${defOf(s, o).name} can't attack during ${player(s, pid).name}'s next turn.`);
+      }
+      return;
+    }
     case "attackBanNextTurn": {
       for (const pid of players(s, e.who, ctx)) {
         (player(s, pid).attackBansNextTurn ??= []).push({ player: ctx.controller });

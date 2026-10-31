@@ -107,6 +107,8 @@ export interface Ctx {
   lastManifested?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** The last sentence created one Equipment token: "Attach it to ~" (U.S.Agent, John Walker) means it. */
+  lastCreatedEquipment?: boolean;
   /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
   lastDugLands?: boolean;
   /** After "look at the top N cards ... You may put any number of them into your hand": "each card you put into your hand this way" (Count "dugToHand"). */
@@ -969,6 +971,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
+  // Rumbling Ruin: "count the number of +1/+1 counters on creatures you control. Creatures your opponents control with power
+  // less than or equal to that number can't block this turn": that number in place.
+  text = text.replace(/\bcount the number of (\+1\/\+1 counters on creatures you control)\. Creatures your opponents control with power less than or equal to that number can't block this turn\./, "creatures your opponents control with power less than or equal to the number of $1 can't block this turn.");
+  // Scrounge: "Target opponent chooses an artifact card in their graveyard. Put that card onto the battlefield under your
+  // control.": that player chooses as it resolves (not targeted), the card entering under your control.
+  text = text.replace(/^Target opponent chooses an artifact card in their graveyard\. Put that card onto the battlefield under your control\.$/, "Target opponent puts an artifact card of their choice from their graveyard onto the battlefield under your control.");
+  // Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": one instruction.
+  text = text.replace(/^(Target (?:player|opponent) reveals (?:two|three) cards at random from their hand), then (discards each [a-z]+ card revealed this way\.)$/, "$1 and $2");
+  // Dust: "Exile any number of target creatures that have -1/-1 counters on them": "with -1/-1 counters on them".
+  text = text.replace(/^Exile any number of target creatures that have -1\/-1 counters on them\.$/, "Exile any number of target creatures with -1/-1 counters on them.");
+  // Rise: "Return target creature card from a graveyard and target creature on the battlefield to their owners' hands": two
+  // targets, each to its owner's hand.
+  text = text.replace(/^Return target creature card from a graveyard and target creature on the battlefield to their owners' hands\.$/, "Return target creature card from a graveyard to its owner's hand. Return target creature to its owner's hand.");
+  // Void Stalker: "Put ~ and target creature on top of their owners' libraries, then those players shuffle their libraries":
+  // put into them and shuffled (CR 701.24), only the cards that got there (rulings: if ~ has left, only the target).
+  text = text.replace(/(^|: )Put ~ and (target creature) on top of their owners' libraries, then those players shuffle their libraries\./, "$1Shuffle ~ and $2 into their owners' libraries.");
+  // Rivals' Duel: "Choose two target creatures that share no creature types. Those creatures fight each other."
+  text = text.replace(/^Choose two target creatures that share no creature types\. Those creatures fight each other\.$/, "Two target creatures that share no creature types fight each other.");
   text = text.replace(/^[Cc]hoose (target creature you control)\. If damage would be dealt to that creature this turn, /, "If damage would be dealt to $1 this turn, ");
   // Fulgent Distraction: "Choose two target creatures. Tap those creatures, then ...": the same as "Tap two target creatures".
   text = text.replace(/^Choose two target creatures\. Tap those creatures, then /, "Tap two target creatures, then ");
@@ -6080,6 +6100,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [sacGain[1] === "gain life" ? { type: "gainLife", who: { ref: "you" }, n } : { type: "draw", who: { ref: "you" }, n }] });
       continue;
     }
+    // Hit // Run: "Target player sacrifices an artifact or creature of their choice. Hit deals damage to that player equal to
+    // that permanent's mana value": the permanent sacrificed, as it last existed (CR 608.2h); none, no damage.
+    const sacDamage = /^~ deals damage to that player equal to that permanent's mana value$/.test(s);
+    if (sacDamage && sacked?.type === "pick" && sacked.action === "sacrifice" && sacked.n === 1 && sacked.who.ref === "target" && !sacked.who.n && sacked.filter.kind === "object") {
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "damage", amount: { count: { kind: "manaValue", of: { ref: "sacrificed" } } }, to: sacked.who }] });
+      continue;
+    }
     // Dominus of Fealty: "you may gain control of target permanent until end of turn. If you do, untap it and it gains
     // haste until end of turn": both only if you did (rulings), about that target.
     if (s === "If you do, untap it and it gains haste until end of turn") {
@@ -7106,6 +7133,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (where === null || !/^That player discards those cards\.?$/.test(sentences[si + 1] ?? "") || (chooseN[2] === "X" && !ctx.spell && !where) || (where && chooseN[2] !== "X")) return null;
       effects.push({ type: "takeFromHand", who: prev.who, action: "discard", n: where ?? (chooseN[2] === "X" ? X : num(chooseN[2]!)), ...(chooseN[1] ? { upTo: true as const } : {}) });
       si++;
+      continue;
+    }
+    // Never Happened: "You choose a nonland card from that player's graveyard or hand and exile it": one card from either.
+    const yardOrHand = /^You choose an? (.+?) from that player's graveyard or hand and exile it$/.exec(s);
+    if (yardOrHand) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      const filter = parseSearchFilter(yardOrHand[1]!);
+      if (filter === null) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: "exile", orGraveyard: true });
       continue;
     }
     const choose = /^You choose an? (.+?) from it( with mana value (?:\d+|X) or (?:less|greater))?( and exile that card)?$/.exec(s);
@@ -11791,6 +11828,12 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (previous.length !== 1 || prev?.type !== "search" || prev.n !== 1 || prev.upTo || prev.filter?.kind !== "card" || `${moreCards[2]} card` !== prev.filter.text) return null;
     return { effects: [{ ...prev, n: num(moreCards[1]!) }], instead: true };
   }
+  // Scorching Lava: "that creature can't be regenerated this turn and if it would die this turn, exile it instead": the
+  // "instead" is the replacement's own (CR 614.1a), added to the damage, not instead of it.
+  if (/^that creature can't be regenerated this turn and if it would die this turn, exile it instead$/.test(text)) {
+    const fx = parseOne(text, ctx);
+    return fx && { effects: fx, instead: false };
+  }
   let t = text;
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
@@ -12163,6 +12206,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
     ctx.lastManifested = faceDown && last.count === 1;
+    ctx.lastCreatedEquipment = last?.type === "createToken" && last.n === 1 && !!last.token.subtypes?.includes("Equipment") && !last.attachTo;
     ctx.lastCreatedCreature = last?.type === "createToken" && last.n === 1 && last.token.types.includes("Creature") && !last.attachTo;
     // The creature that player chose is "that creature" (Imperial Edict).
     if (picked && pk.who.ref === "target") ctx.lastPut = true;

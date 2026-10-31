@@ -817,7 +817,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
   // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it".
-  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it)$/.exec(text))) {
+  // Emergent Haunting: "if you haven't cast a spell from your hand this turn and ~ isn't a creature".
+  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it|~ isn't a creature)$/.exec(text))) {
     const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
@@ -946,6 +947,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Dreadlight Monstrosity: "Activate only if you own a card in exile."
   if (text === "you own a card in exile") return { kind: "amount", amount: { count: { kind: "cardsInExile", who: { ref: "you" } } }, min: 1 };
+  // Howling Galefang: "as long as you own a card in exile that has an Adventure": any such card, however it got there
+  // (rulings); a face-down card has no characteristics.
+  if (text === "you own a card in exile that has an Adventure") return { kind: "amount", amount: { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", hasAdventure: true, text: "card that has an Adventure" } } }, min: 1 };
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in exile$`).exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInExile" } }, max: num(m[1]!) - 1 };
   // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
   if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {
@@ -1373,6 +1377,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Triton Wavebreaker: "As long as ~ is a creature, it has prowess": not while it's a bestowed Aura (CR 702.103b), its
   // card types as layer 4 left them (CR 613.1d).
   if (/^~ is a creature$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", types: ["Creature"], text: "creature" } };
+  if (/^~ isn't a creature$/.test(text) && st.affects.kind === "self") return { kind: "not", cond: { kind: "selfIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } };
   // Mistform Wall: "~ has defender as long as it's a Wall": its creature types as layer 4 left them (CR 613.1d, 613.1f).
   if ((m = /^it's an? ([A-Z][a-z]+)$/.exec(text)) && st.affects.kind === "self" && CREATURE_TYPES.has(m[1]!))
     return { kind: "selfIs", filter: { kind: "object", subtypes: [m[1]!], text: m[1]! } };

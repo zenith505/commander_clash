@@ -521,7 +521,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "If it's a creature, it can't be regenerated this turn, and if it would die this turn, exile it instead" (Carbonize,
   // Disintegrate): about the target of "any target", only if it's a creature.
-  if (/^If it's a creature, it can't be regenerated this turn, and if it would die this turn, exile it instead$/i.test(s)) {
+  // Scorching Lava: "If ~ was kicked, that creature can't be regenerated this turn and if it would die this turn, exile it
+  // instead": "that creature" is the "any target" if it's a creature, the same.
+  if (/^(?:If it's a creature, it can't be regenerated this turn, and|that creature can't be regenerated this turn and) if it would die this turn, exile it instead$/i.test(s)) {
     const i = ctx.targets.length - 1;
     if (ctx.targets[i]?.kind !== "any") return null;
     const what: ObjRef = { ref: "target", index: i };
@@ -638,7 +640,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   if ((m = /^Return ((?:all|each) .+?) to (?:their|its) owners?'s? hands?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "each" ? [{ type: "bounce", what }] : null;
+    // Trial: "Return all creatures blocking or blocked by target creature to their owner's hand".
+    return what?.ref === "each" || (what?.ref === "inCombatWithSelf" && what.ofTarget !== undefined) ? [{ type: "bounce", what }] : null;
   }
   // Get Out: "Return one or two target creatures and/or enchantments you own to your hand": targets you own (CR 108.3),
   // to their owner's hand, yours.
@@ -1526,6 +1529,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1] === "~" ? "~" : "it", ctx);
     const mods = what?.ref === "self" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
+  // Wall of Dust: "Whenever ~ blocks a creature, that creature can't attack during its controller's next turn."
+  if (/^[Tt]hat creature can't attack during its controller's next turn$/.test(s)) {
+    const what = parseObject("that creature", ctx);
+    return what && !isGroup(what) ? [{ type: "cantAttackNextTurn", what }] : null;
   }
   // "Until your next turn, creatures your opponents control attack each combat if able and attack a player other than you
   // if able" (Kardur, Doomscourge), "until your next turn, each creature attacks ..." (Maximum Carnage): goad's

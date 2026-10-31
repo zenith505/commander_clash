@@ -353,7 +353,7 @@ export type Count =
   | { kind: "greatestMvInExile" }
   /** "There are seven or more cards in exile" (Ketramose): every player's exiled cards, face-down ones too (rulings). */
   | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind }
-  | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true }
+  | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true; /** "The lowest mana value" among them (Culling Scales), 0 with none. */ least?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
@@ -562,6 +562,10 @@ export interface TargetSpec {
   orSubtypes?: string[];
   /** Or a card that has an Adventure instead of one of `types`: "instant cards, sorcery cards, and/or have an Adventure" (Frantic Firebolt; rulings: an adventurer card in any zone but the stack). */
   orAdventure?: true;
+  /** "A creature ... that they controlled since the beginning of the turn" (Keldon Twilight): its controller has controlled it continuously since the turn began. */
+  controlledSinceTurnBegan?: true;
+  /** "A card ... that has an Adventure" (Howling Galefang): an adventurer card (CR 715.2), whatever its types. */
+  hasAdventure?: true;
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
   anyOf?: TargetSpec[];
@@ -778,6 +782,8 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesCardTypeWith?: number[];
+  /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
+  sharesNoCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
   differentNameFrom?: number[];
   /**
@@ -1149,7 +1155,7 @@ export type ObjRef =
    */
   | { ref: "diedDamagedBySelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
-  | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true }
+  | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
   | { ref: "blockingIt"; subject?: true }
   /**
@@ -3190,11 +3196,13 @@ export type Effect =
       plot?: true;
       /** Talara's Bane: "You gain life equal to that creature card's toughness, then that player discards that card." */
       gainToughness?: true;
+      /** Never Happened: "a nonland card from that player's graveyard or hand": one card from either zone (action "exile"). */
+      orGraveyard?: true;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true; /** Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": with `random`, `n` cards revealed, only those matching this discarded. */ ofRevealed?: TargetSpec } // CR 701.9
   /** CR 701.22, by the controller, or `who` ("target player scries X", Kozilek's Command). */
   | { type: "scry"; n: Amount; who?: PlayerRef }
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
@@ -3785,6 +3793,8 @@ export type Effect =
    * see Player.attackBansNextTurn.
    */
   | { type: "attackBanNextTurn"; who: PlayerRef }
+  /** Wall of Dust: "that creature can't attack during its controller's next turn": that player's next turn, while it's the same object (CR 400.7). */
+  | { type: "cantAttackNextTurn"; what: ObjRef }
   | {
       type: "playerGains";
       keywords: string[];

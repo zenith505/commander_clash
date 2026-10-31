@@ -1086,6 +1086,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Also an opponent who has left the game since (Spinerock Knoll rulings).
       return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => (cond.you ? Number(p) === you : Number(p) !== you) && n >= cond.n);
     case "attackedWith": {
+      if (cond.combat) {
+        const c = s.players[you]?.attackedCombat;
+        return c?.turn === s.turn && c.combat === (s.combatsThisTurn ?? 0) && c.n >= cond.n;
+      }
       const w = s.players[you]?.attackedWith;
       if (cond.subtype) return w?.turn === s.turn && w.keys.filter((k) => w.kinds?.[k] === "all" || !!(w.kinds?.[k] as string[] | undefined)?.includes(cond.subtype!)).length >= cond.n;
       return w?.turn === s.turn && w.keys.length >= cond.n;

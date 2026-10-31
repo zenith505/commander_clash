@@ -1240,6 +1240,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": not a permanent card, or one you chose
   // not to put there, goes to your hand (the "Otherwise" of the may and of the if).
   text = text.replace(/^([Ll]ook at the top card of your library\. If it's a permanent card, you may put it onto the battlefield\.) If you don't put it onto the battlefield, put it into your hand\.$/, "$1 Otherwise, put it into your hand.");
+  // Ingenious Mastery: "If the {2}{U} cost was paid, ... If that cost wasn't paid, you draw X cards.": the same as
+  // "Otherwise", whether that alternative cost was paid as it was cast (CR 118.9).
+  text = text.replace(/^(If the (?:\{[^}]+\})+ cost was paid, [^.]+\.) If that cost wasn't paid, /, "$1 Otherwise, ");
+  // Sinister Waltz: "Choose three target creature cards in your graveyard. Return two of them at random to the battlefield
+  // and put the other on the bottom of your library." One sentence, so the targets are the "them".
+  text = text.replace(/^Choose three target creature cards in your graveyard\. Return two of them at random to the battlefield and put the other on the bottom of your library\.$/, "Return two of three target creature cards from your graveyard at random to the battlefield and put the other on the bottom of your library.");
+  // Decree of Annihilation: "Exile all artifacts, creatures, and lands from the battlefield, all cards from all graveyards,
+  // and all cards from all hands." Nothing moves between those zones, so one after the other is the same (CR 406.3).
+  text = text.replace(/^Exile all artifacts, creatures, and lands from the battlefield, all cards from all graveyards, and all cards from all hands\.$/, "Exile all artifacts, creatures, and lands. Exile all cards from all graveyards. Exile all cards from all hands.");
   // Pumpkin Bombs: "then put a fuse counter on ~. It deals damage equal to the number of fuse counters on it ...": "it" is ~.
   text = text.replace(/(put an? ([a-z]+) counter on ~\.) It deals damage equal to the number of \2 counters on it to /, "$1 ~ deals damage equal to the number of $2 counters on it to ");
   const effects: Effect[] = [];
@@ -10223,7 +10232,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
       // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
+      // Oko, the Ringleader: "If you've committed a crime this turn, discard a card. Otherwise, discard two cards" (CR 700.13).
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || prev.cond.cond.kind === "committedCrime" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
@@ -10231,7 +10241,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // indestructible one) or wasn't a land gets the second (rulings).
       const destroyedElse = prev?.type === "if" && prev.cond.kind === "destroyedThisWay" && !!prev.cond.cardType;
       // Sheoldred's Restoration: "If ~ was kicked, ... Otherwise, ...": kicked or not, settled as it was cast (CR 702.33e).
-      const kickedElse = prev?.type === "if" && prev.cond.kind === "kicked" && !prev.cond.cost && ctx.spell;
+      const kickedElse = (prev?.type === "if" && prev.cond.kind === "kicked" && !prev.cond.cost && ctx.spell) || (prev?.type === "if" && prev.cond.kind === "altPaid" && prev.cond.alt === "alternative" && ctx.spell);
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && !kickedElse && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
       // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
       if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
@@ -10296,6 +10306,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const whenDo = /^When you do, (.+)$/.exec(s) ?? (searched && effects.length === 1 && effects[0]!.type === "search" && !effects[0]!.who ? searched : null);
     if (whenDo) {
       const prev = effects[effects.length - 1];
+      // Venom, Deadly Devourer: "Exile target creature card from a graveyard. When you do, put X +1/+1 counters on target
+      // Symbiote, where X is the exiled card's toughness": the ability's only target, so if it resolves the card is exiled
+      // (CR 608.2b), and the reflexive ability's X is that card's toughness as it is in exile (CR 603.12).
+      const exiledOnly = prev?.type === "exile" && prev.what.ref === "target" && prev.what.index === 0 && !prev.what.n && effects.length === 1 && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && !ctx.targets[0]!.many && !ctx.targets[0]!.optional;
+      if (exiledOnly && si + 1 === sentences.length && where && /^the exiled card's (?:power|toughness)$/.test(where[2]!)) {
+        const x = parseCount(where[2]!, ctx);
+        const reflexive = x && reflexiveBody(whenDo[1]!, ctx, false, false, true);
+        if (!x || !reflexive) return null;
+        effects.push({ type: "reflexive", body: reflexive, xAmount: x });
+        si = sentences.length;
+        continue;
+      }
       // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
       // (Ancient Bronze Dragon): the roll always happens; the result goes with the reflexive trigger.
       const rolled = prev?.type === "roll" && !prev.chooseOne && effects.length === 1;
@@ -13195,7 +13217,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes || o.xDiscardedMv)) return false;
+    if (o.type === "reflexive" && (o.xAmount !== undefined || o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes || o.xDiscardedMv)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

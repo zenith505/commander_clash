@@ -1430,6 +1430,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attackWalkerNextTurn": {
+      // The planeswalker whose ability this is, as it is now (CR 400.7): gone, there's nothing to attack.
+      const pw = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!pw || pw.zone !== "battlefield" || (ctx.sourceZc !== undefined && (pw.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const name = defOf(s, pw).name;
+      for (const o of e.what ? objects(s, e.what, ctx) : []) {
+        if (o.zone !== "battlefield") continue;
+        (s.attackWalkerNextTurn ??= []).push({ pw: pw.id, pwZc: pw.zoneChanges ?? 0, id: o.id, zc: o.zoneChanges ?? 0, since: s.turn });
+        log(s, `${defOf(s, o).name} attacks ${name} during its controller's next turn if able.`);
+      }
+      for (const pid of e.who ? players(s, e.who, ctx) : []) {
+        (s.attackWalkerNextTurn ??= []).push({ pw: pw.id, pwZc: pw.zoneChanges ?? 0, player: pid, since: s.turn });
+        log(s, `During ${player(s, pid).name}'s next turn, creatures they control attack ${name} if able.`);
+      }
+      return;
+    }
     case "attackBanNextTurn": {
       for (const pid of players(s, e.who, ctx)) {
         (player(s, pid).attackBansNextTurn ??= []).push({ player: ctx.controller });

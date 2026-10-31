@@ -823,6 +823,8 @@ export interface Player {
    * The creatures this player declared as attackers this turn ("id@zoneChanges"): one declared in two combats counts once,
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).
    */
+  /** How many creatures this player declared as attackers in this turn's latest combat (Kytheon, Hero of Akros: "~ and at least two other creatures attacked this combat"). */
+  attackedCombat?: { turn: number; combat: number; n: number };
   attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all"> };
   /**
    * The total power of the creatures this player declared as attackers in the latest combat, as they were declared, and its
@@ -1653,6 +1655,13 @@ export interface GameState {
    * object as it was (`zc`). As that turn begins it becomes an effect for that turn.
    */
   cantAttackNextTurn?: { id: ObjectId; zc: number; player: PlayerId; since: number }[];
+  /**
+   * Gideon, Battle-Forged and Gideon Jura: creatures that attack planeswalker `pw` (as the object it was, `pwZc`) if able,
+   * during a turn after `since`: creature `id` (as `zc`) during its controller's next turn, whoever that is then
+   * (rulings), or every creature `player` controls during their next turn, not locked in (rulings). `turn` is that turn,
+   * set as it begins (game.ts walkersToAttack).
+   */
+  attackWalkerNextTurn?: { pw: ObjectId; pwZc: number; id?: ObjectId; zc?: number; player?: PlayerId; since: number; turn?: number }[];
   /** "Creatures can't be blocked this turn": matching creatures can't be blocked, also ones that arrive later. */
   cantBeBlockedThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */

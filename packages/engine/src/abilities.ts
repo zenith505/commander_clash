@@ -68,6 +68,8 @@ export interface UnlessPays {
   waterbend?: number;
   /** "Unless its controller discards their hand" (Perplex): all of it, even with no cards in hand (rulings). */
   discardHand?: true;
+  /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none (rulings). */
+  exileGraveyard?: true;
   /** "Ward—Discard a card at random" (Alpharael): this many cards chosen at random as the payment (CR 701.9c). */
   discardRandom?: number;
   /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
@@ -175,6 +177,8 @@ export type Count =
   | { kind: "sacrificedThisWayGreatestPower" }
   /** "The total power of the creatures sacrificed this way" (Reign of the Pit): as each last existed, negative powers included (rulings). */
   | { kind: "sacrificedThisWayTotalPower" }
+  /** Corpse Cobble: "the total power of the sacrificed creatures", sacrificed to cast the spell, as each last existed (CR 608.2h), negative powers included. */
+  | { kind: "costSacrificedTotalPower" }
   /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
   | { kind: "putThisWay" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
@@ -2591,7 +2595,7 @@ export type Effect =
   /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
-  | { type: "exileDyingThisTurn" }
+  | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
   | { type: "noSearchThisTurn" }
   /** "Draw a card and reveal it. If it isn't a land card, discard it." (Sindbad): the cards just drawn, revealed; those not matching `keep` are discarded. */
@@ -2760,7 +2764,7 @@ export type Effect =
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -2934,7 +2938,7 @@ export type Effect =
    */
   | { type: "ripple"; n: number; of?: "cause" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
-  | { type: "evolve"; /** Hulkling, Burgeoning Bruiser: evolve's check and counter spelled out, not the keyword, so ~ doesn't "evolve" (CR 702.100b). */ notKeyword?: true }
+  | { type: "evolve"; /** Hulkling, Burgeoning Bruiser: evolve's check and counter spelled out, not the keyword, so ~ doesn't "evolve" (CR 702.100b). */ notKeyword?: true; /** With `notKeyword`: the kind of counter put on it (Evolving Adaptive: "an oil counter"), +1/+1 if not given. */ counter?: CounterKind }
   /**
    * `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). "whileTapped": "for as long as ~
    * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped". Duration
@@ -5034,6 +5038,8 @@ export interface ActivatedAbility {
   lifeCost?: number;
   /** "Pay life equal to the number of colors in your commanders' color identity" (War Room), on top of `lifeCost`. */
   lifeCostIdentity?: true;
+  /** "{X}{B}, {T}, Pay X life" (Krumar Initiate): X life, the X announced for its mana cost, on top of `lifeCost`. */
+  lifeCostX?: true;
   /**
    * "Pay half your life, rounded up" as part of the cost (CR 119.4, 107.1a): half the life total as the cost is worked out
    * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
@@ -5883,6 +5889,8 @@ export interface CompiledCard {
   cantBeCounteredX?: number;
   /** "If you revealed a Dragon card or controlled a Dragon as you cast ~, ~ can't be countered" (Dragonlord's Prerogative): read as kicked. */
   cantBeCounteredKicked?: true;
+  /** "Spell mastery — If there are two or more instant and/or sorcery cards in your graveyard, ~ can't be countered" (Exquisite Firecraft): while this holds for its controller. */
+  cantBeCounteredIf?: StaticCondition;
   /**
    * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
    * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).

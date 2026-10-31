@@ -504,6 +504,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "exileIfDies", what }] : null;
   }
   if (/^If a creature would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn" }];
+  // Malicious Eclipse: "If a creature an opponent controls would die this turn, exile it instead": only those an opponent of
+  // the spell's controller controls as they would die (CR 614.1a).
+  if (/^If a creature an opponent controls would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn", opponentsOfYou: true }];
   // Shadow of Doubt: effects that use the word "search" do nothing this turn; "then shuffle" still shuffles (rulings).
   if (/^Players can't search libraries this turn$/.test(s)) return [{ type: "noSearchThisTurn" }];
   // "Return target creature card from your graveyard to the battlefield. ... If it would leave the battlefield, exile it

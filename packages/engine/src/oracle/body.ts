@@ -4332,6 +4332,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Nivix, Aerie of the Firemind: "Exile the top card of your library. Until your next turn, you may cast it if it's an
+    // instant or sorcery spell.": face up (CR 406.3), cast only, as an instant or sorcery spell (the face cast counting),
+    // until your next turn begins.
+    if (!impulseIf && /^[Ee]xile the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Until your next turn, you may cast it if it's an instant or sorcery spell") {
+      const spellFilter = parseSearchFilter("instant or sorcery card");
+      if (!spellFilter) return null;
+      effects.push({ type: "impulse", n: 1, until: "yourNextTurn", castOnly: true, spellFilter });
+      si++;
+      continue;
+    }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // Dream Pillager: "exile that many cards from the top of your library. Until end of turn, you may cast spells from
     // among those exiled cards." Face up (CR 406.3), spells only (no land play), paid for as usual.
@@ -4564,6 +4574,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond }, effects: [{ type: "impulse", n: 1, until: "thisTurn", free: true }], otherwise: [{ type: "impulse", n: 1, until: "thisTurn" }] });
       ctx.exiledTop = true;
       si += 2;
+      continue;
+    }
+    // Unlucky Witness: "exile the top two cards of your library. Until your next end step, you may play one of those cards.":
+    // once one is played, the other can't be (rulings on Nashi's "one of those cards"); over as your next end step begins.
+    const playOne = exTop && exTop[1] && !exEqual && !impulseIf ? /^(Until your next end step|Until end of turn|Until the end of your next turn), you may play one of those cards$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (playOne) {
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: /next end step/.test(playOne[1]!) ? "yourNextEndStep" : /next turn/.test(playOne[1]!) ? "nextTurn" : "thisTurn", oneOf: true });
+      si++;
       continue;
     }
     // Unstable Amulet, Furious Rise: "Exile the top card of your library. You may play it until you exile another card
@@ -11592,6 +11610,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       if (last?.type !== "loseLife") return null;
       last.drain = true;
+      continue;
+    }
+    // Biomantic Mastery: "Draw a card for each creature target player controls, then draw a card for each creature another
+    // target player controls": two different target players (CR 115.3), each count taken as its draw happens.
+    // (Split at ", then" by now.)
+    const twoPlayers = /^Draw a card for each (\w+) target player controls$/.exec(s);
+    if (twoPlayers && sentences[si + 1] === `Draw a card for each ${twoPlayers[1]} another target player controls`) {
+      si++;
+      const first = parseCount(`${twoPlayers[1]}s target player controls`, ctx);
+      const second = addTarget(ctx, { kind: "player", text: "another target player", distinctFrom: [ctx.lastPlayerTarget!] });
+      ctx.lastPlayerTarget = second;
+      const other = parseCount(`${twoPlayers[1]}s that player controls`, ctx);
+      if (!first || !other) return null;
+      effects.push({ type: "draw", who: { ref: "you" }, n: first }, { type: "draw", who: { ref: "you" }, n: other });
       continue;
     }
     // Cruel Entertainment: each of two different target players (CR 115.3) controls the other during the other's next turn

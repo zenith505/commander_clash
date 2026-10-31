@@ -1,7 +1,7 @@
 import { isRealKicker, type AbilityBody, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
-import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
@@ -1071,6 +1071,8 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (compiled.cantBeCounteredX !== undefined && (item.x ?? 0) >= compiled.cantBeCounteredX) return true;
   // Dragonlord's Prerogative: how it was cast, which a copy copies (CR 707.10).
   if (compiled.cantBeCounteredKicked && item.kicked?.length) return true;
+  // Exquisite Firecraft: its controller's graveyard as something would counter it.
+  if (compiled.cantBeCounteredIf && staticConditionNow(s, compiled.cantBeCounteredIf, o.id, item.controller)) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
   // "Can't be countered by blue or black spells this turn" (Autumn's Veil): the countering spell's colors as it resolves
   // (rulings); abilities still can.
@@ -1095,6 +1097,13 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     discardCards(s, payer, sc.chosen[payer]!);
     sc.paid = true;
   }
+  // Grip of Amnesia: the cards in their graveyard as they chose to pay (see payUnless), exiled as the payment.
+  if (sc.paid === undefined && unless.exileGraveyard && sc.chosen?.[payer]) {
+    const ids = sc.chosen[payer]!.filter((id) => s.objects[id]?.zone === "graveyard");
+    if (ids.length) log(s, `${player(s, payer).name} exiles all cards from their graveyard.`);
+    for (const id of ids) moveObject(s, id, "exile");
+    sc.paid = true;
+  }
   // "Ward—Sacrifice a creature": the permanents they chose (see payUnless), sacrificed as the payment (CR 701.21a).
   if (sc.paid === undefined && unless.sacrifice && sc.chosen?.[payer]) {
     for (const id of sc.chosen[payer]!) {
@@ -1115,12 +1124,12 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
     // (CR 118.3), so they can't pay that.
     if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n)) sc.paid = false;
-    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.discardRandom && !unless.poison) {
+    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.exileGraveyard && !unless.discardRandom && !unless.poison) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.exileGraveyard ? { exileGraveyard: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
       return "paused";
     }
   }

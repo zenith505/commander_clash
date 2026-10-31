@@ -3424,8 +3424,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix and Voltage Surge (what the
   sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane, Thieving Sprite, Serene Sunset, plus the
   multi-line or new-mechanic cards in the same range.
+- Round B54 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000, the easier
+  ones): spell mastery "If there are two or more instant and/or sorcery cards in your graveyard, ~ can't be countered"
+  (Exquisite Firecraft), "Draw a card for each creature target player controls, then ... another target player
+  controls" (Biomantic Mastery), "Counter target spell unless its controller exiles all cards from their graveyard"
+  (Grip of Amnesia: a new pay-or-not option, with an e2e test), "Whenever a land enters under an opponent's control, if
+  that player had another land enter" (Tunnel Ignus), "if it has one or more oil counters on it" (Ichorplate Golem),
+  "Return all cards exiled with ~ to the battlefield under your control" (Synod Sanctum), "sacrifice any number of
+  creatures ... where X is the total power of the sacrificed creatures" (Corpse Cobble), "If a creature an opponent
+  controls would die this turn, exile it instead" (Malicious Eclipse), "if ~ has five or more charge counters on it,
+  remove all of them from it and create that many" (Lightning Coils), "Pay X life" as an activation cost (Krumar
+  Initiate), "Until your next turn, you may cast it if it's an instant or sorcery spell" (Nivix, Aerie of the
+  Firemind), "Lands you control are the chosen type in addition to their other types" (Realmwright), "Exile seven other
+  cards from your graveyard" (Bone Dragon), "Until your next end step, you may play one of those cards" (Unlucky
+  Witness), "As long as there are three or more cards exiled with ~" (Veteran Survivor), "As long as ~ has three or more
+  fire counters on it, it's an artifact creature" (War Balloon), the evolve-like check with an oil counter (Evolving
+  Adaptive), "costs {1} less to cast if it targets an attacking or tapped creature" (Dire Downdraft), "Enchanted land is
+  every basic land type in addition to its other types" (Nylea's Presence). +19 (28,400 of 31,936 with round 222).
+- Out after round B54 (looked at, not done): Foraging Wickermaw (a mana ability that changes its color), Tomb of Urami
+  ("Sacrifice all lands you control" and a mana ability that deals damage), Ohabi Caleria and Sosuke (group "deals
+  damage to a creature" triggers), Gideon, the Oathsworn ("non-Gideon" becomes "non-~" in the normalized text), Garruk,
+  Veiled Butcher ("If you sacrificed a creature this way", "who didn't discard two nonland cards"), Blackmail (the
+  player reveals three of their choice), Cannibalize (two targets controlled by the same player), Moonlace ("target
+  spell or permanent"), Living Conundrum (skip a draw from an empty library), Vhati il-Dal (base power 1 or base
+  toughness 1: a new choice), Hedron Matrix ("+X/+X, where X is its mana value" for the equipped creature). Possible
+  bug to check: the target phrase "attacking creature or tapped creature" parses to `combat: attacking` plus an anyOf.
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (`npm run popular -- --least`, minus the names already in ROADMAP and HISTORY), then the lists below.
+  19,700 up (round B54 took the easier ones up to about 17,000 but left most of that range unread: about 570 there are
+  still unsupported and unlisted, among them Dulcet Sirens, Lim-Dûl's Hex, Energy Arc, Fatal Fissure, Souls of the
+  Faultless, Vengevine, Incriminate, Can't Stay Away and Littjara Kinseekers; `npm run popular -- --least`, minus the
+  names already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

@@ -1721,8 +1721,10 @@ export function compile(d: CardDef): CompiledCard {
     // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
     // Vicious Betrayal: "sacrifice any number of creatures" (none too, CR 601.2b), then "Target creature gets +2/+2 until
     // end of turn for each creature sacrificed this way."
+    // Corpse Cobble: "... sacrifice any number of creatures." then "Create an X/X ... token ..., where X is the total power of
+    // the sacrificed creatures": the same cost, and the creatures as they last existed (CR 608.2h).
     const sacFor = /^As an additional cost to cast ~, (?:you may )?sacrifice any number of ([A-Z][a-z]+|creatures)\.$/.exec(line);
-    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `) || l.includes(` for each ${singularWord(sacFor[1]!)} sacrificed this way.`))) {
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `) || l.includes(` for each ${singularWord(sacFor[1]!)} sacrificed this way.`) || (sacFor[1] === "creatures" && l.includes(", where X is the total power of the sacrificed creatures.")))) {
       const spec = parseTargetPhrase(singularWord(sacFor[1]!));
       if (spec?.kind !== "object" || (sacFor[1] === "creatures" ? spec.subtypes?.length || spec.types?.length !== 1 || spec.types[0] !== "Creature" : !spec.subtypes?.length) || spec.controller) out.unsupported.push(raw);
       else {
@@ -1811,8 +1813,16 @@ export function compile(d: CardDef): CompiledCard {
     // Thran Portal: "As this land enters, choose a basic land type." on its own line, then "This land is the chosen type in
     // addition to its other types.": it keeps its Gate type and gets the chosen one, with that type's mana ability (CR
     // 305.6, rulings). With no type chosen, it gets none (rulings).
-    if (line === "As ~ enters, choose a basic land type." && d.types.includes("Land") && !out.entersChoose?.length) {
+    // Realmwright: the same choice on a creature, for "Lands you control are the chosen type in addition to their other types."
+    if (line === "As ~ enters, choose a basic land type." && (d.types.includes("Land") || lines.includes("Lands you control are the chosen type in addition to their other types.")) && !out.entersChoose?.length) {
       out.entersChoose = [{ what: "basicLandType" }];
+      continue;
+    }
+    // Realmwright: "Lands you control are the chosen type in addition to their other types.": the basic land type chosen as
+    // it entered, added in the type-changing layer (CR 613.1d), with that type's mana ability (CR 305.7); none if none was
+    // chosen.
+    if (line === "Lands you control are the chosen type in addition to their other types." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
+      out.statics.push({ affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
       continue;
     }
     if (line === "~ is the chosen type in addition to its other types." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
@@ -3375,6 +3385,16 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
+    // Exquisite Firecraft: "Spell mastery — If there are two or more instant and/or sorcery cards in your graveyard, this
+    // spell can't be countered." A static ability of the spell (CR 113.6, 101.2), checked whenever something would counter
+    // it: only a count of its controller's graveyard.
+    const masteryUncounterable = /^(?:Spell mastery — )?If (there are \w+ or more instant and\/or sorcery cards in your graveyard), ~ can't be countered\.$/.exec(line);
+    if (masteryUncounterable && isSpell) {
+      const cond = parseStaticCondition(masteryUncounterable[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || out.cantBeCounteredIf) out.unsupported.push(raw);
+      else out.cantBeCounteredIf = cond;
+      continue;
+    }
     // Dragonlord's Prerogative: "If you revealed a Dragon card or controlled a Dragon as you cast this spell, this spell
     // can't be countered" (read as kicked above): a static ability of the spell while it's on the stack (CR 113.6, 101.2),
     // with how it was cast locked in (CR 601.2).
@@ -4836,7 +4856,8 @@ function linkExile(out: CompiledCard) {
   }
   // Unlicensed Hearse: "power and toughness are each equal to the number of cards exiled with it" counts what its one
   // exile ability exiled (CR 607.2a).
-  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"')) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, in the static's condition.
+  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

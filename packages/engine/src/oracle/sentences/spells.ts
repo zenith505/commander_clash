@@ -761,10 +761,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];
   }
   // "Counter target spell unless its controller discards their hand" (Perplex): a choice they make as it resolves (CR 118.12).
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost| with power or toughness \d+ or less)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
+  // "... unless its controller exiles all cards from their graveyard" (Grip of Amnesia): the same.
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost| with power or toughness \d+ or less)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand|exiles all cards from their graveyard))?$/i.exec(s))) {
     m.splice(3, 1);
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
-    const unless = /discards their hand$/.test(s) ? { cost: "{0}", discardHand: true as const } : m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
+    const unless = /discards their hand$/.test(s) ? { cost: "{0}", discardHand: true as const } : /exiles all cards from their graveyard$/.test(s) ? { cost: "{0}", exileGraveyard: true as const } : m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
     // An ability's X: one announced for its cost (Kozilek, the Great Distortion; checked in oracle/activated.ts).
     if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.activated && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];

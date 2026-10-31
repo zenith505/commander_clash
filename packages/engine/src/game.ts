@@ -777,7 +777,8 @@ export function moveObject(
   }
   o.exileIfToGraveyard = undefined;
   // "If that creature would die this turn, exile it instead" (CR 614.1a).
-  if (fromZone === "battlefield" && to === "graveyard" && (o.exileIfDiesTurn === s.turn || (s.exileDyingTurn === s.turn && objIsType(s, o, "Creature")))) {
+  // Malicious Eclipse: only a creature an opponent of that spell's controller controls.
+  if (fromZone === "battlefield" && to === "graveyard" && (o.exileIfDiesTurn === s.turn || ((s.exileDyingTurn === s.turn || s.exileDyingOpponents?.some((x) => x.turn === s.turn && controllerOf(s, o) !== x.player)) && objIsType(s, o, "Creature")))) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
@@ -4279,8 +4280,8 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * The life an activated ability's cost asks for: "Pay 2 life", or "Pay life equal to the number of colors in your
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
-export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
+export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {
@@ -6911,7 +6912,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
-  const lifeCost = activatedLifeCost(s, p.id, ab, o);
+  const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
   if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
@@ -7284,7 +7285,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
-  const lifeCost = activatedLifeCost(s, p.id, ab, o);
+  const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
   const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
   const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
@@ -8749,6 +8750,14 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
         return;
       }
       r.scratch.chosen![p.id] = options;
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
+    if (pend.exileGraveyard) {
+      // Grip of Amnesia: every card in their graveyard, exiled as the counter effect carries on (see paidUnless); an empty
+      // graveyard can be "exiled" too (rulings).
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: { [p.id]: [...p.graveyard] } };
       s.pending = null;
       continueResolution(s);
       return;

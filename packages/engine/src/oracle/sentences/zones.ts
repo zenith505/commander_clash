@@ -1280,6 +1280,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
     // Cold Storage, Endless Sands: "Return each creature card exiled with ~ to the battlefield under your control / its
     // owner's control": the creature cards among them as they are now, all at once (CR 607.2a, 608.2f).
+    // Synod Sanctum: "Return all cards exiled with ~ to the battlefield under your control": the same, all of them.
+    if (/^Return all cards exiled with ~ to the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield" }];
     if ((m = /^Return each creature card exiled with ~ to the battlefield under (your|its owner's) control$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] === "your" ? {} : { ownersControl: true }) }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     // Endless Horizons: "put a card you own exiled with ~ into your hand": the same.

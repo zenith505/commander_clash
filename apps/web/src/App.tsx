@@ -5350,6 +5350,8 @@ function Controls({
             `sacrifice ${sac.n === 1 ? (/^[aeiou]/i.test(sac.filter.text) ? "an" : "a") : sac.n === 2 ? "two" : sac.n === 3 ? "three" : sac.n} ${sac.filter.text}${sac.n === 1 ? "" : "s"}`
           ) : pending.discardHand ? (
             "discard your hand"
+          ) : pending.exileGraveyard ? (
+            "exile all cards from your graveyard"
           ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
           ) : pending.poison ? (

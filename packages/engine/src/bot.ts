@@ -271,6 +271,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
+    // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).
+    if (pend.kind === "payUnless" && pend.exileGraveyard) return [{ type: "payUnless", player: pid, pay: player(s, pid).graveyard.length <= 3 }];
     if (pend.kind === "payUnless" && pend.discardHand) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length <= 1 }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless" && pend.discardRandom) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discardRandom }];
@@ -4166,6 +4168,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
+        // Krumar Initiate: "Pay X life" too; keep at least 10 life.
+        if (ab.lifeCostX && (x ?? 0) > player(s, pid).life - 10) continue;
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
         // O-Naginata: not to a creature it can't be attached to (it would stay where it is, rulings).

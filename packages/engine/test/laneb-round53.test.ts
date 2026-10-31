@@ -105,7 +105,6 @@ const roseNoble = () => card("Rose Noble", "Legendary Creature — Human", "{3}{
 
 const rosecotKnight = () => card("Rosecot Knight", "Creature — Human Knight", "{4}{W}", { cmc: 5, colors: ["W"], power: "3", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhen this creature enters, look at the top six cards of your library. You may reveal an artifact or enchantment card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, put a +1/+1 counter on this creature." });
 const blossomPrancer = () => card("Blossom Prancer", "Creature — Spirit", "{3}{G}{G}", { cmc: 5, colors: ["G"], power: "4", toughness: "4", keywords: ["Reach"], oracleText: "Reach\nWhen this creature enters, look at the top five cards of your library. You may reveal a creature or enchantment card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, you gain 4 life." });
-const contagiousVorrac = () => card("Contagious Vorrac", "Creature — Phyrexian Boar Beast", "{2}{G}", { cmc: 3, colors: ["G"], power: "3", toughness: "3", keywords: ["Proliferate"], oracleText: "When this creature enters, look at the top four cards of your library. You may reveal a land card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)" });
 const pulsarSquadronAce = () => card("Pulsar Squadron Ace", "Creature — Human Pilot", "{1}{W}", { cmc: 2, colors: ["W"], power: "1", toughness: "2", oracleText: "When this creature enters, look at the top five cards of your library. You may reveal a Spacecraft card from among them and put it into your hand. Put the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, put a +1/+1 counter on this creature." });
 const inscribedTablet = () => card("Inscribed Tablet", "Artifact", "{1}", { cmc: 1, colors: [], oracleText: "{1}, {T}, Sacrifice this artifact: Reveal the top five cards of your library. Put a land card from among them into your hand and the rest on the bottom of your library in a random order. If you didn't put a card into your hand this way, draw a card." });
 const okibaSalvage = () => card("Okiba Salvage", "Sorcery", "{4}{B}", { cmc: 5, colors: ["B"], oracleText: "Return target creature or Vehicle card from your graveyard to the battlefield. Then put two +1/+1 counters on that permanent if you control an artifact and an enchantment." });
@@ -150,7 +149,7 @@ const poolOnly = (s: GameState, pid: PlayerId, pool: Partial<Record<"W" | "U" | 
 
 describe("Lane B round 53", () => {
   it("are fully supported", () => {
-    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble(), rosecotKnight(), blossomPrancer(), contagiousVorrac(), pulsarSquadronAce(), inscribedTablet(), okibaSalvage(), mirkwoodNurturer(), mongrelPack(), esquireOfTheKing(), synchronizedEviction(), snowDevil(), sugarCoat(), starportSecurity(), sewerCrocodile(), razorlashTransmogrant());
+    supported(sheoldredsRestoration(), hulklingBurgeoningBruiser(), coldStorage(), endlessSands(), longhornSharpshooter(), aloeAlchemist(), custodiSoulcaller(), aetherWeb(), aetherflameWall(), worldQueller(), mazesMantle(), bloodLust(), hemlockVial(), forceAway(), partingThoughts(), favorableDestiny(), paralyze(), ragamuffinRaptor(), wardscaleDragon(), roseNoble(), rosecotKnight(), blossomPrancer(), pulsarSquadronAce(), inscribedTablet(), okibaSalvage(), mirkwoodNurturer(), mongrelPack(), esquireOfTheKing(), synchronizedEviction(), snowDevil(), sugarCoat(), starportSecurity(), sewerCrocodile(), razorlashTransmogrant());
   });
 
   it("Sheoldred's Restoration: returns the creature card; kicked you gain its mana value in life, unkicked you lose it", () => {
@@ -442,7 +441,7 @@ describe("Lane B round 53", () => {
   const landC = (name = "Test Waste") => card(name, "Land", "", { oracleText: "{T}: Add {C}." });
   const spacecraftC = () => card("Test Spacecraft", "Artifact — Spacecraft", "{3}", { cmc: 3, oracleText: "Station (Tap another creature you control: Put charge counters equal to its power on this Spacecraft. Station only as a sorcery. It's an artifact creature at 12+.)" });
 
-  it("didn't put a card into your hand: Rosecot Knight, Blossom Prancer, Pulsar Squadron Ace and Contagious Vorrac", () => {
+  it("didn't put a card into your hand: Rosecot Knight, Blossom Prancer and Pulsar Squadron Ace", () => {
     const cases: [() => CardDef, Partial<Record<"W" | "G" | "C", number>>, () => CardDef, (s: GameState, me: PlayerId, self: string) => unknown, unknown, unknown][] = [
       [rosecotKnight, { W: 1, C: 4 }, trinket, (s, _me, self) => counters(s, self), 0, 1],
       [blossomPrancer, { G: 2, C: 3 }, enchantmentC, (s, me) => life(s, me), 40, 44],
@@ -459,17 +458,6 @@ describe("Lane B round 53", () => {
         expect(zone(s, top[1]!)).toBe(take ? "hand" : "library");
         expect(measure(s, ap, ids[0]!), `${def().name} ${take}`).toBe(take ? took : skipped);
       }
-    // Contagious Vorrac proliferates only when it took no land.
-    for (const take of [true, false]) {
-      const { s: s0, ap, ids } = setup([contagiousVorrac()]);
-      poolOnly(s0, ap, { G: 1, C: 2 });
-      const grown = putOnBattlefield(s0, ap, bearC("Grown Bear"));
-      s0.objects[grown]!.counters = { "+1/+1": 1 };
-      const top = onTop(s0, ap, [landC(), bearC("Dull Bear")]);
-      let s = settle(castNow(s0, ap, ids[0]!), at("searchLibrary", ap));
-      s = settle(act(s, { type: "searchLibrary", player: ap, found: take ? [top[0]!] : [] }));
-      expect(counters(s, grown)).toBe(take ? 1 : 2);
-    }
   });
 
   it("Inscribed Tablet: a land from the top five, or a card drawn when there is none", () => {

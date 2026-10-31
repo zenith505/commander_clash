@@ -28,6 +28,14 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Walker: { name: "Walker", power: 2, toughness: 2, colors: ["B"], types: ["Creature"], subtypes: ["Zombie"], keywords: [] },
 };
 
+/**
+ * Tokens that are copies of a card in the Oracle card reference, named by it (Ginger, Queen of Sweets: "create a
+ * Gingerbrute token", rulings): that card's characteristics, mana cost included (CR 111.3).
+ */
+export const CARD_TOKENS: Record<string, TokenSpec> = {
+  Gingerbrute: { name: "Gingerbrute", named: true, manaCost: "{1}", power: 1, toughness: 1, colors: [], types: ["Artifact", "Creature"], subtypes: ["Food", "Golem"], keywords: ["Haste"], abilities: "{1}: This creature can't be blocked this turn except by creatures with haste.\n{2}, {T}, Sacrifice this creature: You gain 3 life." },
+};
+
 /** Role tokens (CR 111.10j-r, 303.7): colorless Aura Role enchantment tokens with enchant creature, created attached to a creature. */
 const role = (name: string, text: string): TokenSpec => ({ name, colors: [], types: ["Enchantment"], subtypes: ["Aura", "Role"], keywords: [], abilities: `Enchant creature\n${text}` });
 export const ROLE_TOKENS: Record<string, TokenSpec> = {

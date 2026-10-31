@@ -1262,6 +1262,25 @@ line blocks.
    (replacing the next draw this turn); Become the Pilot (can't be blocked unless attacking its owner); Nemesis Phoenix
    (returned tapped and attacking from the graveyard); Battletide Alchemist ("you may prevent X of that damage" for any
    player).
+   Round 224 (fresh cards from the top): a floating "whenever one or more Gorgons and/or Snakes you control deal combat
+   damage to a player" (Aphelia, Viper Whisperer); "spend this mana only to cast a spell that's one or more colors
+   without {X} in its mana cost" (Titans' Nest); "whenever you and/or at least one permanent you control becomes the
+   target of a spell or ability an opponent controls" once per spell or ability (Leyline of Combustion, CR 115.10);
+   "whenever a creature deals combat damage to its owner" (The Beast, Deathless Prince); "the number of colors of mana
+   spent to cast it" in a cast trigger (Wildgrowth Archaic, CR 601.2h); "remove all +1/+1 counters from ~, and it deals
+   that much damage" (Ashling the Pilgrim); "defending player sacrifices a creature of their choice that's blocking it"
+   (Labyrinth Raptor, CR 509.1h); "it deals damage equal to its power to each other creature" (Showstopping Surprise,
+   Nova Flame); "If no counters were removed this way, ... Otherwise, ..." (Bounty of the Luxa); "creatures dealt
+   damage this way can't block this turn" (Huatli, Warrior Poet); "cast Elf spells and activate abilities of Elf
+   sources" (Woodland Weavemaster); "entered from a graveyard or you cast it from a graveyard" (Breathless Knight);
+   "the first time counters have been put on that creature this turn" (Stalwart Successor); "a card in your graveyard
+   that wasn't put there this combat" (Storrev, Devkarin Lich, CR 506.1); "that player may put a +1/+1 counter on ~. If
+   they do, they add {C} for each counter on it" (Cheering Crowd). +16 (28,574 of 31,936).
+   Out after round 224 (looked at, not done): Heaven Sent (exile it and cast it this turn); Open the Omenpaths (mana of
+   two different colors); Karn's Sylex (players can't pay life, across every life cost); Spark of Creativity ("you may
+   have ~ deal damage ... If you don't, you may play that card"); Strength of the Tajuru (one target per multikick);
+   Fires of Mount Doom ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
+   more); Myr Superion (spend only mana produced by creatures).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

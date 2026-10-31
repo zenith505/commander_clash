@@ -620,7 +620,7 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   const snapshot: GameObject = { ...victim, counters: { ...victim.counters } };
   const chars = characteristics(s, victim);
   log(s, `${player(s, pid).name} sacrifices ${defOf(s, victim).name} (${src}'s exploit).`);
-  moveObject(s, victim.id, "graveyard", { sacrificed: true });
+  moveObject(s, victim.id, "graveyard", { sacrificed: true, ...(exploiter ? { exploitedBy: { id: exploiter.id, zc: exploiter.zoneChanges ?? 0 } } : {}) });
   if (exploiter) fireEvent(s, { type: "exploits", exploiter: exploiter.id, controller: pid, victim: snapshot, chars, watchers });
 }
 
@@ -2678,7 +2678,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} exiles ${p.name}'s library (${n} card${n === 1 ? "" : "s"}).`);
           continue;
         }
-        if (e.hand) {
+        if (e.hand && e.filter) {
+          // Thought Distortion: "Exile all noncreature, nonland cards from that player's hand and graveyard".
+          const inHand = p.hand.filter((id) => printedMatches(e.filter!, defOf(s, obj(s, id))));
+          for (const id of inHand) moveObject(s, id, "exile");
+          log(s, `${src} exiles ${inHand.length ? inHand.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from ${p.name}'s hand.`);
+        } else if (e.hand) {
           const n = p.hand.length;
           for (const id of [...p.hand]) moveObject(s, id, "exile");
           log(s, `${src} exiles ${p.name}'s hand (${n} card${n === 1 ? "" : "s"}).`);

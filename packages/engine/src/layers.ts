@@ -878,7 +878,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "cardLeftYourGraveyard":
       return cond.n ? (s.turnLog?.leftGraveyardCount?.[you] ?? 0) >= cond.n : (s.turnLog?.leftGraveyard ?? []).includes(you);
     case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)
-      const mine = (s.castThisTurn ?? []).filter((c) => c.player === you && (!cond.color || c.colors?.includes(cond.color)));
+      const mine = (s.castThisTurn ?? []).filter((c) => c.player === you && (!cond.color || c.colors?.includes(cond.color)) && (!cond.types || cond.types.some((t) => s.cards[c.card]?.types.includes(t))));
       // As a spell resolves it has counted itself, unless it's a copy, which wasn't cast (CR 707.12). With a color, only if
       // it was cast that color.
       const item = cond.resolving ? s.resolving?.item : undefined;

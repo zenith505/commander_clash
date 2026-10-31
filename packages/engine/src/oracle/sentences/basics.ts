@@ -441,10 +441,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "damage" || !amount) return null;
     return [{ type: "if", cond: { kind: "amountNow", amount, min: num(m[2]!), max: num(m[3]!) }, effects: [], otherwise: fx }];
   }
-  // Dwarven Driller: "Destroy target land unless its controller has ~ deal 2 damage to them", Blazing Salvo: "~ deals 3
+  // Dwarven Driller: "Destroy target land unless its controller has ~ deal 2 damage to them" (Lava Blister: "target
+  // nonbasic land ... 6 damage"), Blazing Salvo: "~ deals 3
   // damage to target creature unless that creature's controller has ~ deal 5 damage to them": that permanent's controller
   // decides as it resolves (CR 608.2d), as it last existed if it has left (608.2h).
-  if ((m = /^([Dd]estroy target land|~ deals \d+ damage to target creature) unless (?:its|that creature's) controller (has ~ deal \d+ damage to them)$/.exec(s)) && (/^[Dd]estroy/.test(m[1]!) || /that creature's/.test(s))) {
+  if ((m = /^([Dd]estroy target (?:nonbasic )?land|~ deals \d+ damage to target creature) unless (?:its|that creature's) controller (has ~ deal \d+ damage to them)$/.exec(s)) && (/^[Dd]estroy/.test(m[1]!) || /that creature's/.test(s))) {
     const before = ctx.targets.length;
     const fx = parseSentence(capital(m[1]!), ctx);
     const options = parsePunisherOptions(m[2]!, ctx);

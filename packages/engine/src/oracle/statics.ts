@@ -519,6 +519,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, n: 0, times: c, coloredOrGeneric: m[2] as Color, text: line } };
   }
+  // Hum of the Radix: "Each artifact spell costs {1} more to cast for each artifact its controller controls": everyone's
+  // artifact spells, counted for the spell's caster as it's cast (CR 601.2f).
+  if ((m = /^Each (artifact|creature|enchantment) spell costs \{(\d+)\} more to cast for each (artifact|creature|enchantment) its controller controls$/.exec(text))) {
+    const base = parseCostChange(`${capital(m[1]!)} spells cost {${m[2]}} more to cast`);
+    const c = parseCount(`${m[3]} you control`, null, true);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.who !== "all" || !c) return "fail";
+    return { costMod: { ...base.costMod, times: c, timesForCaster: true, text: line } };
+  }
   if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (.+)$/.exec(text)) && !/^~/.test(text)) {
     const base = parseCostChange(m[1]!);
     const c = parseCount(m[2]!, null, true);
@@ -594,6 +602,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   if ((m = /^Spells you cast but don't own cost \{(\d+)\} less to cast$/.exec(text))) return { costMod: { who: "you", filter: { kind: "spell", text: "spells you don't own" }, n: -Number(m[1]), notOwned: true, text: line } };
   if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother" } } };
+  // Mage Duel: "~ costs {2} less to cast if you've cast another instant or sorcery spell this turn".
+  if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another instant or sorcery spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother", types: ["Instant", "Sorcery"] } } };
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity), "During turns other than yours, ~ costs {3} more to
   // cast" (Hurkyl's Final Meditation): checked as it's cast (CR 601.2f); a colored reduction takes off that colored mana.
@@ -1473,8 +1483,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
   // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
-  if ((m = /^enchanted (creature|land) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
-    return { kind: "attachedIs", filter: { kind: "object", types: [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
+  // Volition Reins: "if enchanted permanent is tapped": any permanent.
+  if ((m = /^enchanted (creature|land|permanent) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
+    return { kind: "attachedIs", filter: { kind: "object", types: m[1] === "permanent" ? [] : [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
   // Howl of the Hunt: "if enchanted creature is a Wolf or Werewolf": the creature it's attached to, as it is now.
   if ((m = /^enchanted creature is an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && CREATURE_TYPES.has(m[1]!) && (!m[2] || CREATURE_TYPES.has(m[2]))) {
     const kinds = [m[1]!, m[2]].filter((x): x is string => !!x);

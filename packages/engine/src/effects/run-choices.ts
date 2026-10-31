@@ -685,6 +685,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.damagedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "playerDamagedThisWay"
             ? (s.resolving!.playersDamagedThisWay ?? []).length > 0
+            : e.cond.kind === "playerMoreLifeThanYou"
+            ? ((who) => players(s, who, ctx).some((pid) => player(s, pid).life > player(s, ctx.controller).life))(e.cond.who)
+            : e.cond.kind === "subjectExploitedBySelf"
+            ? !!ctx.lki?.exploitedBy && ctx.lki.exploitedBy.id === ctx.sourceId && (ctx.sourceZc === undefined || ctx.lki.exploitedBy.zc === ctx.sourceZc)
             : e.cond.kind === "subjectWasAttacking"
             ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
             : e.cond.kind === "causeSpellIs"

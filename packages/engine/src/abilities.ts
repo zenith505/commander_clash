@@ -251,7 +251,7 @@ export type Count =
   /** "For each player who chose fortune": how many players chose that word (Effect eachChooses). */
   | { kind: "choseWord"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
-  | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
+  | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
@@ -262,6 +262,8 @@ export type Count =
   | { kind: "life"; who: PlayerRef; highest?: true }
   /** "That player's life total as the turn began" (Sengir, the Dark Baron): the trigger's player's (GameState.lifeAsTurnBegan), in the game or not. */
   | { kind: "eventPlayerLifeAsTurnBegan" }
+  /** "If you had no cards in hand at the beginning of this turn" (Mindstorm Crown): your hand size then (GameState.handAsTurnBegan). */
+  | { kind: "handAsTurnBegan" }
   /** "The difference" between your starting life total and your life total when it is less (Shadow of Mortality); 0 otherwise. */
   | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
@@ -537,6 +539,8 @@ export interface TargetSpec {
   toughnessAbovePower?: true;
   /** "Whose power and toughness aren't equal" (Gilt-Leaf Winnower): as it is now. */
   ptUnequal?: true;
+  /** "With power equal to its toughness" (Master Symmetrist): a creature whose power and toughness are the same. */
+  ptEqual?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** For spells: "that wasn't cast from its owner's hand" (Wash Away); a copy was never cast. */
@@ -2036,7 +2040,7 @@ export type StaticCondition =
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number }
-  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Enters with ... unless you've cast another red spell this turn" (Hotheaded Giant): as it enters, other than itself if it was cast (rulings). */ entering?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color }
+  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Enters with ... unless you've cast another red spell this turn" (Hotheaded Giant): as it enters, other than itself if it was cast (rulings). */ entering?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color; /** "Another instant or sorcery spell" (Mage Duel): one with any of these card types. */ types?: string[] }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
    * and had any of this spell's creature types.
@@ -3896,7 +3900,7 @@ export interface SpentReq {
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
-  | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
+  | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string; /** "If it was kicked twice" (Archangel of Wrath): at least this many kicker costs paid. */ times?: number }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
   /** "If this ability has been activated four or more times this turn" (Dragon Whelp): this activated ability, counted as it resolves (rulings). */
@@ -4041,6 +4045,10 @@ export type SpellCondition =
   | { kind: "causeSpellIs"; filter: TargetSpec }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
   | { kind: "subjectWasAttacking" }
+  /** Silumgar Scavenger: "if it exploited that creature": the creature a dies trigger is about was sacrificed for this source's exploit, this object (CR 702.110a, 400.7). */
+  | { kind: "subjectExploitedBySelf" }
+  /** Pulse of the Forge: "if that player or that planeswalker's controller has more life than you", as it resolves. */
+  | { kind: "playerMoreLifeThanYou"; who: PlayerRef }
   /**
    * "If you controlled that permanent, draw a card" about target `index` (Geistwave, Kellan): you control it now, or did
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
@@ -4717,7 +4725,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -5323,6 +5331,8 @@ export interface CostMod {
   if?: StaticCondition;
   /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
   times?: AmountExpr;
+  /** Hum of the Radix: "for each artifact its controller controls": `times` counted for the spell's caster, not the permanent's controller. */
+  timesForCaster?: true;
   /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
   colored?: Color[];
   /** The Leeches: "Red spells you cast cost {R} more to cast": this colored mana added to the total cost (CR 601.2f); `n` is 0. */
@@ -6400,6 +6410,8 @@ export interface CompiledCard {
   skipDrawStep?: boolean;
   /** "Players skip their untap steps." (Stasis, CR 614.10): no player's untap step happens. */
   skipUntapSteps?: boolean;
+  /** Eon Hub: "Players skip their upkeep steps": every player's, the whole step (CR 614.10). */
+  skipUpkeepSteps?: true;
   /** "You draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem): after that player's draw (rulings). */
   drawsInOpponentsDrawStep?: boolean;
   /** "You may choose not to untap ~ during your untap step." (CR 502.3): its controller decides as the step untaps. */
@@ -6710,7 +6722,7 @@ export interface CompiledCard {
   /** `costs`: "Morph—Pay 5 life." (CR 702.37a, 118.8), a morph cost that isn't mana (`cost` is "" then); `text` says it. */
   faceDownCast?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
   /** Hooded Hydra: "As ~ is turned face up, put five +1/+1 counters on it" (a replacement, CR 614.1e), however it's turned face up (rulings). */
-  faceUpCounters?: { counter: string; n: number };
+  faceUpCounters?: { counter: string; n: number | Amount };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */
   textKeywords: string[];
   /** Lines the compiler couldn't turn into rules. Empty means the card is fully supported. */

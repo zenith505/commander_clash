@@ -130,6 +130,7 @@ export interface CastHow {
 export function castConditionMet(cond: SpellCondition, how: CastHow): boolean {
   switch (cond.kind) {
     case "kicked":
+      if (cond.times) return (how.kicks?.length ?? 0) >= cond.times;
       return cond.which === undefined ? !!how.kicks?.length : !!how.kicks?.includes(cond.which);
     case "bargained":
       return !!how.bargained;

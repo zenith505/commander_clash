@@ -1612,6 +1612,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // controls gets -1/-1." Two instructions with the same duration, in order (CR 611.2c: each group is fixed as it resolves).
   text = text.replace(/^Until end of turn, (creatures you control|target creature you control) (get|gets) ([+-]\d+\/[+-]\d+) and (creatures your opponents control|target creature an opponent controls) (get|gets) ([+-]\d+\/[+-]\d+)\.$/, (all, a: string, v1: string, p1: string, b: string, v2: string, p2: string) =>
     (v1 === "get") === a.startsWith("creatures") && (v2 === "get") === b.startsWith("creatures") ? `${capital(a)} ${v1} ${p1} until end of turn. ${capital(b)} ${v2} ${p2} until end of turn.` : all);
+  // Shadows' Verdict: "Exile all creatures and planeswalkers with mana value 3 or less from the battlefield and all creature
+  // and planeswalker cards with mana value 3 or less from all graveyards": the permanents, then the cards (nothing the
+  // first part exiles can reach a graveyard, and no player acts in between).
+  text = text.replace(/^Exile all ([a-z]+s and [a-z]+s with mana value \d+ or (?:less|greater)) from the battlefield and all ([a-z]+ and [a-z]+ cards with mana value \d+ or (?:less|greater) from all graveyards)\.$/, "Exile all $1. Exile all $2.");
+  // Hunted Nightmare: "target opponent puts a deathtouch counter on a creature they control": that player chooses the
+  // creature (rulings), none if they control none.
+  text = text.replace(/^([Tt]arget opponent) puts an? ([a-z]+) counter on a creature they control\.$/, "$1 chooses a creature they control. Put a $2 counter on that creature.");
+  // Bob, Reluctant HYDRA Agent: "return ~ to ~'s owner's hand" (the card's name twice) is "its owner's hand".
+  text = text.replace(/\breturn ~ to ~'s owner's hand\b/g, "return ~ to its owner's hand");
+  // Stronghold Overseer: "Creatures with shadow get +1/+0 until end of turn and creatures without shadow get -1/-0 until end
+  // of turn": two instructions, each group fixed as it resolves (CR 611.2c).
+  text = text.replace(/(^|: )Creatures with ([a-z]+) get ([+-]\d+\/[+-]\d+) until end of turn and creatures without \2 get ([+-]\d+\/[+-]\d+) until end of turn\.$/, "$1All creatures with $2 get $3 until end of turn. All creatures without $2 get $4 until end of turn.");
+  // Tromp the Domains: "Until end of turn, creatures you control gain trample and get +1/+1 for each basic land type among
+  // lands you control": two instructions about the same group with the same duration, fixed as it resolves (CR 611.2c).
+  text = text.replace(/^Until end of turn, creatures you control gain ([a-z]+) and get ([+-]\d+\/[+-]\d+) (for each [^.]+)\.$/, "Creatures you control gain $1 until end of turn. Creatures you control get $2 until end of turn $3.");
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.
@@ -8107,6 +8122,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "playerDamagedThisWay" }, effects: [{ type: "tap", what: { ref: "self" } }] });
       continue;
     }
+    // Provoke the Trolls: "~ deals 3 damage to any target. If a creature is dealt damage this way, it gets +5/+0 until end
+    // of turn": the target, only if it's a creature that was dealt damage (not all prevented).
+    const dealtPump = /^If a creature is dealt damage this way, it gets ([+-]\d+)\/([+-]\d+) until end of turn$/.exec(s);
+    const pumpPrev = effects[effects.length - 1];
+    if (dealtPump && pumpPrev?.type === "damage" && "ref" in pumpPrev.to && pumpPrev.to.ref === "anyTarget" && ctx.targets[pumpPrev.to.index]?.kind === "any" && !ctx.targets[pumpPrev.to.index]!.many) {
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter }, effects: [{ type: "continuous", what: { ref: "target", index: pumpPrev.to.index }, mods: [{ kind: "modifyPT", power: Number(dealtPump[1]), toughness: Number(dealtPump[2]) }], duration: "endOfTurn" }] });
+      continue;
+    }
     // Redcap Melee: "If a nonred permanent is dealt damage this way, you sacrifice a land".
     const dealtIs = /^If an? ([A-Z][a-z]+|creature|non(?:white|blue|black|red|green) (?:creature|permanent)) is dealt damage this way, (.+)$/.exec(s);
     if (dealtIs && effects.some((e) => e.type === "damage")) {
@@ -9648,6 +9672,41 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "continuous", what: { ref: "counteredSource", filter }, mods: [{ kind: "loseAllAbilities" }], duration: "whileControlled", whileOnBattlefield: true });
       continue;
     }
+    // Pulse of the Forge: "~ deals 4 damage to target player or planeswalker. Then if that player or that planeswalker's
+    // controller has more life than you, return ~ to its owner's hand": compared as it resolves, after the damage.
+    const moreLife = ctx.spell ? /^(?:Then i|I)f (that player or that planeswalker's controller|that player) has more life than you, (return ~ to its owner's hand)$/.exec(s) : null;
+    if (moreLife && effects.length) {
+      const who = parsePlayer(moreLife[1]!, ctx);
+      const fx = who && who.ref !== "you" ? parseOne(capital(moreLife[2]!), ctx) : null;
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "playerMoreLifeThanYou", who: who! }, effects: fx });
+      continue;
+    }
+    // Lattice-Blade Mantis: "Whenever ~ attacks, you may remove an oil counter from it. If you do, untap it and it gets +1/+1
+    // until end of turn": both only if the counter was removed (CR 608.2c).
+    const untapPump = !ctx.spell && effects[effects.length - 1]?.type === "may" ? /^If you do, untap (?:it|~) and (?:it|~) gets ([+-]\d+)\/([+-]\d+) until end of turn$/.exec(s) : null;
+    if (untapPump && (ctx.selfIt || /^(?:[Yy]ou may )?remove an? [a-z]+ counter from (?:it|~)\.?$/.test(sentences[si - 1] ?? ""))) {
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "untap", what: { ref: "self" } }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: Number(untapPump[1]), toughness: Number(untapPump[2]) }], duration: "endOfTurn" }] });
+      continue;
+    }
+    // Silumgar Scavenger: "Whenever another creature you control dies, put a +1/+1 counter on ~. It gains haste until end of
+    // turn if it exploited that creature": the one that died was sacrificed for this object's exploit (CR 702.110a).
+    if (s === "~ gains haste until end of turn if it exploited that creature" && ctx.subject && !ctx.spell && effects.length && /^[Pp]ut an? \+1\/\+1 counter on ~\.?$/.test(sentences[si - 1] ?? "")) {
+      const yes = parseOne("~ gains haste until end of turn", ctx);
+      if (!yes) return null;
+      effects.push({ type: "if", cond: { kind: "subjectExploitedBySelf" }, effects: yes });
+      continue;
+    }
+    // Mindstorm Crown: "draw a card if you had no cards in hand at the beginning of this turn. If you had a card in hand, ~
+    // deals 1 damage to you": the hand as the turn began, not as it resolves (rulings), no intervening if (CR 603.4).
+    if (/^[Dd]raw a card if you had no cards in hand at the beginning of this turn$/.test(s) && !effects.length && /^If you had a card in hand, ~ deals \d+ damage to you\.?$/.test(sentences[si + 1] ?? "")) {
+      const yes = parseOne("Draw a card", ctx);
+      const no = parseOne(sentences[si + 1]!.replace(/^If you had a card in hand, /, "").replace(/\.$/, ""), ctx);
+      if (!yes || !no) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "handAsTurnBegan" } }, max: 0 }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     // Zurgo Stormrender: "draw a card if it was attacking. Otherwise, each opponent loses 1 life": the token the trigger is
     // about, as it last existed (CR 608.2h).
     const wasAttacking = (ctx.subject || ctx.subjectIt) && !effects.length ? /^(.+) if it was attacking$/.exec(s) : null;
@@ -10410,7 +10469,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
-      // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration),
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger; To the Slaughter's "a creature and a
+      // planeswalker of their choice"), and so does a search (Entish Restoration),
       // and untapping one of yours (White Plume Adventurer).
       // Toxic Stench: "If there are seven or more cards in your graveyard, instead destroy that creature. It can't be
       // regenerated.": the destroy instead (CR 701.19c).
@@ -10418,7 +10478,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         inner[0] = { ...inner[0]!, noRegen: true };
         si++;
       }
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo" && e.type !== "revealFromHand")) return null;
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "sacrificeEach" && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo" && e.type !== "revealFromHand")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf, ...insteadSubject }, effects: done, otherwise: previous });

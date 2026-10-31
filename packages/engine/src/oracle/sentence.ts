@@ -458,7 +458,7 @@ export function parseChanges(text: string): Modification[] | null {
   // "Becomes black, gets +1/-1, and gains "..."" (Defiling Tears), "becomes an Angel, gets +3/+3, and gains flying and
   // lifelink" (Paragon of the Amesha): a list of changes. Dance of the Skywise: "becomes a blue Dragon Illusion with base
   // power and toughness 4/4, loses all abilities, and gains flying": in that order, so it has flying (rulings).
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
+  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) |isn't an artifact$)|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();
@@ -474,6 +474,9 @@ export function parseChanges(text: string): Modification[] | null {
     // Arcum's Weathervane, Thermal Flux: "is no longer snow", "isn't snow until end of turn": the snow supertype goes
     // (layer 4, CR 205.4a), its other types stay (rulings).
     else if (/^(?:is|are) no longer snow$|^(?:isn't|aren't) snow$/i.test(p)) out.push({ kind: "loseTypes", types: ["Snow"] });
+    // Neurok Transmuter: "becomes blue and isn't an artifact": the card type and its subtypes go (layer 4, rulings), its
+    // other types stay.
+    else if (/^isn't an artifact$/i.test(p)) out.push({ kind: "loseTypes", types: ["Artifact"] });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
     else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {

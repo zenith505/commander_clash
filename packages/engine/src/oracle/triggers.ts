@@ -1034,7 +1034,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
 // "Is exiled from the battlefield" (Soulherder) is leaving it for exile (CR 406.3).
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield|is returned to its owner's hand), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -1096,6 +1096,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
+  // Stormfront Riders: "Whenever ~ or another creature is returned to your hand from the battlefield": one you own goes to
+  // its owner's hand (CR 404.2), a token too before it ceases to exist (rulings). Justice, Vance Astrovik: "Whenever another
+  // nonland permanent you control is returned to its owner's hand": from the battlefield, the only place a permanent is.
+  line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) [a-z]+) is returned to your hand from the battlefield, /, "$1 you own is returned to its owner's hand, ");
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -1113,10 +1117,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
   const exiled = !attached && /^is (?:exiled|put into exile) /.test(m![3]!);
+  const toHand = !attached && m![3] === "is returned to its owner's hand";
   // "Whenever a creature with a coin counter on it dies or is put into exile" (Athreos, Shroud-Veiled): from the
   // battlefield to either one (CR 700.4, 603.6c).
   const diesOrExiled = !attached && m![3] === "dies or is put into exile";
-  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled);
+  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled || toHand);
   // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
   // change, so it's part of the event, like "without dying".
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
@@ -1210,7 +1215,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
       ...(leaves ? { leaves: true as const } : {}),
-      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}),
+      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
     },
@@ -1394,7 +1399,7 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   // "Whenever a creature you control with deathtouch attacks" (Hooded Blightfang), "Whenever a creature with flying
   // attacks" (Windreader Sphinx): one with it as it's declared.
-  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with base power and toughness \d+\/\d+| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike|toxic))?) attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with power equal to its toughness| with an? \+1\/\+1 counter on it| with a mana ability| with base power and toughness \d+\/\d+| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike|toxic))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature(?: with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
@@ -2850,6 +2855,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(line.replace(/tap it(\.?)$/, "tap enchanted creature$1"));
     return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
   }
+  // Volition Reins: "When this Aura enters, if enchanted permanent is tapped, untap it.": "it" is that permanent.
+  if (/^When ~ enters, if enchanted permanent is tapped, untap it\.?$/.test(line)) {
+    const t = parseTrigger(line.replace(/untap it(\.?)$/, "untap enchanted permanent$1"));
+    return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
+  }
   // Codespell Cleric: "When ~ enters, if it was the second spell you cast this turn": ~ as the spell it was, as it
   // triggers and resolves (CR 603.4); a permanent that wasn't cast was no spell.
   const castNth = /^(When ~ enters), if it was the (second|third|fourth) spell you cast this turn, (.+)$/.exec(line);
@@ -3535,12 +3545,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if it was kicked, ...": an intervening if (CR 603.4) on how it was cast.
       let body0 = m[1]!;
       let ifKicked: SpellCondition | undefined;
-      const kicked = /^if (?:it|~) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
+      // Archangel of Wrath: "if it was kicked twice": both of its two kicker costs paid (each at most once, rulings).
+      const kicked = /^if (?:it|~) was kicked(?: with its ((?:\{[^}]+\})+) kicker| (twice))?, (.+)$/i.exec(body0);
       if (kicked) {
         // "When you cast ~, if it was kicked, exile target land." (Sowing Mycospawn): the spell as it was cast.
         if (event !== "selfEnters" && event !== "selfCast") return "fail" as const;
-        ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
-        body0 = kicked[2]!;
+        ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}), ...(kicked[2] ? { times: 2 } : {}) };
+        body0 = kicked[3]!;
       }
       // "When ~ enters, if it was bargained, ..." (CR 702.166b).
       let ifBargained = false;

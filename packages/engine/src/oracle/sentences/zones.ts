@@ -923,6 +923,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who, hand: true }] : null;
   }
+  // Thought Distortion: "Target opponent reveals their hand. Exile all noncreature, nonland cards from that player's hand
+  // and graveyard."
+  if ((m = /^Exile all (.+?) cards from (that player's) hand and graveyard$/.exec(s))) {
+    const who = parsePlayer(m[2]!.replace(/'s$/, ""), ctx);
+    const filter = parseSearchFilter(`${m[1]!} card`);
+    return who && filter ? [{ type: "exileGraveyard", who, hand: true, filter }] : null;
+  }
   // Go Blank: "Target player discards two cards. Then exile that player's graveyard.": the target's.
   if ((m = /^Exile (target player's|target opponent's|that player's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
@@ -944,10 +951,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   const all = theirs ? { what: theirs[2]!, whose: `${theirs[1]!.toLowerCase()}'s` } : (m = /^[Ee]xile all (.+?) from (target player's|target opponent's|each opponent's|your|all) graveyards?$/.exec(s)) && { what: m[1]!, whose: m[2]! };
   if (all) {
     const flashback = all.what === "cards with flashback";
-    const kind = /^(.+?) cards$/.exec(all.what);
+    // Shadows' Verdict: "all creature and planeswalker cards with mana value 3 or less from all graveyards".
+    const kind = /^(.+?) cards( with mana value \d+ or (?:less|greater))?$/.exec(all.what);
     // "All cards": the whole graveyard.
     // "All artifact and enchantment cards" (Saprazzan Bailiff): each card that's either.
-    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]!.replace(/^(artifact|creature|enchantment|instant|sorcery|land) and (artifact|creature|enchantment|instant|sorcery|land)$/, "$1 or $2")} card`) : null;
+    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]!.replace(/^(artifact|creature|enchantment|instant|sorcery|land|planeswalker) and (artifact|creature|enchantment|instant|sorcery|land|planeswalker)$/, "$1 or $2")} card${kind[2] ?? ""}`) : null;
     const w = all.whose;
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;

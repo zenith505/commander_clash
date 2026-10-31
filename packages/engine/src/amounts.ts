@@ -416,6 +416,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
+      if (c.totalMv) return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).reduce((k, id) => k + defMv(defOf(s, s.objects[id]!)), 0), 0);
       if (c.greatestMv) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => defMv(defOf(s, s.objects[id]!)))));
       // Revivify: only those put there from the battlefield this turn.
       return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn)).length, 0);
@@ -427,6 +428,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const pid = ctx.event?.player;
       return pid === undefined ? 0 : (s.lifeAsTurnBegan?.[pid] ?? s.players[pid]?.life ?? 0);
     }
+    case "handAsTurnBegan":
+      return s.handAsTurnBegan?.[ctx.controller] ?? 0;
     case "lifeBelowStart":
       return Math.max(0, STARTING_LIFE - (s.players[ctx.controller]?.life ?? STARTING_LIFE)); // CR 103.4: 40 in Commander (CR 903.7)
     case "experience":
@@ -1076,6 +1079,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";
+    case "handAsTurnBegan":
+      return "cards in hand as the turn began";
     case "lifeBelowStart":
       return "life below starting";
     case "experience":

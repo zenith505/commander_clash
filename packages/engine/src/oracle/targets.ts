@@ -1256,7 +1256,8 @@ export function parseTargetPhrase(
     p = p.slice(0, atLeastChosen.index);
     phrase = phrase.trim().slice(0, atLeastChosen.index);
   }
-  const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
+  // Master Symmetrist: "with power equal to its toughness" is its own comparison (TargetSpec.ptEqual, below), not an amount.
+  const bound0 = / with power equal to its toughness$/i.test(phrase.trim()) ? null : / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
   const amount0 = bound0 ? opts.count?.(from0 ? bound0[4]!.slice(0, from0.index) : bound0[4]!) : null;
   const bound = bound0 && (amount0 || !bound0[2] || bound0[3]) ? bound0 : null;
@@ -1597,6 +1598,10 @@ export function parseTargetPhrase(
   // "Another creature you control with base power 1" (Rapid Augmenter).
   if ((m = / with base power (\d+)$/.exec(p))) {
     extra.basePower = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
+  if ((m = / with power equal to its toughness$/.exec(p))) {
+    extra.ptEqual = true;
     p = p.slice(0, m.index);
   }
   if ((m = / whose power and toughness aren't equal$/.exec(p))) {

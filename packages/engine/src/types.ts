@@ -1104,6 +1104,8 @@ export interface LastKnown {
   commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
+  /** It was sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
+  exploitedBy?: { id: ObjectId; zc: number };
   /** Who controlled each Aura attached to it as it last existed, one entry per Aura (Hateful Eidolon, CR 603.10a). */
   auraControllers?: PlayerId[];
   /** The Equipment attached to it as it last existed (Zack Fair: "an Equipment that was attached to ~"). */
@@ -1828,6 +1830,8 @@ export interface GameState {
   monarchAsTurnBegan?: PlayerId;
   /** Each player's life total as this turn began (Sengir, the Dark Baron), by player id. */
   lifeAsTurnBegan?: number[];
+  /** How many cards each player had in hand as this turn began (Mindstorm Crown), by player id. */
+  handAsTurnBegan?: number[];
   /** The emblems in the command zone (CR 114.1), in the order they were made: objects with `emblem`. */
   emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */

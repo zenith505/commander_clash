@@ -2075,8 +2075,10 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   if (useShieldCounter(s, o, "it being destroyed")) return false;
   const name = defOf(s, o).name;
   // "It can't be regenerated (this turn)": its shields don't apply (CR 701.19c); they stay for later.
-  if (!noRegen && o.noRegenTurn !== s.turn && (o.regenShields ?? 0) > 0) {
-    o.regenShields! -= 1;
+  // Mossbridge Troll: "If ~ would be destroyed, regenerate it": regenerated with no shield used up (rulings).
+  const always = !noRegen && o.noRegenTurn !== s.turn && !!abilitiesOf(s, o).regeneratesInsteadOfDestroyed;
+  if (!noRegen && o.noRegenTurn !== s.turn && ((o.regenShields ?? 0) > 0 || always)) {
+    if (!always) o.regenShields! -= 1;
     o.damage = 0;
     o.deathtouchDamage = false;
     tapPermanent(s, o);
@@ -6862,6 +6864,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
+  else if (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(pid)) return `only ${d.name}'s controller's opponents may activate that ability`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher

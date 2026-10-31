@@ -935,7 +935,8 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (others(spec.differentManaValueFrom).some((x) => defMv(defOf(s, x)) === defMv(defOf(s, o)))) return false;
   // Shifting Loyalties: a card type in common, as they are now (CR 205.2a).
   const cardTypes = (x: GameObject) => characteristics(s, x).types.filter((ty) => CARD_TYPES.has(ty));
-  if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty)))) return false;
+  // Legerdemain: "that shares one of those types with it", only artifact or creature (rulings: checked again as it resolves).
+  if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty) && (!spec.sharesCardTypeAmong || spec.sharesCardTypeAmong.includes(ty))))) return false;
   // Rivals' Duel: no creature type in common, as they are now.
   if (others(spec.sharesNoCreatureTypeWith).some((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));

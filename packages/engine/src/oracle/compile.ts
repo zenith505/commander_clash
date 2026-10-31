@@ -1873,6 +1873,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, reflexive: body };
       continue;
     }
+    // Mossbridge Troll: "If ~ would be destroyed, regenerate it": a replacement effect that regenerates it each time
+    // (CR 614.1a, 701.19a), a shield that's never used up (rulings); "can't be regenerated" still stops it (701.19c).
+    if (/^If ~ would be destroyed, regenerate it\.$/.test(line)) {
+      out.regeneratesInsteadOfDestroyed = true;
+      continue;
+    }
     const libraryDies = /^If ~ would die, put it on (top|the bottom) of its owner's library instead\.$/.exec(line);
     if (libraryDies) {
       out.libraryInsteadOfDying = libraryDies[1] === "top" ? "top" : "bottom";
@@ -4896,7 +4902,9 @@ function linkExile(out: CompiledCard) {
   // Unlicensed Hearse: "power and toughness are each equal to the number of cards exiled with it" counts what its one
   // exile ability exiled (CR 607.2a).
   // Veteran Survivor: "As long as there are three or more cards exiled with ~": the same, in the static's condition.
-  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Profane Procession: "Exile target creature. Then if there are three or more cards exiled with ~, transform it": the
+  // same, in an ability's own condition.
+  if ((out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"') || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

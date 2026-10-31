@@ -200,6 +200,9 @@ function thenSubject(first: string, next: string): string {
   const who = /^(Target player|Target opponent|target player|target opponent|That player or that planeswalker's controller|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
+  // Strangling Grasp: "enchanted permanent's controller sacrifices a nonland permanent of their choice, then that player
+  // loses 1 life": the same player (as the permanent's controller now, or as it last existed: the sacrifice may be it).
+  if (/^enchanted (?:permanent|creature)'s controller sacrifices /i.test(first) && /^that player loses \d+ life$/.test(next)) return `${capital(/^(enchanted (?:permanent|creature)'s controller) /i.exec(first)![1]!)} ${next.slice("that player ".length)}`;
   // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
   // battlefield": the same owner.
   if (/^~'s owner draws /.test(first) && /^that player may put /.test(next)) return `~'s owner ${next.slice("that player ".length)}`;
@@ -239,6 +242,18 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${rest}.`);
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: that[2] === "combat" ? "endOfCombat" : "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
+  // Okoye, Mighty and Adored: "put a +1/+1 counter on target creature. Whenever that creature attacks the monarch this turn,
+  // it gains double strike and trample until end of turn": a delayed trigger about that creature (CR 603.7b-c), "it" being
+  // the creature that attacked; "the monarch" as it attacks, a player, not a planeswalker.
+  const thatAttacks = ctx?.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many ? /^Whenever (?:that creature|it) attacks( the monarch)? this turn, (.+)$/.exec(s) : null;
+  if (thatAttacks) {
+    const rest = [thatAttacks[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
+    if (!/^it gains [a-z ,]+ until end of turn$/.test(rest)) return null;
+    const trigger = parseTrigger(`Whenever ~ attacks, ${rest.replace(/^it /, "~ ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfAttacks" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    const body = JSON.parse(JSON.stringify(trigger.body).replaceAll('{"ref":"self"}', '{"ref":"subject"}')) as typeof trigger.body;
+    return { type: "floatingTrigger", trigger: { ...trigger, body, ...(thatAttacks[1] ? { attacksMonarch: true } : {}) }, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
   // "Choose target opponent. Whenever a creature you control deals combat damage to that player this turn, create a tapped
   // Treasure token." (Great Train Heist): a delayed trigger this turn, only for combat damage to that player.
@@ -1281,6 +1296,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Monoist Circuit-Feeder: "until end of turn, target creature you control gets +X/+0 and target creature an opponent
   // controls gets -0/-X, where X is ...": both until end of turn, X counted as it resolves (rulings).
   text = text.replace(/(^|, )until end of turn, (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+) and (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+)(?=, where X is |\.)/, "$1$2 gets $3 until end of turn and $4 gets $5 until end of turn");
+  // Profane Procession: "Then if there are three or more cards exiled with ~, transform it": "it" is ~.
+  text = text.replace(/(\. Then if there are \w+ or more cards exiled with ~, transform) it\.$/, "$1 ~.");
+  // All Suns' Dawn: "For each color, return up to one target card of that color from your graveyard to your hand": five
+  // targets, each chosen as a card of its color and checked as that color as it resolves (rulings), and the one word
+  // "target" can't name the same card twice (CR 115.3).
+  text = text.replace(/^For each color, return up to one target card of that color from your graveyard to your hand\./, ["white", "blue", "black", "red", "green"].map((c, i) => `Return up to one ${i ? "other " : ""}target ${c} card from your graveyard to your hand.`).join(" "));
+  // Othelm, Sigardian Outcast: "Choose target creature card in your graveyard that was put there from the battlefield this
+  // turn. Return it to the battlefield tapped.": one instruction about that target.
+  text = text.replace(/^Choose (target [a-z ]+ card in your graveyard[a-z ]*)\. Return it to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
   text = text.replace(/^(return it to the battlefield under its owner's control) and (it loses all abilities)(\.?)$/, (_m, a: string, b: string, end: string) => `${a}. ${capital(b)}${end}`);
   // Sudden Reclamation: "Mill four cards, then return a creature card and a land card from your graveyard to your hand":
   // one of each, chosen as it resolves, either one even with none of the other (rulings).
@@ -8960,12 +8984,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // player who puts it there (CR 110.2a).
     // "... with a +1/+1 counter on it" (Planar Incision): it enters with it (CR 122.6).
     // "... then return it to the battlefield tapped under its owner's control" (Eldrazi Confluence): it enters tapped.
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed| tapped)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
+    // The Neutrinos: "exile up to one target creature you own, then return it to the battlefield under your control tapped
+    // and attacking": attacking what you choose as it enters, in combat only (CR 506.3d, 508.4; rulings).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed| tapped)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it| tapped and attacking)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
       const transformed = now[1] === " transformed";
-      if (prev.until || prev.linked || isGroup(prev.what) || (transformed && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(transformed ? { transformed: true as const } : {}), ...(now[1] === " tapped" ? { tapped: true as const } : {}), ...(now[3] ? { counter: "+1/+1" as const } : {}) };
+      const attacking = now[3] === " tapped and attacking";
+      if (prev.until || prev.linked || isGroup(prev.what) || (transformed && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self") || (attacking && (now[1] || now[2] !== "your" || prev.what.ref !== "target"))) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(transformed ? { transformed: true as const } : {}), ...(now[1] === " tapped" || attacking ? { tapped: true as const } : {}), ...(attacking ? { attacking: true as const } : {}), ...(now[3] && !attacking ? { counter: "+1/+1" as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the

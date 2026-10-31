@@ -1282,7 +1282,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A permanent with an effect you may pay to end (a Licid that's an Aura), whoever controls it now (CR 116.2c).
     if (o.zone === "battlefield" && endableEffect(s, HUMAN, o.id)) return setMenu(o.id);
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
-    if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN))) return setMenu(o.id);
+    if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)))) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
     if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || foretellCostOf(s, o) || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
@@ -3651,7 +3651,9 @@ function ArrangeTop({
                   : how === "wholeGraveyard"
                     ? "reorder your graveyard as you choose"
                     : how === "scry" && owner
-                      ? `the top card of ${owner}'s library: leave it on top or put it on the bottom`
+                      ? cards.length === 1
+                        ? `the top card of ${owner}'s library: leave it on top or put it on the bottom`
+                        : `the top ${cards.length} cards of ${owner}'s library: leave any on top and put the rest on the bottom, in any order`
                       : `${how} ${cards.length}`}
           </strong>
           {how !== "look" && <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>}
@@ -4297,11 +4299,11 @@ function AbilityMenu({
       <div className="ability-menu">
         <strong>{d.name}</strong>
         {abilitiesOf(s, o).activated.map((ab, i) => {
-          if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN)) return null;
+          if (!ab.anyPlayer || (ab.ownerOnly && o.owner !== HUMAN) || (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(HUMAN))) return null;
           const problem = abilityProblem(s, HUMAN, objectId, i);
           const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
           return (
-            <button key={i} disabled={!ok} title={problem ?? (ab.ownerOnly ? "Only its owner may activate this ability; you control it." : "Any player may activate this ability; you control it.")} onClick={() => onUse(objectId, i)}>
+            <button key={i} disabled={!ok} title={problem ?? (ab.ownerOnly ? "Only its owner may activate this ability; you control it." : ab.opponentsOnly ? "Only its controller's opponents may activate this ability; you control it." : "Any player may activate this ability; you control it.")} onClick={() => onUse(objectId, i)}>
               <RulesText text={ab.text.replace(/~/g, d.name).replace(/ Any player may activate this ability\.$/, "")} />
             </button>
           );

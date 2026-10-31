@@ -1954,6 +1954,10 @@ export function parseTargetPhrase(
       } else if (w === "non-outlaw") {
         if (alts.length > 1 || notSubtypes.length) return null;
         notSubtypes.push(...OUTLAW_TYPES);
+      } else if (w === "double-faced") {
+        // Tetzin, Gnome Champion: "another double-faced artifact you control" (CR 712.1).
+        if (alts.length > 1 || extra.doubleFaced) return null;
+        extra.doubleFaced = true;
       } else if (w === "suspected") {
         // "Suspected creature" (CR 701.60).
         if (alts.length > 1 || extra.suspected) return null;

@@ -2782,8 +2782,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
+      // "Tapped and attacking" (The Neutrinos): its controller chooses what it attacks as it enters, during combat only; it
+      // was never declared as an attacker (CR 506.3d, 508.4; rulings).
+      const attackOptions = e.attacking && inCombat(s) && back.some((c) => isType(defOf(s, c), "Creature")) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, back.find((c) => isType(defOf(s, c), "Creature"))!).name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
       s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
+      if (attack)
+        for (const c of back) {
+          if (c.zone !== "battlefield" || !objIsType(s, c, "Creature")) continue;
+          c.attacking = attack.player;
+          if (attack.planeswalker) c.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
+          log(s, `${defOf(s, c).name} is attacking ${attack.label}.`);
+        }
       if (e.counterIf) {
         for (const c of back) {
           if (c.zone !== "battlefield" || !objectMatches(s, e.counterIf.filter, c, ctx.controller, false)) continue;

@@ -155,13 +155,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Roxanne, Starfall Savant: "create a tapped colorless artifact token named Meteorite with "When this token enters, it
   // deals 2 damage to any target" and "{T}: Add one mana of any color."": two abilities, entering tapped.
   // Blacksmith's Talent: "create a colorless Equipment artifact token named Sword with "Equipped creature gets +1/+1" and
-  // equip {2}": an Equipment with the keyword too (CR 702.6a).
+  // equip {2}": an Equipment with the keyword too (CR 702.6a). Moira Brown: "a colorless Book Equipment artifact token
+  // named Wasteland Survival Guide": a Book too (CR 205.3g).
   // Kibo, Uktabi Prince: "Each player creates a colorless artifact token named Banana with "..."": each their own.
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped )?colorless (snow )?(Equipment )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?(?: and equip (\\{\\d+\\}))?$`).exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped )?colorless (snow )?(Equipment |Book Equipment )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?(?: and equip (\\{\\d+\\}))?$`).exec(s))) {
     const texts = [m[7]!, ...(m[8] ? [m[8]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
     if (m[9] && !m[5]) return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    const token: TokenSpec = { name: m[6]!, named: true, colors: [], types: ["Artifact"], subtypes: m[5] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[9] ? [`Equip ${m[9]}`] : [])].join("\n"), ...(m[4] ? { snow: true as const } : {}) };
+    const token: TokenSpec = { name: m[6]!, named: true, colors: [], types: ["Artifact"], subtypes: m[5] === "Book Equipment " ? ["Book", "Equipment"] : m[5] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[9] ? [`Equip ${m[9]}`] : [])].join("\n"), ...(m[4] ? { snow: true as const } : {}) };
     return who && texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true as const } : {}) }] : null;
   }
   // Farid, Enterprising Salvager: "create a colorless artifact token named Scrap": its name and type only, no abilities

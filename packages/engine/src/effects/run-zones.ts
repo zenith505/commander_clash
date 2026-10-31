@@ -1982,19 +1982,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileHand": {
-      const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      if (whose === undefined) return;
-      const p = player(s, whose);
-      const ids = [...p.hand];
-      for (const id of ids) {
-        moveObject(s, id, "exile");
-        const o = obj(s, id);
-        if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
-        // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
-        if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+      // "Exile all cards from all hands" (Decree of Annihilation): each player's in turn.
+      const all = e.who ? players(s, e.who, ctx) : [ctx.controller];
+      let total = 0;
+      for (const whose of all) {
+        const p = player(s, whose);
+        const ids = [...p.hand];
+        total += ids.length;
+        for (const id of ids) {
+          moveObject(s, id, "exile");
+          const o = obj(s, id);
+          if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+          // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
+          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        }
+        log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand${e.until ? " and may play them until the end of their next turn" : ""}.` : `${p.name} has no cards in hand to exile.`);
       }
-      s.resolving!.exiledFromHand = ids.length;
-      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand${e.until ? " and may play them until the end of their next turn" : ""}.` : `${p.name} has no cards in hand to exile.`);
+      s.resolving!.exiledFromHand = total;
       return;
     }
     case "putFromHand": {
@@ -2271,6 +2275,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
         }
       });
+      return;
+    }
+    case "randomTargetsToBottom": {
+      // Sinister Waltz: the cards that aren't returned, chosen at random as it resolves among the legal targets left.
+      const left = objects(s, e.what, ctx).map((o) => o.id);
+      while (left.length > e.keep) {
+        const id = left.splice(Math.floor(nextRandom(s) * left.length), 1)[0]!;
+        log(s, `${src} puts ${defOf(s, obj(s, id)).name}, chosen at random, on the bottom of its owner's library.`);
+        moveObject(s, id, "library");
+        // It's a new object now (CR 400.7): the next instruction's "them" no longer finds it.
+        const i = ctx.targets.findIndex((t, j) => j >= (e.what.ref === "target" ? e.what.index : 0) && t?.kind === "object" && t.id === id);
+        if (i >= 0) ctx.legal[i] = false;
+      }
       return;
     }
     case "randomFromGraveyard": {

@@ -1056,6 +1056,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "weld":
     case "putOntoBattlefield":
     case "randomFromGraveyard":
+    case "randomTargetsToBottom":
     case "chooseFromGraveyard":
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
@@ -1183,6 +1184,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "playerGains":
     case "attackBanNextTurn":
     case "cantAttackNextTurn":
+    case "attackWalkerNextTurn":
     case "attach":
     case "becomeLicid":
     case "attachAny":

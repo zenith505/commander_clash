@@ -424,6 +424,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Phoenix Chick: "... tapped and attacking with a +1/+1 counter on it" (it enters with it, CR 614.1c).
   // Retrofitted Transmogrant: "{3}{B}: Return ~ from your graveyard to the battlefield tapped with two +1/+1 counters on it".
   // Relentless X-ATM092: "... tapped with a finality counter on it" (CR 122.1h). Gallia, Tragic Host: "on her" (~).
+  // Sinister Waltz (see body.ts): two of the three at random onto the battlefield, the other on the bottom; with only one or
+  // two still legal targets, all of them onto the battlefield (rulings).
+  if (/^Return two of three target creature cards from your graveyard at random to the battlefield and put the other on the bottom of your library$/.test(s)) {
+    const what = parseObject("three target creature cards from your graveyard", ctx, true);
+    if (what?.ref !== "target" || what.n !== 3) return null;
+    return [{ type: "randomTargetsToBottom", what, keep: 2 }, { type: "putOntoBattlefield", what }];
+  }
   if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on (?:it|~))?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
@@ -1002,7 +1009,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s))) {
+  // Chorale of the Void: "onto the battlefield under your control tapped and attacking" is the same as "tapped and
+  // attacking under your control": attacking what you choose (rulings, CR 508.4).
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s.replace(/ onto the battlefield under your control tapped and attacking$/, " onto the battlefield tapped and attacking under your control")))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -1044,8 +1053,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;
     // "Tapped and attacking" (Alesha, Yore-Tiller Nephilim): attacking what its controller chooses (CR 508.4, rulings).
+    // Chorale of the Void: "under your control tapped and attacking", another player's card under your control.
     const attacking = / and attacking$/.test(m[3] ?? "");
-    if (attacking && (m[4] || attach)) return null;
+    if (attacking && (owner || attach)) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toSelf ? { attachToSource: true as const } : toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
@@ -1208,6 +1218,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
   if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
+  // Decree of Annihilation: "exile all cards from all hands": every player's, face up (CR 406.3).
+  if (/^[Ee]xile all cards from all hands$/.test(s)) return [{ type: "exileHand", who: { ref: "eachPlayer" } }];
   // Hypnox: "exile all cards from target opponent's hand": the same for that player's hand, face up (CR 406.3).
   if ((m = /^[Ee]xile all cards from (target opponent|target player)'s hand$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

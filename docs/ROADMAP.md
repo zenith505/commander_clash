@@ -1,8 +1,8 @@
 # Roadmap
 
-28,601 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,180 of
-9,979 (91%).
+28,615 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,184 of
+9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -324,7 +324,7 @@ line blocks.
    taking the easy ones.
    Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (returning as another type), Spellweaver
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
-   Sequence, The Seventh Doctor, Lucy MacLean, Gideon Jura, Treacherous Greed ("a creature that dealt damage this
+   Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife, Galloping
    Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
@@ -630,7 +630,7 @@ line blocks.
    Tamiyo, Compleated Sage (a token named after her short name), Proteus Staff ("the rest on the bottom in any order"),
    Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Umbris, Fear Manifest, Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
-   Gideon Jura (+2: creatures attack him if able), Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
+   Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
    Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
    tails for the others without asking.
@@ -1281,6 +1281,26 @@ line blocks.
    Fires of Mount Doom ("when you play a card this way"); Festival of Embers (cast from the graveyard by paying 1 life
    more); Myr Superion (spend only mana produced by creatures). (Karn's Sylex and Strength of the Tajuru, also looked at
    here, went in with Lane B round B63.)
+   Round 225 (fresh cards from the top): "If you've committed a crime this turn, ... Otherwise, ..." (Oko, the
+   Ringleader); "When ~ has two or fewer loyalty counters on him, transform him" (Garruk Relentless); transforming back
+   faces with no loyalty box keep their counters (Garruk, the Veil-Cursed, Arlinn, Embraced by the Moon; CR 712.18);
+   "if ~ and at least two other creatures attacked this combat" (Kytheon, Hero of Akros); requirements to attack a
+   planeswalker, "attacks ~ during its controller's next turn if able" (Gideon, Battle-Forged) and "during target
+   opponent's next turn, creatures that player controls attack ~ if able" (Gideon Jura), weighed against goad and
+   encore (CR 508.1d), with the bot and a hint in the attack bar; "all cards from all hands" (Decree of Annihilation);
+   "its controller creates a token that's a copy of that creature" (Parallel Evolution); "Return two of them at random"
+   (Sinister Waltz); "under your control tapped and attacking" from the defending player's graveyard (Chorale of the
+   Void); "When you do, ... where X is the exiled card's toughness" (Venom, Deadly Devourer); "If the {2}{U} cost was
+   paid, ... an opponent ..." (Ingenious Mastery, Devastating Mastery); "a player drawing a card causes a triggered
+   ability ... to trigger an additional time" (Krang, the All-Powerful); "put an additional +1/+1 counter on it" (Cursed
+   Wombat). UI fix: clicking an opponent's planeswalker to attack it attacked the player instead. +14 (28,615 of 31,936 with Lane B B63).
+   Tadeas, Juniper Ascendant was left to Lane B's B63.
+   Out after round 225 (looked at, not done): Wayta, Trainer Prodigy (damage triggers doubled across many events);
+   Auntie Ool (ward with blight); Fell Beast's Shriek (splice onto instant or sorcery); Jasmine Boreal of the Seven
+   (mana for creature spells with no abilities); Kethis, the Hidden Hand (graveyard cards gain "you may play"); Cult of
+   the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
+   Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
+   the next instant or sorcery); Garland, Knight of Cornelia (return transformed from the graveyard).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

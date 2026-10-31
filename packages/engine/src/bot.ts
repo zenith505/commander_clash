@@ -113,6 +113,8 @@ import {
   landUntappedOffer,
   creatureTypesOf,
   mustAttackPlayers,
+  walkersFreeToAttack,
+  attackTargetScore,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -5660,6 +5662,16 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     if (d === undefined) continue;
     attacks = [...attacks.filter((a) => a.attacker !== o.id), { attacker: o.id, defender: d }];
   }
+  // One that has to attack Gideon attacks him if able, unless attacking a player obeys more of its requirements (CR 508.1d).
+  const walkerBound: { attacker: ObjectId; defender: PlayerId; planeswalker: ObjectId }[] = [];
+  for (const o of potentialAttackers(s, pid)) {
+    const ws = walkersFreeToAttack(s, o);
+    if (!ws.length) continue;
+    const other = Math.max(0, ...opps.filter((d) => !attackProblem(s, o, d)).map((d) => attackTargetScore(s, o, d)));
+    if (other > 1) continue;
+    attacks = attacks.filter((a) => a.attacker !== o.id);
+    walkerBound.push({ attacker: o.id, defender: controllerOf(s, obj(s, ws[0]!)), planeswalker: ws[0]! });
+  }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   // Scarred Puma stays home without a black or green creature beside it (CR 508.1c).
@@ -5678,7 +5690,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   attacks = attacks.filter((a) => !costsOf(a).length || spare(a));
   const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + c.n, 0), 0);
   if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, attacks.flatMap(costsOf)))) attacks = attacks.filter((a) => !costsOf(a).length);
-  let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
+  let declared = [...attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit), ...walkerBound];
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");
   if (declared.length > cap) {

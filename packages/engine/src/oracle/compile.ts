@@ -227,7 +227,11 @@ export function isFullySupported(d: CardDef): boolean {
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
   // A planeswalker needs a printed loyalty number to enter with (CR 306.5b), or "X" with {X} in its mana cost: the X it
   // was cast with (CR 107.3m; Nissa, Steward of Elements).
-  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "") && !(d.loyalty === "X" && cost.hasX)) return false;
+  // A transforming card's back face with no loyalty box (Garruk, the Veil-Cursed) keeps the counters it has when it
+  // transforms (CR 712.18); put onto the battlefield transformed, it enters with none (306.5b) and goes to the graveyard
+  // (704.5i).
+  const backNoLoyalty = d.faceOf && d.faceOf.face > 0 && d.layout === "transform" && d.loyalty === undefined;
+  if (d.types.includes("Planeswalker") && !backNoLoyalty && !/^\d+$/.test(d.loyalty ?? "") && !(d.loyalty === "X" && cost.hasX)) return false;
   const c = compileCard(d);
   // Creatures, and Vehicles that can become creatures (CR 301.7a), need numbers for power and toughness,
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).
@@ -5489,6 +5493,8 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   if (line === "As long as ~ is equipped, if a triggered ability of ~ or an Equipment attached to it triggers, that ability triggers an additional time.") return { selfOrEquipment: true };
   // Veyran, Voice of Duality.
   if (line === "If you casting or copying an instant or sorcery spell causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "castOrCopy" } };
+  // Krang, the All-Powerful: any player's draw (CR 603.2d); not abilities that trigger on what the draw led to (rulings).
+  if (line === "If a player drawing a card causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "draws" } };
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
   // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
   const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);

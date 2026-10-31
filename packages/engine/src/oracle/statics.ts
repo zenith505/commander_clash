@@ -1254,6 +1254,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Tolsimir, Midnight's Light: "if ~ attacked this combat": declared as an attacker in this combat (CR 508.1), even if
   // it's been removed from combat since.
   if (/^~ attacked this combat$/.test(text)) return { kind: "self", is: "attackedThisCombat" };
+  // Kytheon, Hero of Akros: "if ~ and at least two other creatures attacked this combat": declared as attackers, also ones
+  // that have left the battlefield since; not ones put onto the battlefield attacking (rulings, CR 508.1).
+  if ((m = new RegExp(`^~ and at least ${NUM} other creatures attacked this combat$`).exec(text))) return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisCombat" }, { kind: "attackedWith", n: num(m[1]!) + 1, combat: true }] };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).

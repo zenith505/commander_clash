@@ -1538,6 +1538,20 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];
   // "An opponent draws a card" (Baleful Mastery): one its controller chooses as it resolves (rulings).
   if ((m = new RegExp(`^[Aa]n opponent draws ${NUMX} cards?$`).exec(s))) return [{ type: "choose", choice: "opponent" }, { type: "draw", who: { ref: "chosenPlayer" }, n: amt(m[1]!) }];
+  // Ingenious Mastery: "an opponent creates two Treasure tokens and they scry 2": one opponent, chosen as it resolves, does
+  // both (rulings).
+  if ((m = /^[Aa]n opponent creates (two) Treasure tokens and they scry (\d+)$/.exec(s))) {
+    const treasure = parseSentence(`Create ${m[1]} Treasure tokens`, ctx);
+    if (treasure?.length !== 1 || treasure[0]!.type !== "createToken") return null;
+    return [{ type: "choose", choice: "opponent" }, { ...treasure[0]!, who: { ref: "chosenPlayer" } }, { type: "scry", n: Number(m[2]), who: { ref: "chosenPlayer" } }];
+  }
+  // Devastating Mastery: "an opponent chooses up to two nonland permanents they control and returns them to their owner's
+  // hand": an opponent you choose as it resolves (rulings), who picks them then.
+  if ((m = /^[Aa]n opponent chooses up to (two) (nonland permanents) they control and returns them to their owner's hand$/.exec(s))) {
+    const filter = parseTargetPhrase("nonland permanent");
+    if (filter?.kind !== "object") return null;
+    return [{ type: "choose", choice: "opponent" }, { type: "pick", who: { ref: "chosenPlayer" }, filter: { ...filter, text: "nonland permanent" }, n: num(m[1]!), upTo: true, action: "bounce" }];
+  }
   // "Draw half X cards, rounded down" (Wan Shi Tong), "you gain half X life and draw half X cards. Round down each time."
   // (Hydroid Krasis, CR 107.1a).
   if ((m = /^(?:(.+?) )?(draws?|gains?|loses?) half X (cards|life)(?:, rounded (up|down))?$/i.exec(s)) && /^draw/i.test(m[2]!) === (m[3] === "cards")) {

@@ -325,6 +325,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     anyPlayer = ownerOnly = true;
     effectText = effectText.slice(0, effectText.length - " Only ~'s owner may activate this ability.".length);
   }
+  // Clergy of the Holy Nimbus: "Only your opponents may activate this ability": any opponent of its controller, who then
+  // controls the ability (CR 602.2, 113.8); not its controller.
+  let opponentsOnly = false;
+  if (!anyone && !ownerOnly && / Only your opponents may activate this ability\.$/.test(effectText)) {
+    anyPlayer = opponentsOnly = true;
+    effectText = effectText.slice(0, effectText.length - " Only your opponents may activate this ability.".length);
+  }
   for (let found = true; found; ) {
     found = false;
     if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
@@ -586,6 +593,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(ownerOnly ? { ownerOnly: true as const } : {}),
+    ...(opponentsOnly ? { opponentsOnly: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     ...(spendOnly ? { spendOnly } : {}),
     manaCost,

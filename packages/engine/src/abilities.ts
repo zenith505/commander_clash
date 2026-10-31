@@ -807,6 +807,8 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesCardTypeWith?: number[];
+  /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
+  sharesCardTypeAmong?: string[];
   /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesNoCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
@@ -2585,7 +2587,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -3276,7 +3278,7 @@ export type Effect =
   /** Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn." (Player.nextDrawExiles) */
   | { type: "nextDrawExile"; who: PlayerRef }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
-  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
+  | { type: "orderTop"; who: PlayerRef; n: Amount; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
    * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
    * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
@@ -4338,6 +4340,7 @@ export type TriggerEvent =
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
   | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)
   | "eachDrawStep" // At the beginning of each player's draw step
+  | "selfTransforms" // "When equipped creature transforms" (Neglected Heirloom): the creature it's attached to transformed (CR 701.27)
   | "selfTransformsInto" // "When ~ transforms into ~" (CR 701.27e): it transformed or converted into this face
   | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
@@ -4817,6 +4820,8 @@ export interface TriggeredAbility {
   group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
   attacksMostLife?: boolean;
+  /** "Whenever equipped creature attacks the monarch" (The Spear of Bashenga): the monarch as it attacks, not a planeswalker. */
+  attacksMonarch?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
   /** "Whenever ~ attacks a battle" (Thrashing Frontliner, CR 310.5). */
@@ -5031,6 +5036,8 @@ export interface ActivatedAbility {
   anyPlayer?: true;
   /** With `anyPlayer`: "Only ~'s owner may activate this ability" (Personal Incarnation): its owner, whoever controls it. */
   ownerOnly?: true;
+  /** With `anyPlayer`: "Only your opponents may activate this ability" (Clergy of the Holy Nimbus): an opponent of its controller. */
+  opponentsOnly?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
@@ -5660,6 +5667,8 @@ export interface CompiledCard {
    * replacement effect (CR 614.1a).
    */
   libraryInsteadOfDying?: "top" | "bottom";
+  /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
+  regeneratesInsteadOfDestroyed?: true;
   exileInsteadOfDying?: {
     self?: true;
     /** A granted "If this creature would die, exile it instead" (Can't Stay Away) beside its own one about others (cards.ts withGranted). */

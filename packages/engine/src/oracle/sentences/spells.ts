@@ -347,6 +347,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "scry", n: amt(m[2]!), who }] : null;
   }
+  // Mesmeric Sliver: "fateseal 1" (CR 701.29a): look at the top N cards of an opponent's library, chosen as it resolves,
+  // and put any number of them on the bottom, the rest on top, as a scry of their library.
+  if ((m = new RegExp(`^(?:you )?[Ff]ateseal ${NUM}$`).exec(s))) return [{ type: "orderTop", who: { ref: "chosenPlayer" }, n: num(m[1]!), mayBottom: true, fateseal: true }];
   // "Discover 4" (CR 701.57a): exile until a nonland card with mana value 4 or less, cast it free or put it into your hand.
   // "Discover X, where X is its toughness": X is worked out as the instruction starts (body.ts defineX).
   if ((m = /^(?:[Yy]ou )?[Dd]iscover (\d+|X)$/.exec(s))) return [{ type: "discover", n: amt(m[1]!) }];

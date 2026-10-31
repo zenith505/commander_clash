@@ -1520,6 +1520,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[1]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];
   }
+  // Phenomenon Investigators: "return a nonland permanent you own to your hand": any of yours on the battlefield, whoever
+  // controls it, chosen as it resolves (CR 108.3).
+  if ((m = /^Return an? (?!target )([a-z]+(?: [a-z]+)?) you own to your hand$/i.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, owner: "you", text: `${filter.text} you own` }, n: 1, action: "bounce", anyController: true }];
+  }
   // Nulltread Gargantuan: "Put a creature you control on top of its owner's library": chosen as it resolves, not targeted,
   // itself too (rulings).
   if ((m = /^Put an? (?!target )([a-z]+) you control on top of its owner's library$/i.exec(s))) {

@@ -1,7 +1,7 @@
 import type { Amount, AmountExpr, Modification, Effect, PlayerRef, TargetSpec } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital, isGroup } from "./words";
 import { Ctx, parseBody } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
@@ -238,7 +238,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // "Add an amount of {C} equal to the amount of mana spent to cast that spell at the beginning of your next main phase"
   // (Mana Sculpt): the same as with the time first (Mana Drain).
-  const addLater = /^([Aa]dd .+) at the beginning of your next main phase$/.exec(s);
+  // Conduit of Storms: "Whenever ~ attacks, add {R} at the beginning of your next main phase this turn": the same; a
+  // creature attacks only in its controller's turn, so that main phase comes this turn (rulings: even if ~ has left).
+  const addLater = /^([Aa]dd .+) at the beginning of your next main phase(?: this turn)?$/.exec(s);
   if (addLater) return parseSentence(`At the beginning of your next main phase, ${addLater[1]!.replace(/^A/, "a")}`, ctx);
   // "It gets +2/+0 until end of combat" (Murk Dwellers): read as "until end of turn", then ended with the combat phase
   // instead (CR 500.5a). Only effects that change objects for a while.
@@ -296,6 +298,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // The Wondrous Wasp: "tap up to one target creature. It loses all abilities for as long as ~ remains on the
   // battlefield": the same as until end of turn, ending when ~ leaves instead (CR 611.2b).
   // Opportunistic Dragon: "it can't attack or block" the same way.
+  // Neko-Te: "That creature doesn't untap during its controller's untap step for as long as ~ remains on the battlefield":
+  // the same, ending when ~ leaves (CR 611.2b).
+  const remainsUntap = !ctx.spell && /^(It|That creature|Target creature) doesn't untap during its controller's untap step for as long as ~ remains on the battlefield$/.exec(s);
+  if (remainsUntap) {
+    const what = parseObject(remainsUntap[1]!.replace(/^(?:It|That|Target)/, (w) => w.toLowerCase()), ctx);
+    return what && !isGroup(what) ? [{ type: "continuous", what, mods: [{ kind: "doesntUntap" }], duration: "whileControlled", whileOnBattlefield: true }] : null;
+  }
   const remainsLoses = !ctx.spell && /^((?:It|That creature|Target creature|Up to one target creature) (?:loses all abilities|can't attack or block)) for as long as ~ remains on the battlefield$/.exec(s);
   if (remainsLoses) {
     const fx = parseSentence(`${remainsLoses[1]} ${/can't/.test(remainsLoses[1]!) ? "this turn" : "until end of turn"}`, ctx);

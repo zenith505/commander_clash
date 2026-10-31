@@ -3332,6 +3332,39 @@
   ]
  },
  {
+  "oracleId": "66566999-f70a-4f14-9bf0-23325295a977",
+  "name": "Clergy of the Holy Nimbus",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "If this creature would be destroyed, regenerate it.\n{1}: This creature can't be regenerated this turn. Only your opponents may activate this ability.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2a838818-d590-4374-9a63-d9e6381a0f0d",
   "name": "Cloud Key",
   "manaCost": "{3}",
@@ -11604,6 +11637,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "21c82044-6e16-4e41-a6d0-e4d7cb42f37c",
+  "name": "Mesmeric Sliver",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Sliver",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sliver"
+  ],
+  "oracleText": "All Slivers have \"When this permanent enters, you may fateseal 1.\" (To fateseal 1, its controller looks at the top card of an opponent's library, then they may put that card on the bottom of that library.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Fateseal"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ed9accb-9f0c-40fa-aeea-2d1e1c9d1bd1",
   "name": "Metalworker",
   "manaCost": "{3}",
@@ -17496,6 +17561,34 @@
   "set": "spm",
   "releasedAt": "2025-09-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4a4cf6e2-8673-45b8-bc21-cd030f312cd1",
+  "name": "Spin into Myth",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put target creature on top of its owner's library, then fateseal 2. (To fateseal 2, look at the top two cards of an opponent's library, then put any number of them on the bottom of that player's library and the rest on top in any order.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Fateseal"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

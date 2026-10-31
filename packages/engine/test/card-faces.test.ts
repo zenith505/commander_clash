@@ -268,7 +268,8 @@ describe("card faces from Scryfall", () => {
         artUrl: img("delver", "back").art_crop,
       },
     ]);
-    expect(isFullySupported(d)).toBe(false);
+    // Its upkeep reveal-and-transform trigger is supported since Lane B round B58.
+    expect(isFullySupported(d)).toBe(true);
   });
 
   it("a split card's halves each have their own mana cost and color (CR 709.1, 202.2); the image is the card's", () => {

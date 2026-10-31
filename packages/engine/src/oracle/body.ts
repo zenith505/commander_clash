@@ -13347,7 +13347,7 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   // "Remove all time counters from ~ and ~ deals 20 damage to you" (Cursed Recording).
   // Gloom Ripper: "target creature you control gets +X/+0 until end of turn and up to one target creature an opponent
   // controls gets -0/-X until end of turn": an unchosen "up to one" target's part does nothing (CR 115.6).
-  const parts = s.split(/,? and (?=(?:you|each|target|up to one target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|that creature(?= fights)|scry \d+$|surveil \d+$|blight \d+$)\b|it (?=can't be blocked by creatures with greater power this combat$)|~ (?=can't be blocked this turn$|gets [+-]\d+\/[+-]\d+ until end of turn$|deals \d+ damage to you$)|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|up to one target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|that creature(?= fights)|scry \d+$|surveil \d+$|blight \d+$)\b|~ (?=can't be blocked this turn$|gets [+-]\d+\/[+-]\d+ until end of turn$|deals \d+ damage to you$)|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

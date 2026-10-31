@@ -5,9 +5,7 @@
 // ~ if able"), Decree
 // of Annihilation ("all cards from all hands"), Parallel Evolution ("its controller creates a token that's a copy of
 // that creature"), Sinister Waltz ("Return two of them at random"), Chorale of the Void ("under your control tapped and
-// attacking"), Venom, Deadly Devourer ("When you do, ... where X is the exiled card's toughness"), Tadeas, Juniper
-// Ascendant ("hexproof unless it's attacking", "can't be blocked by creatures with greater power this combat"),
-// Ingenious Mastery and Devastating Mastery ("an opponent ..." if the alternative cost was paid), Krang, the
+// attacking"), Venom, Deadly Devourer ("When you do, ... where X is the exiled card's toughness"), Ingenious Mastery and Devastating Mastery ("an opponent ..." if the alternative cost was paid), Krang, the
 // All-Powerful ("If a player drawing a card causes a triggered ability ... to trigger") and Cursed Wombat ("put an
 // additional +1/+1 counter on it").
 
@@ -83,14 +81,13 @@ const evolution = card("Parallel Evolution", "Sorcery", "{3}{G}{G}", {"keywords"
 const waltz = card("Sinister Waltz", "Sorcery", "{3}{B}{R}", {"oracleText": "Choose three target creature cards in your graveyard. Return two of them at random to the battlefield and put the other on the bottom of your library."});
 const chorale = card("Chorale of the Void", "Enchantment — Aura", "{3}{B}", {"keywords": ["Enchant", "Void"], "oracleText": "Enchant creature you control\nWhenever enchanted creature attacks, put target creature card from defending player's graveyard onto the battlefield under your control tapped and attacking.\nVoid — At the beginning of your end step, sacrifice this Aura unless a nonland permanent left the battlefield this turn or a spell was warped this turn."});
 const venom = card("Venom, Deadly Devourer", "Legendary Creature — Symbiote Villain", "{2}{B}{G}", {"power": "4", "toughness": "4", "keywords": ["Vigilance", "Menace"], "oracleText": "Vigilance, menace\n{3}: Exile target creature card from a graveyard. When you do, put X +1/+1 counters on target Symbiote, where X is the exiled card's toughness."});
-const tadeas = card("Tadeas, Juniper Ascendant", "Legendary Creature — Human Monk", "{2}{G}{W}", {"power": "1", "toughness": "3", "keywords": ["Reach"], "oracleText": "Reach\nTadeas has hexproof unless it's attacking.\nWhenever a creature you control with reach attacks, untap it and it can't be blocked by creatures with greater power this combat.\nWhenever one or more creatures you control deal combat damage to a player, draw a card."});
 const ingenious = card("Ingenious Mastery", "Sorcery", "{X}{2}{U}", {"keywords": ["Treasure", "Scry"], "oracleText": "You may pay {2}{U} rather than pay this spell's mana cost.\nIf the {2}{U} cost was paid, you draw three cards, then an opponent creates two Treasure tokens and they scry 2. If that cost wasn't paid, you draw X cards."});
 const devastating = card("Devastating Mastery", "Sorcery", "{2}{W}{W}{W}{W}", {"oracleText": "You may pay {2}{W}{W} rather than pay this spell's mana cost.\nIf the {2}{W}{W} cost was paid, an opponent chooses up to two nonland permanents they control and returns them to their owner's hand.\nDestroy all nonland permanents."});
 const krang = card("Krang, the All-Powerful", "Legendary Artifact Creature — Utrom Robot", "{4}{U}", {"power": "3", "toughness": "3", "oracleText": "If a player drawing a card causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.\nWhenever a player draws their second card each turn, put a +1/+1 counter on Krang."});
 const wombat = card("Cursed Wombat", "Creature — Nightmare Wombat", "{B}{G}", {"power": "2", "toughness": "3", "keywords": ["Adapt"], "oracleText": "{2}{B}{G}: Adapt 2. (If this creature has no +1/+1 counters on it, put two +1/+1 counters on it.)\nPermanents you control have \"Whenever one or more +1/+1 counters are put on this permanent, put an additional +1/+1 counter on it. This ability triggers only once each turn.\""});
 
 describe("round 225", () => {
-  it("parse", () => supported(oko, garruk, arlinn, kytheon, jura, decree, evolution, waltz, chorale, venom, tadeas, ingenious, devastating, krang, wombat));
+  it("parse", () => supported(oko, garruk, arlinn, kytheon, jura, decree, evolution, waltz, chorale, venom, ingenious, devastating, krang, wombat));
 
   it("Oko, the Ringleader: +1 draws two, then discards one after a crime this turn, two otherwise", () => {
     for (const crime of [false, true]) {
@@ -335,22 +332,6 @@ describe("round 225", () => {
     s = settle(s, { me: ap, targets: [tgt(v)] });
     expect(zone(s, dead)).toBe("exile");
     expect(s.objects[v]!.counters["+1/+1"]).toBe(5);
-  });
-
-  it("Tadeas: hexproof unless attacking; a creature with reach that attacks untaps and can't be blocked by greater power", () => {
-    const { s: s0, ap, opp } = setup([]);
-    const t = putOnBattlefield(s0, ap, tadeas);
-    const big = putOnBattlefield(s0, opp, card("Test Giant", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
-    invalidateCharacteristics(s0);
-    expect(characteristics(s0, s0.objects[t]!).keywords).toContain("Hexproof");
-    let s = toAttack(s0, ap);
-    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: t, defender: opp }] });
-    s = settle(s, { me: ap });
-    expect(s.objects[t]!.tapped).toBe(false);
-    expect(characteristics(s, s.objects[t]!).keywords).not.toContain("Hexproof");
-    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, s.pending ? botActions(s, s.pending.player)[0]! : { type: "passPriority", player: waitingOn(s)! });
-    expect(s.pending?.kind).toBe("declareBlockers");
-    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: big, attacker: t }] })).toThrow();
   });
 
   it("Ingenious Mastery: for {2}{U} you draw three, then an opponent creates two Treasures and scries 2; otherwise X cards", () => {

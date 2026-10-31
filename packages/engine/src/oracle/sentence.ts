@@ -252,10 +252,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return fx?.every((e) => (e.type === "continuous" || e.type === "exchangePower") && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
   // Yuan Shao's Infantry: "~ can't be blocked this combat": the same, for the combat going on (CR 506.1, 511.3).
-  // Tadeas, Juniper Ascendant: "it can't be blocked by creatures with greater power this combat".
-  const thisCombat = /^(~|it|that creature) can't be blocked( by creatures with greater power)? this combat$/i.exec(s);
+  const thisCombat = /^(~|it|that creature) can't be blocked this combat$/i.exec(s);
   if (thisCombat) {
-    const fx = parseSentence(`${thisCombat[1]} can't be blocked${thisCombat[2] ?? ""} this turn`, ctx);
+    const fx = parseSentence(`${thisCombat[1]} can't be blocked this turn`, ctx);
     return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);

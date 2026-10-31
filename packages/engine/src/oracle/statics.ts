@@ -345,8 +345,6 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // you control a creature named Silver Surfer, ~'s Herald" (that name kept as written by normalizeSelf).
   else if ((m = /^(~ attacks (?:an opponent with the most life among your opponents )?each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
-  // Tadeas, Juniper Ascendant: "~ has hexproof unless it's attacking": while it isn't an attacking creature (CR 506.4).
-  else if ((m = /^(~ has hexproof) unless it's attacking$/.exec(text))) [statement, cond, notCond] = [m[1], "~ is attacking", true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).

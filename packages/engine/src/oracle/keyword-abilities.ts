@@ -379,7 +379,8 @@ export function parseCostKeyword(
     if (!plainMana(m[1]!) || (cost?.kind !== "payLife" && cost?.kind !== "discard") || !d.types.includes("Creature")) return "fail";
     return { alt: { kind: "blitz", mana: m[1]!, costs: [cost], text: m[2]!.replace(/^[PD]/, (c) => c.toLowerCase()) } };
   }
-  if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {
+  // Not "Blitz costs you pay cost {1} less ..." (Henzie "Toolbox" Torre), a static ability about blitz.
+  if ((m = /^(Blitz|Warp)(?: |—)(?!costs\b)(.+?)\.?$/.exec(line))) {
     const mana = m[2]!;
     if (!/^(\{[^}]+\})+$/.test(mana) || !plainMana(mana)) return "fail";
     if (m[1] === "Blitz") return d.types.includes("Creature") ? { alt: { kind: "blitz", mana } } : "fail";

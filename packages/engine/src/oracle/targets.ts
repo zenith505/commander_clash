@@ -1016,6 +1016,15 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
     if (!base || base.filter.kind !== "object" || base.filter.owner) return null;
     return { filter: { ...base.filter, owner: "you", text: phrase.trim().toLowerCase() }, other: base.other };
   }
+  // "Each Spider and legendary creature you control" (Ultimate Spider-Man): each creature you control that's a Spider
+  // or legendary (either one, TargetSpec.anyOf), once each.
+  const typeAndLegendary = /^((?:all |each )?)([A-Z][a-z]+) and legendary creatures? you control$/.exec(p);
+  if (typeAndLegendary && CREATURE_TYPES.has(singular(typeAndLegendary[2]!))) {
+    const base = parseGroup(`${typeAndLegendary[1]!}creature you control`, bare, count);
+    if (!base || base.filter.kind !== "object" || base.filter.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", subtypes: [singular(typeAndLegendary[2]!)], text: singular(typeAndLegendary[2]!) }, { kind: "object", supertypes: ["Legendary"], text: "legendary" }];
+    return { filter: { ...base.filter, anyOf, text: phrase.trim().toLowerCase() }, other: base.other };
+  }
   // "Each other creature you control that's a token or a Rabbit" (Finneas, Ace Archer): either one (TargetSpec.anyOf).
   const tokenOr = /^((?:all |each )?(?:other )?creatures? you control) that(?:'s| is| are|'re) (?:a )?tokens? or (?:an? )?([A-Z][a-z]+)$/.exec(p);
   if (tokenOr && CREATURE_TYPES.has(singular(tokenOr[2]!))) {

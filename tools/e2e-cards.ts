@@ -1,5 +1,5 @@
 // Writes the card definitions the browser tests use (apps/web/e2e/cards.json), so the tests run without the
-// full card data. Every quoted string in apps/web/e2e/*.ts that is a card name is included.
+// full card data. Every quoted string (double or single quotes) in apps/web/e2e/*.ts that is a card name is included.
 //
 //   npm run e2e:cards           (needs data/generated/cards.json)
 
@@ -12,7 +12,10 @@ registerMeldResults(cards);
 const byName = new Map(cards.map((c) => [c.name, c]));
 const names = new Set<string>();
 for (const f of readdirSync(dir).filter((f) => f.endsWith(".ts")))
-  for (const m of readFileSync(new URL(f, dir), "utf8").matchAll(/"([^"\n]+)"/g)) if (byName.has(m[1]!)) names.add(m[1]!);
+  // Single quotes too (a separate pass, so an apostrophe can't hide a name), for a name with double quotes in it
+  // (Henzie "Toolbox" Torre).
+  for (const re of [/"([^"\n]+)"/g, /'([^'\n]+)'/g])
+    for (const m of readFileSync(new URL(f, dir), "utf8").matchAll(re)) if (byName.has(m[1]!)) names.add(m[1]!);
 // A meld card's combined back face (CR 712.4), which the game needs and the tests needn't quote.
 for (const r of meldResultsFor([...names].map((n) => byName.get(n)!))) names.add(r.name);
 // A quoted word that happens to be a card name ("Sacrifice") is left out if the engine can't play it anyway.

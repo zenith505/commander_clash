@@ -2298,8 +2298,17 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
 /** Freerunning is cheaper than the mana cost: pay it whenever it's allowed (CR 702.173a). */
 function freerunPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
-  if (o.zone !== "hand" || !altCost(defOf(s, o), "freerunning") || !(s.freerunningThisTurn ?? []).includes(pid)) return null;
-  return castPlan(s, pid, id, false, undefined, "freerunning");
+  if (o.zone !== "hand" || !(s.freerunningThisTurn ?? []).includes(pid)) return null;
+  // Its own freerunning cost, else one a permanent gives it (Ezio Auditore da Firenze); the cheaper first.
+  const ways = (["freerunning", "grantedFreerunning"] as const).flatMap((k) => {
+    const a = altCost(defOf(s, o), k, s, pid, o);
+    return a ? [{ k, mv: manaValue(parseManaCost(a.mana)) }] : [];
+  }).sort((a, b) => a.mv - b.mv);
+  for (const w of ways) {
+    const plan = castPlan(s, pid, id, false, undefined, w.k);
+    if (plan) return plan;
+  }
+  return null;
 }
 
 /**

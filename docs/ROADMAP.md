@@ -1,6 +1,6 @@
 # Roadmap
 
-28,710 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,724 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,235 of
 9,979 (92%).
 
@@ -3914,8 +3914,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
   Spinner, Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
+- Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
+  turn, create a 2/2 green Bear creature token (you gain 5 life) instead" (Words of Wilding, Words of Worship: one draw
+  replaced for each activation, from an empty library too, CR 614.11; a bot uses one in its upkeep for its draw step),
+  "You may look at face-down creatures you don't control any time" (Lens of Clarity, also the top of your library;
+  Found Footage, Keeper of the Lens: the UI shows what they are, not face-down spells, rulings; browser test),
+  "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield
+  during their last turn" (Arboria: who put it, the controller of what resolved, rulings; not their planeswalkers),
+  "When one or more of your opponents are dealt combat damage during your turn, draw two cards. If your library has no
+  cards in it, you win the game" (Fblthp, Impossibly Lost), "Then if that creature is a Mutant, Ninja, or Turtle"
+  (Turtle Van), Take's "Remove all +1/+1 counters ... Draw that many cards" (Give // Take, fused too), Believe's "You may
+  put it onto the battlefield if it's a creature card. If you don't, put it into your hand" (Reason // Believe), "a
+  noncreature or Robot spell from your hand without paying its mana cost" once each of your turns (Vision, Spectral
+  Synthezoid), Howl of the Horde's raid copy "an additional time" (a second delayed trigger, rulings), "Whenever a player
+  taps a Mountain, Forest, or Plains for mana" (Keeper of Progenitus), "that player adds {G}{G}{G}. Until end of turn,
+  they don't lose this mana" (Shizuko, Caller of Autumn). +14 (28,724 of 31,936 with round 229).
+- Known gap from round B67: with shields from two different Words waiting, the drawing player would choose which one
+  replaces a draw (rulings, CR 616.1); the oldest is used first.
+- Out after round B67 (looked at, not done): Words of War, Words of Waste and Words of Wind (a target or choices in the
+  middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
+  Lumbering Battlement, Wall of Mourning, Kayla's Music Box and Serpent's Soul-Jar (cards exiled with ~ from abilities
+  not linked yet), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
+  so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
+  from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 110
+  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 100
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
@@ -3926,8 +3949,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
   Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
-  Curse of Inertia, Dreamshaper Shaman, Nefarious Lich, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's
-  Sanction, Kathril, Words of Wilding, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli; then on up from 13,200.
+  Curse of Inertia, Dreamshaper Shaman, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's Sanction, Kathril,
+  Jump Scare, Feral Encounter, Gimli; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

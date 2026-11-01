@@ -10838,6 +10838,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7df50107-25d8-47dc-9a13-27b257cfbf6f",
+  "name": "Lens of Clarity",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may look at the top card of your library and at face-down creatures you don't control any time.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ktk",
+  "releasedAt": "2014-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6496eea7-38f5-4428-a379-b08b0eeb5239",
   "name": "Leonardo, Big Brother",
   "manaCost": "{2}{W}",

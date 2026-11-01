@@ -273,7 +273,9 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   } else if (adds === "one mana of any color") out.adds = { kind: "anyColor", n: 1 };
   else if (adds === "two mana in any combination of colors") out.adds = { kind: "anyColor", n: 2 };
   else if (adds === "one mana of the chosen color" || (adds === "one mana of that color" && out.ofChosen)) out.adds = { kind: "chosenColor" };
-  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land"))) out.adds = { kind: "produced" };
+  // Keeper of Progenitus: "Whenever a player taps a Mountain, Forest, or Plains for mana, that player adds one mana of any
+  // type that land produced": a land with one of those types.
+  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land") || (m[1] === "land" && !!filter.subtypes?.length && filter.subtypes.every((t) => ["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(t)) && !filter.types?.length))) out.adds = { kind: "produced" };
   else return "fail";
   return out as ManaTrigger;
 }

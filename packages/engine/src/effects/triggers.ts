@@ -1700,7 +1700,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const wc = controllerOf(s, w);
       for (const t of abilitiesOf(s, w).triggers) {
         const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
-        if (!g) continue;
+        if (!g || (g.yourTurn && s.activePlayer !== wc)) continue;
         const fits = (h: (typeof ev.hits)[number]) => {
           if ((h.by !== wc && !g.anyController) || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
           const o = s.objects[h.source];

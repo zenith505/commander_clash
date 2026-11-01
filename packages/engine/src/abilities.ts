@@ -3320,6 +3320,8 @@ export type Effect =
   | { type: "surveil"; n: Amount } // CR 701.25
   /** Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn." (Player.nextDrawExiles) */
   | { type: "nextDrawExile"; who: PlayerRef }
+  /** Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature token (you gain 5 life) instead." (Player.nextDrawInstead) */
+  | { type: "nextDrawInstead"; gain?: number; token?: TokenSpec }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
@@ -4802,7 +4804,7 @@ export interface TriggeredAbility {
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
    * once for each player dealt damage, "that player" them.
    */
-  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true; /** "During your turn" (Fblthp, Impossibly Lost): only while its controller is the active player. */ yourTurn?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity); for "selfIsDealtDamage", "is dealt 3 or more damage" at once (Innocent Bystander). */
@@ -6750,6 +6752,13 @@ export interface CompiledCard {
   lookTop?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   lookTopIf?: StaticCondition;
+  /**
+   * "You may look at face-down creatures you don't control (your opponents control) any time" (Lens of Clarity, Found
+   * Footage): its controller sees what those face-down permanents are (CR 708.5), not face-down spells (rulings).
+   */
+  lookFaceDown?: true;
+  /** Arboria: "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn" (attackProblem). */
+  attackOnlyActive?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
   /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */

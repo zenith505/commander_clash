@@ -2855,6 +2855,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   if (opts.selfIt) text = text.replace(/^[Pp]ut (an? [+-]\d\/[+-]\d counter) on it and (an? [+-]\d\/[+-]\d counter) on ((?:up to one )?(?:other )?target [^.]+)\./, "Put $1 on ~. Put $2 on $3.");
   // Oblivion's Hunger: "Draw a card if that creature has a +1/+1 counter on it": the condition first, the same instruction.
   text = text.replace(/(^|\. )Draw a card if that creature has (an? [^.,]+ counter on it)\./, "$1If that creature has $2, draw a card.");
+  // Precognition: "you may look at the top card of target opponent's library. If you do, you may put that card on the
+  // bottom of that player's library": looking changes nothing in the game, so the same as looking and then choosing
+  // whether to move it (the target is chosen either way, CR 603.3d).
+  text = text.replace(/^[Yy]ou may look at the top card of (target opponent's|target player's) library\. If you do, you may put that card /, (_, who: string) => `Look at the top card of ${who} library. You may put that card `);
+  // Cabal Conditioning: "Any number of target players each discard a number of cards equal to the greatest mana value
+  // among permanents you control": the same as "X cards, where X is ...", counted once as it resolves (CR 608.2h).
+  text = text.replace(/^(Any number of target players each discard) a number of cards equal to (the greatest mana value among permanents you control)\.$/, "$1 X cards, where X is $2.");
+  // Arm the Cathars: "Until end of turn, target creature gets +3/+3, up to one other target creature gets +2/+2, and up to
+  // one other target creature gets +1/+1. Those creatures gain vigilance until end of turn.": three different creatures
+  // (rulings), each with its own bonus and vigilance.
+  text = text.replace(/^Until end of turn, target creature gets (\+\d+\/\+\d+), up to one other target creature gets (\+\d+\/\+\d+), and up to one other target creature gets (\+\d+\/\+\d+)\. Those creatures gain ([a-z]+) until end of turn\.$/, "Target creature gets $1 and gains $4 until end of turn. Up to one other target creature gets $2 and gains $4 until end of turn. Up to one other target creature gets $3 and gains $4 until end of turn.");
+  // Nightcreep: "Until end of turn, all creatures become black and all lands become Swamps": two changes, each to the
+  // permanents there as it resolves (CR 611.2c; rulings).
+  text = text.replace(/^Until end of turn, (all creatures) become ([a-z]+) and (all lands) become ([A-Z][a-z]+)\.$/, "Until end of turn, $1 become $2. Until end of turn, $3 become $4.");
   // Seedtime: "Take an extra turn after this one if an opponent cast a blue spell this turn": the condition first.
   text = text.replace(/^Take an extra turn after this one if (an opponent cast an? [a-z]+ spell this turn)\./, "If $1, take an extra turn after this one.");
   // Ajani Goldmane: "Create a white Avatar creature token. It has "This creature's power and toughness are each equal to
@@ -7578,6 +7592,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], colors: [({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[phaseInstead[1] as "white"]], text: phaseInstead[1]! };
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: ex, otherwise: fx });
       si++;
+      continue;
+    }
+    // Vindictive Triumph: "Exile target creature or planeswalker. If that permanent's mana value was 3 or less, return it to
+    // the battlefield tapped under your control. Exile it at the beginning of the next end step.": its mana value as it
+    // last existed ({X} as 0, rulings; CR 608.2h), the same before or after it's exiled; returned, it's a new object
+    // (CR 400.7), the one the delayed exile is about.
+    const triumph = /^[Ee]xile target creature or planeswalker$/.test(s) && ctx.spell ? /^If that permanent's mana value was (\d+) or less, return it to the battlefield tapped under your control\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (triumph && /^Exile it at the beginning of the next end step\.?$/.test(sentences[si + 2] ?? "")) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "exile" || ctx.targets.length !== before + 1 || ctx.targets[before]!.kind !== "object") return null;
+      const it: ObjRef = { ref: "target", index: before };
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(triumph[1]) }, text: `mana value ${triumph[1]} or less` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ type: "flicker", what: it, under: "you", tapped: true }, { type: "delayed", when: "nextEndStep", of: it, effects: [{ type: "exile", what: { ref: "subject" } }], text: "Exile it" }], otherwise: fx });
+      si += 2;
       continue;
     }
     // Raze to the Ground: "Destroy target artifact. If its mana value was 1 or less, draw a card.", Extinguish the Light,
@@ -13862,6 +13891,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
   // "Create a 2/2 red Mutant creature token. It gains haste until end of turn. Destroy it at the beginning of the next end
   // step" (Old Hob): an instruction about the tokens just created leaves "it" meaning them.
   if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
+  // Elemental Appeal: "Create a 7/1 ... token ... Exile it at the beginning of the next end step. If this spell was kicked,
+  // that creature gets +7/+0 until end of turn": the delayed exile is about those tokens and leaves them "it" too.
+  if (last?.type === "delayed" && last.each === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
   // A clash moves no permanents: "those creatures" after it are still the tokens before it (Gilt-Leaf Ambush).
   if (last?.type === "clash") return;
 

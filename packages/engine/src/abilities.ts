@@ -634,6 +634,8 @@ export interface TargetSpec {
   manaCostIn?: string[];
   /** "Target spell with {X} in its mana cost" (Frontline Medic; CR 107.3). */
   xInCost?: true;
+  /** "A card with a kicker ability" (Coralhelm Chronicler): kicker or multikicker (CR 702.33; rulings), not replicate and the like. */
+  kickerAbility?: true;
   /** "A spell ... without {X} in its mana cost" (Titans' Nest): no {X} in its mana cost (an {X} in another cost doesn't count, rulings). */
   noXInCost?: true;
   /**

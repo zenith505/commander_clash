@@ -1,7 +1,7 @@
 # Roadmap
 
-28,946 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
+28,970 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4206,6 +4206,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with the most (Adamaro, First to Desire), "if you had an X or a Y enter the battlefield under your control this turn"
   (Cleaving Reaper). Fix: "Then if ..., sacrifice ~ and it deals" put the damage outside the condition. +21 (28,946 of
   31,936).
+- Round B76 (one-line templates from the bottom of the list): look-at-the-top filters "a blue or artifact card"
+  (Tezzeret's Gatebreaker), "a card with a kicker ability" (Coralhelm Chronicler: multikicker too, not replicate,
+  rulings), "a land card or a card with {X} in its mana cost" (Paradox Surveyor), "if an opponent cast a blue and/or
+  black spell this turn" (Sandstalker Moloch); "target artifact (Forest) becomes an artifact creature with base power and
+  toughness 5/5 (a 4/5 green Treefolk creature) for as long as ~ remains on the battlefield" (Skilled Animator, Unctus's
+  Retrofitter, Awakener Druid, CR 611.2b); "becomes an Island in addition to its other types" with no duration (Sealock
+  Monster) and "the basic land type of your choice in addition to its other types" (Navigator's Compass, CR 305.7);
+  base power and toughness set to another creature's actual ones as the trigger resolves (Galion, Elvenking's Butler,
+  Exuberant Wolfbear, Unruly Krasis) or to "4/1 or 1/4" (Master of Winds, CR 613.4b); "you may look at the top card of
+  target opponent's library. If you do, you may put that card on the bottom" (Precognition); a token's delayed exile
+  leaving it "that creature" (Elemental Appeal); three different targets with three bonuses (Arm the Cathars);
+  creatures black and lands Swamps (Nightcreep); "creatures controlled by that player or by that planeswalker's
+  controller can't block this turn", a rule for the turn (Concussive Bolt, rulings); exile, then back tapped under your
+  control if its mana value was 3 or less (Vindictive Triumph); plural "become blue Illusions in addition to their other
+  colors and types" (Phantasmal Form); "Return target Aura card from your graveyard to the battlefield" (Rise to Glory,
+  Brotherhood Outcast: what it enchants is chosen as it enters, CR 303.4f); "discard a number of cards equal to"
+  (Cabal Conditioning); "Enchanted creature deals 1 damage to target creature with flying" (Dizzying Gaze: the creature
+  is the source). +24 (28,970 of 31,936).
+- Out after round B76 (looked at, not done): Mind Roots (a land card discarded this way onto the battlefield: no
+  effect for cards a discard just moved yet), Mark for Death ("Other creatures that player controls can't block this
+  turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (the target player looks at
+  the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (costs with "or": "sacrifice an
+  artifact or discard a nonland card", "remove a +1/+1 counter or a charge counter").
 - Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),
   Titania, Voice of Gaea's ward ("discard a card or pay {2}"), Fog Patch and Choking Vines ("become blocked"), Mistform
   Warchief, Vexing Sphinx (cumulative upkeep of discarding), Invoke the Ancients (a counter chosen for each token),

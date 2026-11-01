@@ -535,6 +535,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > 0) }];
+    // Krenko's Buzzcrusher: for each player, up to one of their permanents to destroy: an opponent's best one, none of ours.
+    const destroying = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && destroying?.type === "destroy" && destroying.what.ref === "created") {
+      const theirs = pend.options.filter((id) => controllerOf(s, obj(s, id)) !== pid).map((id) => ({ id, w: permanentWorth(s, pid, id) })).sort((a, b) => b.w - a.w);
+      return [{ type: "pickPermanents", player: pid, ids: theirs[0] && theirs[0].w > 0 ? [theirs[0].id] : [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
@@ -3866,6 +3872,12 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
   }
   if (pend.purpose === "guessHand") return most(tally(me.hand)) ?? pend.options[0]!;
   if (pend.purpose === "find") return best(me.library, value) ?? pend.options[0]!;
+  // The Clone Saga: our biggest creature that can attack this turn, else the biggest one.
+  if (pend.purpose === "ownCreature") {
+    const board = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    const ready = board.filter((id) => !obj(s, id).tapped && !isSummoningSick(s, obj(s, id)));
+    return best(ready.length ? ready : board, (o) => power(s, o)) ?? best([...me.hand, ...me.library], value) ?? pend.options[0]!;
+  }
   if (pend.purpose === "own") return best([...me.hand, ...me.library], (o) => value(o) + (o.zone === "hand" ? 10 : 0)) ?? pend.options[0]!;
   const opps = pend.purpose === "theirs" && pend.of !== undefined && pend.of !== pid ? [pend.of] : opponents(s, pid);
   const shown = opps.flatMap((x) => [...player(s, x).command, ...player(s, x).graveyard, ...player(s, x).exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x)]);

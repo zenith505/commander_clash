@@ -1295,6 +1295,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
+  // Sidequest: Hunt the Mark: "if a creature died under an opponent's control this turn" (as it last existed, CR 700.4).
+  if (text === "a creature died under an opponent's control this turn") return { kind: "amount", amount: { count: { kind: "diedThisTurn", opponents: true } }, min: 1 };
   // White Glove Gourmand: "if another Human died under your control this turn": of that type as it last existed. "Another"
   // can't be the permanent with the ability, which hasn't died while it's on the battlefield.
   if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };

@@ -497,7 +497,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (d.all || d.subtypes.includes(c.subtype!)) && (!c.yours || d.controller === ctx.controller)).length;
       // A changeling is every creature type (CR 702.73a), so never "non-Skeleton".
       if (c.notSubtype) return (s.diedTypesThisTurn ?? []).filter((d) => !(d.all || d.subtypes.includes(c.notSubtype!)) && (!c.yours || d.controller === ctx.controller)).length;
-      return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
+      return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => (!c.yours || p === ctx.controller) && (!c.opponents || p !== ctx.controller)).length;
     case "plusOnesPutThisTurn":
       return (s.turnLog?.plusOnes ?? [])
         .filter((p) => (!c.byYou || p.by === ctx.controller) && (!c.onYours || p.controller === ctx.controller) && (!c.creature || p.creature) && (!c.self || (p.id === ctx.sourceId && p.zc === (ctx.sourceZc ?? s.objects[p.id]?.zoneChanges ?? 0))))
@@ -1214,7 +1214,7 @@ function describeCount(c: Count): string {
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":
-      return `#${c.nontoken ? "nontoken " : ""}${c.notSubtype ? `non-${c.notSubtype} creature` : (c.subtype ?? "creature")}s that died${c.yours ? " under your control" : ""} this turn`;
+      return `#${c.nontoken ? "nontoken " : ""}${c.notSubtype ? `non-${c.notSubtype} creature` : (c.subtype ?? "creature")}s that died${c.yours ? " under your control" : c.opponents ? " under your opponents' control" : ""} this turn`;
     case "plusOnesPutThisTurn":
       return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":

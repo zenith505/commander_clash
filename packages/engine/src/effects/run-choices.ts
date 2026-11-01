@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
@@ -48,7 +48,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
         const n = Number(sc.payX);
-        loseLife(s, ctx.controller, n);
+        payLife(s, ctx.controller, n);
         log(s, `${player(s, ctx.controller).name} pays ${n} life for ${src}.`);
         sc.may = true;
       }
@@ -1126,7 +1126,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
           // "Any player may pay 5 life" (Dash Hopes), "sacrifices a creature or pays 3 life" (Indulgent Tormentor):
           // chosen on the prompt above, so paid now, not asked again (CR 119.4).
-          loseLife(s, pid, o.pay.life);
+          payLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {
           const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, lowerFirst(describePenalty(s, e, ctx)), lowerFirst(describePenalty(s, e, ctx)));

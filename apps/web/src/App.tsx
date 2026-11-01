@@ -4336,7 +4336,7 @@ function AbilityMenu({
       <strong>{d.name}</strong>
       {choice && (
         <button disabled={!playable || !canEnterUntapped(s, HUMAN, objectId)} onClick={() => onPlay(true)}>
-          Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})
+          {choice.kind === "mayTapRad" ? "Play it untapped" : <>Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})</>}
         </button>
       )}
       {foretold && (
@@ -4356,7 +4356,7 @@ function AbilityMenu({
         ))}
       {inHand && !foretold && !split && asTypes.length < 2 && (
         <button disabled={!playable} onClick={() => onPlay()}>
-          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
+          {land ? (choice?.kind === "mayTapRad" ? `Play it tapped (you get ${choice.n} rad counters)` : choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {faces.map((face) => {
@@ -4378,7 +4378,7 @@ function AbilityMenu({
           <span key={`land${face}`} className="face-play">
             {untap && (
               <button disabled={!ok || !asFace(s, o, face, () => canEnterUntapped(s, HUMAN, objectId))} onClick={() => onPlayFace(face, true)}>
-                Play {fd.name} untapped ({untap.kind === "payLife" ? `pay ${untap.n} life` : `reveal ${/^[AEIOU]/.test(untap.filter.text) ? "an" : "a"} ${untap.filter.text}`})
+                Play {fd.name} untapped{untap.kind === "mayTapRad" ? "" : ` (${untap.kind === "payLife" ? `pay ${untap.n} life` : `reveal ${/^[AEIOU]/.test(untap.filter.text) ? "an" : "a"} ${untap.filter.text}`})`}
               </button>
             )}
             <button disabled={!ok} title={fd.oracleText} onClick={() => onPlayFace(face)}>

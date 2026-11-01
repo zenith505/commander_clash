@@ -280,7 +280,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).
-    if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
+    if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^(?:reveal|have)/.test(pend.prompt) || player(s, pid).life >= 16 }];
     // Sepulchral Primordial: each opponent's creature card comes back under our control.
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     // Krark's Thumb: keep the won flip.
@@ -1525,7 +1525,7 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
       const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
       // Spelunking: it enters untapped anyway, so no life is paid for it.
       const free = othersMakeItEnterUntapped(s, obj(s, a.objectId));
-      const untapped = c.entersTappedChoice && !free ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
+      const untapped = c.entersTappedChoice && !free ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind !== "payLife" || p.life >= 16) : undefined;
       const tapped = !free && (c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false));
       return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
     }),

@@ -912,6 +912,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Increasing Ambition: "Search your library for a card and put that card into your hand. If ~ was cast from a graveyard,
   // instead search your library for two cards and put those cards into your hand. Then shuffle." One search either way,
   // then the shuffle: the same as each search followed by its shuffle.
+  // Expand the Sphere: "If you put fewer than two lands onto the battlefield this way, proliferate a number of times equal
+  // to the difference": 2 minus the lands the look put onto the battlefield, none for two (CR 701.34).
+  const fewerLands = /^(Look at the top (?:six|seven|five) cards of your library\. Put up to two land cards from among them onto the battlefield tapped and the rest on the bottom of your library in a random order\.) If you put fewer than two lands onto the battlefield this way, proliferate a number of times equal to the difference\.$/.exec(text.trim());
+  if (fewerLands) {
+    const b = parseBody(fewerLands[1]!, opts);
+    const dig = b?.effects.length === 1 && b.targets.length === 0 ? b.effects[0] : undefined;
+    if (dig?.type !== "dig" || dig.into !== "battlefield" || dig.count !== 2 || !dig.upTo) return null;
+    return { ...b!, effects: [dig, { type: "proliferate", n: { count: { kind: "putThisWay" }, times: -1, plus: 2 } }], text };
+  }
   const searchInstead = /^Search your library for (an? [^.,]+?) and put that card into your hand\. If ~ was cast from a graveyard, instead search your library for (two [^.,]+?) and put those cards into your hand\. Then shuffle\.$/.exec(text.trim());
   if (searchInstead) return parseBody(`Search your library for ${searchInstead[1]}, put that card into your hand, then shuffle. If ~ was cast from a graveyard, instead search your library for ${searchInstead[2]}, put those cards into your hand, then shuffle.`, opts);
   // Volatile Arsonist: "it deals 1 damage to each of up to one target creature, up to one target player, and/or up to one
@@ -1960,6 +1969,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Taigam, Master Opportunist: "copy it, then exile the spell you cast with four time counters on it." is two
   // instructions, the copy first.
   text = text.replace(/^[Cc]opy it, then (exile the spell you cast with \w+ time counters? on it\.)/, (_, rest: string) => `Copy it. ${capital(rest)}`);
+  // Observed Stasis: "remove enchanted creature from combat. Then draw a card for each tapped creature its controller
+  // controls": its being enchanted creature, the count taken after the removal (CR 506.4 doesn't untap it, rulings).
+  text = text.replace(/^[Rr]emove enchanted creature from combat\. Then draw a card for each tapped creature its controller controls\.$/, "Remove enchanted creature from combat. Draw a card for each tapped creature enchanted creature's controller controls.");
   // Vexing Radgull: "that player gets two rad counters if they don't have any rad counters. Otherwise, proliferate."
   text = text.replace(/(^|\. )[Tt]hat player gets (\w+) rad counters if they don't have any rad counters\. Otherwise,/, (_, lead: string, n: string) => `${lead}If that player has no rad counters, that player gets ${n} rad counters. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");

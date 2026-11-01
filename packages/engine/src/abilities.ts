@@ -1620,6 +1620,8 @@ export type Modification =
   | { kind: "cantActivate"; exceptMana?: true; /** Serra Bestiary: "its activated abilities with {T} in their costs", mana abilities too (rulings). */ tapCost?: true }
   /** "Can't be blocked except by three or more creatures" (CR 509.1b; menace is the same with two, 702.111b). */
   | { kind: "minBlockers"; n: number }
+  /** Tromokratis: "can't be blocked unless all creatures defending player controls block it" (CR 509.1b): every creature that player controls, tapped ones included (rulings). */
+  | { kind: "blockedOnlyByAll" }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
@@ -4476,6 +4478,8 @@ export type TriggerEvent =
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
   | "youRollDie"
   | "youPlayAnotherLand" // "When you play another land" (City of Traitors): playing a land (CR 305.1), not this one
+  /** "Whenever you pay life" (Font of Agonies): once per payment of life more than 0 (CR 119.4, 119.8); "that many" is the life paid. Not losing life without the word "pay" (rulings). */
+  | "youPayLife"
   | "youLoseLife" // "Whenever you lose life" (Vilis, Broker of Blood): once per life-loss event, as "opponentLosesLife"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever another player loses the game" (Sengir, the Dark Baron): after they've left (CR 800.4a), "that player" them. */
@@ -5452,6 +5456,8 @@ export interface ManaSpend {
   disturb?: true;
   /** "This mana can't be spent to cast spells from your hand" (Karolina Dean): not on a spell cast from a hand (ManaUse.fromHand). */
   notFromHand?: true;
+  /** "Spend this mana only to cast spells you don't own" (Thieving Varmint): only on a spell another player owns (ManaUse.owner, CR 108.3). */
+  notOwnSpells?: true;
   text: string;
 }
 
@@ -5472,7 +5478,11 @@ export type EntersCondition =
  * tapped." The choice is made as it enters (CR 614.12).
  */
 /** `orControl`: "or you control a Dragon" (Temple of the Dragon Queen): untapped then with nothing revealed. */
-export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec };
+export type EntersChoice =
+  | { kind: "payLife"; n: number }
+  | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec }
+  /** Mariposa Military Base: "You may have ~ enter tapped. If you do, you get two rad counters." Untapped unless its player chooses (CR 614.1c); entering by an effect, it's untapped. */
+  | { kind: "mayTapRad"; n: number };
 
 /**
  * "Instant and sorcery spells you cast cost {1} less to cast", "Noncreature spells cost {1} more to cast",
@@ -5701,7 +5711,8 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
-  | { what: "counters"; onPlayer: true; op: "plusOne" }
+  /** Izzet Generatorium, Aether Refinery: "If you would get one or more {E}, you get that many plus one {E} instead" / "twice that many": energy only (`counter`); you order them, plus one first (rulings, CR 616.1). */
+  | { what: "counters"; onPlayer: true; op: "plusOne" | "double"; counter?: "energy" }
   /**
    * Vorinclex, Monstrous Raider and Innkeeper's Talent: "If you would put one or more counters on a permanent or player,
    * put twice that many ..." (`putter` "you") and "If an opponent would put ..., they put half that many ..., rounded
@@ -6245,6 +6256,8 @@ export interface CompiledCard {
   seesOpponents?: true;
   /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
   tapBasicManaTimes?: number;
+  /** Damping Sphere: "If a land is tapped for two or more mana, it produces {C} instead of any other type and amount" (CR 106.12b, 614.1a): any player's land (manaabilities.ts tappedForMana). */
+  dampsLandMana?: true;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */

@@ -434,6 +434,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // Thran Turbine: "This mana can't be spent to cast spells": on abilities and other costs only (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells.") return { abilities: "any", other: true, text: sentence };
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand": on anything else (CR 106.6).
+  // Thieving Varmint: "Spend this mana only to cast spells you don't own" (CR 106.6, 108.3): the spell's owner, not its caster.
+  if (sentence === "Spend this mana only to cast spells you don't own.") return { spells: { kind: "spell", text: "spells you don't own" }, notOwnSpells: true, text: sentence };
   if (sentence === "This mana can't be spent to cast spells from your hand.") return { spells: { kind: "spell", text: "spells" }, notFromHand: true, abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).
   const cant = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(sentence);

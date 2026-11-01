@@ -943,10 +943,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${singularWord(m[1]!)} an opponent controls`, { chosen: true });
     return spec?.kind === "object" && !spec.owner ? count({ kind: "permanents", filter: { ...spec, owner: "you", text: p } }) : null;
   }
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|the chosen player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|the chosen player controls|those players control|those opponents control|enchanted creature's controller controls)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
-    const theirs = /^(target|that|those|the chosen) /.test(who);
+    const theirs = /^(target|that|those|the chosen|enchanted creature's) /.test(who);
     const suffix = who === "you control" ? " you control" : who === "on the battlefield" || theirs ? "" : " an opponent controls";
     const spec = parseTargetPhrase(`${words}${suffix}${m[4] ? ` ${m[4]}` : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
@@ -1035,6 +1035,8 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
   if ((x === "that player's" || x === "their") && (ctx.eventPlayer || ctx.defending)) return { ref: "eventPlayer" };
   if (x === "enchanted player's" || x === "enchanted opponent's") return { ref: "enchantedPlayer" };
+  // Observed Stasis: "each tapped creature its controller controls", its being enchanted creature (CR 303.4).
+  if (x === "enchanted creature's controller's" && !ctx.spell) return { ref: "hostController" };
   if (x === "defending player's" && ctx.defending) return { ref: "eventPlayer" };
   return null;
 }

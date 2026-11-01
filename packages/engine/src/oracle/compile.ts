@@ -2584,6 +2584,10 @@ export function compile(d: CardDef): CompiledCard {
       else out.tapManaTimes = (out.tapManaTimes ?? 1) * n;
       continue;
     }
+    if (line === "If a land is tapped for two or more mana, it produces {C} instead of any other type and amount.") {
+      out.dampsLandMana = true;
+      continue;
+    }
     const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
     if (plusLife) {
       out.lifeGainPlus = (out.lifeGainPlus ?? 0) + Number(plusLife[1]);

@@ -95,7 +95,7 @@ export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n
   if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPoisonForYou && controllerOf(s, s.objects[id]!) === pid)) return 0;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
-    .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
+    .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller && (!mod.counter || mod.counter === kind)) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
     .map(({ mod }) => mod.op);
   return apply(n, ops, kind === "poison" || kind === "rad");
 }

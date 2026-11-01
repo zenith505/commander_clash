@@ -1736,6 +1736,8 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
 
 function entersTappedNow(s: GameState, o: GameObject, printed: CompiledCard, choice?: boolean): boolean {
   if (printed.entersTappedUnless) return !conditionHolds(s, printed.entersTappedUnless, o.controller, o.id);
+  // Mariposa Military Base: tapped only when its player chooses so as they play it (putLandPlayed).
+  if (printed.entersTappedChoice?.kind === "mayTapRad") return false;
   if (printed.entersTappedChoice) return !choice && !controlsForEntry(s, o.controller, printed.entersTappedChoice, o.id);
   return false;
 }
@@ -1828,6 +1830,7 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   if (!choice) return false;
   const p = player(s, pid);
   if (choice.kind === "payLife") return payableLife(s, pid) >= choice.n;
+  if (choice.kind === "mayTapRad") return true;
   if (controlsForEntry(s, pid, choice, landId)) return true;
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
@@ -1948,6 +1951,16 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   lost[pid] = (lost[pid] ?? 0) + n;
   const batch = lifeBatch ?? (s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1);
   fireEvent(s, { type: "lifeLost", player: pid, amount: n, first, batch });
+}
+
+/**
+ * A player pays life (CR 119.4): that much life is lost, and "whenever you pay life" (Font of Agonies) sees the payment.
+ * Only payments use this, not life lost without the word "pay" (rulings on Font of Agonies).
+ */
+export function payLife(s: GameState, pid: PlayerId, n: number) {
+  if (n <= 0) return;
+  loseLife(s, pid, n);
+  fireEvent(s, { type: "lifePaid", player: pid, amount: n });
 }
 
 let lifeBatch: number | undefined;
@@ -4402,7 +4415,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   if (banned) throw new RulesError(banned);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
-    throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
+    throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice && choice.kind !== "mayTapRad" ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
   putLandPlayed(s, p, id, untapped, face);
 }
 
@@ -4420,6 +4433,7 @@ export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): st
   const choice = entersRulesOf(s, pid, id).entersTappedChoice;
   if (!choice || !canEnterUntapped(s, pid, id) || controlsForEntry(s, pid, choice, id)) return null;
   const name = defOf(s, obj(s, id)).name;
+  if (choice.kind === "mayTapRad") return `have ${name} enter untapped (tapped, you get ${choice.n} rad counters)`;
   return choice.kind === "payLife" ? `pay ${choice.n} life so ${name} enters untapped` : `reveal a ${choice.filter.text} from your hand so ${name} enters untapped`;
 }
 
@@ -4435,7 +4449,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
-    loseLife(s, p.id, choice.n);
+    payLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
   } else if (untapped && choice?.kind === "reveal" && !controlsForEntry(s, p.id, choice, id)) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
@@ -4453,9 +4467,15 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   s.playingLand = id;
-  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
+  // Mariposa Military Base: not untapped means its player has it enter tapped, and they get the rad counters (CR 614.1c).
+  const tapRad = choice?.kind === "mayTapRad" && !untapped ? choice.n : 0;
+  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(tapRad ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
   s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  if (tapRad) {
+    const n = putPlayerCounters(s, p.id, "rad", tapRad);
+    if (n > 0) log(s, `${p.name} gets ${n} rad counters.`);
+  }
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
 
@@ -4520,7 +4540,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
-  if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
+  if (ab.lifeCost) payLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -4577,7 +4597,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -5818,7 +5838,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
-  loseLife(s, p.id, paid.lifePaid);
+  payLife(s, p.id, paid.lifePaid);
   // The amount of mana spent to cast it, by anyone (increment, CR 702.191a).
   const manaSpent = Object.values(paid.spent).reduce((a, b) => a + b, 0) + (choices.assisted && choices.assist !== undefined ? choices.assisted : 0);
   if (choices.assisted && choices.assist !== undefined) {
@@ -7180,7 +7200,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} ${c.untap ? "untaps" : "taps"} ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       if (!c.n) continue; // "pay X life" with X = 0
-      loseLife(s, p.id, c.n);
+      payLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "craft") {
       // Craft's materials (CR 702.167a): exiled; the cards are "used to craft" what it becomes (702.167c). A token isn't
@@ -7794,7 +7814,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
   }
-  loseLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
+  payLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) {
@@ -8430,7 +8450,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (pend.what === "lifeAsEnters") {
       // "As ~ enters, pay any amount of life" (CR 614.12, 119.4): that much life is paid now, as it enters.
       const n = Number(choice);
-      if (n) loseLife(s, p.id, n);
+      if (n) payLife(s, p.id, n);
       o.lifePaidAsEntered = n;
       log(s, `${p.name} pays ${n} life as ${pend.source} enters.`);
       invalidateCharacteristics(s);
@@ -9168,7 +9188,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
     const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
-    loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
+    payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     loseEnergy(s, p.id, energy);
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
   }
@@ -9238,7 +9258,7 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       for (const id of tap) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${tap.map((id) => nameOf(s, id)).join(", ")} to waterbend.`);
     }
-    loseLife(s, p.id, paid.lifePaid + life);
+    payLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
     if (pend.poison) {
       // "Ward—Get five poison counters": getting them is the payment (CR 118.3); ten or more loses as a state-based
@@ -9748,7 +9768,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (tax) {
     const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
     if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);
-    loseLife(s, p.id, paid.lifePaid);
+    payLife(s, p.id, paid.lifePaid);
     log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
   }
   for (const a of attacks) {
@@ -9941,7 +9961,10 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
  */
 /** How many creatures it takes to block this attacker: two with menace (CR 702.111b), three or more with "can't be blocked except by three or more creatures" (509.1b). */
 export function blockersNeeded(s: GameState, at: GameObject): number {
-  return Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+  const n = Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+  // Tromokratis: every creature the player it attacks controls, tapped ones included, so one tapped means no block (rulings).
+  if (characteristics(s, at).blockedOnlyByAll && at.attacking !== undefined) return Math.max(n, creaturesOf(s, at.attacking).length);
+  return n;
 }
 
 export function maxBlocks(s: GameState, o: GameObject): number {
@@ -9985,6 +10008,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   }
   for (const [atId, n] of Object.entries(count)) {
     const need = blockersNeeded(s, obj(s, atId));
+    if (n < need && characteristics(s, obj(s, atId)).blockedOnlyByAll && need === creaturesOf(s, p.id).length) throw new RulesError(`${nameOf(s, atId)} can't be blocked unless all creatures you control block it`); // CR 509.1b
     if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
     if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
   }

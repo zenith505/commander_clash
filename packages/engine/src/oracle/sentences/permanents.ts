@@ -299,6 +299,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && isGroup(what) ? [{ type: "removeFromCombat", what, remember: true }, { type: "untap", what: { ref: "created" } }] : null;
   }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
+  // Observed Stasis: "remove enchanted creature from combat".
+  if (/^[Rr]emove enchanted creature from combat$/.test(s) && !ctx.spell) return [{ type: "removeFromCombat", what: { ref: "attached" } }];
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
     const what = parseObject(m[2] ?? m[3]!, ctx);

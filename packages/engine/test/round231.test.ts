@@ -384,7 +384,7 @@ describe("round 231: Bomat Courier and Moonring Mirror (face-down exile of the t
     let { s, ap, ids } = setup([looting]);
     putOnBattlefield(s, ap, moonring);
     s = settle(run(s, planCast(s, ap, ids[0]!)), { me: ap });
-    if (s.pending?.kind === "discard" || s.pending?.kind === "chooseCards") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
+    if (s.pending?.kind === "discard") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
     const hidden = s.players[ap]!.exile.filter((id) => s.objects[id]!.hiddenExile);
     expect(hidden.length).toBe(2);
     trimHand(s, ap);
@@ -416,7 +416,7 @@ describe("round 231: Typhoid Mary, Fractured", () => {
     poolOnly(s, ap, { R: 1 });
     s = run(s, planCast(s, ap, ids[0]!));
     s = settle(s, { me: ap });
-    if (s.pending?.kind === "discard" || s.pending?.kind === "chooseCards") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
+    if (s.pending?.kind === "discard") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
     expect(s.players[ap]!.graveyard.length).toBeGreaterThanOrEqual(3);
     s.objects[t]!.tapped = false;
     trimHand(s, ap);
@@ -503,5 +503,26 @@ describe("round 231: Moment of Reckoning", () => {
     poolOnly(s2, ap2, { W: 2, B: 2, C: 3 });
     expect(planCast(s2, ap2, ids2[0]!, xs.map(tgt), [0, 0, 0, 0, 0])).toBeNull();
     expect(planCast(s2, ap2, ids2[0]!, xs.slice(0, 4).map(tgt), [0, 0, 0, 0])).not.toBeNull();
+  });
+});
+
+const kyren = card("Kyren Archive", "Artifact", "{3}", {"oracleText":"At the beginning of your upkeep, you may exile the top card of your library face down.\n{5}, Discard your hand, Sacrifice this artifact: Put all cards exiled with this artifact into their owner's hand."});
+describe("round 231: Kyren Archive (face-down exile at upkeep)", () => {
+  it("exiles the top card face down at your upkeep; its sacrifice discards your hand and puts those cards into it", () => {
+    supported(kyren);
+    let { s, ap } = setup([]);
+    const k = putOnBattlefield(s, ap, kyren);
+    const top = s.players[ap]!.library[0]!;
+    s = passUntil(s, "upkeep", ap);
+    s = settle(s, { me: ap, may: true });
+    expect(zone(s, top)).toBe("exile");
+    expect(s.objects[top]!.hiddenExile).toBeTruthy();
+    s = passUntil(s, "main1", ap);
+    const inHand = [...s.players[ap]!.hand];
+    poolOnly(s, ap, { C: 5 });
+    s = settle(run(s, planActivate(s, ap, k, 0)), { me: ap });
+    expect(zone(s, k)).toBe("graveyard");
+    expect(zone(s, top)).toBe("hand");
+    expect(inHand.every((id) => zone(s, id) === "graveyard")).toBe(true);
   });
 });

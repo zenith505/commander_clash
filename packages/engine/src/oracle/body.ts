@@ -1116,7 +1116,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // checked as the trigger is put on the stack, when its mode is chosen (CR 603.3c).
   const randomUnless = !opts.spell && !opts.activated ? /^[Cc]hoose one at random\. If ([^.]+), you choose one instead(?:\.| —)\s*((?:•[^•]+)+)$/.exec(text.trim()) : null;
   if (randomUnless) {
-    const cond = parseStaticCondition(randomUnless[1]!);
+    const cond = parseStaticCondition(randomUnless[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = cond ? parseModal("one", randomUnless[2]!, text.trim(), opts) : null;
     if (!body) return null;
     return { ...body, modal: { ...body.modal!, random: true, randomUnless: cond! } };

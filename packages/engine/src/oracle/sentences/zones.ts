@@ -1321,7 +1321,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^(?:Return a card you own exiled with ~ to|Put a card you own exiled with ~ into) your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
     // Connecting the Dots: "Put all cards exiled with ~ into their owners' hands": the same, face down ones too.
-    if (/^Return all cards exiled with ~ to their owner's hand$|^Put all cards exiled with ~ into their owners' hands$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
+    if (/^Return all cards exiled with ~ to their owner's hand$|^Put all cards exiled with ~ into their (?:owners' hands|owner's hand)$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".

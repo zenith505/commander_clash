@@ -345,7 +345,7 @@ line blocks.
    sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble!, Chocobo Camp,
    Transcendence, Fumble, Goblin Assassin, Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
    Gorex, the Tombshell, Council's Deliberation, Lumbering Megasloth, Braids's Frightful Return, Awakening of
-   Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship, Amareth, Stoic Farmer, See the Unwritten, Razorlash
+   Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship, Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder, Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
    Ringleader, Fiery Annihilation, Spell Crumple; past rank 12,200: Academy Loremaster, Cait, Celebrate the Harvest,
    Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack ("deals damage to itself equal to its
@@ -1410,6 +1410,13 @@ line blocks.
    Wretched, Paleontologist's Pick-Axe and Sunbird Standard ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
    direction); Ramses, Assassin Lord (attacked this turn by an Assassin you controlled).
+   Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
+   has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault
+   ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
+   graveyard); Yurlok of Scorch Thrash (mana burn, "each player adds {B}{R}{G}"); Tomik, Distinguished Advokist; Storm
+   Cauldron; Arlinn, the Pack's Hope; The Temporal Anchor; Chandra, Fire of Kaladesh; Panoptic Mirror; Crafty
+   Cutpurse; Hydro-Man; Rootcoil Creeper; Zuko, Conflicted; Runo Stromkirk; Rootpath Purifier; Enduring Angel (not
+   started; next candidates).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -2193,8 +2200,8 @@ line blocks.
      that targets" (Danitha, Sword of Hope), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
-     Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko, Genku.
-     Random modes still out: Outlaws' Merriment, Typhoid Mary.
+     Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
+     Random modes still out: Outlaws' Merriment.
    Left from the round after Seasons (lists of targets, Vivid, Gates/Deserts/Caves, counts):
    - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
      to the battlefield (they enter at the same time; Thwart the Grave also has commas inside one target), and "it" or

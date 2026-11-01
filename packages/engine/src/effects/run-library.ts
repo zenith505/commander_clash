@@ -347,7 +347,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (dealt) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false });
       }
       if (!e.life || n <= 0) return;
-      for (const pid of players(s, e.life.who, ctx)) {
+      const inst = e.life.instead && staticConditionNow(s, e.life.instead.cond, ctx.sourceId ?? "", ctx.controller, ctx.event?.player, undefined, ctx.sourceZc);
+      for (const pid of players(s, inst ? e.life.instead!.who : e.life.who, ctx)) {
         if (e.life.gain) gainLife(s, pid, n);
         else loseLife(s, pid, n);
         log(s, `${player(s, pid).name} ${e.life.gain ? "gains" : "loses"} ${n} life.`);

@@ -1262,7 +1262,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
-      if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
+      // CR 702.171b; Caustic Bronco gone before its ability resolves: saddled as it last existed (rulings, CR 608.2h).
+      if (cond.is === "saddled") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return lk && lk.zc === sourceZc ? !!lk.saddled : !!src.saddled;
+      }
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a

@@ -1082,6 +1082,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^(?:nonartifact creatures|creature tokens)$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
   // Harvester of Misery: "other creatures get -2/-2 until end of turn": every creature but the source.
   const othersAll = other && /^creatures$/i.test(p);
+  // Roar of Resistance: "creatures attacking your opponents and/or planeswalkers they control get +2/+0 until end of
+  // turn": whichever are attacking them as it resolves (CR 611.2c), not ones attacking a battle.
+  if (!all && !other && /^creatures attacking your opponents and\/or planeswalkers they control$/i.test(p))
+    return { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingOpponentOrTheirPlaneswalker", text: phrase.trim().toLowerCase() }, other };
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that fought this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -1823,6 +1827,11 @@ export function parseTargetPhrase(
   // planeswalker or battle (CR 506.3), as for Oviya's static.
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking one of your opponents$/.test(p)) {
     extra.combat = "attackingOpponent";
+    p = "creature";
+  }
+  // Roar of Resistance: "creatures attacking your opponents and/or planeswalkers they control".
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking your opponents and\/or planeswalkers they control$/.test(p)) {
+    extra.combat = "attackingOpponentOrTheirPlaneswalker";
     p = "creature";
   }
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you or a planeswalker you control$/.test(p)) {

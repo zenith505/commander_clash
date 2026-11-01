@@ -679,7 +679,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -928,7 +928,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity" | /** "A card of the chosen kind" after "choose land or nonland" (Chosen.landOrNonland). */ "landOrNonland" | /** "Creatures attacking the last chosen player" (Triarch Stalker): `attackingWhom` that player (Chosen.player), none while there's none. */ "attackingPlayer";
   /** "With mana value of the chosen quality" (Extinction Event), "with power of that quality" (Zimone's Hypothesis): odd or even, zero being even. */
   parity?: { of: "manaValue" | "power"; is?: "odd" | "even"; /** "Without mana value of the chosen quality": the other one. */ not?: true };
   /**
@@ -3014,6 +3014,8 @@ export type Effect =
       untilTypes?: string[];
       /** With "castFree": "if that spell's mana value is 8 or less" (Breaching Dragonstorm), the spell as it's cast (CR 202.3). */
       maxMv?: number;
+      /** With "castFree": "if the spell's mana value is less than the number of Mountains you control" (Solstice Revelations): counted as it resolves. */
+      mvLessThan?: Amount;
       /** "If you don't, put that card into your hand" (Breaching Dragonstorm): the card not cast. */
       orHand?: true;
       /** "Until you reveal a nonland card with mana value 3 or less" (Treasure Keeper): only one like this stops it. */
@@ -3215,7 +3217,7 @@ export type Effect =
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
-  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true }; /** Sarkhan the Mad: "~ deals damage to himself equal to that card's mana value", if it's still on the battlefield. */ selfDamage?: true; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
+  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true; /** Caustic Bronco: "You lose life equal to that card's mana value if ~ isn't saddled. Otherwise, each opponent loses that much life": while `cond` holds as it resolves (the source as it last existed, rulings), `who` loses it instead. */ instead?: { cond: StaticCondition; who: PlayerRef } }; /** Sarkhan the Mad: "~ deals damage to himself equal to that card's mana value", if it's still on the battlefield. */ selfDamage?: true; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
   /**
    * Keen Duelist, Parker Luck: two players each reveal the top card of their library, each loses life equal to the mana
    * value of the card the other revealed, then each puts the card they revealed into their hand.
@@ -4010,7 +4012,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity";
+export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity" | /** "Choose land or nonland" (Abundant Harvest, Chosen.landOrNonland). */ "landOrNonland";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
@@ -5184,7 +5186,7 @@ export interface ActivatedAbility {
    * +1/+1 counter on the creature it targets" (Warrior's Blades): `n` less for each, once the target is chosen (CR
    * 602.2b, 601.2f).
    */
-  costLessPerTarget?: { n: number; each: "color" | "+1/+1" };
+  costLessPerTarget?: { n: number; each: "color" | "+1/+1" | /** Belt of Giant Strength: "costs {X} less to activate, where X is the power of the creature it targets" (a negative power reduces nothing, CR 107.1b). */ "power" };
   /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
@@ -6153,6 +6155,8 @@ export interface CompiledCard {
   activateOnlyOwnTurn?: true;
   /** "No more than one creature can attack each combat." / "... block ..." (Silent Arbiter; CR 508.1c, 509.1b): for everyone. */
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
+  /** War's Toll: "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (CR 508.1d): a requirement on each opponent's creatures once any of them is declared as an attacker. */
+  opponentsAttackAll?: true;
   combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number; /** "As long as ~ is tapped, no more than one creature can attack you each combat" (Mirri, Weatherlight Duelist). */ attackYouIfTapped?: number };
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;
@@ -6523,6 +6527,8 @@ export interface CompiledCard {
   spendAnyColorAll?: true;
   /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */
   spendAnyColorCreatureAbilities?: true;
+  /** Oath of Nissa: "You may spend mana as though it were mana of any color to cast planeswalker spells" (CR 609.4b), its controller's. */
+  spendAnyColorPlaneswalkerSpells?: true;
   /** Vizier of the Menagerie: "You can spend mana of any type to cast creature spells" (CR 609.4b), its controller's. */
   spendAnyTypeCreatureSpells?: true;
   /**
@@ -6627,7 +6633,7 @@ export interface CompiledCard {
    * to less than one mana." (Training Grounds, CR 602.2b applies 601.2f): only generic mana, X's too (rulings), of
    * permanents like `filter` on the battlefield from the source's controller's view; `atLeastOne`, never below one mana.
    */
-  activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true; /** "Enchanted artifact's activated abilities cost {2} less to activate" (Power Artifact): only the permanent this Aura is attached to. */ enchanted?: true }[];
+  activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true; /** Agatha of the Vile Cauldron: "cost {X} less ..., where X is ~'s power": that much more, its power as the cost is worked out (none while it's 0 or less). */ selfPower?: true; /** "Enchanted artifact's activated abilities cost {2} less to activate" (Power Artifact): only the permanent this Aura is attached to. */ enchanted?: true }[];
   /**
    * Zirda, the Dawnwaker: "Abilities you activate that aren't mana abilities cost {2} less to activate. This effect can't
    * reduce the mana in that cost to less than one mana." Any such ability its controller activates, from any zone (rulings).
@@ -6918,7 +6924,7 @@ export interface CompiledCard {
   /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
   perTargetCost?: { opponents: boolean; n: number }[];
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
-  opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true }[];
+  opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true; /** Monastery Siege: "that target you or a permanent you control": targeting this permanent's controller counts too. */ you?: true; /** Only while this holds (a Siege's anchor word, CR 614.12b). */ if?: StaticCondition }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
   targetLifeTax?: number;
   /**

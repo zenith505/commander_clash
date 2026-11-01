@@ -154,6 +154,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "34841228-31ac-48ac-b6d6-486b5e1e07dd",
+  "name": "Abundant Harvest",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose land or nonland. Reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and the rest on the bottom of your library in a random order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
   "name": "Ad Nauseam",
   "manaCost": "{3}{B}{B}",

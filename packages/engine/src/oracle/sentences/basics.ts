@@ -1231,6 +1231,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
   // "Choose odd or even." (Extinction Event): as it resolves; "of the chosen quality" after it (zero is even).
   if (/^Choose odd or even$/i.test(s)) return [{ type: "choose", choice: "parity" }];
+  // Abundant Harvest: "Choose land or nonland." as it resolves; "a card of the chosen kind" after it.
+  if (/^Choose land or nonland$/i.test(s)) return [{ type: "choose", choice: "landOrNonland" }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 

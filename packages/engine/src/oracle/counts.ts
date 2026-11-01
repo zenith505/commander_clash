@@ -181,6 +181,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
   // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
   if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
+  // Mariposa Military Base: "for each rad counter you have" (CR 122.1), yours only.
+  if ((each && /^rad counter you have$/i.test(p)) || /^the number of rad counters you have$/i.test(p)) return { count: { kind: "rad", who: { ref: "you" } } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
@@ -534,6 +536,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
   // Balin, Loremaster: "you may discard your hand. Draw X cards, where X is the number of cards discarded this way".
   if (each && ctx?.afterYourDiscard && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
+  // Captain Howler: "Whenever you discard one or more cards, ... for each card discarded this way": the trigger event's cards.
+  if (each && ctx?.discardBatch && /^card discarded this way$/i.test(p)) return count({ kind: "eventAmount" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
   if (each && (m = /^(non[a-z]+|creature|land|artifact|instant|sorcery|enchantment) card discarded this way$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.toLowerCase()} card`);

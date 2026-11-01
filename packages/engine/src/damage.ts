@@ -222,7 +222,8 @@ export function dealDamage(
       spellDealt(s, src, { battle: o.id });
     }
     if ((!walker && !battle) || c.types.includes("Creature")) {
-      if (has(src, "Infect") || has(src, "Wither")) {
+      // Everlasting Torment: as though every source had wither (CR 702.80a).
+      if (has(src, "Infect") || has(src, "Wither") || s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).allDamageWither)) {
         // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt. They're put on with
         // the rest of the damage dealt at the same time, as one event for replacement effects (Vizier of Remedies rulings).
         // Keyed by the permanent and the source's controller, who puts them on (rulings on Vorinclex, All Will Be One).

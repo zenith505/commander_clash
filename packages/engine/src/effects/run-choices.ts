@@ -487,6 +487,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const paid: Effect = { type: "cumulativeUpkeepPaid" };
       if (e.selfCounter) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "counters", what: { ref: "self" }, counter: e.selfCounter, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.selfCounter} counter${sc.n === 1 ? "" : "s"} on ~ to keep it (cumulative upkeep)`, keep: true }, ctx);
       if (e.drawCost) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "draw", who: { ref: "you" }, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Draw ${sc.n === 1 ? "a card" : `${sc.n} cards`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      if (e.addMana) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "addMana", mana: e.addMana.repeat(sc.n) } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Add ${e.addMana.repeat(sc.n)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
@@ -679,7 +680,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "yardChosenIs"
             ? (s.resolving!.yardChosen ?? []).some((id) => !!s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "putIntoHandIs"
-            ? [...(s.resolving!.putIntoHand ?? []), ...(s.resolving!.dugToHandCards ?? [])].some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
+            ? [...(s.resolving!.putIntoHand ?? []), ...(s.resolving!.dugToHandCards ?? [])].some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!))) || (!!e.cond.orState && staticConditionNow(s, e.cond.orState, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined))
             : e.cond.kind === "returnedToHandIs"
             ? (s.resolving!.returnedToHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "impulsedIs"

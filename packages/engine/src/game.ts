@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -1896,8 +1896,8 @@ const lifeLocked = (s: GameState, pid: PlayerId) => s.battlefield.some((id) => a
  * Karn's Sylex: "Players can't pay life to cast spells or to activate abilities that aren't mana abilities": the life a
  * player can pay for such a cost is none (0 life can always be paid, CR 119.4b), Phyrexian mana's included (CR 107.4f).
  */
-export function sylexed(s: GameState, life: number): number {
-  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).noLifeCosts) ? Math.min(0, life) : life;
+export function sylexed(s: GameState, life: number, /** A mana ability's cost: only Angel of Jubilation's and Yasharn's "can't pay life to cast spells or activate abilities" stop it (rulings). */ mana = false): number {
+  return s.battlefield.some((id) => ((r) => r === "all" || (r && !mana))(abilitiesOf(s, obj(s, id)).noLifeCosts)) ? Math.min(0, life) : life;
 }
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
@@ -6312,7 +6312,7 @@ export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): Obj
   if (n === undefined) return [];
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
-    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n && canBeSacrificed(s, o);
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n && canSacrificeForCost(s, o);
   });
 }
 
@@ -6407,7 +6407,7 @@ export function bargainCandidates(s: GameState, pid: PlayerId, spell: ObjectId):
   if (!compileCard(defOf(s, obj(s, spell))).bargain) return [];
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
-    return id !== spell && controllerOf(s, o) === pid && (o.isToken || objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment")) && canBeSacrificed(s, o);
+    return id !== spell && controllerOf(s, o) === pid && (o.isToken || objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment")) && canSacrificeForCost(s, o);
   });
 }
 
@@ -6426,7 +6426,7 @@ export function offeringCandidates(s: GameState, pid: PlayerId, spell: ObjectId)
   if (!filter) return [];
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
-    return id !== spell && controllerOf(s, o) === pid && objectMatches(s, filter, o, pid, false) && canBeSacrificed(s, o);
+    return id !== spell && controllerOf(s, o) === pid && objectMatches(s, filter, o, pid, false) && canSacrificeForCost(s, o);
   });
 }
 
@@ -6595,7 +6595,7 @@ const costOrMana = (d: CardDef, i?: number) => (i === undefined ? "" : (compileC
  * Can these costs beyond mana be paid, for a spell (`o` is the card being cast) or an ability (`o` is its
  * source)? Without choices, just whether they could be. `doing`: "cast X", "activate X's ability".
  */
-function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string, /** Turning a face-down permanent face up or a mana ability: Karn's Sylex doesn't stop paying life for it. */ lifeAnyway = false): string | null {
+function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string, /** Turning a face-down permanent face up ("special", no rule stops paying life for it) or a mana ability ("mana": only Angel of Jubilation's kind does). */ lifeFor: "costs" | "mana" | "special" = "costs"): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
   const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
@@ -6617,7 +6617,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "payLife") {
-      if (c.n && (lifeAnyway ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id))) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
+      if (c.n && (lifeFor === "special" ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id), lifeFor === "mana")) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
       continue;
     }
     if (c.kind === "craft") {
@@ -6708,7 +6708,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     const pool =
       c.kind === "sacrifice"
-        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false) && (c.exile || canBeSacrificed(s, obj(s, id))))
+        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false) && (c.exile || canSacrificeForCost(s, obj(s, id))))
         : c.kind === "tap"
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
@@ -6802,7 +6802,7 @@ const FOOD: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Food
 export function forageWays(s: GameState, pid: PlayerId, o?: GameObject): { cards: ObjectId[]; foods: ObjectId[] } {
   return {
     cards: player(s, pid).graveyard.filter((id) => id !== o?.id),
-    foods: s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, FOOD, obj(s, id), pid, false) && canBeSacrificed(s, obj(s, id))),
+    foods: s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, FOOD, obj(s, id), pid, false) && canSacrificeForCost(s, obj(s, id))),
   };
 }
 
@@ -7223,7 +7223,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   // A stun counter that can't be removed keeps it tapped, so {Q} can't be paid (rulings on Fear of Sleep Paralysis).
   if (ab.untapSelf && (o.counters.stun ?? 0) > 0 && countersStay(s, o, "stun")) return `${d.name}'s stun counter can't be removed`;
   if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 302.6
-  if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
+  if (ab.sacrificeSelf && o.zone === "battlefield" && !canSacrificeForCost(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
@@ -7248,8 +7248,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
-  // Karn's Sylex: not for an ability that isn't a mana ability.
-  const costLife = (n: number) => (ab.mana ? n : sylexed(s, n));
+  // Karn's Sylex: not for a mana ability; Angel of Jubilation: for any ability.
+  const costLife = (n: number) => sylexed(s, n, !!ab.mana);
   if (lifeCost && costLife(payableLife(s, p.id)) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && costLife(payableLife(s, p.id)) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
@@ -7304,7 +7304,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`, !!ab.mana);
+    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
@@ -7312,7 +7312,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
-  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, ab.mana ? p.life : sylexed(s, p.life))) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, sylexed(s, p.life, !!ab.mana))) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -7624,7 +7624,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab, o, x);
   const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
-  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, (ab.mana ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id))) - halfLife - lifeCost)!;
+  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, sylexed(s, payableLife(s, p.id), !!ab.mana) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -11198,7 +11198,7 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   if (!Number.isInteger(x) || x < 0 || (x > 0 && !parseManaCost(fd.cost).hasX)) return "that isn't a value of X for it";
   // "Morph—Pay 5 life", "Morph—Sacrifice two Mountains" (CR 702.37e, 118.8): paid as it's turned face up; without the
   // choices, only whether it could be.
-  const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up", true) : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
+  const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up", "special") : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
   if (cp) return cp;
   const cost = faceUpManaCost(fd.cost, x);
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to turn it face up (${cost})`;

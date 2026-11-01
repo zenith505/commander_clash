@@ -335,6 +335,16 @@ export function parseCostKeyword(
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, drawCost: true }], text: "Cumulative upkeep—draw a card: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you draw a card for each age counter on it." },
         },
       };
+    // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can
+    // always be paid; what isn't spent empties from the pool as the upkeep step ends (CR 500.4).
+    const adds = /^Cumulative upkeep—Add ((?:\{[WUBRGC]\})+)\.?$/.exec(line);
+    if (adds)
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, addMana: adds[1]! }], text: `Cumulative upkeep—add ${adds[1]}: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you add ${adds[1]} for each age counter on it.` },
+        },
+      };
     const raw = m[1]!.replace(/^Pay /, "").replace(/^\{([WUBRG])\} or \{([WUBRG])\}$/, (x, a: string, b: string) => (a !== b ? `{${a}/${b}}` : x));
     const pay = parsePayCost(raw);
     if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "Sacrifice a creature", ...

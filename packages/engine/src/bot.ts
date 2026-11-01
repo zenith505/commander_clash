@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -240,6 +240,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const left = self?.zone === "battlefield" ? toughness(s, self) - (upkeepFx.selfCounter === "-1/-1" ? n : 0) : 0;
       return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
     }
+    // Braid of Fire: adding the mana costs nothing, so keep it.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.addMana) return [{ type: "chooseMay", player: pid, yes: true }];
     // Psychic Vortex: keep drawing while the library has plenty left and the hand isn't overfull.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.drawCost) {
       const n = s.resolving?.scratch?.n ?? 0;
@@ -1324,7 +1326,7 @@ function faceUpCosts(s: GameState, pid: PlayerId, o: GameObject, costs: Addition
       if (fits.length < c.n || hand.length < c.n + 1) return null;
       out.discard = fits.slice(0, c.n);
     } else if (c.kind === "sacrifice" || c.kind === "returnToHand") {
-      const pool = (c.kind === "sacrifice" ? s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objectMatches(s, c.filter, obj(s, x), pid, false) && canBeSacrificed(s, obj(s, x))) : returnCandidates(s, pid, c))
+      const pool = (c.kind === "sacrifice" ? s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objectMatches(s, c.filter, obj(s, x), pid, false) && canSacrificeForCost(s, obj(s, x))) : returnCandidates(s, pid, c))
         .map((x) => obj(s, x))
         .filter((x) => x.id !== o.id && !x.isCommander && (objIsType(s, x, "Land") ? lands(s, pid) >= 6 + c.n : x.isToken || worth(s, pid, x) <= 3))
         .sort((a, b) => Number(b.tapped) - Number(a.tapped) || worth(s, pid, a) - worth(s, pid, b));
@@ -3032,7 +3034,7 @@ function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, {
   const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));
   return s.battlefield
     .map((x) => obj(s, x))
-    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canBeSacrificed(s, o)))
+    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canSacrificeForCost(s, o)))
     .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
     .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }
@@ -4467,7 +4469,7 @@ function chooseCreatureForMana(s: GameState, pid: PlayerId): Action[] | null {
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       const pool = s.battlefield
         .map((x) => obj(s, x))
-        .filter((x) => controllerOf(s, x) === pid && x.id !== id && !x.isCommander && objIsType(s, x, "Creature") && objectMatches(s, c.filter, x, pid, false) && (c.exile || canBeSacrificed(s, x)))
+        .filter((x) => controllerOf(s, x) === pid && x.id !== id && !x.isCommander && objIsType(s, x, "Creature") && objectMatches(s, c.filter, x, pid, false) && (c.exile || canSacrificeForCost(s, x)))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))
         .slice(0, 3);
       for (const fodder of pool) {

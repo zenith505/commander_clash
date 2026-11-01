@@ -2450,6 +2450,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Search your library, graveyard, and/or outside the game for an instant or sorcery card you own" (Invasion of
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.
+  // Eye of Jace: "sacrifice ~, it deals 2 damage to each opponent, and you gain 2 life": three instructions in order, the
+  // damage from ~ as it last existed (CR 608.2h).
+  text = text.replace(/\b(sacrifice ~), (it deals \d+ damage to each opponent), and (you gain \d+ life)\./, "$1 and $2 and $3.");
+  // Moon Girl and Devil Dinosaur: "until end of turn, ~'s base power and toughness become 6/6 and they gain trample": ~ (one
+  // creature, named in the plural) has that base power and toughness and gains trample until end of turn (layer 7b, CR
+  // 613.4b).
+  text = text.replace(/\buntil end of turn, ~'s base power and toughness become (\d+\/\d+) and (?:they gain|it gains) ([a-z ]+)\./, "until end of turn, ~ has base power and toughness $1 and gains $2.");
+  // Sun-Blessed Mount: "search your library and/or graveyard for a card named Huatli, Dinosaur Knight, reveal it, then put
+  // it into your hand" is the "reveal it, and put it" search (the sentence splitter would break it at ", then").
+  text = text.replace(/\b(search your library and\/or graveyard for a card named [^.]+?, reveal it), then put it into your hand\./i, "$1, and put it into your hand.");
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
   // Karn, the Great Creator: "You may reveal an artifact card you own from outside the game or choose a face-up artifact
   // card you own in exile. Put that card into your hand." Likewise only the exiled card (see zones.ts).
@@ -2961,7 +2971,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     .flatMap((x) => {
       // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
       // Nor under a leading "Unless you sacrifice an Island, ..." (Elder Spawn): both are what happens without it.
-      const m = /^(?:If|[Uu]nless) /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
+      // Nor under "Then if ..." (Eye of Jace: "Then if there are seven or more cards in your graveyard, sacrifice ~, it deals
+      // 2 damage to each opponent, and you gain 2 life"): all of it is conditional.
+      const m = /^(?:If|Then if|[Uu]nless) /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
     })
     // Legion Leadership: "Until end of turn, double target creature's power and it gains first strike": two instructions.
@@ -6241,6 +6253,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Brambleweft Behemoth, and a card named Nissa, Genesis Mage. Reveal those cards, put them into your hand, then
     // shuffle.": both zones together, up to one card for each (any or all of them may be found, rulings, CR 701.23b); a
     // card named Forest is only that, not any Forest (rulings).
+    // Verdant Crescendo: "Search your library for a basic land card and put it onto the battlefield tapped. Search your
+    // library and graveyard for a card named Nissa, Nature's Artisan, reveal it, put it into your hand, then shuffle.": two
+    // searches, one shuffle at the end (the first search's library is the same one); the named card from either zone, or
+    // none if neither has it (CR 701.23b).
+    const firstSearch = /^Search your library for (an? [a-z ]+? card) and put it onto the battlefield( tapped)?$/.exec(s);
+    const namedNext = /^Search your library and graveyard for a card named ([A-Z][^~]*?), reveal it, put it into your hand, then shuffle$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (firstSearch && namedNext) {
+      const filter = parseSearchFilter(firstSearch[1]!.replace(/^an? /, ""));
+      if (!filter) return null;
+      effects.push(
+        { type: "search", filter, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield", ...(firstSearch[2] ? { tapped: true as const } : {}) }, noShuffle: true },
+        { type: "search", filter: { kind: "card", named: namedNext[1]!, text: `card named ${namedNext[1]}` }, n: 1, upTo: false, reveal: true, dest: { zone: "hand" }, andGraveyard: true },
+      );
+      noteLast(ctx, [effects[effects.length - 1]!]);
+      si++;
+      continue;
+    }
     const libAndYard = /^Search your library and graveyard for (an? .+?)(, reveal them, put them into your hand, then shuffle)?$/.exec(s);
     if (libAndYard && (libAndYard[2] || sentences[si + 1]?.replace(/\.$/, "") === "Reveal those cards, put them into your hand, then shuffle")) {
       const parts = libAndYard[1]!.split(/,? and (?=an? )|, (?=an? )/);
@@ -6261,12 +6290,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Darkness and put it onto the battlefield. If you search your library this way, shuffle.": the graveyard and the
     // hand, and the library too if you choose; only then a shuffle (rulings, CR 701.23). Agency Outfitter: "a card named A
     // and/or a card named B and put them onto the battlefield": up to one of each name.
-    const andOrLib = /^(?:([Yy]ou may) )?[Ss]earch your graveyard, hand,? and\/or library for a card named ([A-Z][^,~]*?)(?: and\/or a card named ([A-Z][^,~]*?))? and put (it|them) onto the battlefield$/.exec(s);
-    if (andOrLib && isShuffle(si + 1) && (andOrLib[4] === "them") === !!andOrLib[3]) {
-      const names = [andOrLib[2]!, ...(andOrLib[3] ? [andOrLib[3]] : [])];
+    // Boonweaver Giant: "you may search your graveyard, hand, and/or library for an Aura card and put it onto the battlefield
+    // attached to ~"; Runed Crown: "your library, hand, and/or graveyard for a Rune card": the same three zones (searching
+    // the library is the only choice that matters, it shuffles), the Aura only onto the source, if it could enchant it, or
+    // it stays where it is (rulings, CR 303.4f-g).
+    const andOrLib = /^(?:([Yy]ou may) )?[Ss]earch your (?:graveyard, hand,? and\/or library|library, hand,? and\/or graveyard) for (?:a card named ([A-Z][^,~]*?)(?: and\/or a card named ([A-Z][^,~]*?))?|an? (Aura|Rune) card) and put (it|them) onto the battlefield( attached to ~)?$/.exec(s);
+    if (andOrLib && isShuffle(si + 1) && (andOrLib[5] === "them") === !!andOrLib[3] && !andOrLib[4] === !andOrLib[6]) {
+      const names = andOrLib[2] ? [andOrLib[2], ...(andOrLib[3] ? [andOrLib[3]] : [])] : [];
       if (names.some((n) => / or |\band\b/.test(n))) return null;
-      const filter: TargetSpec = names.length === 1 ? { kind: "card", named: names[0]!, text: `card named ${names[0]}` } : { kind: "card", anyOf: names.map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: names.map((n) => `card named ${n}`).join(" and/or ") };
-      const search: Effect = { type: "search", filter, n: names.length, upTo: names.length > 1, reveal: false, dest: { zone: "battlefield" }, orGraveyard: true, andHand: true, ...(names.length > 1 ? { oneEach: true as const } : {}) };
+      const filter: TargetSpec = andOrLib[4] ? { kind: "card", subtypes: [andOrLib[4]], text: `${andOrLib[4]} card` } : names.length === 1 ? { kind: "card", named: names[0]!, text: `card named ${names[0]}` } : { kind: "card", anyOf: names.map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: names.map((n) => `card named ${n}`).join(" and/or ") };
+      const n = Math.max(1, names.length);
+      const search: Effect = { type: "search", filter, n, upTo: n > 1, reveal: false, dest: { zone: "battlefield", ...(andOrLib[6] ? { attachToSelf: true as const } : {}) }, orGraveyard: true, andHand: true, ...(n > 1 ? { oneEach: true as const } : {}) };
       const fx: Effect = andOrLib[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
       effects.push(fx);
       noteLast(ctx, [fx]);

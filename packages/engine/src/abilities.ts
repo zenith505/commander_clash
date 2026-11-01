@@ -124,7 +124,7 @@ export type Count =
    */
   | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "Different kinds of counters among creatures you control" (Hundred-Battle Veteran): the kinds, each counted once. */ counterKinds?: true; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each different power among creatures you control" (Golden Ratio): each power once. */ differentPowers?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true; /** "The number of creatures attacking them" (Within Range): attacking one of these players themselves, not a planeswalker or battle (CR 506.3, 508.1b). */ attackingWho?: PlayerRef }
   /** "The number of cards in your hand", "in that player's hand". */
-  | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec; /** "Cards with at least six different mana values are revealed" (Atemsis, All-Seeing): how many different mana values (CR 202.3). */ differentManaValues?: true }
+  | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec; /** "Cards with at least six different mana values are revealed" (Atemsis, All-Seeing): how many different mana values (CR 202.3). */ differentManaValues?: true; /** "The number of cards in the hand of the opponent with the most cards in hand" (Adamaro, First to Desire): the largest of those players' hands, not their total. */ most?: true }
   /**
    * "The number of cards in that player's hand minus the number of cards in your hand" (Dark Suspicions), "draw cards
    * equal to the difference" if they have more (Balance of Power): never below 0 (CR 107.1b).
@@ -441,7 +441,7 @@ export type Count =
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
   | { kind: "greatestDrawn" }
   /** "For each player being attacked" (Pack Attack): players a creature is attacking, not their planeswalkers (CR 506.2, 508.3b). */
-  | { kind: "playersAttacked" }
+  | { kind: "playersAttacked"; /** "For each opponent you're attacking" (Astral Confrontation): only opponents a creature you control is attacking (the player, not a planeswalker or battle of theirs, CR 506.2, 508.1b). */ byYou?: true }
   /** "The number of cards you've drawn this turn" (Duelist of the Mind), "they've drawn this turn" (Cerebral Vortex). */
   | { kind: "drawnThisTurn"; who: PlayerRef }
   /** "For each card you've discarded this turn" (Change of Fortune): for any reason, this resolution's too (rulings). */
@@ -527,6 +527,8 @@ export type Count =
     }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
+  /** "Unlocked doors among Rooms you control" (Rampaging Soulrager): the unlocked designations of those Room permanents (CR 709.5c). */
+  | { kind: "unlockedDoors" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
@@ -624,6 +626,8 @@ export interface TargetSpec {
   controlledSinceTurnBegan?: true;
   /** "A card ... that has an Adventure" (Howling Galefang): an adventurer card (CR 715.2), whatever its types. */
   hasAdventure?: true;
+  /** "Aura spells with enchant creature" (Rootwater Shaman): its enchant ability is "enchant creature" itself (CR 702.5a), not a narrower one such as "enchant creature you control". */
+  enchantCreature?: true;
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
   anyOf?: TargetSpec[];
@@ -2034,7 +2038,7 @@ export type StaticCondition =
    * entered under your control this turn, as they entered, even if they've left since; with all of `types`, none of
    * `notTypes`, and `subtype`.
    */
-  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
+  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; /** "An Angel or Berserker" (Cleaving Reaper): either subtype. */ orSubtype?: string; n: number; /** "another": not the source itself (Éowyn, Shieldmaiden). */ other?: true; /** "Last turn" (Ephara, God of the Polis): during the turn before this one (GameState.lastTurn.creaturesEntered; creatures only). */ lastTurn?: true }
   /**
    * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
@@ -4434,6 +4438,8 @@ export type TriggerEvent =
   | "permanentDestroyed"
   /** "Whenever ~ becomes unattached from a permanent" (it leaving too, CR 603.10a): the subject is that permanent. */
   | "selfBecomesUnattached"
+  /** "Whenever ~ becomes attached to a creature" (Enormous Energy Blade): equipped or enchanted onto it, or entering attached to it; the subject is that creature. */
+  | "selfBecomesAttached"
   /** "Whenever an Aura becomes attached to ~" (Brood Keeper): one entering attached to it or moved onto it from something else (rulings); the subject is the Aura. */
   | "auraAttachedToSelf"
   /** "Whenever an Aura you control becomes attached to a creature you control" (Siona, Captain of the Pyleas): entering attached too (rulings). */

@@ -1,7 +1,7 @@
 # Roadmap
 
-28,949 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
+28,985 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,307 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4260,6 +4260,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a permanent is returned to a player's hand, that player ..." (Warped Devotion: its owner). +21 (28,925 of
   31,936 with rounds 230 to 236 and B71 to B73). Also faster: the characteristics cache's count check (it
   was rebuilt as a string on every read) and the state copy, which took the slow Cocoon test from about 5 s to 1 s.
+- Round B75 (one-line templates from the bottom of the list): "Put up to one target ... on top of its owner's library"
+  (Dovin's Dismissal: with its only target illegal it doesn't resolve, CR 608.2b), "reveal it, then put it into your
+  hand" (Sun-Blessed Mount), a search to the battlefield then one of library and graveyard for a named card (Verdant
+  Crescendo), "Search your graveyard, hand, and/or library for an Aura (Rune) card and put it onto the battlefield
+  attached to ~" (Boonweaver Giant, Runed Crown: only an Aura that could enchant it, CR 303.4a), granted outlast
+  (Enduring Sliver, CR 702.107a), "another creature" once each turn (Knight of Wundagore), "creature you control that
+  has an Adventure" (Mysterious Pathlighter), "Aura spells with enchant creature as though they had flash" (Rootwater
+  Shaman: a creature cast bestowed too, CR 702.103b, d), "base power and toughness become N/N and they gain"
+  (Moon Girl and Devil Dinosaur), "sacrifice ~ and it deals ... and you gain" (Eye of Jace), "When you cast ~ while you
+  control a ..." (Social Snub), "gain control of target ..., untap that creature, and it gains haste" (Eldrazi
+  Obligator, Yasova Dragonclaw: a may-pay untap of an untapped creature still gives control and haste, CR 701.26b,
+  609.3), "loses all land types and abilities" (Lithoform Blight, CR 305.7), unlocked doors among Rooms you control
+  (Rampaging Soulrager), "Whenever this Equipment becomes attached to a creature, tap that creature" (Enormous Energy
+  Blade), "Whenever enchanted creature blocks a creature, that creature doesn't untap" (Shield
+  of the Righteous), costs {1} less for each opponent you're attacking (Astral Confrontation), cards in the hand of the opponent
+  with the most (Adamaro, First to Desire), "if you had an X or a Y enter the battlefield under your control this turn"
+  (Cleaving Reaper). Fix: "Then if ..., sacrifice ~ and it deals" put the damage outside the condition. +21 (28,985 of
+  31,936 with rounds 237 to 239).
+- Out after round B75 (looked at, not done): Mishra, Artificer Prodigy (a search for a card with the cast spell's name),
+  Titania, Voice of Gaea's ward ("discard a card or pay {2}"), Fog Patch and Choking Vines ("become blocked"), Mistform
+  Warchief, Vexing Sphinx (cumulative upkeep of discarding), Invoke the Ancients (a counter chosen for each token),
+  Wolfbat, Ronin (sacrificing an attached Equipment as a cost), Tallowisp (an Aura with enchant creature in a search:
+  next, it can reuse Rootwater Shaman's filter).
 - Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
   removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
   as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
@@ -4312,8 +4335,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,
-  minus the names already in ROADMAP and HISTORY). After round B74 about 265 of those are ranked below 25,000 and about
-  440 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
+  minus the names already in ROADMAP and HISTORY). After round B75 about 269 of those are ranked below 25,000 and about
+  412 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of

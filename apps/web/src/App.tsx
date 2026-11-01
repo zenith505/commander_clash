@@ -114,6 +114,7 @@ import {
   teamworkCandidates,
   teamworkPower,
   conspireCandidates,
+  hasConspire,
   dredgeOptions,
   madnessCastOf,
   planSuspend,
@@ -1083,7 +1084,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (evidenceValue(s, candidates) >= compiled.evidence) return setEvidencePick({ draft: d, key: "evidence", label: card.name, n: compiled.evidence, candidates, optional: true });
     }
     // Conspire: you may tap two untapped creatures you control that share a color with it (CR 702.78a).
-    if (d.conspire === undefined && compiled.conspire) {
+    if (d.conspire === undefined && hasConspire(s, HUMAN, s.objects[d.objectId]!)) {
       const candidates = conspireCandidates(s, HUMAN, d.objectId).filter((id) => !d.convoke?.includes(id) && !d.teamwork?.includes(id));
       if (candidates.length >= 2)
         return setCostPick({ draft: d, kind: "conspire", label: card.name, what: "conspire: you may tap two untapped creatures you control that share a color with it to copy it", n: 2, candidates, chosen: [] });
@@ -4692,7 +4693,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> instead of drawing, put one of the top {pending.cards.length === 1 ? "card" : `${pending.cards.length} cards`} of your library into your hand and the rest into your graveyard.
+          <strong>{pending.source}:</strong> instead of drawing, put one of the top {pending.cards.length === 1 ? "card" : `${pending.cards.length} cards`} of your library into your hand and the rest {pending.bottom ? "on the bottom of your library in any order" : "into your graveyard"}.
           {pending.instead ? " Or replace the draw another way:" : ""}
         </span>
         {pending.cards.length < 2 ? (
@@ -4785,6 +4786,21 @@ function Controls({
             </button>
           );
         })}
+      </div>
+    );
+  }
+  if (pending?.kind === "drawInstead" && pending.player === HUMAN) {
+    return (
+      <div className="controls">
+        <span>
+          <strong>Replace this draw:</strong> choose which effect applies instead of drawing a card; the others wait for your next draw this turn
+          {pending.left > 0 ? ` (${pending.left} more draw${pending.left === 1 ? "" : "s"} after this)` : ""}
+        </span>
+        {pending.options.map((choice, i) => (
+          <button key={choice} onClick={() => dispatch([{ type: "drawInstead", player: HUMAN, choice }])}>
+            {pending.labels[i]}
+          </button>
+        ))}
       </div>
     );
   }

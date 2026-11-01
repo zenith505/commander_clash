@@ -1641,7 +1641,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.mustAttackMostLife = true;
       return;
     case "mustAttackPlayer":
-      if (m.player === "chosen" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
+      if (m.player === "chosen" || typeof m.player === "object" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
       if (!c.mustAttack.includes(m.player)) c.mustAttack.push(m.player);
       return;
     case "cantBeBlockedBy":

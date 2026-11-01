@@ -483,6 +483,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "drawEmptyReturn":
       chooseDrawEmptyReturn(s, p, action.objectId);
       break;
+    case "drawInstead":
+      chooseDrawInstead(s, p, action.choice);
+      break;
     case "drawLook":
       chooseDrawLook(s, p, action.objectId, action.instead);
       break;
@@ -1376,8 +1379,9 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
-  // it as it would exist on the battlefield (CR 614.12, rulings).
-  const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
+  // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
+  // Tesak), each instance its own choice.
+  const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
   const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -1715,6 +1719,7 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
     // "Of the chosen quality" (Ashling's Prerogative): chosen as the source entered. "Enchanted player controls"
     // (Radiant Restraints): the player the Aura is attached to now.
     return rules.some((r) => {
+      if (r.cast && !o.wasCast) return false;
       if (r.filter.controller !== "enchanted") return objectMatches(s, bindChosen(r.filter, src.chosen), o, you, false);
       const { controller: _, ...rest } = r.filter;
       return src.attachedToPlayer !== undefined && objectMatches(s, { ...rest, controlledBy: src.attachedToPlayer }, o, you, false);
@@ -2227,59 +2232,18 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
       break;
     }
-    // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their
-    // library. They may play it this turn." The draw doesn't happen (CR 614.6), so an empty library loses nothing. With
-    // other replacements for the same draw, this one applies first (the drawing player's choice, CR 616.1, isn't asked).
-    const urabrask = player(s, pid).nextDrawExiles?.findIndex((x) => x.turn === s.turn) ?? -1;
-    if (urabrask >= 0) {
-      const p = player(s, pid);
-      const { source } = p.nextDrawExiles!.splice(urabrask, 1)[0]!;
-      p.nextDrawExiles = p.nextDrawExiles!.filter((x) => x.turn === s.turn);
-      if (!p.nextDrawExiles.length) p.nextDrawExiles = undefined;
+    // Shields for the next draw this turn: Urabrask, Heretic Praetor's exile and the Words' tokens or life. The draw
+    // doesn't happen (CR 614.6). With different ones waiting, the drawing player chooses which applies to this draw (CR
+    // 616.1, the Words' rulings); the others wait for the next draw.
+    const shields = drawShields(s, pid);
+    if (shields.length) {
       if (made.length) made.shift();
       else n--;
-      const top = p.library[0];
-      if (top === undefined) {
-        log(s, `${p.name} would draw a card; ${source} replaces it, and their library is empty.`);
-        continue;
+      if (shields.length > 1) {
+        s.pending = { kind: "drawInstead", player: pid, options: shields.map((x) => x.key), labels: shields.map((x) => x.label), left: n, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}) };
+        return false;
       }
-      moveObject(s, top, "exile");
-      const o = obj(s, top);
-      o.mayPlay = { player: pid, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
-      log(s, `${p.name} exiles ${nameOf(s, top)} from the top of their library instead of drawing, and may play it this turn (${source}).`);
-      continue;
-    }
-    // The Words (Words of Wilding, Words of Worship): "The next time you would draw a card this turn, create a 2/2 green
-    // Bear creature token (you gain 5 life) instead." The draw doesn't happen (CR 614.6), so an empty library loses nothing
-    // (CR 614.11); a draw in the middle of several is replaced before the rest are drawn (CR 614.11a). With several
-    // Words waiting, the drawing player would choose which one applies (rulings, CR 616.1): the oldest is used first.
-    const words = player(s, pid).nextDrawInstead?.findIndex((x) => x.turn === s.turn) ?? -1;
-    if (words >= 0) {
-      const p = player(s, pid);
-      const w = p.nextDrawInstead!.splice(words, 1)[0]!;
-      p.nextDrawInstead = p.nextDrawInstead!.filter((x) => x.turn === s.turn);
-      if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
-      if (made.length) made.shift();
-      else n--;
-      if (w.gain !== undefined) {
-        log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
-        gainLife(s, pid, w.gain);
-      }
-      if (w.token) {
-        const token = w.token;
-        const { same, extra } = tokenBatch(s, pid, token, 1);
-        enterTogether(s, () => {
-          const made: GameObject[] = [];
-          for (let i = 0; i < same; i++) made.push(createToken(s, pid, token));
-          // Created by that Words' ability, not by whatever spell or ability is resolving now.
-          for (const t of made) {
-            if (w.sourceId !== undefined) t.createdWith = { id: w.sourceId, zc: w.sourceZc ?? 0 };
-            else delete t.createdWith;
-          }
-          createExtraTokens(s, pid, extra);
-        });
-        log(s, `${p.name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
-      }
+      applyDrawShield(s, pid, shields[0]!.key);
       continue;
     }
     // Notion Thief: this draw is skipped and its controller draws instead.
@@ -2339,20 +2303,27 @@ function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep"
   const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
   const instead = archives || dredge.length || abundance ? { ...(archives ? { archive: 2 } : {}), ...(dredge.length ? { dredge } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}) } : undefined;
   if (cards.length > 1 || instead) {
-    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
+    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}), ...(abilitiesOf(s, obj(s, src)).drawDigBottom ? { bottom: true as const } : {}) };
     return "paused";
   }
-  keepOne(s, p, nameOf(s, src), cards, cards[0]);
+  keepOne(s, p, nameOf(s, src), cards, cards[0], abilitiesOf(s, obj(s, src)).drawDigBottom);
   return true;
 }
 
-function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], keep?: ObjectId) {
+/** The look of digInstead: `keep` into the hand, the rest into the graveyard, or (`bottom`) onto the bottom of the library, returned to be ordered. */
+function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], keep?: ObjectId, bottom?: true): ObjectId[] {
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   log(s, cards.length ? `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${source}).` : `${p.name} would draw from an empty library; ${source} replaces it, so nothing happens.`);
   if (keep !== undefined) moveObject(s, keep, "hand");
   const rest = cards.filter((id) => id !== keep);
+  if (bottom) {
+    for (const id of rest) p.library.push(...p.library.splice(p.library.indexOf(id), 1));
+    if (cards.length) log(s, `${p.name} puts a card into their hand${rest.length ? ` and ${rest.length === 1 ? "the other" : `the other ${rest.length}`} on the bottom of their library` : ""}.`);
+    return rest;
+  }
   for (const id of rest) moveObject(s, id, "graveyard");
   if (cards.length) log(s, `${p.name} puts a card into their hand${rest.length ? ` and ${rest.map((id) => nameOf(s, id)).join(", ")} into their graveyard` : ""}.`);
+  return [];
 }
 
 /**
@@ -2568,7 +2539,12 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
     if (pend.cards.length > 1 && (id === undefined || !pend.cards.includes(id))) throw new RulesError("that isn't one of the cards");
     if (pend.cards.some((c) => !p.library.includes(c))) throw new RulesError("those cards moved");
     s.pending = null;
-    keepOne(s, p, pend.source, pend.cards, id ?? pend.cards[0]);
+    const rest = keepOne(s, p, pend.source, pend.cards, id ?? pend.cards[0], pend.bottom);
+    // Tomorrow: its player orders the cards put on the bottom, then the draws go on.
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: p.id, cards: rest, bottom: true, source: pend.source, thenDraw: { left: pend.left, made, ...(pend.after ? { after: pend.after } : {}) } };
+      return;
+    }
   }
   continueDraws(s, p.id, pend.left, pend.after, made);
 }
@@ -2773,6 +2749,85 @@ export function drawStepDrawn(s: GameState) {
 }
 
 /** The draws left after one was replaced, then whatever was drawing: the draw step, or a resolving spell or ability. */
+/**
+ * The different shields waiting to replace `pid`'s next draw this turn (Player.nextDrawExiles, Player.nextDrawInstead),
+ * one for each different result: "exile" for Urabrask's, "words:<index>" for the oldest of each kind of Words' shield.
+ */
+export function drawShields(s: GameState, pid: PlayerId): { key: string; label: string }[] {
+  const p = player(s, pid);
+  const out: { key: string; label: string }[] = [];
+  const urabrask = p.nextDrawExiles?.find((x) => x.turn === s.turn);
+  if (urabrask) out.push({ key: "exile", label: `Exile the top card of your library; you may play it this turn (${urabrask.source})` });
+  const seen = new Set<string>();
+  (p.nextDrawInstead ?? []).forEach((w, i) => {
+    if (w.turn !== s.turn) return;
+    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null]);
+    if (seen.has(kind)) return;
+    seen.add(kind);
+    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : ""].filter(Boolean).join(" and ");
+    out.push({ key: `words:${i}`, label: `${what.charAt(0).toUpperCase()}${what.slice(1)} (${w.source})` });
+  });
+  return out;
+}
+
+/** One of drawShields' shields replaces a draw of `pid`'s (CR 614.6), and is used up. */
+function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
+  const p = player(s, pid);
+  if (key === "exile") {
+    // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of
+    // their library. They may play it this turn." An empty library loses nothing.
+    const urabrask = p.nextDrawExiles!.findIndex((x) => x.turn === s.turn);
+    const { source } = p.nextDrawExiles!.splice(urabrask, 1)[0]!;
+    p.nextDrawExiles = p.nextDrawExiles!.filter((x) => x.turn === s.turn);
+    if (!p.nextDrawExiles.length) p.nextDrawExiles = undefined;
+    const top = p.library[0];
+    if (top === undefined) {
+      log(s, `${p.name} would draw a card; ${source} replaces it, and their library is empty.`);
+      return;
+    }
+    moveObject(s, top, "exile");
+    const o = obj(s, top);
+    o.mayPlay = { player: pid, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+    log(s, `${p.name} exiles ${nameOf(s, top)} from the top of their library instead of drawing, and may play it this turn (${source}).`);
+    return;
+  }
+  // The Words (Words of Wilding, Words of Worship): "The next time you would draw a card this turn, create a 2/2 green
+  // Bear creature token (you gain 5 life) instead." An empty library loses nothing (CR 614.11); a draw in the middle of
+  // several is replaced before the rest are drawn (CR 614.11a).
+  const w = p.nextDrawInstead!.splice(Number(key.slice("words:".length)), 1)[0]!;
+  p.nextDrawInstead = p.nextDrawInstead!.filter((x) => x.turn === s.turn);
+  if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
+  if (w.gain !== undefined) {
+    log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
+    gainLife(s, pid, w.gain);
+  }
+  if (w.token) {
+    const token = w.token;
+    const { same, extra } = tokenBatch(s, pid, token, 1);
+    enterTogether(s, () => {
+      const made: GameObject[] = [];
+      for (let i = 0; i < same; i++) made.push(createToken(s, pid, token));
+      // Created by that Words' ability, not by whatever spell or ability is resolving now.
+      for (const t of made) {
+        if (w.sourceId !== undefined) t.createdWith = { id: w.sourceId, zc: w.sourceZc ?? 0 };
+        else delete t.createdWith;
+      }
+      createExtraTokens(s, pid, extra);
+    });
+    log(s, `${p.name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
+  }
+}
+
+/** Answers PendingDecision "drawInstead": the shield that replaces this draw; the draws after it go on. */
+function chooseDrawInstead(s: GameState, p: Player, choice: string) {
+  const pend = s.pending;
+  if (pend?.kind !== "drawInstead" || pend.player !== p.id) throw new RulesError("no draw to replace");
+  if (!pend.options.includes(choice)) throw new RulesError("choose one of the replacement effects");
+  s.pending = null;
+  applyDrawShield(s, p.id, choice);
+  continueDraws(s, p.id, pend.left, pend.after, [...(pend.made ?? [])]);
+}
+
 export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
   if (!draw(s, pid, left, after, made, true)) return;
   if (after === "drawStep") drawStepDrawn(s);
@@ -4025,6 +4080,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
+  // Possibility Technician: only while that player controls a Kavu.
+  if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
   if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
   // Chandra, Hope's Beacon: only a card with a face that is a spell of this kind.
@@ -6095,6 +6152,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       }
       // Its caster would choose a permission that doesn't exile the spell afterwards over one that does (Jaya Ballard's
       // emblem), and one with no cost on top or counter as it enters over one with them (Noctis, Prince of Lucis).
+      // Jump-start it already has (CR 702.133a): another instance changes nothing.
+      if (g.way.kind === "jumpStart" && compileCard(d).fromGraveyard?.some((w) => w.kind === "jumpStart")) continue;
       const had = out.findIndex((w) => w.kind === g.way.kind);
       if (had >= 0 && g.way.kind === "permission" && permissionBurden(g.way) < permissionBurden(out[had]!)) out.splice(had, 1);
       else if (had >= 0 || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
@@ -6299,10 +6358,24 @@ function teamworkProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
   return null;
 }
 
+/**
+ * Does `o`, cast by `pid`, have conspire (CR 702.78a)? Its own, or from a permanent `pid` controls ("each noncreature
+ * spell you cast has conspire", Raiding Schemes), by its printed characteristics as a spell; "from exile" (Rassilon) is
+ * where it's cast from. Two instances, each its own cost and copy (CR 702.78b), aren't modeled: one at most.
+ */
+export function hasConspire(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (compileCard(d).conspire) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConspire ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
+  });
+}
+
 /** Creatures `pid` could tap for conspire: untapped creatures they control that share a color with the spell (CR 702.78a). */
 export function conspireCandidates(s: GameState, pid: PlayerId, spell: ObjectId): ObjectId[] {
   const o = obj(s, spell);
-  if (!compileCard(defOf(s, o)).conspire) return [];
+  if (!hasConspire(s, pid, o)) return [];
   const colors = defOf(s, o).colors;
   return s.battlefield.filter((id) => {
     const c = obj(s, id);
@@ -6313,7 +6386,7 @@ export function conspireCandidates(s: GameState, pid: PlayerId, spell: ObjectId)
 function conspireProblem(s: GameState, pid: PlayerId, spell: ObjectId, choices?: CostChoices, convoke?: ObjectId[]): string | null {
   const ids = choices?.conspire;
   if (ids === undefined || !ids.length) return null;
-  if (!compileCard(defOf(s, obj(s, spell))).conspire) return `${nameOf(s, spell)} doesn't have conspire`;
+  if (!hasConspire(s, pid, obj(s, spell))) return `${nameOf(s, spell)} doesn't have conspire`;
   if (ids.length !== 2 || ids[0] === ids[1]) return "conspire taps two untapped creatures you control";
   const ok = conspireCandidates(s, pid, spell);
   if (ids.some((id) => !ok.includes(id))) return "conspire taps untapped creatures you control that share a color with it";
@@ -6449,6 +6522,12 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
     if (choices.viaWay) return choices.viaWay.costs;
     const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
     if (s && o?.zone === "graveyard") return graveyardWay(s, o, "permission", pid)?.costs;
+  }
+  // Jump-start a permanent gave the card (Niv-Mizzet, Supreme): that way's discard, the card having none of its own.
+  if (choices?.via === "jumpStart" && !graveyardCast(d, "jumpStart")) {
+    if (choices.viaWay) return choices.viaWay.costs;
+    const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+    if (s && o?.zone === "graveyard") return graveyardWay(s, o, "jumpStart", pid)?.costs;
   }
   return graveyardCast(d, choices?.via)?.costs;
 }
@@ -6963,10 +7042,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       closeZoneBatch(s);
     } else if (c.kind === "sacrifice" && c.exile) {
       for (const id of choices.sacrifice ?? []) {
-        // "The exiled creature's mana value" (Food Chain): as it last existed (CR 608.2h).
+        // "The exiled creature's mana value" (Food Chain), "if the exiled creature was a Thrull" (Soul Exchange): as it
+        // last existed (CR 608.2h).
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} exiles ${nameOf(s, id)}.`);
         moveObject(s, id, "exile");
         // "Cards exiled with ~" (Mechtitan Core): the cards it became in exile (CR 400.7); a token is gone (CR 704.5d).

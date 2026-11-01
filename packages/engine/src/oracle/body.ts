@@ -108,6 +108,10 @@ export interface Ctx {
   lastPut?: boolean;
   /** The last sentence manifested one card ("manifest dread"): "that creature" is the face-down 2/2 (CR 701.40a, 701.62a). */
   lastManifested?: boolean;
+  /** A "whenever players finish voting" trigger (Erestor of the Council): its body may read the votes. */
+  votesEvent?: boolean;
+  /** The last sentence was "choose a creature you control" (a pick, not a target): "its" is that creature (Goliath Hatchery). */
+  lastChosen?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
   /** The last sentence created one Equipment token: "Attach it to ~" (U.S.Agent, John Walker) means it. */
@@ -215,6 +219,8 @@ function thenSubject(first: string, next: string): string {
   // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
   // battlefield": the same owner.
   if (/^~'s owner draws /.test(first) && /^that player may put /.test(next)) return `~'s owner ${next.slice("that player ".length)}`;
+  // Cait, Cage Brawler: "you and defending player each draw a card, then discard a card": the same two players.
+  if (/^[Yy]ou and defending player each draw /.test(first) && /^discard /.test(next)) return `You and defending player each ${next}`;
   // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
   if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
   // Rolling Hamsphere: "create three 1/1 red Hamster creature tokens, then it deals X damage to any target": the tokens
@@ -909,7 +915,7 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
   return undefined;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // Vildin-Pack Alpha: "Whenever a Werewolf you control enters, you may transform it": the whole instruction, about the
   // permanent that entered while it's still that object (CR 400.7); one that can't transform doesn't (CR 701.27c).
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
@@ -1012,7 +1018,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
@@ -1229,6 +1235,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
     ...(opts.clashed ? { clashed: true } : {}),
     ...(opts.discardBatch ? { discardBatch: true } : {}),
+    ...(opts.votesEvent ? { votesEvent: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -2766,6 +2773,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
   // votes nobody sees until all are made), not two.
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
+  // Galadriel, Elven-Queen: "the Ring tempts you, then you put a +1/+1 counter on your Ring-bearer": you do both, in order.
+  text = text.replace(/\bthe Ring tempts you, then you put /g, "the Ring tempts you, then put ");
   // Ifrit, Warden of Inferno: "If ~ has three or more lore counters on it, exile it, then return it ...": "it" is ~.
   text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
@@ -3210,6 +3219,41 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!reflexive || filter?.kind !== "object") return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacMany[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, xSacrificed: true }] });
+      si++;
+      continue;
+    }
+    // Vault 21: House Gambit: "For each of those cards that has the same mana value as another card revealed this way,
+    // create a Treasure token": the revealed cards whose mana value another revealed card has (X is 0, rulings).
+    const sharedMv = last?.type === "revealFromHand" && !last.bottom && !last.one ? /^For each of those cards that has the same mana value as another card revealed this way, (create an? .+ token)$/.exec(s) : null;
+    if (sharedMv) {
+      const made = parseOne(capital(sharedMv[1]!), ctx);
+      if (made?.length !== 1 || made[0]!.type !== "createToken" || made[0]!.n !== 1) return null;
+      effects.push({ ...made[0]!, n: { count: { kind: "revealedSharedMv" } } });
+      continue;
+    }
+    // Augusta, Order Returned: "each player exiles a card from their graveyard. When one or more nonland cards are exiled
+    // this way, put that many +1/+1 counters on target attacking creature.": a reflexive trigger (CR 603.12) only if one
+    // or more of the cards exiled are nonland cards, its target chosen then (rulings), X counted as it triggers.
+    const yardEach = last?.type === "chooseFromGraveyard" && last.dest === "exile" && last.who?.ref === "eachPlayer" ? /^When one or more (nonland )?cards are exiled this way, (.+ that many .+)$/.exec(s) : null;
+    if (yardEach) {
+      const filter = yardEach[1] ? parseSearchFilter("nonland card") : undefined;
+      const reflexive = filter !== null ? reflexiveBody(yardEach[2]!.replace(/\bthat many\b/, "X"), ctx, false, false, true) : null;
+      if (!reflexive || filter === null) return null;
+      const count = { count: { kind: "yardChosenThisWay" as const, ...(filter ? { filter } : {}) } };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: count, min: 1 }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${yardEach[2]}.` }, xAmount: count }] });
+      continue;
+    }
+    // Nyssa of Traken: "sacrifice any number of artifacts. When you sacrifice one or more artifacts this way, tap up to that
+    // many target creatures and draw that many cards.": none too; the reflexive trigger (CR 603.12) only if one or more
+    // were sacrificed, with up to as many targets, chosen then; the cards drawn don't depend on the targets (rulings).
+    const sacAny = /^[Ss]acrifice any number of ([a-z]+s)$/.exec(s);
+    const sacAnyWhen = sacAny && new RegExp(`^When you sacrifice one or more ${sacAny[1]} this way, (.+)$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (sacAny && sacAnyWhen) {
+      const filter = parseTargetPhrase(`${sacAny[1]!.replace(/s$/, "")} you control`);
+      const reflexive = filter?.kind === "object" ? reflexiveBody(sacAnyWhen[1]!.replace(/\bthat many\b/g, "X"), ctx, false, false, true) : null;
+      if (!reflexive || filter?.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacAny[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${sacAnyWhen[1]}.` }, xSacrificed: true }] });
       si++;
       continue;
     }
@@ -6828,6 +6872,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!r) return null;
       effects.push({ type: "revealTop", ...(atRandom ? { randomFromHand: true as const } : {}) }, r.effect);
       si = r.next - 1;
+      continue;
+    }
+    // Cait, Cage Brawler: "Whenever ~ attacks, you and defending player each draw a card, then discard a card": each draws,
+    // then each chooses a card in APNAP order and they're discarded at once (CR 101.4). "Put two +1/+1 counters on ~ if you
+    // discarded the card with the greatest mana value among those cards or tied for greatest": among the cards discarded so.
+    const youAndDefending = !ctx.spell ? /^You and defending player each (draw|discard) a card$/i.exec(s) : null;
+    if (youAndDefending) {
+      const who = { ref: "youAndEventPlayer" as const };
+      effects.push(youAndDefending[1] === "draw" ? { type: "draw", who, n: 1 } : { type: "discard", who, n: 1, random: false });
+      continue;
+    }
+    const greatestDiscard = !ctx.spell ? /^(Put .+ on ~) if you discarded the card with the greatest mana value among those cards or tied for greatest$/.exec(s) : null;
+    if (greatestDiscard) {
+      const last = effects[effects.length - 1];
+      const inner = parseOne(greatestDiscard[1]!, ctx);
+      if (last?.type !== "discard" || last.who.ref !== "youAndEventPlayer" || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "youDiscardedGreatestMv" }, effects: inner });
       continue;
     }
     // Keen Duelist: "you and target opponent each reveal the top card of your library. You each lose life equal to the mana
@@ -13902,6 +13963,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
     ctx.lastManifested = faceDown && last.count === 1;
+    ctx.lastChosen = last?.type === "pick" && last.action === "choose" && last.n === 1 && last.who.ref === "you" && !last.among && !last.anyNumber;
     ctx.lastCreatedEquipment = last?.type === "createToken" && last.n === 1 && !!last.token.subtypes?.includes("Equipment") && !last.attachTo;
     ctx.lastCreatedCreature = last?.type === "createToken" && last.n === 1 && last.token.types.includes("Creature") && !last.attachTo;
     // The creature that player chose is "that creature" (Imperial Edict).

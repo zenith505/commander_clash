@@ -2094,6 +2094,8 @@ export interface AttackCostDue {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Whenever players finish voting" (Erestor of the Council): the votes cast (CR 701.38). */
+  votes?: { voter: PlayerId; choice: string }[];
   /** "Whenever you roll one or more dice": the highest of the dice's results ("if any of those results was 10 or higher", Farideh). */
   rollMax?: number;
   /** A "whenever you clash" trigger: whether that player won that clash ("If you won, ...", CR 701.30d). */

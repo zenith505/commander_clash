@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile" | /** Nulltread Gargantuan: "put a creature you control on top of its owner's library". */ "libraryTop";
+export type PickAction = /** Indominus Rex, Alpha: cards in hand discarded as it enters. */ "discard" | "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile" | /** Nulltread Gargantuan: "put a creature you control on top of its owner's library". */ "libraryTop";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -152,6 +152,12 @@ export type Count =
   | { kind: "affectedControllerHand" }
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
+  /** Erestor of the Council: "the number of opponents who voted for a choice you didn't vote for" in the vote that triggered it (an opponent may count both ways, rulings). */
+  | { kind: "opponentsVotedOtherwise" }
+  /** Vault 21: House Gambit: "for each of those cards that has the same mana value as another card revealed this way": the cards revealed from hand whose mana value another of them shares (X is 0, rulings). */
+  | { kind: "revealedSharedMv" }
+  /** Augusta, Order Returned: "when one or more nonland cards are exiled this way, put that many ...": the cards the chooseFromGraveyard before moved (ResolvingState.yardChosen), only those like `filter`. */
+  | { kind: "yardChosenThisWay"; filter?: TargetSpec }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
@@ -278,6 +284,8 @@ export type Count =
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
+  /** Goliath Hatchery: "its total toxic value": the sum of the N of its toxic abilities (CR 702.164b), 0 if it's gone. */
+  | { kind: "toxicValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
   | { kind: "colorsOf"; of: ObjRef }
   /** "The damage already dealt to it this turn" (Whipkeeper): all of it, since it became that object, even if regeneration removed it (rulings). */
@@ -1279,6 +1287,10 @@ export type PlayerRef =
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
+  /** Cait, Cage Brawler: "you and defending player": you, then the trigger's player, in APNAP order (CR 101.4). */
+  | { ref: "youAndEventPlayer" }
+  /** Erestor of the Council: "each opponent who voted for a choice you voted for" in the vote that triggered it. */
+  | { ref: "votedWithYou" }
   /** "Each of those opponents" (Breeches, Brazen Plunderer): the players a "one or more ... deal damage to your opponents" event was about (TriggerEventInfo.players). */
   | { ref: "eventPlayers" }
   /** "That attacking player" (Breena): the player who attacked, for "playerAttacksYourOpponent" (TriggerEventInfo.attacker). */
@@ -2092,6 +2104,8 @@ export type StaticCondition =
   | { kind: "opponentGraveyard"; n: number; /** "If a graveyard has twenty or more cards in it" (Visions of Beyond): yours too. */ anyone?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true; /** "If no creatures attacked this turn" (Charging Cinderhorn): any player's attack. */ anyone?: true }
+  /** "If ~ has dealt 3 or more damage this turn" (Chandra, Fire of Kaladesh): the total this object dealt this turn. */
+  | { kind: "selfDealtDamageThisTurn"; n: number }
   /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */
   | { kind: "activatedLoyaltyThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
@@ -2478,7 +2492,7 @@ export type Effect =
    * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
    * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
+  | { type: "revealFromHand"; filter?: TargetSpec; /** "Reveal up to five nonland cards from your hand" (Vault 21: House Gambit): at most this many. */ max?: number; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; /** Hypnox: "exile all cards from target opponent's hand": that player's instead of yours. */ who?: PlayerRef; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean }
   /**
@@ -4027,7 +4041,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -4056,6 +4070,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string; /** "If it was kicked twice" (Archangel of Wrath): at least this many kicker costs paid. */ times?: number }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** Cait, Cage Brawler: "if you discarded the card with the greatest mana value among those cards or tied for greatest": among the cards discarded while this resolves. */
+  | { kind: "youDiscardedGreatestMv" }
   /** "If this ability has been activated four or more times this turn" (Dragon Whelp): this activated ability, counted as it resolves (rulings). */
   | { kind: "activatedTimes"; n: number }
   /** "Exile up to one target creature card from a graveyard. If you exiled a card this way, ..." (Ardyn): target `index` is now in exile, moved there by this (CR 400.7). */
@@ -4448,6 +4464,8 @@ export type TriggerEvent =
   | "ringTemptsYou"
   /** "Whenever you choose a creature as your Ring-bearer". */
   | "youChooseRingBearer"
+  /** "Whenever players finish voting" (Erestor of the Council, CR 701.38): after each vote, the votes in the event. */
+  | "playersFinishVoting"
   | "anotherCreatureYouControlEnters"
   | "landYouControlEnters" // landfall: "Whenever a land you control enters"
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
@@ -5898,6 +5916,12 @@ export interface CompiledCard {
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */
   entersDiscardHand?: true;
+  /**
+   * Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
+   * card discarded this way has flying. The same is true for ...": a counter of each of these keywords (CR 122.1b) that a
+   * discarded card has, one of each kind however many cards have it (rulings).
+   */
+  entersDiscardKeywords?: string[];
   /** Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked" (rulings: no trigger, CR 614.1c). */
   entersMillPerKick?: number;
   /**
@@ -6010,7 +6034,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */

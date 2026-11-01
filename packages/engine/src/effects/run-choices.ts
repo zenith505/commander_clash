@@ -796,6 +796,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
             : e.cond.kind === "sacrificedSubtype"
             ? ((k, c) => !!k && (!!k.allCreatureTypes || [c.subtype, ...(c.orSubtypes ?? [])].some((t) => !!k.subtypes?.includes(t))))(ctx.sacrificed?.[0], e.cond)
+            : e.cond.kind === "youDiscardedGreatestMv"
+            ? ((ids) => {
+                const mv = (id: ObjectId) => characteristics(s, s.objects[id]!).manaValue;
+                const top = Math.max(...ids.map(mv));
+                return ids.some((id) => s.objects[id]!.owner === ctx.controller && mv(id) === top);
+              })((s.resolving!.discardedAll ?? []).filter((id) => !!s.objects[id]))
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "activatedTimes"

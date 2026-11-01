@@ -621,6 +621,13 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
     case "eventPlayers":
       return s.turnOrder.filter((p) => ctx.event?.players?.includes(p) && !player(s, p).lost);
+    case "votedWithYou": {
+      const votes = ctx.event?.votes ?? [];
+      const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
+      return opponents(s, ctx.controller).filter((p) => votes.some((v) => v.voter === p && mine.has(v.choice)));
+    }
+    case "youAndEventPlayer":
+      return s.turnOrder.filter((p) => (p === ctx.controller || p === ctx.event?.player) && !player(s, p).lost);
     case "attackingPlayer":
       return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":

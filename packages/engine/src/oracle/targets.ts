@@ -152,6 +152,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Gremlin Infestation: "enchanted artifact's controller", in a permanent's own ability.
   if (/^enchanted (?:artifact|creature|enchantment|land|permanent)'s controller$/.test(x) && !ctx.spell) return { ref: "hostController" };
   if (x === "each opponent") return { ref: "eachOpponent" };
+  // Erestor of the Council: "each opponent who voted for a choice you voted for", in the vote that triggered it.
+  if (x === "each opponent who voted for a choice you voted for" && ctx.votesEvent) return { ref: "votedWithYou" };
   if (x === "each player") return { ref: "eachPlayer" };
   // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
   // the player it targets, or the planeswalker's controller.
@@ -452,6 +454,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   // "Return Trusty Boomerang to its owner's hand" in an ability it gives: that Equipment (grants.ts binds it).
   if (x === "\u27easource\u27eb") return { ref: "grantSource" };
+  // Galadriel, Elven-Queen: "put a +1/+1 counter on your Ring-bearer": the controller's, none without one (CR 701.54a).
+  if (/^your Ring-bearer$/.test(x) && !ctx.spell) return { ref: "ringBearer" };
   if (ctx.subjectIt && /^that (land|artifact|enchantment|planeswalker|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
   // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
   if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };

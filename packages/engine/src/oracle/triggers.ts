@@ -3341,6 +3341,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(text.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
   }
+  // Erestor of the Council: "Whenever players finish voting, ..." (CR 701.38): its body reads the votes cast.
+  const votesDone = /^Whenever players finish voting, (.+)$/.exec(line);
+  if (votesDone) {
+    const body = parseBody(votesDone[1]!, { votesEvent: true });
+    return body ? { event: "playersFinishVoting", body } : "fail";
+  }
+  // Kitt Kanto, Mayhem Diva: "At the beginning of combat on each player's turn, ... target creature that player controls
+  // ...": every turn's beginning of combat (CR 507.1), "that player" the active player.
+  const eachCombatThat = /^At the beginning of combat on each player's turn, (.+\bthat player\b.+)$/.exec(line);
+  if (eachCombatThat) {
+    const body = parseBody(eachCombatThat[1]!, { eventPlayer: true });
+    return body ? { event: "eachBeginCombat", body } : "fail";
+  }
   // Black Vise, The Rack: "At the beginning of the chosen player's upkeep, ..." of a permanent that chose a player as it
   // entered (CR 614.12): an "each upkeep" trigger only on that player's turn; "that player" and "their" are that player.
   // Archivist of Gondor: "At the beginning of the monarch's end step, that player draws a card": an "each end step" trigger

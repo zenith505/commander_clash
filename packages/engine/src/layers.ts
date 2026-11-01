@@ -825,6 +825,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ok = !!other && (!cond.withKeyword || !!chars.get(other.id)?.keywords.some((k) => sameCI(k, cond.withKeyword!)));
       return ok !== !!cond.not;
     }
+    case "selfDealtDamageThisTurn": {
+      const key = `${sourceId}@${s.objects[sourceId]?.zoneChanges ?? 0}`;
+      return Object.values(s.turnLog?.sourceDamage ?? {}).reduce((n, byKey) => n + (byKey[key] ?? 0), 0) >= cond.n;
+    }
     case "attackedThisTurn":
       return (cond.anyone ? s.turnOrder.some((p) => s.players[p]!.attackedTurn === s.turn) : s.players[you]?.attackedTurn === s.turn) !== !!cond.not;
     case "activatedLoyaltyThisTurn":

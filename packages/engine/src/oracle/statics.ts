@@ -873,6 +873,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   // Hazoret, Godseeker: "~ can't attack or block unless you have max speed" (CR 702.179e: speed 4).
   if (text === "you have max speed") return { kind: "maxSpeed" };
+  // Chandra, Fire of Kaladesh: "If ~ has dealt 3 or more damage this turn": all the damage this object dealt this turn,
+  // to anything, under any controller (TurnLog.sourceDamage, by the object it is now, CR 400.7).
+  if ((m = new RegExp(`^~ has dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "selfDealtDamageThisTurn", n: num(m[1]!) };
   // Heroic Return: "~ costs {2} less to cast if a creature is attacking you": attacking you, not a planeswalker you control
   // (CR 506.3).
   if (text === "a creature is attacking you") return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingYou", text: "creatures attacking you" } } }, min: 1 };

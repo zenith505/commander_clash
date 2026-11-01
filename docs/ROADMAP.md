@@ -1,6 +1,6 @@
 # Roadmap
 
-28,938 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,949 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
 9,979 (93%).
 
@@ -1520,6 +1520,34 @@ line blocks.
    Cosmos); "that opponent may pay {X}, where X is the number of cards in their hand. If they don't, they can't attack
    you this combat" (Champions of Minas Tirith: that combat phase only, not their planeswalkers, per the rulings). +13
    (28,938 of 31,936 with B71-B74).
+   Round 238 (top of the list, now done): "the Ring tempts you, then you put a +1/+1 counter on your Ring-bearer" after
+   a will of the council vote (Galadriel, Elven-Queen: ObjRef ringBearer); "If you attacked this turn, you may have ~
+   enter as a copy" (Protean Raider, entersAsCopy ifAttacked); "~ has dealt 3 or more damage this turn" and the −7's
+   "Each player dealt damage this way gets an emblem" (Chandra, Fire of Kaladesh: StaticCondition
+   selfDealtDamageThisTurn from TurnLog.sourceDamage); "you and defending player each draw a card, then discard a card
+   ... if you discarded the card with the greatest mana value among those cards or tied for greatest" (Cait, Cage
+   Brawler); "each player exiles a card from their graveyard. When one or more nonland cards are exiled this way, put
+   that many +1/+1 counters" (Augusta, Order Returned: Count yardChosenThisWay, reflexive CR 603.12); "sacrifice any
+   number of artifacts. When you sacrifice one or more artifacts this way, tap up to that many target creatures and
+   draw that many cards" (Nyssa of Traken); "At the beginning of combat on each player's turn ... target creature that
+   player controls" (Kitt Kanto, Mayhem Diva: trigger eachBeginCombat with the event player); "choose a creature you
+   control, then draw cards equal to its total toxic value" (Goliath Hatchery: Count toxicValue, CR 702.164b); "As ~
+   enters, discard any number of creature cards. It enters with a flying counter on it if a card discarded this way has
+   flying. The same is true for ..." (Indominus Rex, Alpha: enters choice discardKeywords, a pickPermanents "discard"
+   prompt with a browser test, CR 614.12 and 122.1b); "Reveal up to five nonland cards from your hand. For each of
+   those cards that has the same mana value as another card revealed this way, create a Treasure" (Vault 21: House
+   Gambit, Count revealedSharedMv); "Whenever players finish voting, each opponent who voted for a choice you voted for
+   ... the number of opponents who voted for a choice you didn't vote for" (Erestor of the Council: trigger
+   playersFinishVoting, PlayerRef votedWithYou, Count opponentsVotedOtherwise). +11 (28,949 of 31,936 with B71-B74).
+   Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
+   Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
+   Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
+   searches, one land under your control); Quest for Ula's Temple (a may-reveal of a looked-at card); Arlinn, the
+   Pack's Hope (+1 "until your next turn" flash plus an extra counter on each creature entering); Rootcoil Creeper
+   (mana only for spells from your graveyard, a flashback card returned from exile); Whiskervale Forerunner (put it
+   onto the battlefield only on your turn); Deification (choose a planeswalker type, loyalty-damage replacement);
+   Anafenza, the Foremost (exile instead of an opponent's graveyard, including cards not on the battlefield); Herald
+   of Leshrac and Burning-Rune Demon (as before).
    Out after round 237 (looked at, not done): Burning-Rune Demon ("search for exactly two cards ... with different
    names": no ruling on finding just one); Herald of Leshrac, Vault 21, Whiskervale Forerunner, Rootweaver Druid,
    Galadriel, Elven-Queen, Erestor, King of the Oathbreakers, Deification, Indominus Rex, Protean Raider, Anafenza the

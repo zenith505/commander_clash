@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
-import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
+import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
@@ -540,7 +540,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           sourceCardId: cardIdOf(o),
           sourceZc: spell ? (o.zoneChanges ?? 0) : (ctx.sourceZc ?? o.zoneChanges ?? 0),
           ...(spell || item?.fromSpell ? { fromSpell: true as const } : {}),
-          trigger: e.trigger,
+          // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
+          // trigger (its source may be gone by the time it triggers).
+          trigger: ctx.chosen?.name !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -1304,4 +1306,16 @@ export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition
   if (cond.kind !== "kicked") return false;
   if (cond.times) return (kicked?.length ?? 0) >= cond.times;
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
+}
+
+/** A copy of `t` with every "with the chosen name" filter in it bound to `chosen`'s name (CR 201.4). */
+function bindChosenName<T>(t: T, chosen: Chosen): T {
+  const walk = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== "object") return v;
+    const o = v as Record<string, unknown>;
+    const out = Object.fromEntries(Object.entries(o).map(([k, x]) => [k, walk(x)]));
+    return o.chosen === "name" && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
+  };
+  return walk(t) as T;
 }

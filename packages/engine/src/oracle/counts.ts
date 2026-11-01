@@ -1078,7 +1078,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
     return cards.length === 1 && ctx.targets.every((t) => t.kind === "card" || t.kind === "object" || t.kind === "any") ? { ref: "target", index: cards[0]! } : null;
   }
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
-  if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
+  // Dovescape: "where X is the spell's mana value", the same.
+  if (x === "that spell's" || x === "the spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
   // "Whenever you cast a spell, you lose life equal to its mana value" (Teval, Arbiter of Virtue): in a cast trigger's
   // first sentence with no target, "it" is the spell cast.
   if (x === "its" && ctx.castSpell && ctx.spellIt && !ctx.targets.length && !ctx.selfIt) return { ref: "castSpell" };

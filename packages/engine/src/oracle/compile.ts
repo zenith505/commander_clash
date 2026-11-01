@@ -323,6 +323,8 @@ function selfPronouns(t: string): string {
     // parseCopyExcept) and "if his sneak cost was paid" (read with the trigger).
     .replace(/\b(?:his or her|he or she|him or her)\b|\bexcept [^."]*|\b(?:his|her) \w+ cost was paid\b/gi, (m) => `\u0001${kept.push(m) - 1}\u0001`)
     .replace(/\b(?:[Hh]is|[Hh]er(?= (?:power|toughness|owner's|owner|controller|name|loyalty|additional|sneak|other|text|mana)\b))\b/g, "~'s")
+    // The Incredible Hulk: "If he's attacking".
+    .replace(/\b(?:[Hh]e|[Ss]he)'s (?=attacking\b)/g, "~ is ")
     .replace(/\b(?:[Hh]e|[Ss]he|him|her)\b(?!')/g, "~")
     .replace(/\u0001(\d+)\u0001/g, (_, n: string) => kept[Number(n)]!);
 }
@@ -837,7 +839,11 @@ export function compile(d: CardDef): CompiledCard {
       const chapter = /^((?:I|II|III|IV|V|VI|VII)(?:, (?:I|II|III|IV|V|VI|VII))*) — (.+)$/.exec(line);
       if (chapter) {
         // "I, II, III — Pain — You draw a card ...": a chapter's name is a flavor word, with no rules meaning (CR 207.2d).
-        const body = parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
+        // The Princess Takes Flight: "III — Return the exiled card to the battlefield under its owner's control": the card
+        // its chapter I exiled (CR 607.2a; linkExile).
+        const body = /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
+          ? { targets: [], effects: [{ type: "returnLinked" as const, dest: "battlefield" as const, here: true as const }], text: chapter[2]! }
+          : parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
         if (!body) out.unsupported.push(raw);
         else for (const n of chapter[1]!.split(", ")) out.triggers.push(bindThisAbility({ event: "chapter", chapter: ROMAN.indexOf(n), body } as TriggeredAbility, line));
         continue;
@@ -5462,8 +5468,18 @@ function linkExile(out: CompiledCard) {
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;
+  // The Princess Takes Flight: a later chapter returns what an earlier one exiled, its only exile.
+  if (returns.some((t) => t.event === "chapter")) {
+    const chExiles = out.triggers.flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && t.event === "chapter" && !e.until));
+    const allExiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || e.type === "search");
+    const ret = returns[0]!;
+    if (returns.length !== 1 || chExiles.length !== 1 || allExiles.length !== 1 || chExiles[0]!.what.ref !== "target" || !(ret.chapter! > (out.triggers.find((t) => allEffects(t.body.effects).includes(chExiles[0]!))?.chapter ?? 99))) out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
+    else chExiles[0]!.linked = true;
+    return;
+  }
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
-  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand") && !("until" in e && e.until);
+  // Hoarding Dragon: "search your library for an artifact card, exile it, then shuffle" is its exile ability too.
+  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" | "search" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split)) && !("until" in e && e.until);
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
@@ -5477,12 +5493,17 @@ function linkExile(out: CompiledCard) {
   // Fear of Abduction: "As an additional cost to cast this spell, exile a creature you control" with an enters ability that
   // exiles: both are linked to the leaves ability (CR 607.2a, 607.2q).
   if (out.additionalCosts?.filter((c) => c.kind === "sacrifice" && c.exile).length === 1 && !out.costOr && exiles.length === 1 && returns.length === 1 && returns[0]!.event === "selfLeaves" && allEffects(returns[0]!.body.effects).every((e) => e.type !== "linkedExileToken")) out.costExileLinked = true;
-  if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
+  // "When this creature dies, you may put the exiled card into its owner's hand" (Hoarding Dragon): a leaves ability too.
+  if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && exiles[0]!.type === "search"))) {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;
   }
   const ex = exiles[0]!;
-  if (ex.type !== "hideaway") ex.linked = true; // hideaway's exile is always linked
+  // The card a search exiles is one you get back, not one you want gone (for the bot).
+  if (ex.type === "search") {
+    ex.dest.linked = true;
+    delete ex.away;
+  } else if (ex.type !== "hideaway") ex.linked = true; // hideaway's exile is always linked
 }
 
 /**

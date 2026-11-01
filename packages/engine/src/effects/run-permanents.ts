@@ -1593,8 +1593,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Balan: each Equipment that isn't attached to the source already (CR 701.3c) and could be (CR 701.3b).
       const host = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!host || host.zone !== "battlefield" || (ctx.sourceZc !== undefined && (host.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      // Rhuk: the Equipment attached to the trigger's creature: now if it's still there, else as it last existed (the
+      // same objects, still on the battlefield, CR 400.7).
+      const subj = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      const stillThere = !!subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === ctx.subject!.zc;
+      const fromSubject = (o: GameObject) => (stillThere ? o.attachedTo === subj!.id : (ctx.lki?.equipment ?? []).some((x) => x.id === o.id && x.zc === (o.zoneChanges ?? 0)));
       for (const id of [...s.battlefield]) {
         const o = obj(s, id);
+        if (e.fromSubject && (!ctx.subject || !fromSubject(o) || !canAttachTo(s, o, host))) continue;
         if (o.id !== host.id && o.attachedTo !== host.id && objectMatches(s, e.filter, o, ctx.controller, false)) attachTo(s, o, host);
       }
       return;

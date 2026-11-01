@@ -1,6 +1,6 @@
 # Roadmap
 
-28,814 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,826 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,259 of
 9,979 (92%).
 
@@ -1451,7 +1451,7 @@ line blocks.
    "During any turn you attacked with a commander, you may play those cards" (Neriv, Crackling Vanguard); "It becomes
    foretold. Its foretell cost is its mana cost reduced by {2}" (Ethereal Valkyrie, CR 702.143; hand picker and browser
    test; a card with its own foretell uses the cheaper cost). Pick prompts now show the effect's own prompt text. +13
-   (28,790 of 31,936 with B67 and B68).
+   (28,812 of 31,936 with B67 to B70).
    Round 234 (top of the list, now done): "copy that spell if it targets a permanent or player ... If you don't copy a
    spell this way, draw a card" (Shiko and Narset, Unified, checked as the trigger resolves); "Draw a card for each
    creature you control but don't own" and "Starting with you, each player chooses a creature. Destroy each creature
@@ -1469,7 +1469,7 @@ line blocks.
    times" (Chandra, Pyromaster; also Soul of Shandalar and Huntmaster of the Fells's Ravager); "Whenever you attack this
    turn, ~ deals damage ... to that creature" and "a red instant or sorcery spell" (Jaya, Fiery Negotiator; also
    Unyaro Griffin); "exile all creatures blocked by this creature" (Wall of Nets, returned when it leaves). +14
-   (28,814 of 31,936 with B69).
+   (28,826 of 31,936 with B69 and B70).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
    activated abilities); Brutal Hordechief (you choose how opponents' creatures block); Sudden Substitution (exchange
@@ -3857,7 +3857,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder, Sigardian Zealot,
-  Rhuk, Alpha Brawl, Brain in a Jar, Sita Varma, Munda and Hans Eriksson.
+  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar, Sita Varma, Munda and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
   end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
   this way, it enters with two additional +1/+1 counters" (Heroic Return; the same condition lets Confront the Assault
@@ -4055,6 +4055,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Until your next turn, he becomes a land" (Hydro-Man, Fluid Felon), "This turn, creatures can't block unless their
   controller pays {X} for each blocking creature they control" (War Cadence), "Remove X +1/+1 counters from among
   creatures you control" (Retribution of the Ancients; browser test). +10 (28,774 of 31,936 with rounds 230 and 231).
+- Round B70 (from EDHREC rank about 19,700 up and the B10 and B67 lists): cards exiled with ~ linked to more abilities
+  (CR 607.2a): "You may cast a spell with mana value X from among cards exiled with ~ without paying its mana cost"
+  (Kaho, Minamo Historian: the bot picks an X it can cast; browser test), "cast an instant or sorcery spell from among
+  cards exiled with ~" (Jeleva, Nephalia's Scourge), "until end of turn, you may play a card exiled with ~" (Raphael,
+  Most Attitude: one card, paid for; browser test), "Until end of turn, you may cast a creature spell from among cards
+  exiled with this artifact" (Serpent's Soul-Jar), "Until end of turn, you may play cards you own exiled with this
+  artifact" (Kayla's Music Box, exiled face down), the cards delve exiled are exiled with ~ (Ethereal Forager, rulings),
+  "Spells with the same name as a card exiled with ~ can't be cast" by opponents (Circu, Dimir Lobotomist; CR 201.2a,
+  bots target opponents' libraries with it). "During that turn, power-up abilities can't be activated" (Kang the
+  Conqueror), "Attach all Equipment attached to that creature to ~" when another equipped creature attacks or dies
+  (Rhuk, Hexgold Nabber: the Equipment attached as it died), "Creatures attacking the last chosen player have menace /
+  get +1/+0" (Triarch Stalker, Beckoning Will-o'-Wisp), "Each opponent exiles the top card of their library. Until end
+  of turn, you may cast spells from among those cards by paying life equal to the spells' mana values" (Xander's
+  Pact), "Exile the top card of target player's library". +12 (28,799 of 31,936 with rounds 230 to 232).
+- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
+  stack), Munda, Ambush Leader (cards from the top revealed and put back on top in any order), Krang & Shredder
+  (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
 - Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen
   (rulings: a block requirement can't make a player pay it); with Ravenous Slime and another "exile it instead" (two
   Slimes, Kalitas), the first one found applies, not the dying creature's controller's choice (CR 616.1); bots never
@@ -4069,8 +4086,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard).
 - Out after round B67 (looked at, not done): Words of War, Words of Waste and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
-  Lumbering Battlement, Wall of Mourning, Kayla's Music Box and Serpent's Soul-Jar (cards exiled with ~ from abilities
-  not linked yet), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
+  Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
+  Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
@@ -4080,7 +4097,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
-  Succession, The Rack, Xander's Pact, Infernal Tutor, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
+  Succession, The Rack, Infernal Tutor, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
   Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,

@@ -4,7 +4,7 @@ import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
-import { characteristics, controllerOf, staticConditionNow } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
@@ -516,7 +516,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           sc.asked = true;
           if (r.chosen) r.chosen = { ...r.chosen, player: undefined };
         }
-        if (r.chosen?.player !== undefined) return;
+        // Triarch Stalker: "the last chosen player" is kept on the permanent, while it's still that object (CR 400.7).
+        const keep = () => {
+          const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.player !== undefined) {
+            me.chosen = { ...me.chosen, player: r.chosen.player };
+            invalidateCharacteristics(s);
+          }
+        };
+        if (r.chosen?.player !== undefined) return keep();
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = Math.max(...living.map((x) => player(s, x).life));
         const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
@@ -525,13 +533,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const pick = opps[Math.floor(nextRandom(s) * opps.length)]!;
           r.chosen = { ...r.chosen, player: pick };
           log(s, `${player(s, pick).name} is chosen at random for ${src}.`);
-          return;
+          return keep();
         }
         if (opps.length === 1) {
           r.chosen = { ...r.chosen, player: opps[0]! };
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
-        if (opps.length <= 1) return;
+        if (opps.length <= 1) return keep();
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }

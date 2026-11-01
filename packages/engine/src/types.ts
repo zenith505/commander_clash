@@ -1059,6 +1059,8 @@ export interface ExtraTurn {
   loseAtEnd?: { controller: PlayerId; sourceCardId: string; subject: { id: ObjectId; zc: number } };
   /** "Skip the untap step of that turn" (Savor the Moment, CR 614.10). */
   skipUntap?: true;
+  /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror): anyone's (CR 702.193). */
+  noPowerUp?: true;
 }
 
 /** A triggered ability waiting to be put on the stack. CR 603.3 */
@@ -1797,6 +1799,13 @@ export interface GameState {
    * cost": one each, for `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile), this turn only.
    */
   linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string; /** "A creature spell" (Idol of Endurance). */ filter?: TargetSpec }[];
+  /**
+   * "Until end of turn, you may play a card exiled with ~" (Raphael, Most Attitude), "you may cast a creature spell from
+   * among cards exiled with ~" (Serpent's Soul-Jar), "you may play cards you own exiled with ~" (Kayla's Music Box): for
+   * `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile, CR 607.2a), this turn only, paying the
+   * usual costs with the usual timing (rulings). One card each unless `all`.
+   */
+  linkedPlays?: { player: PlayerId; source: string; turn: number; sourceName: string; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];

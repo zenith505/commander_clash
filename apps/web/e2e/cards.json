@@ -10023,6 +10023,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "395a7bd6-7c2d-448e-842c-ca53256d7008",
+  "name": "Kaho, Minamo Historian",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "When Kaho enters, search your library for up to three instant cards, exile them, then shuffle.\n{X}, {T}: You may cast a spell with mana value X from among cards exiled with Kaho without paying its mana cost.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e937e0f5-ca35-4dce-9f05-8f2075731628",
   "name": "Kami of Ancient Law",
   "manaCost": "{1}{W}",
@@ -15396,6 +15429,43 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eaf194a7-d95f-4738-9052-92ad00443a76",
+  "name": "Raphael, Most Attitude",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Mutant Ninja Turtle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Ninja",
+   "Turtle"
+  ],
+  "oracleText": "Menace (This creature can't be blocked except by two or more creatures.)\nAlliance — Whenever another creature you control enters, you may exile the top card of your library.\nWhenever Raphael attacks, until end of turn, you may play a card exiled with Raphael.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Alliance",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

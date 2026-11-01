@@ -54,6 +54,14 @@ function bansOn(s: GameState, name: string | undefined) {
  */
 export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
   for (const b of s.namedBansUntil ?? []) if (hasName(d.name, b.name) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
+  // Circu, Dimir Lobotomist: the names of the cards exiled with it, still exiled and face up (a face-down card has none,
+  // CR 708.2a); a name in common is the same name (CR 201.2a).
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (!abilitiesOf(s, o).linkedNameCastBan || controllerOf(s, o) === pid) continue;
+    const named = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).map((l) => s.objects[l.id]).find((c) => c?.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === (s.linkedExile![`${o.id}@${o.zoneChanges ?? 0}`]!.find((l) => l.id === c.id)!.zc) && defOf(s, c).name.split(" // ").some((n) => hasName(d.name, n)));
+    if (named) return `${characteristics(s, o).name}: its controller's opponents can't cast spells named ${defOf(s, named).name}`;
+  }
   for (const { o, ban } of bansOn(s, d.name)) {
     if (ban.kind !== "cast") continue;
     if (ban.who === "opponents" && controllerOf(s, o) === pid) continue;

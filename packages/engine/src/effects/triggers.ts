@@ -819,6 +819,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return [a.zone === "battlefield" ? controllerOf(s, a) : (s.lastKnown?.[aid]?.controller ?? a.owner)];
       });
       if (auraControllers.length) (lki as LastKnown).auraControllers = auraControllers;
+      // The Equipment attached to it then (Rhuk, Hexgold Nabber: "all Equipment attached to that creature").
+      const equipment = (ev.attachments ?? []).flatMap((aid) => {
+        const a = s.objects[aid];
+        return a?.zone === "battlefield" && characteristics(s, a).subtypes.includes("Equipment") ? [{ id: a.id, zc: a.zoneChanges ?? 0 }] : [];
+      });
+      if (equipment.length) (lki as LastKnown).equipment = equipment;
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0));

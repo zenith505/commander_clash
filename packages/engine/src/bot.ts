@@ -1,4 +1,4 @@
-import { playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -4232,7 +4232,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
       const fixedX = definedX(s, o, ab);
-      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      // Kaho, Minamo Historian: "cast a spell with mana value X from among cards exiled with ~": X matching one of them.
+      const linkedMvX = cost.hasX && body.effects.some((e) => e.type === "castFromAmong" && e.fromLinked && e.exactMv !== undefined) ? [...new Set(linkedCards(s, id).map((l) => defMv(defOf(s, obj(s, l.id)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a) : undefined;
+      if (linkedMvX && !linkedMvX.length) continue;
+      const xs = fixedX != null ? [fixedX] : linkedMvX ? linkedMvX : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.

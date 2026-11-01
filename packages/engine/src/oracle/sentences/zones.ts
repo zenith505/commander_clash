@@ -82,6 +82,22 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || (m[1] && !filter)) return null;
     return [{ type: "castLinkedFree", ...(filter ? { filter } : {}) }];
   }
+  // Raphael, Most Attitude: "until end of turn, you may play a card exiled with ~"; Serpent's Soul-Jar: "... you may cast a
+  // creature spell from among cards exiled with ~"; Kayla's Music Box: "... you may play cards you own exiled with ~": the
+  // cards its own exile took (compile.ts links them, CR 607.2a), paid for as usual with the usual timing (rulings).
+  if ((m = /^(?:[Uu]ntil end of turn, you|You) may (play a card|cast an? (creature|artifact|instant or sorcery|noncreature) spell from among cards|play cards you own) exiled with ~(?<until> until end of turn)?$/.exec(s)) && (m.groups?.until !== undefined) === /^You/.test(s) && !ctx.spell) {
+    const filter = m[2] ? parseSearchFilter(`${m[2]} card`) : undefined;
+    if (m[2] && !filter) return null;
+    return [{ type: "playLinkedThisTurn", ...(filter ? { filter } : {}), ...(m[2] ? { castOnly: true as const } : {}), ...(m[1] === "play cards you own" ? { all: true as const, owned: true as const } : {}) }];
+  }
+  // Kaho, Minamo Historian: "You may cast a spell with mana value X from among cards exiled with ~ without paying its mana
+  // cost"; Jeleva: "an instant or sorcery spell"; Shell of the Last Kappa: "a spell": one spell now, as this resolves
+  // (CR 608.2g), from the cards linked to it (compile.ts links them, CR 607.2a). The spell as it's cast is checked
+  // (an Adventure or a modal double-faced card's face, CR 715.3, 712.11c).
+  if ((m = /^[Yy]ou may cast an? (?:(instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell( with mana value X)? from among cards exiled with ~ without paying its mana cost$/.exec(s)) && !ctx.spell) {
+    const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
+    return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
+  }
   // Idol of Endurance: "Exile all creature cards with mana value 3 or less from your graveyard until ~ leaves the
   // battlefield": they return to the graveyard when it leaves (CR 610.3).
   if ((m = /^[Ee]xile all (.+?) cards( with mana value \d+ or less)? from your graveyard until ~ leaves the battlefield$/.exec(s)) && !ctx.spell) {
@@ -1307,6 +1323,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Duplicity, Gustha's Scepter: cards exiled face down with ~, and what happens to them later (CR 406.3, 607.2a).
   if (!ctx.spell) {
     if ((m = new RegExp(`^Exile the top ${NUM} cards of your library face down$`, "i").exec(s))) return [{ type: "exileFaceDown", from: "top", n: num(m[1]!) }];
+    // Kayla's Music Box: "Look at the top card of your library, then exile it face down. (You may look at it any time.)"
+    if (/^Look at and exile the top card of your library face down$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 1, look: true }];
     // Connecting the Dots: "exile the top card of your library face down" (no one may look at it, CR 406.3).
     if (/^Exile the top card of your library face down$/i.test(s)) return [{ type: "exileFaceDown", from: "top", n: 1 }];
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
@@ -1331,6 +1349,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
     // Connecting the Dots: "Put all cards exiled with ~ into their owners' hands": the same, face down ones too.
     if (/^Return all cards exiled with ~ to their owner's hand$|^Put all cards exiled with ~ into their (?:owners' hands|owner's hand)$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
+    // Ethereal Forager: "return an instant or sorcery card exiled with ~ to its owner's hand": one of them, chosen as it
+    // resolves.
+    if (/^Return an instant or sorcery card exiled with ~ to its owner's hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } }];
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
@@ -1372,6 +1393,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "attachToChosen", source: { ref: "each", filter: { kind: "object", subtypes: ["Aura", "Equipment"], controller: "you", text: "Aura or Equipment you control" } }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true }];
   // Balan, Wandering Knight: "Attach all Equipment you control to ~": each that could be attached to it (CR 701.3a-b).
   if (/^Attach all Equipment you control to ~$/.test(s) && !ctx.spell) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], controller: "you", text: "Equipment you control" } }];
+  // Rhuk, Hexgold Nabber: "attach all Equipment attached to that creature to ~": the trigger's creature's, all or none
+  // (rulings).
+  if (/^[Aa]ttach all Equipment attached to (?:that creature|it) to ~$/.test(s) && !ctx.spell && ctx.subject) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], text: "Equipment" }, fromSubject: true }];
   // Vulshok Battlemaster: "attach all Equipment on the battlefield to it": every player's, still under its controller's
   // control (rulings).
   if ((m = /^[Aa]ttach all Equipment on the battlefield to (~|it)$/.exec(s)) && !ctx.spell && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], text: "Equipment" } }];

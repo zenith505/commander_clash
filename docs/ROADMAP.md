@@ -1381,8 +1381,8 @@ line blocks.
    cards from among them onto the battlefield" after exiling the top N (Xenagos, the Reveler); "If you control a Squirrel
    or returned a Squirrel card to your hand this way" (Cache Grab); "Whenever an opponent attacks another one of your
    opponents, you and the attacking player each draw a card and lose 1 life" and "goad target creature defending player
-   controls" (Karazikar, the Eye Tyrant); "exile target nonland permanent an opponent controls until target enchantment
-   you control leaves the battlefield" (Calix, Guided by Fate); "Whenever one or more cards are discarded, ... for each
+   controls" (Karazikar, the Eye Tyrant); "exile target creature or enchantment you don't control until target enchantment
+   you control leaves the battlefield" (Calix, Destiny's Hand); "Whenever one or more cards are discarded, ... for each
    card discarded this way" (Captain Howler, Sea Scourge); "you may exile one of them from your graveyard. If you do,
    you may cast it this turn" (Conspiracy Theorist); "ward {X}, where X is the number of experience counters you have"
    (Minthara, Merciless Soul); "All damage is dealt as though its source had wither" (Everlasting Torment). +12 (28,710

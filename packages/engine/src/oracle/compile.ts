@@ -690,6 +690,9 @@ export function compile(d: CardDef): CompiledCard {
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
     // An instant's or sorcery's ability word ("Spell mastery — If ...", CR 207.2c): no rules meaning either.
     if (isSpell) line = line.replace(SPELL_ABILITY_WORD, "");
+    // Zimone, All-Questioning: "if ... you control a prime number of lands, create Primo, ..., then put that many +1/+1
+    // counters on it": that many is the number of lands, counted as it resolves.
+    line = line.replace(/^(At the beginning of your end step, if [^,]+ and you control a prime number of lands, create [^.]+ token, then put) that many (\+1\/\+1 counters on it)\.$/, "$1 X $2, where X is the number of lands you control.");
     // Ascendant Acolyte: "~ enters with a +1/+1 counter on it for each +1/+1 counter among other creatures you control":
     // counted as it enters, when it isn't on the battlefield yet (CR 614.1c), so the same as "among creatures you control".
     line = line.replace(/^(~ enters with a \+1\/\+1 counter on it for each \+1\/\+1 counter among) other (creatures you control\.)$/, "$1 $2");
@@ -1388,6 +1391,10 @@ export function compile(d: CardDef): CompiledCard {
       if (again) (out.triggersAgain ??= []).push({ ...again, anchor: anchored[1]! });
       // Glacierwood Siege: "• Sultai — You may play lands from your graveyard." (the permission of Crucible of Worlds).
       else if (out.entersAnchor!.includes(anchored[1]!) && anchored[2] === "You may play lands from your graveyard." && !out.landsFromGraveyardIf) out.landsFromGraveyardIf = { kind: "anchor", word: anchored[1]! };
+      // Monastery Siege: "Dragons — Spells your opponents cast that target you or a permanent you control cost {2} more to
+      // cast": once per spell (rulings), only while that word was chosen.
+      else if (out.entersAnchor!.includes(anchored[1]!) && /^Spells your opponents cast that target you or a permanent you control cost \{\d+\} more to cast\.$/.test(anchored[2]!))
+        (out.opponentsTargetTax ??= []).push({ n: Number(/\{(\d+)\}/.exec(anchored[2]!)![1]), filter: { kind: "object", text: "permanent" }, you: true, if: { kind: "anchor", word: anchored[1]! } });
       else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
       continue;
     }
@@ -1563,6 +1570,18 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "As ~ enters, discard your hand.") {
       out.entersDiscardHand = true;
       continue;
+    }
+    // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
+    // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
+    // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
+    const indominus = /^As ~ enters, discard any number of creature cards\. It enters with a flying counter on it if a card discarded this way has flying\. The same is true for (.+), and ([a-z ]+)\.$/.exec(line);
+    if (indominus) {
+      const kinds = ["flying", ...indominus[1]!.split(", "), indominus[2]!];
+      const known = ["flying", "first strike", "double strike", "deathtouch", "hexproof", "haste", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"];
+      if (kinds.every((k) => known.includes(k)) && new Set(kinds).size === kinds.length && !out.entersDiscardKeywords) {
+        out.entersDiscardKeywords = kinds;
+        continue;
+      }
     }
     // Arsenal Thresher: "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a
     // +1/+1 counter on it for each card revealed this way.": amplify 1's choice (CR 702.38a, 614.12), of artifact cards.
@@ -2397,7 +2416,11 @@ export function compile(d: CardDef): CompiledCard {
     // Superior Spider-Man: "... a copy of any creature card in a graveyard, except ... When you do, exile that card.": a
     // reflexive trigger as it enters as that copy (CR 603.12), exiling the card copied.
     const exileCopied = / When you do, exile that card\.$/.test(line);
-    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line.replace(/ When you do, exile that card\.$/, ""));
+    // Protean Raider: "Raid — If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield":
+    // the option only exists if you attacked with a creature this turn, as it enters (rulings).
+    const raidClone = /^If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield\.$/.test(line);
+    const cloneLine = raidClone ? line.replace(/^If you attacked this turn, you/, "You") : line;
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(cloneLine.replace(/ When you do, exile that card\.$/, ""));
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
@@ -2427,7 +2450,7 @@ export function compile(d: CardDef): CompiledCard {
       const ifEmbalmed = clone[3] === "if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" ? { noManaCost: true, colors: ["W" as const], addSubtypes: ["Zombie"] } : undefined;
       const except = others ? { text: others } : ifEmbalmed ? undefined : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped, ...(raidClone ? { ifAttacked: true as const } : {}) };
         continue;
       }
     }
@@ -2519,6 +2542,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If a creature you control would explore, instead it explores, then it explores again.") {
       out.exploresTwice = true;
+      continue;
+    }
+    if (line === "If a creature you control would explore, instead you scry 1, then that creature explores.") {
+      out.scryBeforeExplore = true;
       continue;
     }
     if (line === "As ~ enters, note your life total.") {
@@ -2664,6 +2691,11 @@ export function compile(d: CardDef): CompiledCard {
     // Scion of Halaster's granted ability: a replacement for the player's first draw each turn (CR 614.1a, 614.5).
     if (line === "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them into your graveyard and the other back on top of your library. Then draw a card.") {
       out.firstDrawLook = true;
+      continue;
+    }
+    // War's Toll: a requirement (CR 508.1d) once an opponent declares any attacker (game.ts declareAttackers).
+    if (line === "If a creature an opponent controls attacks, all creatures that opponent controls attack if able.") {
+      out.opponentsAttackAll = true;
       continue;
     }
     if (line === "If you would draw a card while your library has no cards in it, you win the game instead.") {
@@ -2975,10 +3007,12 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Sam, Loyal Attendant: "Activated abilities of Foods you control cost {1} less to activate": any Food artifact (rulings).
-    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens|Foods)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    // Agatha of the Vile Cauldron: "... cost {X} less to activate, where X is ~'s power. This effect can't reduce ...":
+    // only abilities of creatures on the battlefield (rulings), generic mana only.
+    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens|Foods)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line) ?? /^Activated abilities of (creatures)( you control) cost \{(X)\} less to activate, where X is ~'s power\.( This effect can't reduce the mana in that cost to less than one mana\.)$/.exec(line);
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {
-      (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
+      (out.activationLess ??= []).push({ n: activationLess[3] === "X" ? 0 : Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}), ...(activationLess[3] === "X" ? { selfPower: true as const } : {}) });
       continue;
     }
     // Power Artifact: "Enchanted artifact's activated abilities cost {2} less to activate. This effect can't reduce the mana
@@ -3402,6 +3436,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Players may spend mana as though it were mana of any color.") {
       out.spendAnyColorAll = true;
+      continue;
+    }
+    // Oath of Nissa (CR 609.4b): colored symbols of its controller's planeswalker spells paid with mana of any color.
+    if (line === "You may spend mana as though it were mana of any color to cast planeswalker spells.") {
+      out.spendAnyColorPlaneswalkerSpells = true;
       continue;
     }
     if (line === "You can spend mana of any type to cast creature spells.") {
@@ -4330,7 +4369,9 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Equip {4}. This ability costs {1} less to activate for each color of the creature it targets." (Dragonfire Blade)
-    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line);
+    // Belt of Giant Strength: "Equip {10}. This ability costs {X} less to activate, where X is the power of the creature it
+    // targets": {1} less for each point of its power as the cost is worked out (CR 601.2f, 602.2b).
+    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line) ?? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(X)\} less to activate, where X is (the power of) the creature it targets\.$/.exec(line);
     // "Equip {4}. This ability costs {3} less to activate if you're the monarch." (Crown of Gondor): checked as it's
     // activated (CR 602.2b, 601.2f).
     const equipLessIf = !equipLessPer ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate if ([^.]+)\.$/.exec(line) : null;
@@ -4352,7 +4393,7 @@ export function compile(d: CardDef): CompiledCard {
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
         equip: true,
-        ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
+        ...(equipLessPer ? { costLessPerTarget: { n: equipLessPer[2] === "X" ? 1 : Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : equipLessPer[3] === "the power of" ? ("power" as const) : ("+1/+1" as const) } } : {}),
         ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
         ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
         ...(equipOnce ? { oncePerTurn: true } : {}),
@@ -5690,7 +5731,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

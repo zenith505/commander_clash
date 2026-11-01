@@ -374,7 +374,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     }
     const taken = new Set(Object.values(yp.picked).flat());
     // Ill-Gotten Gains: into their hands, any cards; onto the battlefield, only permanent cards (CR 110.4b).
-    const toHand = e.dest === undefined;
+    const toHand = e.dest === undefined || e.dest === "exile";
     const cards = p.lost ? [] : yardOf(pid).graveyard.filter((id) => !taken.has(id) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (toHand || isPermanentCard(defOf(s, obj(s, id)))));
     const max = Math.min(e.n, cards.length);
     // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
@@ -388,7 +388,7 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
     const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
     const what = e.n > 1 ? `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: toHand ? "hand" : "battlefield" };
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${what}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest === "exile" ? "exile" : toHand ? "hand" : "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
@@ -398,6 +398,13 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
   if (e.dest === undefined) {
     for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to their hand.`);
     for (const { id } of moves) moveObject(s, id, "hand");
+    return;
+  }
+  // Augusta, Order Returned: each exiles the card they chose, all at the same time; "this way" is those cards.
+  if (e.dest === "exile") {
+    for (const { id, pid } of moves) log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their graveyard.`);
+    for (const { id } of moves) moveObject(s, id, "exile");
+    s.resolving!.yardChosen = moves.map((m) => m.id).filter((id) => obj(s, id).zone === "exile");
     return;
   }
   const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
@@ -1993,11 +2000,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : e.max !== undefined ? `up to ${e.max} ${e.filter?.text ?? "card"}s` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : Math.min(e.max ?? cards.length, cards.length), fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
         return "paused";
       }
       const chosen = sc.found.filter((id) => e.orControl && s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === p.id);
-      const shown = sc.found.filter((id) => p.hand.includes(id));
+      const shown = sc.found.filter((id) => p.hand.includes(id)).slice(0, e.max ?? Infinity);
       sc.found = undefined;
       if (chosen.length) {
         s.resolving!.revealedFromHand = chosen.length;

@@ -825,6 +825,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ok = !!other && (!cond.withKeyword || !!chars.get(other.id)?.keywords.some((k) => sameCI(k, cond.withKeyword!)));
       return ok !== !!cond.not;
     }
+    case "selfDealtDamageThisTurn": {
+      const key = `${sourceId}@${s.objects[sourceId]?.zoneChanges ?? 0}`;
+      return Object.values(s.turnLog?.sourceDamage ?? {}).reduce((n, byKey) => n + (byKey[key] ?? 0), 0) >= cond.n;
+    }
     case "attackedThisTurn":
       return (cond.anyone ? s.turnOrder.some((p) => s.players[p]!.attackedTurn === s.turn) : s.players[you]?.attackedTurn === s.turn) !== !!cond.not;
     case "activatedLoyaltyThisTurn":
@@ -1271,7 +1275,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
-      if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
+      // CR 702.171b; Caustic Bronco gone before its ability resolves: saddled as it last existed (rulings, CR 608.2h).
+      if (cond.is === "saddled") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return lk && lk.zc === sourceZc ? !!lk.saddled : !!src.saddled;
+      }
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
@@ -1322,13 +1330,20 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         if (cond.differentNames) n = names.size;
         if (cond.sameName) n = Math.max(0, ...byName.values());
         if (cond.sameCreatureType) n = everyType + Math.max(0, ...byType.values());
-        return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+        return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (!cond.prime || isPrime(n));
       });
     }
     case "allOf":
       return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc));
   }
 }
+
+/** Zimone, All-Questioning: 2, 3, 5, 7, 11, ... (1 and 0 aren't prime). */
+export const isPrime = (n: number): boolean => {
+  if (n < 2) return false;
+  for (let d = 2; d * d <= n; d++) if (n % d === 0) return false;
+  return true;
+};
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
 export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {

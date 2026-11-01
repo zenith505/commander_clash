@@ -154,6 +154,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "34841228-31ac-48ac-b6d6-486b5e1e07dd",
+  "name": "Abundant Harvest",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose land or nonland. Reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and the rest on the bottom of your library in a random order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
   "name": "Ad Nauseam",
   "manaCost": "{3}{B}{B}",
@@ -9423,6 +9449,43 @@
   "set": "dmu",
   "releasedAt": "2022-09-09",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "723a66c3-2c2c-411c-bba5-922e8601981b",
+  "name": "Indominus Rex, Alpha",
+  "manaCost": "{1}{U/B}{U/B}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Dinosaur Mutant",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur",
+   "Mutant"
+  ],
+  "oracleText": "As Indominus Rex enters, discard any number of creature cards. It enters with a flying counter on it if a card discarded this way has flying. The same is true for first strike, double strike, deathtouch, hexproof, haste, indestructible, lifelink, menace, reach, trample, and vigilance.\nWhen Indominus Rex enters, draw a card for each counter on it.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rex",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21151,6 +21214,38 @@
   "commanderLegal": "legal",
   "set": "lea",
   "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d6ee6cc1-902d-4f56-afa5-6fa4813bfbbc",
+  "name": "Typhoid Rats",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Rat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rat"
+  ],
+  "oracleText": "Deathtouch (Any amount of damage this deals to a creature is enough to destroy it.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

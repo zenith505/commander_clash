@@ -170,6 +170,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Caradora, Heart of Alacria: "on a creature or Vehicle you control" (an artifact subtype, CR 205.3g).
   if (line === "If one or more +1/+1 counters would be put on a creature or Vehicle you control, that many plus one +1/+1 counters are put on it instead.")
     return { what: "counters", counter: "+1/+1", on: "creatureOrVehicle", who: "you", op: "plusOne" };
+  // Zabaz, the Glimmerwasp: only the counters a modular trigger puts (CR 702.43a), on a creature its controller controls.
+  if (line === "If a modular triggered ability would put one or more +1/+1 counters on a creature you control, that many plus one +1/+1 counters are put on it instead.")
+    return { what: "counters", counter: "+1/+1", on: "creature", who: "you", op: "plusOne", modular: true };
   // Mowu, Loyal Companion: only on itself.
   if (line === "If one or more +1/+1 counters would be put on ~, that many plus one +1/+1 counters are put on it instead.") return { what: "counters", counter: "+1/+1", on: "permanent", who: "any", op: "plusOne", self: true };
   // Mauhúr, Uruk-hai Captain: "on an Army, Goblin, or Orc you control" (creature types, so a changeling counts).

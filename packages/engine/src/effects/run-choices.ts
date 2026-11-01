@@ -383,7 +383,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // The Second Doctor: what doing it means for an opponent.
           const you = player(s, ctx.controller).name;
           const ban = after?.type === "attackBanNextTurn" && pid !== ctx.controller ? `If you do, you can't attack ${you} or permanents ${you} controls during your next turn.` : undefined;
-          const otherwise = loss !== undefined ? `If you don't, you lose ${loss} life.` : ban;
+          // Web of Inertia, Jace, Multiverse Architect: what not doing it means for that player's attack this turn.
+          const next = s.resolving!.body.effects[s.resolving!.next + 1];
+          const webBan = next?.type === "if" && next.cond.kind === "theyChose" && next.cond.not && next.effects[0]?.type === "attackBanThisTurn" ? next.effects[0] : undefined;
+          const webText = webBan ? `If you don't, creatures you control can't attack ${webBan.subtype ? `${webBan.subtype}s ${you} controls` : you} this turn.` : undefined;
+          const otherwise = loss !== undefined ? `If you don't, you lose ${loss} life.` : (ban ?? webText);
           s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: typeof e.wheel === "number" ? e.wheel : amountNow(s, e.wheel, { ...ctx, eachOne: pid }) } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(otherwise ? { otherwise } : {}) };
           return "paused";
         }
@@ -595,10 +599,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
         return "paused";
       }
-      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : "type"] === undefined) {
+      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except) };
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : {}) };
         return "paused";
       }
       return;
@@ -792,6 +796,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
             : e.cond.kind === "sacrificedSubtype"
             ? ((k, c) => !!k && (!!k.allCreatureTypes || [c.subtype, ...(c.orSubtypes ?? [])].some((t) => !!k.subtypes?.includes(t))))(ctx.sacrificed?.[0], e.cond)
+            : e.cond.kind === "youDiscardedGreatestMv"
+            ? ((ids) => {
+                const mv = (id: ObjectId) => characteristics(s, s.objects[id]!).manaValue;
+                const top = Math.max(...ids.map(mv));
+                return ids.some((id) => s.objects[id]!.owner === ctx.controller && mv(id) === top);
+              })((s.resolving!.discardedAll ?? []).filter((id) => !!s.objects[id]))
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "activatedTimes"

@@ -79,6 +79,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // "When ~ blocks, return it to its owner's hand at end of combat" (Wall of Junk): the same event (CR 603.2).
   [/^When(?:ever)? ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever you pay life, (.+)$/, "youPayLife"],
   // The Millennium Calendar: the permanents you untap in your untap step's turn-based action (CR 502.3), all at once.
   [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
@@ -4130,9 +4131,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youPayLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youPayLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;

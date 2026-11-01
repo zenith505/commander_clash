@@ -281,7 +281,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).
-    if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
+    if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^(?:reveal|have)/.test(pend.prompt) || player(s, pid).life >= 16 }];
     // Sepulchral Primordial: each opponent's creature card comes back under our control.
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     // Krark's Thumb: keep the won flip.
@@ -531,6 +531,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
       return [{ type: "pickPermanents", player: pid, ids: pick ? [pick.id] : [] }];
     }
+    // Battle for Bretagard: "For each of them, create a token that's a copy of it": one of each name, the best first.
+    if (pend.kind === "pickPermanents" && pend.differentNames && pend.action === "choose") return [{ type: "pickPermanents", player: pid, ids: differentlyNamed(s, [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) }];
     // "Remove a lore counter from each of any number of Sagas you control. Put a +1/+1 counter on ~ for each lore counter
     // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
@@ -1524,7 +1526,7 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
       const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
       // Spelunking: it enters untapped anyway, so no life is paid for it.
       const free = othersMakeItEnterUntapped(s, obj(s, a.objectId));
-      const untapped = c.entersTappedChoice && !free ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
+      const untapped = c.entersTappedChoice && !free ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind !== "payLife" || p.life >= 16) : undefined;
       const tapped = !free && (c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false));
       return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
     }),
@@ -2864,10 +2866,10 @@ function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { 
 const usefulInGraveyard = (s: GameState, id: ObjectId) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length || abilitiesOf(s, obj(s, id)).activated.some((ab) => ab.zone === "graveyard");
 
 /** Cards to collect evidence N with (CR 701.59a): the fewest that do it, none we'd use from the graveyard; null if there aren't. */
-function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] | null {
+function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): ObjectId[] | null {
   const keepers = player(s, pid).graveyard.filter((c) => usefulInGraveyard(s, c));
-  if (evidenceProblem(s, pid, n, undefined, not, [...taken, ...keepers])) return null;
-  return autoEvidence(s, pid, n, not, [...taken, ...keepers]);
+  if (evidenceProblem(s, pid, n, undefined, not, [...taken, ...keepers], filter)) return null;
+  return autoEvidence(s, pid, n, not, [...taken, ...keepers], filter);
 }
 
 /** Does the spell do more if evidence was collected for it (CR 701.59c): a part of it, its enters trigger, or a lower cost? */
@@ -3010,7 +3012,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.discard = chooseDiscards(s, pid, c.n, id);
     } else if (c.kind === "collectEvidence") {
       // Conspiracy Unraveler's alternative cost: the fewest cards that make it up.
-      const ids = spareEvidence(s, pid, c.n, id, out.exileCards);
+      const ids = spareEvidence(s, pid, c.n, id, out.exileCards, c.filter);
       if (!ids) return null;
       out.collect = ids;
     } else if (c.kind === "exileFromGraveyard" && c.top) {
@@ -4880,7 +4882,7 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       if (pool.length < c.n) return null;
       out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
     } else if (c.kind === "collectEvidence") {
-      const ids = spareEvidence(s, pid, c.n);
+      const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter);
       if (!ids) return null;
       out.collect = ids;
     } else if (c.kind === "discard" && c.random) {

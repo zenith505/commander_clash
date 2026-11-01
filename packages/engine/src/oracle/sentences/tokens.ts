@@ -148,11 +148,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // A Vehicle token: "create a 3/2 colorless Vehicle artifact token with crew 1" (Mu Yanling, Wind Rider), "a 5/5
   // colorless Vehicle artifact token named Zeppelin with flying and crew 3" (Lita): an artifact, not a creature, with its
   // printed power and toughness (CR 301.7) and crew N (CR 702.122a).
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (\\d+)/(\\d+) colorless Vehicle artifact tokens?(?: named ([A-Z][\\w'-]*))? with (?:([a-z, ]+?),? and )?crew (\\d+)$`).exec(s))) {
+  // Pia Nalaar, Chief Mechanic: "an X/X colorless Vehicle artifact token named Nalaar Aetherjet with flying and crew 2":
+  // X worked out as it's created (body.ts defines it), a name of more than one word.
+  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (\\d+|X)/(\\d+|X) colorless Vehicle artifact tokens?(?: named ([A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*))? with (?:([a-z, ]+?),? and )?crew (\\d+)$`).exec(s))) {
+    const xx = m[2] === "X";
+    if (xx !== (m[3] === "X")) return null;
     const keywords = m[5] ? parseKeywordList(m[5]) : [];
     if (!keywords) return null;
-    const token: TokenSpec = { name: m[4] ?? "Vehicle", ...(m[4] ? { named: true as const } : {}), power: Number(m[2]), toughness: Number(m[3]), colors: [], types: ["Artifact"], subtypes: ["Vehicle"], keywords, abilities: `Crew ${m[6]}` };
-    return [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }];
+    const token: TokenSpec = { name: m[4] ?? "Vehicle", ...(m[4] ? { named: true as const } : {}), power: xx ? 0 : Number(m[2]), toughness: xx ? 0 : Number(m[3]), colors: [], types: ["Artifact"], subtypes: ["Vehicle"], keywords, abilities: `Crew ${m[6]}` };
+    return [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...(xx ? { pt: X } : {}) }];
   }
   // A named noncreature token with an ability of its own: "create eight colorless snow artifact tokens named Replicated Ring
   // with "{T}: Add one mana of any color."" (Replicating Ring, CR 111.4).

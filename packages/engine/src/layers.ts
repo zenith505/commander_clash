@@ -183,6 +183,8 @@ export interface Characteristics {
   cantActivateTap: boolean;
   /** "Can't be blocked except by three or more creatures": the most such an ability asks for, 0 if none (CR 509.1b). */
   minBlockers: number;
+  /** Tromokratis: blocked only by all the creatures its defending player controls (CR 509.1b). */
+  blockedOnlyByAll?: true;
   /**
    * The players who goaded it (CR 701.15), or whose effect asks the same of it without goading it (Kardur): it attacks
    * each combat if able, and a player other than them if able.
@@ -1716,6 +1718,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     }
     case "minBlockers":
       c.minBlockers = Math.max(c.minBlockers, m.n);
+      return;
+    case "blockedOnlyByAll":
+      c.blockedOnlyByAll = true;
       return;
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);

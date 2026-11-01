@@ -98,6 +98,7 @@ import {
   printedMatches,
   parseManaCost,
   manaValue,
+  namesDiffer,
   autoConvoke,
   hasConvoke,
   autoCrew,
@@ -408,7 +409,7 @@ type CastDraft = {
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
 type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
-type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
+type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean; /** The Capitoline Triad: its own words, not collecting evidence. */ title?: string } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
@@ -774,7 +775,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "collectEvidence") {
         // "Collect evidence 3": click cards in your graveyard until their mana values add up (CR 701.59a).
         if (d.collect !== undefined) continue;
-        return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN), optional: false });
+        return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN, undefined, [], c.filter), optional: false, ...(c.notEvidence && c.filter ? { title: `exile ${c.filter.text}s from your graveyard with total mana value ${c.n} or more` } : {}) });
       }
       if (c.kind === "craft") {
         // Craft's materials (CR 702.167a): click permanents you control and/or cards in your graveyard that fit.
@@ -1906,7 +1907,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <EvidenceChoice
               key={`${evidencePick.label}:${evidencePick.n}:${evidencePick.key ?? "ability"}`}
               s={s}
-              title={`${evidencePick.label}: ${evidencePick.optional ? "you may collect" : "collect"} evidence ${evidencePick.n}, exiling cards with total mana value ${evidencePick.n} or more from your graveyard`}
+              title={evidencePick.title ? `${evidencePick.label}: ${evidencePick.title}` : `${evidencePick.label}: ${evidencePick.optional ? "you may collect" : "collect"} evidence ${evidencePick.n}, exiling cards with total mana value ${evidencePick.n} or more from your graveyard`}
               n={evidencePick.n}
               cards={evidencePick.candidates}
               onHover={setHover}
@@ -2101,7 +2102,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
-  if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
+  if (c.kind === "collectEvidence") return c.notEvidence && c.filter ? `exile ${c.filter.text}s with total mana value ${c.n} or more from your graveyard` : `collect evidence ${c.n}`;
   if (c.kind === "putCounter") return counterOnWhat(c);
   if (c.kind === "mill") return c.exile ? `exile the top ${c.n === 1 ? "card" : `${c.n} cards`} of your library` : `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
@@ -4336,7 +4337,7 @@ function AbilityMenu({
       <strong>{d.name}</strong>
       {choice && (
         <button disabled={!playable || !canEnterUntapped(s, HUMAN, objectId)} onClick={() => onPlay(true)}>
-          Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})
+          {choice.kind === "mayTapRad" ? "Play it untapped" : <>Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})</>}
         </button>
       )}
       {foretold && (
@@ -4356,7 +4357,7 @@ function AbilityMenu({
         ))}
       {inHand && !foretold && !split && asTypes.length < 2 && (
         <button disabled={!playable} onClick={() => onPlay()}>
-          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
+          {land ? (choice?.kind === "mayTapRad" ? `Play it tapped (you get ${choice.n} rad counters)` : choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {faces.map((face) => {
@@ -4378,7 +4379,7 @@ function AbilityMenu({
           <span key={`land${face}`} className="face-play">
             {untap && (
               <button disabled={!ok || !asFace(s, o, face, () => canEnterUntapped(s, HUMAN, objectId))} onClick={() => onPlayFace(face, true)}>
-                Play {fd.name} untapped ({untap.kind === "payLife" ? `pay ${untap.n} life` : `reveal ${/^[AEIOU]/.test(untap.filter.text) ? "an" : "a"} ${untap.filter.text}`})
+                Play {fd.name} untapped{untap.kind === "mayTapRad" ? "" : ` (${untap.kind === "payLife" ? `pay ${untap.n} life` : `reveal ${/^[AEIOU]/.test(untap.filter.text) ? "an" : "a"} ${untap.filter.text}`})`}
               </button>
             )}
             <button disabled={!ok} title={fd.oracleText} onClick={() => onPlayFace(face)}>
@@ -5005,13 +5006,15 @@ function Controls({
     // Slaughter the Strong: the chosen creatures' total power, a negative power subtracting.
     const totalPower = pending.maxTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
     const untapProblem = pending.action === "untapLimited" ? untapChoiceProblem(s, HUMAN, pending.options, discards) : undefined;
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem;
+    // Battle for Bretagard: "with different names".
+    const sameNames = !!pending.differentNames && !namesDiffer(s, discards);
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem && !sameNames;
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
           {pending.prompt
-            ? pending.prompt
+            ? `${pending.prompt}${sameNames ? " (two of them have the same name)" : ""}`
             : pending.action === "ringBearer"
             ? `the Ring tempts you: click a creature of yours to be your Ring-bearer. It's legendary and can't be blocked by creatures with greater power, and gains the Ring's other abilities as the Ring tempts you more times.`
             : pending.action === "attach"

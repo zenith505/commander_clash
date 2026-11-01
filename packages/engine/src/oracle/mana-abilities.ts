@@ -433,6 +433,13 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "This mana can't be spent to pay generic mana costs.") return { spells: { kind: "spell", text: "spells" }, abilities: "any", other: true, notGeneric: true, text: sentence };
   // Thran Turbine: "This mana can't be spent to cast spells": on abilities and other costs only (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells.") return { abilities: "any", other: true, text: sentence };
+  // Thieving Varmint: "Spend this mana only to cast spells you don't own" (CR 106.6, 108.3): the spell's owner, not its caster.
+  if (sentence === "Spend this mana only to cast spells you don't own.") return { spells: { kind: "spell", text: "spells you don't own" }, notOwnSpells: true, text: sentence };
+  // Brotherhood Headquarters: "only to cast an Assassin spell or a spell that has freerunning, or to activate an ability of
+  // an Assassin source": a spell with that creature type or with freerunning (CR 702.173), or an ability of a permanent or
+  // card anywhere with that creature type.
+  if (sentence === "Spend this mana only to cast an Assassin spell or a spell that has freerunning, or to activate an ability of an Assassin source.")
+    return { spells: { kind: "spell", anyOf: [{ kind: "spell", subtypes: ["Assassin"], text: "Assassin spell" }, { kind: "spell", keywords: ["Freerunning"], text: "spell that has freerunning" }], text: "Assassin spells or spells that have freerunning" }, abilities: { kind: "object", subtypes: ["Assassin"], text: "Assassin source" }, anyZone: true, text: sentence };
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand": on anything else (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells from your hand.") return { spells: { kind: "spell", text: "spells" }, notFromHand: true, abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).

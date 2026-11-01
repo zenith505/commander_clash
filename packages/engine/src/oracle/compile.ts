@@ -2491,6 +2491,18 @@ export function compile(d: CardDef): CompiledCard {
       out.noSacrificeCosts = noCosts[1] === "creatures" ? "creatures" : "nonland";
       continue;
     }
+    if (line === "If a creature you control would explore, instead it explores, then it explores again.") {
+      out.exploresTwice = true;
+      continue;
+    }
+    if (line === "As ~ enters, note your life total.") {
+      out.notesLifeOnEnter = true;
+      continue;
+    }
+    if (line === "Spells and abilities your opponents control can't cause you to sacrifice permanents.") {
+      out.opponentsCantMakeYouSacrifice = true;
+      continue;
+    }
     if (line === "If a player would gain life, that player gains no life instead.") {
       out.gainsNoLife = true;
       continue;
@@ -2936,7 +2948,8 @@ export function compile(d: CardDef): CompiledCard {
       out.youActivateLess = { n: Number(youActivateLess[1]), ...(youActivateLess[2] ? { atLeastOne: true as const } : {}) };
       continue;
     }
-    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    // Sam, Loyal Attendant: "Activated abilities of Foods you control cost {1} less to activate": any Food artifact (rulings).
+    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens|Foods)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {
       (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });

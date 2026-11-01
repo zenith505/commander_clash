@@ -858,6 +858,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject("its", ctx);
     return of?.ref === "target" ? count({ kind: "damageDealtToThisTurn", of }) : null;
   }
+  // Tangled Colony: "When ~ dies, create X ... tokens ..., where X is the amount of damage dealt to it this turn": the
+  // permanent it was (CR 400.7), all the damage dealt to it this turn (TurnLog.damageDealtTo).
+  if (/^the amount of damage dealt to it this turn$/.test(p)) {
+    const of = whoseObject("its", ctx);
+    return of?.ref === "self" || of?.ref === "target" ? count({ kind: "damageDealtToThisTurn", of }) : null;
+  }
   // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
   // (rulings).
   // Doran, Besieged by Time: "the difference between its power and toughness".

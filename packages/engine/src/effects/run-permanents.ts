@@ -1267,7 +1267,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "explore":
-      return explore(s, objects(s, e.what ?? { ref: "self" }, ctx)[0], ctx, src);
+      return exploreReplaced(s, objects(s, e.what ?? { ref: "self" }, ctx)[0], ctx, src);
     case "exploreEach": {
       // The rulings: each of them explores, in the order its controller chooses; nobody acts in between.
       const sc = (s.resolving!.scratch ??= {});
@@ -1286,7 +1286,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           st.current = picked && st.left.includes(picked) ? picked : st.left[0]!;
           st.left = st.left.filter((id) => id !== st.current);
         }
-        if (explore(s, s.objects[st.current], ctx, src) === "paused") return "paused";
+        if (exploreReplaced(s, s.objects[st.current], ctx, src) === "paused") return "paused";
         st.current = sc.explored = sc.may = undefined;
       }
       sc.exploreEach = undefined;
@@ -1906,6 +1906,26 @@ export function unlockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]) {
  * otherwise `self` gets a +1/+1 counter, then they decide whether the card goes to their graveyard (rulings). A
  * creature that has left still explores, with no counter.
  */
+/**
+ * One instruction to explore, replaced: Topography Tracker makes it explore twice, each one of them doubling it again
+ * (replacement effects of one kind applied to the modified event, cumulative like Alhammarret's Archive, CR 614.5, 616.1).
+ * "A creature you control": its controller's, the instruction's controller's once it has left.
+ */
+function exploreReplaced(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  if (sc.exploresLeft === undefined) {
+    const you = self && self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller;
+    const trackers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).exploresTwice).length;
+    sc.exploresLeft = 2 ** Math.min(trackers, 6);
+    if (trackers) log(s, `${self ? characteristics(s, self).name : src} explores ${sc.exploresLeft} times instead (Topography Tracker).`);
+  }
+  while (sc.exploresLeft > 0) {
+    if (explore(s, self, ctx, src) === "paused") return "paused";
+    sc.exploresLeft--;
+  }
+  sc.exploresLeft = undefined;
+}
+
 function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
   const p = player(s, ctx.controller);
   const sc = (s.resolving!.scratch ??= {});

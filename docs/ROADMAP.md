@@ -1,8 +1,8 @@
 # Roadmap
 
-28,869 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,276 of
-9,979 (92%).
+28,885 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
+9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -1488,6 +1488,25 @@ line blocks.
    "the number of creatures that were exiled under your opponents' control this turn" (Vren, the Relentless,
    TurnLog.creaturesExiled); "target creature that player controls becomes a Coward" (Gornog, the Red Reaper). +16
    (28,842 of 31,936 with B69 and B70).
+   Round 236 (top of the list, now done): "if you had another creature enter the battlefield under your control last
+   turn" (Ephara, God of the Polis, GameState.lastTurn.creaturesEntered); "where X is the amount of damage dealt to it
+   this turn" in a dies trigger (Tangled Colony: the permanent it was, TurnLog.damageDealtTo); "Spells and abilities
+   your opponents control can't cause you to sacrifice permanents" (Sigarda, Host of Herons and Tajuru Preserver:
+   cards.ts opponentForbidsSacrifice, no option to sacrifice either; costs of your own spells and abilities, mana
+   abilities included, are moveObject `cost`); "hexproof from each of its colors" (Tam, Mindful First-Year: filled in
+   from its colors in layer 6); "Remove X time counters from ~ and exile it: Return each nonland permanent card with
+   mana value X" (Hourglass of the Lost: an activated ability's own X); "and whenever a permanent you control enters
+   from exile" (Fire Lord Zuko) and "Whenever a land you control enters from anywhere other than your hand or you cast a
+   spell from anywhere other than your hand" (The Lost and the Damned); "Whenever the final chapter ability of a Saga
+   you control triggers" (Historian's Boon); "Activated abilities of Foods you control cost {1} less" (Sam, Loyal
+   Attendant); "If two cards that share a color were milled this way, repeat this process" (Grindstone); "choose a
+   kind of counter at random that ~ doesn't have on it" (Crystalline Giant); "note your life total" (Sigarda's
+   Splendor, GameObject.notedLife); "Whenever a nontoken creature an opponent controls enters this turn" (Theoretical
+   Duplication); "instead it explores, then it explores again" (Topography Tracker; two of them: four times,
+   cumulative as Alhammarret's Archive's rulings say); "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger:
+   a different creature for each age counter, itself allowed; browser test). +16 (28,858 of 31,936 with B69 and B70).
+   Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
+   the dead creature's +1/+1 counters).
    Out after round 235 (looked at, not done): Squandered Resources (mana of a type the sacrificed land could produce);
    Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
    players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
@@ -4109,8 +4128,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Ventifact Bottle), "creature or planeswalker an opponent controls that's red or white" and "deals damage equal to its
   power to that permanent" (Flourishing Grapple: that permanent is the first target; it was read as the creature
   dealing the damage), "a basic, Sphere, or Locus land card" and "Activate only if there are nine or more lands with
-  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,855 of 31,936
-  with rounds 230 to 235).
+  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,871 of 31,936
+  with rounds 230 to 236).
 - Round B72 (from EDHREC rank about 24,300 up to 13,300; every card left unread in that range that a "cards exiled
   with ~" or "while it has a counter" template could cover): cards exiled with ~ (CR 607.2a): "Put a creature card
   exiled with ~ onto the battlefield under your control. It gains haste until end of turn" (Yggdrasil, Rebirth Engine:
@@ -4131,7 +4150,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature's owner puts it on their choice of the top or bottom of their library" (Tolarian Contempt); "choose a
   suspended card you own and remove that many time counters from it" (Amy Pond: picked as it resolves, the last counter
   casts it, CR 702.62; browser test). Engine fix: a "top or bottom of their library" effect with several targets
-  looped forever (it moved the cards already put there again). +14 (28,869 of 31,936 with rounds 230 to 235).
+  looped forever (it moved the cards already put there again). +14 (28,885 of 31,936 with rounds 230 to 236).
 - Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 added escape until
   end of turn, now in main, to build on), Kheru Mind-Eater (whoever controls it may look at and play the face-down card),
   Lodestone Bauble (up to four basic land cards from one player's graveyard, the player chosen even with no target),

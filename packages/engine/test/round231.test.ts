@@ -1,7 +1,9 @@
 // Round 231: cards from the top of the popularity list. Loot, the Key to Everything ("the number of card types among
 // other nonland permanents you control"); Witch-king, Sky Scourge ("Whenever you attack with one or more Wraiths, exile
 // the top X cards of your library, where X is their total power"); Kaya, Orzhov Usurper; Shadow of the Enemy; Inside
-// Information; Amareth, the Lustrous; Ashiok, Nightmare Weaver; Connecting the Dots; Prowling Geistcatcher.
+// Information; Amareth, the Lustrous; Ashiok, Nightmare Weaver; Connecting the Dots (Bomat Courier and Moonring Mirror
+// came along); Prowling Geistcatcher; Typhoid Mary, Fractured; Genku, Future Shaper; Unexpected Results; Moment of
+// Reckoning.
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -82,6 +84,12 @@ const amareth = card("Amareth, the Lustrous", "Legendary Creature — Dragon", "
 const ashiok = card("Ashiok, Nightmare Weaver", "Legendary Planeswalker — Ashiok", "{1}{U}{B}", {"loyalty":"3","oracleText":"+2: Exile the top three cards of target opponent's library.\n−X: Put a creature card with mana value X exiled with Ashiok onto the battlefield under your control. That creature is a Nightmare in addition to its other types.\n−10: Exile all cards from all opponents' hands and graveyards."});
 const dots = card("Connecting the Dots", "Enchantment", "{1}{R}", {"oracleText":"Whenever a creature you control attacks, exile the top card of your library face down. (You can't look at it.)\n{1}{R}, Discard your hand, Sacrifice this enchantment: Put all cards exiled with this enchantment into their owners' hands."});
 const geistcatcher = card("Prowling Geistcatcher", "Creature — Human Rogue", "{3}{B}", {"power":"2","toughness":"4","oracleText":"Whenever you sacrifice another creature, exile it. If that creature was a token, put a +1/+1 counter on this creature.\nWhen this creature leaves the battlefield, return each card exiled with it to the battlefield under your control."});
+const typhoid = card("Typhoid Mary, Fractured", "Legendary Creature — Mutant Villain", "{1}{B}{R}", {"power":"3","toughness":"3","keywords":["Mary","Typhoid Mary","Bloody Mary","Treasure"],"oracleText":"Whenever Typhoid Mary attacks, choose one at random. If you discarded a card this turn, you choose one instead.\n• Mary — Create a Treasure token.\n• Typhoid Mary — Draw a card.\n• Bloody Mary — Each opponent loses 2 life and you gain 2 life."});
+const genku = card("Genku, Future Shaper", "Legendary Creature — Moonfolk Wizard", "{2}{W}{U}", {"power":"2","toughness":"5","oracleText":"Whenever another nontoken permanent you control leaves the battlefield, choose one that hasn't been chosen this turn. Create a creature token with those characteristics.\n• 2/2 white Fox with vigilance.\n• 1/2 blue Moonfolk with flying.\n• 1/1 black Rat with lifelink.\n{3}{W}{U}: Put a +1/+1 counter on each creature you control."});
+const unexpected = card("Unexpected Results", "Sorcery", "{2}{G}{U}", {"oracleText":"Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without paying its mana cost. If it's a land card, you may put it onto the battlefield and return Unexpected Results to its owner's hand."});
+const reckoning = card("Moment of Reckoning", "Sorcery", "{3}{W}{W}{B}{B}", {"oracleText":"Choose up to four. You may choose the same mode more than once.\n• Destroy target nonland permanent.\n• Return target nonland permanent card from your graveyard to the battlefield."});
+const bomat = card("Bomat Courier", "Artifact Creature — Construct", "{1}", {"power":"1","toughness":"1","keywords":["Haste"],"oracleText":"Haste\nWhenever this creature attacks, exile the top card of your library face down. (You can't look at it.)\n{R}, Discard your hand, Sacrifice this creature: Put all cards exiled with this creature into their owners' hands."});
+const moonring = card("Moonring Mirror", "Artifact", "{5}", {"oracleText":"Whenever you draw a card, exile the top card of your library face down.\nAt the beginning of your upkeep, you may exile all cards from your hand face down. If you do, put all other cards you own exiled with this artifact into your hand."});
 // Helpers.
 const ornithopter = card("Ornithopter", "Artifact Creature — Thopter", "{0}", { power: "0", toughness: "2", keywords: ["Flying"], oracleText: "Flying" });
 const pacifism = card("Test Aura Field", "Enchantment", "{1}{W}", { oracleText: "Creatures can't attack you unless their controller pays {1} for each creature they control that's attacking you." });
@@ -91,9 +99,20 @@ const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw t
 const outlet = card("Test Altar", "Artifact", "{1}", { oracleText: "Sacrifice a creature: You gain 1 life." });
 const murder = card("Test Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
 const bigBear = card("Test Ogre", "Creature — Ogre", "{2}{R}{R}", { power: "4", toughness: "3" });
+const wrath = card("Test Wrath", "Sorcery", "{2}{W}{W}", { oracleText: "Destroy all creatures." });
+const looting = card("Test Looting", "Sorcery", "{R}", { oracleText: "Draw two cards, then discard two cards." });
+/** Replaces a player's library with fresh copies of `def`. */
+const libraryOf = (s: GameState, pid: PlayerId, def: CardDef, n: number) => {
+  const p = s.players[pid]!;
+  for (const id of p.library.splice(0)) {
+    s.objects[id]!.zone = "exile";
+    p.exile.push(id);
+  }
+  return Array.from({ length: n }, () => into(s, pid, def, "library"));
+};
 
 describe("round 231: parse", () => {
-  it("every card of the round is fully supported", () => supported(loot, witchKing, kaya, shadow, inside, amareth, ashiok, dots, geistcatcher));
+  it("every card of the round is fully supported", () => supported(loot, witchKing, kaya, shadow, inside, amareth, ashiok, dots, geistcatcher, typhoid, genku, unexpected, reckoning, bomat, moonring));
 });
 
 describe("round 231: Loot, the Key to Everything", () => {
@@ -344,5 +363,145 @@ describe("round 231: Prowling Geistcatcher", () => {
     expect(zone(s, g)).toBe("graveyard");
     expect([zone(s, mine), zone(s, stolen)]).toEqual(["battlefield", "battlefield"]);
     expect([s.objects[mine]!.controller, s.objects[stolen]!.controller]).toEqual([ap, ap]);
+  });
+});
+
+describe("round 231: Bomat Courier and Moonring Mirror (face-down exile of the top card)", () => {
+  it("Bomat Courier exiles the top card face down as it attacks, and its sacrifice puts it into your hand", () => {
+    let { s, ap, opp } = setup([]);
+    const b = putOnBattlefield(s, ap, bomat);
+    const top = s.players[ap]!.library[0]!;
+    s = attack(s, ap, [{ attacker: b, defender: opp }]);
+    s = settle(s, { me: ap });
+    expect(zone(s, top)).toBe("exile");
+    s = passUntil(s, "main2", ap);
+    poolOnly(s, ap, { R: 1 });
+    s = settle(run(s, planActivate(s, ap, b, 0)));
+    expect(zone(s, top)).toBe("hand");
+  });
+
+  it("Moonring Mirror exiles the top card face down as you draw; at upkeep it trades your hand for those cards", () => {
+    let { s, ap, ids } = setup([looting]);
+    putOnBattlefield(s, ap, moonring);
+    s = settle(run(s, planCast(s, ap, ids[0]!)), { me: ap });
+    if (s.pending?.kind === "discard" || s.pending?.kind === "chooseCards") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
+    const hidden = s.players[ap]!.exile.filter((id) => s.objects[id]!.hiddenExile);
+    expect(hidden.length).toBe(2);
+    trimHand(s, ap);
+    const keep = into(s, ap, divination, "hand");
+    s = passUntil(s, "end", ap);
+    s = passUntil(s, "upkeep", ap);
+    s = settle(s, { me: ap });
+    expect(zone(s, keep)).toBe("exile");
+    expect(hidden.every((id) => zone(s, id) === "hand")).toBe(true);
+  });
+});
+
+describe("round 231: Typhoid Mary, Fractured", () => {
+  it("chooses one mode at random as it attacks", () => {
+    let { s, ap, opp } = setup([]);
+    const t = putOnBattlefield(s, ap, typhoid);
+    trimHand(s, ap);
+    const before = { life: s.players[ap]!.life, hand: s.players[ap]!.hand.length, perms: s.battlefield.length };
+    s = attack(s, ap, [{ attacker: t, defender: opp }]);
+    expect(s.pending?.kind).not.toBe("chooseModes");
+    s = settle(s, { me: ap });
+    const happened = [s.battlefield.length > before.perms, s.players[ap]!.hand.length > before.hand, s.players[ap]!.life > before.life];
+    expect(happened.filter(Boolean).length).toBe(1);
+  });
+
+  it("if you discarded a card this turn, you choose the mode instead", () => {
+    let { s, ap, opp, ids } = setup([looting, divination, divination]);
+    const t = putOnBattlefield(s, ap, typhoid);
+    poolOnly(s, ap, { R: 1 });
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s, { me: ap });
+    if (s.pending?.kind === "discard" || s.pending?.kind === "chooseCards") s = settle(act(s, botActions(s, ap)[0]!), { me: ap });
+    expect(s.players[ap]!.graveyard.length).toBeGreaterThanOrEqual(3);
+    s.objects[t]!.tapped = false;
+    trimHand(s, ap);
+    s = attack(s, ap, [{ attacker: t, defender: opp }]);
+    expect(s.pending?.kind).toBe("chooseModes");
+    const life = s.players[opp]!.life;
+    s = act(s, { type: "chooseModes", player: ap, modes: [2] });
+    s = settle(s, { me: ap });
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+describe("round 231: Genku, Future Shaper", () => {
+  it("each other nontoken permanent leaving makes a token of a mode not chosen this turn; a fourth makes none", () => {
+    let { s, ap, ids } = setup([wrath]);
+    putOnBattlefield(s, ap, genku);
+    for (let i = 0; i < 4; i++) putOnBattlefield(s, ap, bear());
+    const tokens = () => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap);
+    s = settle(run(s, planCast(s, ap, ids[0]!)), { me: ap });
+    // Each trigger asks in turn; the first one that can still be chosen each time.
+    for (let i = 0; i < 6 && s.pending?.kind === "chooseModes"; i++) {
+      const legal = s.pending.legal;
+      s = settle(act(s, { type: "chooseModes", player: ap, modes: [legal.indexOf(true)] }), { me: ap });
+    }
+    // Genku died with them; its triggers still each choose a different mode (rulings).
+    const made = tokens().map((id) => characteristics(s, s.objects[id]!).subtypes[0]).sort();
+    expect(made).toEqual(["Fox", "Moonfolk", "Rat"]);
+  });
+
+  it("a new turn lets the modes be chosen again", () => {
+    let { s, ap, opp, ids } = setup([murder, murder]);
+    putOnBattlefield(s, ap, genku);
+    const b1 = putOnBattlefield(s, ap, bear());
+    const b2 = putOnBattlefield(s, ap, bear());
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(b1)])), { me: ap });
+    if (s.pending?.kind === "chooseModes") s = settle(act(s, { type: "chooseModes", player: ap, modes: [0] }), { me: ap });
+    s = passUntil(s, "main1", opp);
+    s = passUntil(s, "main1", ap);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(b2)])), { me: ap });
+    expect(s.pending?.kind).toBe("chooseModes");
+    if (s.pending?.kind !== "chooseModes") throw new Error();
+    expect(s.pending.legal).toEqual([true, true, true]);
+  });
+});
+
+describe("round 231: Unexpected Results", () => {
+  it("a nonland card on top may be cast for free as it resolves; the spell goes to the graveyard", () => {
+    let { s, ap, ids } = setup([unexpected]);
+    libraryOf(s, ap, divination, 5);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s, { me: ap });
+    expect(s.pending?.kind).toBe("castFree");
+    if (s.pending?.kind !== "castFree") throw new Error();
+    const div = s.pending.objectId;
+    s = settle(act(s, { type: "castSpell", player: ap, objectId: div, payment: [], targets: [] } as unknown as Action), { me: ap });
+    expect(zone(s, div)).toBe("graveyard");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+
+  it("a land card may be put onto the battlefield, returning the spell to its owner's hand; declined, both stay", () => {
+    let { s, ap, ids } = setup([unexpected]);
+    const lands = libraryOf(s, ap, card("Test Wastes", "Land", "", { oracleText: "{T}: Add {C}." }), 5);
+    s = settle(run(s, planCast(s, ap, ids[0]!)), { me: ap, may: true });
+    expect(lands.filter((id) => zone(s, id) === "battlefield").length).toBe(1);
+    expect(zone(s, ids[0]!)).toBe("hand");
+    s = settle(run(s, planCast(s, ap, ids[0]!)), { me: ap, may: false });
+    expect(lands.filter((id) => zone(s, id) === "battlefield").length).toBe(1);
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+});
+
+describe("round 231: Moment of Reckoning", () => {
+  it("chooses up to four modes, the same one more than once", () => {
+    let { s, ap, opp, ids } = setup([reckoning]);
+    const a = putOnBattlefield(s, opp, bear());
+    const b = putOnBattlefield(s, opp, pacifism);
+    const back = into(s, ap, bigBear, "graveyard");
+    poolOnly(s, ap, { W: 2, B: 2, C: 3 });
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(a), tgt(b), tgt(back)], [0, 0, 1])), { me: ap });
+    expect([zone(s, a), zone(s, b), zone(s, back)]).toEqual(["graveyard", "graveyard", "battlefield"]);
+    // Four is the most.
+    const { s: s2, ap: ap2, opp: opp2, ids: ids2 } = setup([reckoning]);
+    const xs = Array.from({ length: 5 }, () => putOnBattlefield(s2, opp2, bear()));
+    poolOnly(s2, ap2, { W: 2, B: 2, C: 3 });
+    expect(planCast(s2, ap2, ids2[0]!, xs.map(tgt), [0, 0, 0, 0, 0])).toBeNull();
+    expect(planCast(s2, ap2, ids2[0]!, xs.slice(0, 4).map(tgt), [0, 0, 0, 0])).not.toBeNull();
   });
 });

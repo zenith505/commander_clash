@@ -1112,6 +1112,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (!body || usesX(body.modal!.modes)) return null;
     return { ...body, modal: { ...body.modal!, maxCount } };
   }
+  // Typhoid Mary, Fractured: "choose one at random. If you discarded a card this turn, you choose one instead. • ...":
+  // checked as the trigger is put on the stack, when its mode is chosen (CR 603.3c).
+  const randomUnless = !opts.spell && !opts.activated ? /^[Cc]hoose one at random\. If ([^.]+), you choose one instead(?:\.| —)\s*((?:•[^•]+)+)$/.exec(text.trim()) : null;
+  if (randomUnless) {
+    const cond = parseStaticCondition(randomUnless[1]!);
+    const body = cond ? parseModal("one", randomUnless[2]!, text.trim(), opts) : null;
+    if (!body) return null;
+    return { ...body, modal: { ...body.modal!, random: true, randomUnless: cond! } };
+  }
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -2902,6 +2911,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // Unexpected Results: "Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without
+    // paying its mana cost. If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand." Cast
+    // as this resolves (ignoring card-type timing), or it stays on top; the spell goes to your hand from the stack only if
+    // the land was put onto the battlefield (rulings).
+    if (ctx.spell && s === "Shuffle your library" && sentences[si + 1] === "Reveal the top card" && sentences[si + 2] === "If it's a nonland card, you may cast it without paying its mana cost" && sentences[si + 3] === "If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand") {
+      const land: TargetSpec = { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" };
+      effects.push(
+        { type: "shuffle", who: { ref: "you" } },
+        { type: "revealTop" },
+        { type: "if", cond: { kind: "revealedIs", filter: land, not: true }, effects: [{ type: "playLinked", revealed: true }] },
+        { type: "if", cond: { kind: "revealedIs", filter: land }, effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" } }, { type: "spellToHand" }], text: "put the revealed land onto the battlefield and return ~ to its owner's hand" }] },
+      );
+      si += 3;
+      continue;
+    }
     // Spinal Embrace: "At the beginning of the next end step, sacrifice it. If you do, you gain life equal to its toughness":
     // one delayed trigger (CR 603.7) about the creature; you sacrifice it only if you still control it then (rulings, CR
     // 701.21a), and gain life only if you did, its toughness as it last existed (CR 608.2h).
@@ -10919,9 +10943,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Ashiok, Nightmare Weaver: "Put a creature card with mana value X exiled with ~ onto the battlefield under your
     // control. That creature is a Nightmare in addition to its other types": as it enters, from then on.
     const nightmare = /^That creature is an? ([A-Z][a-z]+) in addition to its other types$/.exec(s);
-    if (nightmare && CREATURE_TYPES.has(nightmare[1]!)) {
-      const prev = effects[effects.length - 1];
-      if (prev?.type !== "moveLinked" || prev.dest !== "battlefield" || !prev.one || prev.alsoMods || prev.ownersControl) return null;
+    const nightmarePrev = effects[effects.length - 1];
+    if (nightmare && CREATURE_TYPES.has(nightmare[1]!) && nightmarePrev?.type === "moveLinked") {
+      const prev = nightmarePrev;
+      if (prev.dest !== "battlefield" || !prev.one || prev.alsoMods || prev.ownersControl) return null;
       prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [nightmare[1]!] }];
       continue;
     }
@@ -13683,7 +13708,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
 
 // "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
 // "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
-const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
+const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|up to four|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
@@ -13698,6 +13723,8 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "up to one": () => [0, 1],
   // Call Damage Control: "Choose up to two." on a spell: none, one or two (CR 700.2).
   "up to two": () => [0, 2],
+  // Moment of Reckoning: "Choose up to four. You may choose the same mode more than once." (two modes).
+  "up to four": () => [0, 4],
   // "Choose any number —" (Rankle and Torbran): none, some or all, in the order printed (rulings).
   "any number": (n) => [0, n],
 };
@@ -13707,14 +13734,15 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
   for (const b of bullets.split("•").map((x) => x.trim()).filter(Boolean)) {
     // "Street Justice — Exile target creature ...": a mode's name is a flavor word, with no rules meaning (CR 207.2d).
     // A trigger's modes can say what its event was about: "Create a Royal Role token attached to that creature".
-    const body = parseBody(b.replace(/^[A-Z][A-Za-z' ,!-]* — /, ""), opts);
+    // Typhoid Mary, Fractured: "Typhoid Mary — Draw a card", the card's own name (so "~") as the flavor word.
+    const body = parseBody(b.replace(/^(?:[A-Z][A-Za-z' ,!-]*|~) — /, ""), opts);
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }
   // Only a triggered ability's, whose modes may all be left out (CR 700.2b, 603.3c).
   if (count === "any number" && (opts.spell || opts.activated)) return null;
   const [min, max] = MODE_COUNTS[count]!(modes.length);
-  if (modes.length < 2 || max > modes.length) return null;
+  if (modes.length < 2 || (max > modes.length && count !== "up to four")) return null;
   return { targets: [], effects: [], text, modal: { min, max, modes } };
 }
 

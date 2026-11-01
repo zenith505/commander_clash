@@ -2361,7 +2361,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       }
       // The only possible choice, unless choosing none is one too ("you may choose two").
       else if (n === min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
-      else if (printed.modal.random) {
+      else if (printed.modal.random && !(printed.modal.randomUnless && staticConditionNow(s, printed.modal.randomUnless, t.sourceId, t.controller))) {
         // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
         const can = legal.flatMap((ok, i) => (ok ? [i] : []));
         t.modes = [can[Math.floor(nextRandom(s) * can.length)]!];

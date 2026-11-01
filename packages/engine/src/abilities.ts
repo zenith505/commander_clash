@@ -4265,6 +4265,8 @@ export interface AbilityBody {
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
     unchosen?: "ever" | "turn";
     random?: true;
+    /** With `random`: "If you discarded a card this turn, you choose one instead" (Typhoid Mary, Fractured): chosen by the controller while this holds. */
+    randomUnless?: StaticCondition;
     /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
     optional?: true;
     /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */

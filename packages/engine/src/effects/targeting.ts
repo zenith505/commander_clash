@@ -1109,7 +1109,9 @@ export function modesUsed(s: GameState, body: AbilityBody, sourceId?: ObjectId):
 /** Remember the modes chosen for a "choose one that hasn't been chosen [this turn]" ability of `sourceId` (see modesUsed). */
 export function noteModesChosen(s: GameState, body: AbilityBody, sourceId: ObjectId, modes: number[], sourceZc?: number) {
   const o = s.objects[sourceId];
-  if (!body.modal?.unchosen || !o || (sourceZc !== undefined && (o.zoneChanges ?? 0) !== sourceZc)) return;
+  // A source that has left the battlefield (Genku leaving with other permanents, its triggers put on the stack after): kept
+  // on the card it became, so each of those triggers chooses a different mode (rulings); a new permanent starts over.
+  if (!body.modal?.unchosen || !o || (sourceZc !== undefined && (o.zoneChanges ?? 0) !== sourceZc && o.zone === "battlefield")) return;
   const before = modesUsed(s, body, sourceId);
   (o.modesChosen ??= {})[body.text] = { modes: [...before, ...modes], turn: s.turn };
 }

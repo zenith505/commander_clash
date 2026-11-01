@@ -607,7 +607,8 @@ export function compile(d: CardDef): CompiledCard {
       .replace(/\b([Ee])nchanted (Forest|Island|Swamp|Mountain|Plains)(?= becomes | is put into a graveyard| is an? )/g, (x, e: string, t: string, _i, text: string) => (new RegExp(`^Enchant ${t}$`, "m").test(text) ? `${e}nchanted land` : x))
       .split("\n")
       .map((l) => {
-        const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
+        // Moment of Reckoning: "Choose up to four. You may choose the same mode more than once.": none to four of them.
+        const same = /^Choose (one|two|three|four|five|up to four)\. You may choose the same mode more than once\.$/.exec(l.trim());
         if (same && isSpell) {
           repeat = true;
           return `Choose ${same[1]} —`;
@@ -4925,11 +4926,16 @@ export function compile(d: CardDef): CompiledCard {
   }
   if (repeat) {
     const modal = out.spell?.modal;
-    if (modal && !modal.costs && !modal.pawprints && modal.min === modal.max && modal.min > 1) modal.repeat = true;
+    if (modal && !modal.costs && !modal.pawprints && ((modal.min === modal.max && modal.min > 1) || (modal.min === 0 && modal.max > 1))) modal.repeat = true;
     else if (out.spell) {
       delete out.spell;
       out.unsupported.push("You may choose the same mode more than once.");
     }
+  }
+  // More modes to choose than there are, without "the same mode more than once": not a list we read.
+  if (out.spell?.modal && !out.spell.modal.repeat && !out.spell.modal.pawprints && out.spell.modal.max > out.spell.modal.modes.length) {
+    delete out.spell;
+    out.unsupported.push("(chooses more modes than it has)");
   }
   if (escalate && escalate !== "fail") {
     // A "Choose one or more" (or "one or both") list without other mode costs.
@@ -5620,8 +5626,18 @@ function joinRollTables(lines: string[]): void {
  * A modal ability is a "choose ... —" line followed by one line per mode, each starting
  * with a bullet (CR 700.2). Join them into one line so the ability is compiled as a whole.
  */
-function joinModes(lines: string[]): string[] {
+function joinModes(lines0: string[]): string[] {
   const out: string[] = [];
+  // Genku, Future Shaper: "choose one that hasn't been chosen this turn. Create a creature token with those
+  // characteristics." then "• 2/2 white Fox with vigilance." and so on: each mode creates that token.
+  const lines = lines0.map((l, i) => {
+    const head = /^(.+, choose one that hasn't been chosen this turn)\. Create a creature token with those characteristics\.$/.exec(l);
+    if (head && /^\s*•/.test(lines0[i + 1] ?? "")) return `${head[1]} —`;
+    const tokenMode = /^\s*• (\d+\/\d+ (?:white|blue|black|red|green) [A-Z][a-z]+)( with [a-z ]+)?\.$/.exec(l);
+    const header = lines0.slice(0, i).reverse().find((x) => !/^\s*•/.test(x));
+    if (tokenMode && header && /, choose one that hasn't been chosen this turn\. Create a creature token with those characteristics\.$/.test(header)) return `• Create a ${tokenMode[1]} creature token${tokenMode[2] ?? ""}.`;
+    return l;
+  });
   // "{4}, {T}: Choose one. Activate only as a sorcery." then the modes (Aetheric Amplifier): the restriction goes after
   // the last mode, where the activated ability's parser reads it.
   let restriction: string | undefined;
@@ -5651,7 +5667,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
     // Glorfindel, Dauntless Rescuer: "..., choose one and ~ gets +1/+1 until end of turn." too.
-    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random(?:\. If [^.]+, you choose one instead)?|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
     else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);

@@ -1,7 +1,7 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
+import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -4503,11 +4503,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Enchanted creature has protection from the chosen color. This effect doesn't remove ~." (Cho-Manno's Blessing)
-    const spare = /^(Enchanted creature has protection from .+?\.) This effect doesn't remove ~\.$/.exec(line);
+    // Tattoo Ward: "Enchanted creature gets +1/+1 and has protection from enchantments. This effect doesn't remove ~.";
+    // Spectra Ward: "... protection from each color. This effect doesn't remove Auras.": no Aura falls off for it, this
+    // one or another (rulings), though one from elsewhere still does (CR 702.16c).
+    const spare = /^(Enchanted creature (?:gets [+-]\d+\/[+-]\d+ and )?has protection from .+?\.) This effect doesn't remove (~|Auras)\.$/.exec(line);
     if (spare) {
       const st = parseStatic(spare[1]!);
-      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
-      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
+      const prot = (m: Modification) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k));
+      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.some(prot) && st.mods.every((m) => prot(m) || m.kind === "modifyPT");
+      const spares = spare[2] === "Auras" ? ("auras" as const) : (true as const);
+      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => (prot(m) ? { ...m, spares } : m)) as typeof st.mods, text: line });
       else out.unsupported.push(raw);
       continue;
     }

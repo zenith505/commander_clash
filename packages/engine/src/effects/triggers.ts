@@ -280,6 +280,8 @@ export type TriggerSourceEvent =
   | { type: "targeted"; stackId: string; only?: ObjectId[] }
   /** A player searched their own library (CR 701.23). */
   | { type: "searchedLibrary"; player: PlayerId }
+  /** A player's library was shuffled (CR 701.24), by its owner. */
+  | { type: "shuffledLibrary"; player: PlayerId }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number; /** The controller of the spell or ability whose effect made them discard, if one did (not a cost). */ cause?: PlayerId }
   /** A card (or token) was put into a graveyard, from any zone. */
@@ -2163,6 +2165,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentSearchesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "shuffledLibrary") {
+    // Cosi's Trickster, Psychic Surgery: each shuffle triggers it once (rulings: twice for Green Sun's Zenith).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you !== ev.player) add(o, you, (e) => e === "opponentShufflesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "draw") {
     const draws = (o: GameObject, you: PlayerId) =>

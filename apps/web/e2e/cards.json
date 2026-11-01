@@ -311,6 +311,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23b2de61-a29c-4a32-b38c-408c723727ce",
+  "name": "Agency Outfitter",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Sphinx Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx",
+   "Detective"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may search your graveyard, hand and/or library for a card named Magnifying Glass and/or a card named Thinking Cap and put them onto the battlefield. If you search your library this way, shuffle.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
   "name": "Agitator Ant",
   "manaCost": "{2}{R}",
@@ -2224,6 +2257,37 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cef9e0d3-5e28-4c5f-88fc-0d78af5a4db1",
+  "name": "Boggart Forager",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Rogue"
+  ],
+  "oracleText": "{R}, Sacrifice this creature: Target player shuffles their library.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11701,6 +11765,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f2ce9e55-07c0-4f36-a59e-127693fc0f62",
+  "name": "Magnifying Glass",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{4}, {T}: Investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Investigate"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -15180,6 +15271,32 @@
   "commanderLegal": "legal",
   "set": "som",
   "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e5128230-3535-4f77-8b97-20d0791e7b1d",
+  "name": "Psychic Surgery",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an opponent shuffles their library, you may look at the top two cards of that library. You may exile one of those cards. Then put the rest on top of that library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20046,6 +20163,32 @@
   "set": "znr",
   "releasedAt": "2020-09-25",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a54fb3de-0581-461e-be33-dc4f4d16a33e",
+  "name": "Thinking Cap",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+2.\nEquip Detective {1}\nEquip {3} ({3}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

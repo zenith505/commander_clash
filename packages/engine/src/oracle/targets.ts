@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan", "Room"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Sphere", "Spacecraft", "Planet", "Plan", "Room"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 const CREATURE_OR_LEGENDARY: TargetSpec[] = [{ kind: "object", types: ["Creature"], text: "creature" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }];
@@ -1227,7 +1227,8 @@ export function parseTargetPhrase(
   if (thatsCombat) return parseTargetPhrase(`${thatsCombat[1] ?? ""}${thatsCombat[3]} ${thatsCombat[2]}creature`, opts);
   // Terminal Criticism: "creature or planeswalker that's blue or red"; Essence Burn: "black or green creature or
   // planeswalker": a creature or planeswalker of either color.
-  const huedTypes = /^(target )?(?:(white|blue|black|red|green) or (white|blue|black|red|green) (creature or planeswalker)|(creature or planeswalker) that's (white|blue|black|red|green) or (white|blue|black|red|green))$/.exec(phrase.trim());
+  // Flourishing Grapple: "creature or planeswalker an opponent controls that's red or white".
+  const huedTypes = /^(target )?(?:(white|blue|black|red|green) or (white|blue|black|red|green) (creature or planeswalker)|(creature or planeswalker(?: an opponent controls| you control)?) that's (white|blue|black|red|green) or (white|blue|black|red|green))$/.exec(phrase.trim());
   if (huedTypes) {
     const head = parseTargetPhrase(`${huedTypes[1] ?? ""}${huedTypes[4] ?? huedTypes[5]}`, opts);
     const colors = [huedTypes[2] ?? huedTypes[6], huedTypes[3] ?? huedTypes[7]].map((c) => COLOR_WORDS[c!]!);

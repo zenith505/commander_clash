@@ -2306,6 +2306,8 @@ export interface Resolving {
   returnedNontoken?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
+  /** How many cards a dig with rest "keep" left on top (an orderTop with `digRest` arranges them). */
+  digRest?: number;
   /** How many cards its last look at the top of a library put into a hand (Count "dugToHand"). */
   dugToHand?: number;
   /** The cards it put there (Count "dugToHandMv"). */

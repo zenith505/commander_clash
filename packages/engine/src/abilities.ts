@@ -1042,6 +1042,8 @@ export interface SearchDest {
   attachToSelf?: true;
   /** "Put it onto the battlefield attached to target player" (Bitterheart Witch): an Aura enchanting that player only, if it could, else it stays in the library (CR 303.4f-g). */
   attachToPlayer?: PlayerRef;
+  /** "Put it onto the battlefield attached to target creature" (Arachnus Spinner): an Aura only onto that creature, if it's still a legal target and it could enchant it, else it stays where it is (CR 303.4f-g). */
+  attachTo?: ObjRef;
   /** "Search your library for any number of Plains cards, exile them" (Endless Horizons): the cards exiled are linked to the source, for its "a card you own exiled with ~" (CR 607.2a). */
   linked?: true;
   /** "Exile the other with a silver counter on it" (Karn, Scion of Urza): a counter of this kind on each card exiled (CR 122.1). */
@@ -1518,7 +1520,7 @@ export type Modification =
    * creature card in your graveyard has flying. The same is true for ..." (Bleeding Effect): those a creature card in
    * its controller's graveyard has as it resolves.
    */
-  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true | "graveyard" }
+  | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. */ spares?: true | "auras"; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -3342,7 +3344,7 @@ export type Effect =
   /** Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature token (you gain 5 life) instead." (Player.nextDrawInstead) */
   | { type: "nextDrawInstead"; gain?: number; token?: TokenSpec }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
-  | { type: "orderTop"; who: PlayerRef; n: Amount; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
+  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "Then put the rest on top ... in any order" (Psychic Surgery): only the cards a dig before it left there, at most `n` (one left has no order to choose). */ digRest?: true; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
    * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
    * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
@@ -4583,6 +4585,11 @@ export type TriggerEvent =
   | "playerDiscards"
   /** "Whenever an opponent searches their library" (Archivist of Oghma): their own library, not another's (rulings). */
   | "opponentSearchesLibrary"
+  /**
+   * "Whenever an opponent shuffles their library" (Cosi's Trickster, Psychic Surgery): each time one is told to shuffle
+   * their library (CR 701.24), an empty one too; cards put on the bottom in a random order aren't shuffled (rulings).
+   */
+  | "opponentShufflesLibrary"
   /**
    * "Whenever an opponent attacks you with two or more creatures" (Everett K. Ross), "Whenever an opponent attacks with
    * creatures, if two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara, Tomik): see

@@ -65,6 +65,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "castFromAmong" && e.who.ref === "target") mark(e.who.index);
     // "Put it onto the battlefield attached to target player" (Bitterheart Witch): a Curse, for an opponent.
     if (e.type === "search" && e.dest.attachToPlayer?.ref === "target") mark(e.dest.attachToPlayer.index);
+    // "Put it onto the battlefield attached to target creature" (Arachnus Spinner, the only one): Arachnus Web, which stops
+    // that creature attacking or blocking, for an opponent's creature.
+    if (e.type === "search" && e.dest.attachTo?.ref === "target") mark(e.dest.attachTo.index, e.dest.attachTo.n);
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);

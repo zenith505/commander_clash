@@ -1,7 +1,7 @@
 # Roadmap
 
-28,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,252 of
+28,826 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,259 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1452,6 +1452,31 @@ line blocks.
    foretold. Its foretell cost is its mana cost reduced by {2}" (Ethereal Valkyrie, CR 702.143; hand picker and browser
    test; a card with its own foretell uses the cheaper cost). Pick prompts now show the effect's own prompt text. +13
    (28,812 of 31,936 with B67 to B70).
+   Round 234 (top of the list, now done): "copy that spell if it targets a permanent or player ... If you don't copy a
+   spell this way, draw a card" (Shiko and Narset, Unified, checked as the trigger resolves); "Draw a card for each
+   creature you control but don't own" and "Starting with you, each player chooses a creature. Destroy each creature
+   chosen this way" (The Horus Heresy: anyone's creature, picker and browser test); "exile cards equal to its power from
+   the top of its owner's library ... mana of any type can be spent" (Dead Man's Chest, CR 609.4b); "Choose any number
+   of artifact tokens and/or creature tokens you control with different names. For each of them, create a token that's
+   a copy of it" (Battle for Bretagard; the picker refuses two of one name, browser test); "Exile any number of historic
+   cards from your graveyard with total mana value 30 or greater" as a cost, not collecting evidence, and the emblem's
+   "base power and toughness 9/9" (The Capitoline Triad; picker and browser test); "If you've cycled a card named ~ four
+   or more times this game" (Yidaro, Wandering Monster: Player.cycledNames; the library is shuffled even if it left the
+   graveyard); "then puts each Goblin card milled this way into their hand" (Grub's Command); "becomes a Human Soldier
+   creature with power and toughness each equal to the number of loyalty counters on him" (Gideon, Champion of Justice,
+   locked in as it resolves, rulings); "target player or planeswalker and ... up to one target creature that player or
+   that planeswalker's controller controls" and "Choose an instant or sorcery card exiled this way and copy it three
+   times" (Chandra, Pyromaster; also Soul of Shandalar and Huntmaster of the Fells's Ravager); "Whenever you attack this
+   turn, ~ deals damage ... to that creature" and "a red instant or sorcery spell" (Jaya, Fiery Negotiator; also
+   Unyaro Griffin); "exile all creatures blocked by this creature" (Wall of Nets, returned when it leaves). +14
+   (28,826 of 31,936 with B69 and B70).
+   Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
+   "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
+   activated abilities); Brutal Hordechief (you choose how opponents' creatures block); Sudden Substitution (exchange
+   control of a spell and a creature); Lobelia, Defender of Bag End (exile the top card of each opponent's library face
+   down, play them free); Spinerock Tyrant (copies that gain wither); Curse of Echoes (each other player may copy the
+   spell); Sovereigns of Lost Alara (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
+   with undaunted).
    Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
    trigger); Sorceress's Schemes (target a card in exile that has flashback); Cursecloth Wrappings (embalm granted to a
    graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage

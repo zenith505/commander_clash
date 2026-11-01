@@ -169,7 +169,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}) };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}), ...(e.differentNames ? { differentNames: true as const } : {}) };
       return "paused";
     }
     if (!n || (e.upTo && !options.length)) {
@@ -195,7 +195,8 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // Drop of Honey, Purging Scythe: one of those tied for the least power or toughness, anyone's.
       const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
       const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
-      const fate = tied ?? ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
+      // The Horus Heresy: anyone's creature, in the ability's own words.
+      const fate = tied ?? (e.anyController && e.prompt ? undefined : (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
       // The ability's own words otherwise (Sunder the Gateway: "click an Incubator token you control to transform it").
       const own = e.prompt?.replace(/~/g, src);
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, ...(fate ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}) };
@@ -1391,8 +1392,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       };
       const isLand = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
       const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
+      // Chandra, Pyromaster: one card chosen, then only its copies.
+      const copiedOne = e.oneCard ? Object.keys(st.copied ?? {}) : [];
       const options = st.ids
         .map((x) => x.id)
+        .filter((id) => !copiedOne.length || copiedOne.includes(id))
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       if (e.look && options.length === 1) {

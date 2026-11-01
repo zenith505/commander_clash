@@ -730,6 +730,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.lki?.exploitedBy && ctx.lki.exploitedBy.id === ctx.sourceId && (ctx.sourceZc === undefined || ctx.lki.exploitedBy.zc === ctx.sourceZc)
             : e.cond.kind === "subjectWasAttacking"
             ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
+            : e.cond.kind === "cycledSelfNamed"
+            ? ((o) => !!o && (player(s, ctx.controller).cycledNames?.[defOf(s, o).name] ?? 0) >= (e.cond as { n: number }).n)(ctx.sourceId ? s.objects[ctx.sourceId] : undefined)
+            : e.cond.kind === "causeTargetsPermanentOrPlayer"
+            ? (() => {
+                const item = s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause ?? ""];
+                return (item?.targets ?? []).some((t) => t.kind === "player" || (t.kind === "object" && ((o) => !!o && o.zone === "battlefield" && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc))(s.objects[t.id])));
+              })()
             : e.cond.kind === "causeSpellIs"
             ? ((f) => {
                 // The spell the cast trigger is about, on the stack or gone from it (its card, as it was cast).

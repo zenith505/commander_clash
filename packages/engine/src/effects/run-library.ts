@@ -1753,6 +1753,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
+  if (cycled) for (const c of cards) (player(s, pid).cycledNames ??= {})[c.name] = (player(s, pid).cycledNames?.[c.name] ?? 0) + 1;
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}), ...(cause !== undefined ? { cause } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }

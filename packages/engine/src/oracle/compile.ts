@@ -4512,6 +4512,17 @@ export function compile(d: CardDef): CompiledCard {
       });
       continue;
     }
+    // Shiko and Narset, Unified: "Flurry — Whenever you cast your second spell each turn, copy that spell if it targets a
+    // permanent or player, and you may choose new targets for the copy. If you don't copy a spell this way, draw a card."
+    // Checked as the trigger resolves; a spell with such a target is copied even if no new target could be legal, and
+    // one without it draws (rulings).
+    if (line === "Whenever you cast your second spell each turn, copy that spell if it targets a permanent or player, and you may choose new targets for the copy. If you don't copy a spell this way, draw a card.") {
+      const t = parseTrigger("Whenever you cast your second spell each turn, copy that spell. You may choose new targets for the copy.");
+      const draw = parseBody("Draw a card.");
+      if (!t || t === "fail" || !draw || draw.targets.length) out.unsupported.push(raw);
+      else out.triggers.push({ ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "causeTargetsPermanentOrPlayer" }, effects: t.body.effects, otherwise: draw.effects }], text: line.replace(/^Whenever [^,]+, /, "") } });
+      continue;
+    }
     // Ivy, Gleeful Spellthief: "Whenever a player casts a spell that targets only a single creature other than ~, you may
     // copy that spell. The copy targets ~." Every target of it the same creature (rulings), a copy for this ability's
     // controller aimed at ~ if ~ is a legal target for it, even if the spell is gone by then (rulings, CR 707.10c).
@@ -5496,7 +5507,8 @@ function linkExile(out: CompiledCard) {
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
   // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it": the card the sacrifice put in a graveyard.
-  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice"))));
+  // Wall of Nets: "At end of combat, exile all creatures blocked by ~".
+  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice") || (e.what.ref === "blockingIt" && !!e.what.blocked && t.event === "eachEndCombat"))));
   // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
   // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
   // that became this permanent (CR 607.2q, recorded as it's cast).

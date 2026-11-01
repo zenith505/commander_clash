@@ -3915,7 +3915,7 @@ export type Effect =
    * (Jace, Multiverse Architect): `who`'s creatures, this turn; `subtype`: only planeswalkers of that type you control
    * instead of you.
    */
-  | { type: "attackBanThisTurn"; who: PlayerRef; subtype?: string }
+  | { type: "attackBanThisTurn"; who: PlayerRef; subtype?: string; /** "Can't attack you this combat" (Champions of Minas Tirith): this combat phase only. */ combat?: true }
   /** Wall of Dust: "that creature can't attack during its controller's next turn": that player's next turn, while it's the same object (CR 400.7). */
   | { type: "cantAttackNextTurn"; what: ObjRef }
   /**

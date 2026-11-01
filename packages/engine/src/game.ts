@@ -9560,8 +9560,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
   // Web of Inertia: that player only (not their planeswalkers or battles); Jace, Multiverse Architect: their Jaces only.
   for (const b of player(s, c.controller).attackBansThisTurn ?? []) {
-    if (b.turn !== s.turn || b.player !== hit) continue;
-    if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this turn`;
+    if (b.turn !== s.turn || b.player !== hit || (b.combat !== undefined && b.combat !== (s.combatsThisTurn ?? 0))) continue;
+    if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this ${b.combat !== undefined ? "combat" : "turn"}`;
     if (b.subtype && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker") && characteristics(s, obj(s, attacked)).subtypes.includes(b.subtype)) return `${c.name} can't attack ${b.subtype}s ${player(s, hit).name} controls this turn`;
   }
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;

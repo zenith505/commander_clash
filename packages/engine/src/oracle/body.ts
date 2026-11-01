@@ -4761,7 +4761,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     // Mtenda Lion, Shrouded Serpent: "Whenever ~ attacks, defending player may pay {U}": the player it's attacking (CR 506.2).
-    const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Dd]efending player) may pay (.+)$/.exec(s);
+    const thatMay = /^([Tt]hat player|[Tt]hat opponent|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Dd]efending player) may pay (.+)$/.exec(s);
+    // Champions of Minas Tirith: "that opponent may pay {X}, where X is the number of cards in their hand. If they don't,
+    // they can't attack you this combat": a punisher whose penalty is that restriction (CR 508.1c), in this combat only.
+    const cantAttack = thatMay && /^If (?:the player|that player|they) (?:doesn't|don't), they can't attack you this combat\.?$/.test(sentences[si + 1] ?? "");
+    if (thatMay && cantAttack) {
+      // "On each opponent's turn, ... that opponent": the player whose turn it is.
+      const who = /^that opponent$/i.test(thatMay[1]!) ? (ctx.eventPlayer ? { ref: "eventPlayer" as const } : null) : parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
+      if (!who || who.ref === "you" || options?.length !== 1 || !("pay" in options[0]!)) return null;
+      effects.push({ type: "punisher", who, options, effects: [{ type: "attackBanThisTurn", who: { ref: "punished" }, combat: true }], penalty: "your creatures can't attack {you} this combat" });
+      si++;
+      continue;
+    }
     // "If they don't, return that card to the battlefield under your control ..." (Meathook Massacre II): what you do.
     const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+|return that card to the battlefield under your control.*)$/.exec(sentences[si + 1] ?? "");
     if (thatMay && thatThen) {
@@ -13912,6 +13924,11 @@ export function usesX(v: unknown): boolean {
 export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   let m: RegExpExecArray | null;
   if (text === "{X}") return { cost: "", generic: X };
+  // Champions of Minas Tirith: "{X}, where X is the number of cards in their hand", counted as it resolves.
+  if ((m = /^\{X\}, where X is (.+)$/.exec(text))) {
+    const n = parseCount(m[1]!, ctx);
+    return n && typeof n === "object" ? { cost: "", generic: n } : null;
+  }
   // Thassa's Intervention: "twice {X}", generic mana.
   if (text === "twice {X}") return { cost: "", generic: { count: { kind: "x" }, times: 2 } };
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };

@@ -767,7 +767,7 @@ export interface Player {
    */
   attackBansNextTurn?: { player: PlayerId; turn?: number }[];
   /** Effect attackBanThisTurn: this player's creatures can't attack `player` (or, with `subtype`, their planeswalkers of that type) during `turn`. */
-  attackBansThisTurn?: { player: PlayerId; turn: number; subtype?: string }[];
+  attackBansThisTurn?: { player: PlayerId; turn: number; subtype?: string; /** "This combat" (Champions of Minas Tirith): only in that combat phase (GameState.combatsThisTurn). */ combat?: number }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */

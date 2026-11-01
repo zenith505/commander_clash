@@ -8,7 +8,8 @@
 // control", X checked once); Wernog, Rider's Chaplain ("each opponent may investigate ... one plus the number of opponents
 // who investigated this way"); Web of Inertia and Jace, Multiverse Architect ("creatures they control can't attack you /
 // Jaces you control this turn"); Alrund, God of the Cosmos ("each foretold card you own in exile", "choose a card type, then
-// reveal ... and the rest on the bottom of your library in any order").
+// reveal ... and the rest on the bottom of your library in any order"); Champions of Minas Tirith ("that opponent may pay
+// {X}, where X is the number of cards in their hand. If they don't, they can't attack you this combat").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest as forestCard, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -69,6 +70,8 @@ const jace = (): CardDef => ({"oracleId":"3321c134-bf5b-4f63-8035-fca0bbdfa86b",
 const scout = () => card("Test Scout", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control explores." });
 
 const alrund = (): CardDef => ({"oracleId":"0a69c3dd-52a3-4ef6-b53f-b0780e0dc5f8","name":"Alrund, God of the Cosmos // Hakka, Whispering Raven","manaCost":"{3}{U}{U}","cmc":5,"typeLine":"Legendary Creature — God // Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Alrund gets +1/+1 for each card in your hand and each foretold card you own in exile.\nAt the beginning of your end step, choose a card type, then reveal the top two cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.","power":"1","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":["Scry","Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"mythic","layout":"modal_dfc","gameChanger":false,"faces":[{"name":"Alrund, God of the Cosmos","manaCost":"{3}{U}{U}","typeLine":"Legendary Creature — God","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Alrund gets +1/+1 for each card in your hand and each foretold card you own in exile.\nAt the beginning of your end step, choose a card type, then reveal the top two cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.","power":"1","toughness":"1","colors":["U"],"imageUrl":"https://cards.scryfall.io/normal/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276"},{"name":"Hakka, Whispering Raven","manaCost":"{1}{U}","typeLine":"Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Bird"],"oracleText":"Flying\nWhenever Hakka deals combat damage to a player, return it to its owner's hand, then scry 2.","power":"2","toughness":"3","colors":["U"],"imageUrl":"https://cards.scryfall.io/normal/back/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/back/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276"}]}) as CardDef;
+
+const champions = (): CardDef => ({"oracleId":"464a930a-79d5-4436-864d-3ce9f29475ae","name":"Champions of Minas Tirith","manaCost":"{5}{W}","cmc":6,"typeLine":"Creature — Human Soldier","supertypes":[],"types":["Creature"],"subtypes":["Human","Soldier"],"oracleText":"When this creature enters, you become the monarch.\nAt the beginning of combat on each opponent's turn, if you're the monarch, that opponent may pay {X}, where X is the number of cards in their hand. If they don't, they can't attack you this combat.","power":"4","toughness":"6","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/7/27062b1b-c9d0-4921-867d-56c7978fc21d.jpg?1783916006","artUrl":"https://cards.scryfall.io/art_crop/front/2/7/27062b1b-c9d0-4921-867d-56c7978fc21d.jpg?1783916006","commanderLegal":"legal","set":"ltc","releasedAt":"2023-06-23","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 describe("round 237: Twists and Turns", () => {
   it("is supported", () => supported(twists()));
@@ -424,5 +427,64 @@ describe("round 237: Alrund, God of the Cosmos", () => {
     expect(s.players[ap]!.hand.length).toBe(handBefore + 1);
     const lib = s.players[ap]!.library;
     expect(lib[lib.length - 1]).toBe(land);
+  });
+});
+
+describe("round 237: Champions of Minas Tirith", () => {
+  it("is supported", () => supported(champions()));
+
+  /** To the beginning of combat on `who`'s turn, stopping at its payment prompt. */
+  const toCombat = (s: GameState, who: PlayerId) => {
+    s = passUntil(s, "main1", who);
+    s = passUntil(s, "beginCombat", who);
+    for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length) && s.step === "beginCombat" && s.pending?.kind !== "payUnless"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s;
+  };
+
+  it("the monarch's opponent who doesn't pay {X} (cards in hand) can't attack them this combat; others, and their planeswalkers, they can", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, champions());
+    s.monarch = ap;
+    const c = putOnBattlefield(s, opp, bear());
+    s = toCombat(s, opp);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: opp, cost: `{${s.players[opp]!.hand.length}}`, otherwise: `your creatures can't attack ${s.players[ap]!.name} this combat` });
+    s = act(s, { type: "payUnless", player: opp, pay: false });
+    s = settle(s);
+    expect(attackProblem(s, s.objects[c]!, ap)).toMatch(/can't attack .* this combat/);
+    const third = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    expect(attackProblem(s, s.objects[c]!, third)).toBeNull();
+    // A later combat this turn is another combat.
+    s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
+    expect(attackProblem(s, s.objects[c]!, ap)).toBeNull();
+  });
+
+  it("paying lets them attack", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, champions());
+    s.monarch = ap;
+    const c = putOnBattlefield(s, opp, bear());
+    s = toCombat(s, opp);
+    expect(s.pending?.kind).toBe("payUnless");
+    s.players[opp]!.manaPool.C = 10;
+    s = settle(act(s, { type: "payUnless", player: opp, pay: true }));
+    expect(attackProblem(s, s.objects[c]!, ap)).toBeNull();
+  });
+
+  it("with no cards in hand, {0} is paid; no trigger when you aren't the monarch", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, champions());
+    s.monarch = ap;
+    const c = putOnBattlefield(s, opp, bear());
+    s = passUntil(s, "main1", opp);
+    s.players[opp]!.hand = [];
+    s = settle(toCombat(s, opp));
+    expect(s.pending).toBeFalsy();
+    expect(attackProblem(s, s.objects[c]!, ap)).toBeNull();
+    let t = setup([]);
+    putOnBattlefield(t.s, t.ap, champions());
+    t.s.monarch = t.opp;
+    const d = putOnBattlefield(t.s, t.opp, bear());
+    t.s = settle(toCombat(t.s, t.opp));
+    expect(attackProblem(t.s, t.s.objects[d]!, t.ap)).toBeNull();
   });
 });

@@ -1785,8 +1785,11 @@ export function parseAffected(subject: string): Affects | null {
     let status: TargetSpec["status"];
     let nontoken = false;
     let historic = false;
+    const notColors: Color[] = [];
     for (const [i, w] of words.entries()) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
+      // "Other nonblack creatures you control get +1/+1" (Angel of Jubilation): whichever aren't black right now.
+      else if (/^non(white|blue|black|red|green)$/i.test(w) && !notColors.length && !colors.length) notColors.push(COLOR_WORDS[w.toLowerCase().slice(3)]!);
       // "Green or blue creatures you control" (Murkfiend Liege): colors already match any of the listed ones.
       else if (w.toLowerCase() === "or" && i === 1 && words.length === 3 && COLOR_WORDS[words[0]!.toLowerCase()] && COLOR_WORDS[words[2]!.toLowerCase()]) continue;
       // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
@@ -1810,7 +1813,7 @@ export function parseAffected(subject: string): Affects | null {
       else if (/^historic$/i.test(w) && !historic) historic = true;
       else return null;
     }
-    const specWords = [historic ? "historic" : undefined, nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, multicolored ? "multicolored" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
+    const specWords = [...notColors.map((c) => `non${Object.keys(COLOR_WORDS).find((k) => COLOR_WORDS[k] === c)}`), historic ? "historic" : undefined, nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, multicolored ? "multicolored" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
     const spec: TargetSpec | undefined = specWords.length
       ? {
           kind: "object",
@@ -1821,6 +1824,7 @@ export function parseAffected(subject: string): Affects | null {
           ...(status ? { status } : {}),
           ...(nontoken ? { token: false } : {}),
           ...(historic ? { anyOf: HISTORIC } : {}),
+          ...(notColors.length ? { notColors } : {}),
           text: `${specWords.join(" ")} creature`,
         }
       : undefined;
@@ -1834,6 +1838,10 @@ export function parseAffected(subject: string): Affects | null {
       other: !!m[1],
     };
   }
+  // Umbra Mystic: "Auras attached to permanents you control": anyone's Auras attached to a permanent you control, not your
+  // Auras attached to others' permanents (rulings).
+  if (x === "Auras attached to permanents you control")
+    return { kind: "filter", types: ["Enchantment"], subtypes: ["Aura"], spec: { kind: "object", attachedTo: { kind: "object", controller: "you", text: "permanent you control" }, text: "Aura attached to a permanent you control" } };
   // "Other Zombies you control", "Elves you control"
   m = /^(Other )?([A-Z][a-z]+) you control$/.exec(x);
   if (m && CREATURE_TYPES.has(singular(m[2]!))) return { kind: "filter", types: ["Creature"], subtypes: [singular(m[2]!)], controller: "you", other: !!m[1] };

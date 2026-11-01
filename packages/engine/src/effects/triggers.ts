@@ -1525,7 +1525,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const you = controllerOf(s, o);
         if (!abilitiesOf(s, o).triggers.some((t) => t.event === "playerAttacksYourOpponent")) continue;
         const theirs = s.turnOrder.filter((q) => attacked.includes(q) && opponents(s, you).includes(q));
-        for (const p of theirs) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
+        // Karazikar: only when the attacking player is one of the watcher's opponents too.
+        for (const p of theirs) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !t.anyOpponent && (!t.attackerOpponent || opponents(s, you).includes(ev.controller)), undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
         // "One or more of your opponents" (Jolene): once.
         if (theirs.length) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !!t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: theirs[0]!, attacker: ev.controller });
       }
@@ -2175,7 +2176,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           continue;
         }
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };

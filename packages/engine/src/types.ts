@@ -385,6 +385,8 @@ export interface GameObject {
     orPay?: true;
     /** "During any turn you attacked with a token" (Neyali): only in a turn its player declared a token as an attacker (Player.tokenAttackedTurn). */
     attackedWithToken?: true;
+    /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only in a turn its player declared a commander as an attacker (Player.commanderAttackedTurn). */
+    attackedWithCommander?: true;
     /** "If you control a Kavu" (Possibility Technician): only while `player` controls a permanent like this. */
     ifControl?: TargetSpec;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
@@ -860,6 +862,10 @@ export interface Player {
   ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
   /** The last turn they declared a token as an attacker (Neyali's "during any turn you attacked with a token"; CR 508.1). */
   tokenAttackedTurn?: number;
+  /** How many times this game they cycled a card of each English name (Yidaro, Wandering Monster: "If you've cycled a card named ~ four or more times this game"; any card with that name counts, rulings). */
+  cycledNames?: Record<string, number>;
+  /** The last turn they declared a commander as an attacker (Neriv's "during any turn you attacked with a commander"; CR 508.1, 903.3). */
+  commanderAttackedTurn?: number;
   /** The dungeon card they own in the command zone and the room their venture marker is on (CR 309.4). */
   dungeon?: { name: string; room: number };
   /** The dungeons they've completed, in order (CR 309.7). */
@@ -1322,7 +1328,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Miracle: the cost of the instance that triggered (a granted one, Lorehold), when not the card's own. */ miracleCost?: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[] }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Miracle: the cost of the instance that triggered (a granted one, Lorehold), when not the card's own. */ miracleCost?: string; /** Madness a permanent gave the card (Falkenrath Gorger): that cost, when not the card's own. */ madnessCost?: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[] }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1419,7 +1425,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number> }
@@ -1567,6 +1573,10 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Creatures exiled from the battlefield, by the player who controlled each (Vren, the Relentless). */
+  creaturesExiled?: Record<number, number>;
+  /** How many times each player descended (CR 700.11): permanent cards put into their graveyard (The Mycotyrant). */
+  descended?: Record<number, number>;
   /** Energy counters each player paid or lost in total (Blaster Hulk). */
   energyLost?: Record<number, number>;
   /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */
@@ -1674,7 +1684,7 @@ export interface GameState {
    */
   animated?: Record<string, { id: ObjectId; zc: number }>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
-  flashbackGrants?: { id: ObjectId; zc: number }[];
+  flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number } }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**

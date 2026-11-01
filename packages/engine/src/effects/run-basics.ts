@@ -7,7 +7,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
-import { tapManaTimes, timesAsMuch } from "../manaabilities";
+import { tappedForMana } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { evalAmount } from "../amounts";
 import { fireEvent } from "./triggers";
@@ -606,7 +606,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.either;
         // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
         const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
-        const added = s.resolving?.item.manaAbility?.tapped ? timesAsMuch(made, tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) : made;
+        const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made) : made;
         for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx) });
         log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
         return;
@@ -626,7 +626,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.manaMix;
         const from = manaSourceOrigins(s, ctx);
         const mixed = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
-        const colors = s.resolving?.item.manaAbility?.tapped ? timesAsMuch(mixed, tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) : mixed;
+        const colors = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, mixed) : mixed;
         for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
         if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;
@@ -637,7 +637,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (marked) (marked.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? marked.zoneChanges ?? 0}|addedMana`);
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
-      if (s.resolving?.item.manaAbility?.tapped) added = timesAsMuch([...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)).map((m) => `{${m}}`).join("");
+      if (s.resolving?.item.manaAbility?.tapped) added = tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType)).map((m) => `{${m}}`).join("");
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);

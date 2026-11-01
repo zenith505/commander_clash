@@ -299,6 +299,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && isGroup(what) ? [{ type: "removeFromCombat", what, remember: true }, { type: "untap", what: { ref: "created" } }] : null;
   }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
+  // Observed Stasis: "remove enchanted creature from combat".
+  if (/^[Rr]emove enchanted creature from combat$/.test(s) && !ctx.spell) return [{ type: "removeFromCombat", what: { ref: "attached" } }];
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
     const what = parseObject(m[2] ?? m[3]!, ctx);
@@ -1537,6 +1539,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(self ? m[1]!.replace(/^~ and /, "") : m[1]!, ctx);
     if (what?.ref !== "target" || ctx.targets.length !== first + (self ? 1 : 2) || ctx.targets.slice(first).some((t) => t.kind !== "object" || t.skip)) return null;
     return [{ type: "exchangeControl", a: self ? { ref: "self" } : { ref: "target", index: first }, b: { ref: "target", index: self ? first : first + 1 } }];
+  }
+  // Gornog, the Red Reaper: "target creature that player controls becomes a Coward": its creature types replaced by that
+  // one (CR 205.1a, 613.1d), other types and subtypes kept, with no duration: for as long as it stays on the battlefield
+  // (CR 611.2a; rulings).
+  if ((m = /^([Tt]arget creature(?: that player controls| an opponent controls)?) becomes an? ([A-Z][a-z]+)$/.exec(s)) && CREATURE_TYPES.has(m[2]!)) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref === "target" && !what.n) return [{ type: "continuous", what, mods: [{ kind: "setSubtypes", subtypes: [m[2]!] }], duration: "game" }];
   }
   // Curious Colossus: "each creature target opponent controls loses all abilities, becomes a Coward in addition to its other
   // types, and has base power and toughness 1/1": with no duration, for as long as each stays on the battlefield (CR

@@ -557,7 +557,7 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
-  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : compileCard(defOf(s, obj(s, id))).madness;
+  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
 }
 
 /**
@@ -1201,6 +1201,12 @@ export function moveObject(
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
+  // Vren, the Relentless: "creatures that were exiled under your opponents' control this turn", tokens too (rulings), by the
+  // player who controlled each as it left.
+  if (fromZone === "battlefield" && to === "exile" && wasCreature) {
+    const ex = ((s.turnLog ??= {}).creaturesExiled ??= {});
+    ex[lastController] = (ex[lastController] ?? 0) + 1;
+  }
   if (fromZone === "battlefield" && to === "graveyard") {
     const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
     for (const t of last.types) if (!mine.includes(t)) mine.push(t);
@@ -1217,7 +1223,7 @@ export function moveObject(
     if (!last.types.includes("Land")) s.voidThisTurn = true;
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
-  if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
+  if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o))) noteDescended(s, o.owner);
   // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
   if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
@@ -1275,7 +1281,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
       const types = (s.turnLog.toGraveyardTypes ??= {});
       for (const t of defOf(s, p).types) types[t] = (types[t] ?? 0) + 1;
       noteOwnGraveyardTypes(s, p);
-      if (!(s.descendedThisTurn ??= []).includes(p.owner)) s.descendedThisTurn.push(p.owner);
+      if (isPermanentCard(defOf(s, p))) noteDescended(s, p.owner);
     }
     if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
     // A commander that went to the command zone instead isn't where the effect looks for the new objects.
@@ -1736,6 +1742,8 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
 
 function entersTappedNow(s: GameState, o: GameObject, printed: CompiledCard, choice?: boolean): boolean {
   if (printed.entersTappedUnless) return !conditionHolds(s, printed.entersTappedUnless, o.controller, o.id);
+  // Mariposa Military Base: tapped only when its player chooses so as they play it (putLandPlayed).
+  if (printed.entersTappedChoice?.kind === "mayTapRad") return false;
   if (printed.entersTappedChoice) return !choice && !controlsForEntry(s, o.controller, printed.entersTappedChoice, o.id);
   return false;
 }
@@ -1828,6 +1836,7 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   if (!choice) return false;
   const p = player(s, pid);
   if (choice.kind === "payLife") return payableLife(s, pid) >= choice.n;
+  if (choice.kind === "mayTapRad") return true;
   if (controlsForEntry(s, pid, choice, landId)) return true;
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
@@ -1948,6 +1957,23 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   lost[pid] = (lost[pid] ?? 0) + n;
   const batch = lifeBatch ?? (s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1);
   fireEvent(s, { type: "lifeLost", player: pid, amount: n, first, batch });
+}
+
+/**
+ * A player pays life (CR 119.4): that much life is lost, and "whenever you pay life" (Font of Agonies) sees the payment.
+ * Only payments use this, not life lost without the word "pay" (rulings on Font of Agonies).
+ */
+export function payLife(s: GameState, pid: PlayerId, n: number) {
+  if (n <= 0) return;
+  loseLife(s, pid, n);
+  fireEvent(s, { type: "lifePaid", player: pid, amount: n });
+}
+
+/** `pid` descended (CR 700.11): a permanent card was put into their graveyard; counted for "the number of times you descended this turn" (The Mycotyrant). */
+function noteDescended(s: GameState, pid: PlayerId) {
+  if (!(s.descendedThisTurn ??= []).includes(pid)) s.descendedThisTurn.push(pid);
+  const n = ((s.turnLog ??= {}).descended ??= {});
+  n[pid] = (n[pid] ?? 0) + 1;
 }
 
 let lifeBatch: number | undefined;
@@ -2695,6 +2721,21 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * graveyard have dredge 2", The Necrobloom). Every such grant says dredge 2 and no land card has dredge of its own, so
  * there's never a choice between two Ns.
  */
+/**
+ * Madness a permanent its owner controls gives this card (Falkenrath Gorger: "Each Vampire creature card you own that
+ * isn't on the battlefield has madness. The madness cost is equal to its mana cost."): that cost, if the card has a mana
+ * cost (CR 702.35a; with none there's no cost to pay, CR 118.6).
+ */
+export function grantedMadness(s: GameState, o: GameObject): string | undefined {
+  const d = defOf(s, o);
+  if (o.zone === "battlefield" || !d.manaCost) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) === o.owner && abilitiesOf(s, p).madnessGrants?.some((f) => printedMatches(f, d))) return d.manaCost;
+  }
+  return undefined;
+}
+
 export function dredgeAmount(s: GameState, pid: PlayerId, id: ObjectId): number | undefined {
   const d = defOf(s, obj(s, id));
   const own = compileCard(d).dredge;
@@ -4188,6 +4229,7 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
+  if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
   // Possibility Technician: only while that player controls a Kavu.
   if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
@@ -4405,7 +4447,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   if (banned) throw new RulesError(banned);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
-    throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
+    throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice && choice.kind !== "mayTapRad" ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
   putLandPlayed(s, p, id, untapped, face);
 }
 
@@ -4423,6 +4465,7 @@ export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): st
   const choice = entersRulesOf(s, pid, id).entersTappedChoice;
   if (!choice || !canEnterUntapped(s, pid, id) || controlsForEntry(s, pid, choice, id)) return null;
   const name = defOf(s, obj(s, id)).name;
+  if (choice.kind === "mayTapRad") return `have ${name} enter untapped (tapped, you get ${choice.n} rad counters)`;
   return choice.kind === "payLife" ? `pay ${choice.n} life so ${name} enters untapped` : `reveal a ${choice.filter.text} from your hand so ${name} enters untapped`;
 }
 
@@ -4439,7 +4482,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
-    loseLife(s, p.id, choice.n);
+    payLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
   } else if (untapped && choice?.kind === "reveal" && !controlsForEntry(s, p.id, choice, id)) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
@@ -4457,9 +4500,15 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   s.playingLand = id;
-  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
+  // Mariposa Military Base: not untapped means its player has it enter tapped, and they get the rad counters (CR 614.1c).
+  const tapRad = choice?.kind === "mayTapRad" && !untapped ? choice.n : 0;
+  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(tapRad ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
   s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  if (tapRad) {
+    const n = putPlayerCounters(s, p.id, "rad", tapRad);
+    if (n > 0) log(s, `${p.name} gets ${n} rad counters.`);
+  }
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
 
@@ -4524,7 +4573,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
-  if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
+  if (ab.lifeCost) payLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -4581,7 +4630,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -5822,7 +5871,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
-  loseLife(s, p.id, paid.lifePaid);
+  payLife(s, p.id, paid.lifePaid);
   // The amount of mana spent to cast it, by anyone (increment, CR 702.191a).
   const manaSpent = Object.values(paid.spent).reduce((a, b) => a + b, 0) + (choices.assisted && choices.assist !== undefined ? choices.assisted : 0);
   if (choices.assisted && choices.assist !== undefined) {
@@ -6199,7 +6248,15 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 }
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
-export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0));
+export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape);
+/**
+ * Escape an effect gave this card until end of turn with a cost of its own (The Grim Captain's Locker): a grantedEscape
+ * way, unless a permanent already gives it escape (one escape way is offered for each kind, see grantedWays).
+ */
+const grantedEscapeUntilEot = (s: GameState, o: GameObject): CastFromGraveyard[] => {
+  const g = o.zone === "graveyard" ? s.flashbackGrants?.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.escape) : undefined;
+  return g?.escape ? [{ kind: "grantedEscape", mana: g.escape.mana, costs: [{ kind: "exileFromGraveyard", n: g.escape.exile }], exile: false }] : [];
+};
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 /** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
@@ -6221,7 +6278,9 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   // An adventurer card its owner may cast only as its Adventure (Mosswood Dreadknight): that way, as that face.
   const face = o.face === undefined && o.mayPlay?.face !== undefined && layoutOf(s, o) === "adventure" ? o.mayPlay.face : undefined;
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner), ...asAdventure];
+  const granted = grantedWays(s, o, d, caster ?? o.owner);
+  const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...granted, ...escapeEot, ...asAdventure];
 }
 
 /**
@@ -6584,23 +6643,24 @@ const cardMv = (s: GameState, id: ObjectId) => defMv(defOf(s, obj(s, id)));
 export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
 
 /** The cards `pid` could exile to collect evidence: their graveyard, but not `not` (a spell on its way to the stack) or `taken`. */
-export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = []) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id));
+/** `filter`: only cards like this (The Capitoline Triad's historic cards). */
+export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))));
 
 /**
  * Why `ids` can't collect evidence N, or null: cards in `pid`'s graveyard with total mana value N or more (CR 701.59a).
  * Without `ids`, whether they could: without enough, they can't choose to (701.59b).
  */
-export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = []): string | null {
-  const pool = evidenceCandidates(s, pid, not, taken);
+export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): string | null {
+  const pool = evidenceCandidates(s, pid, not, taken, filter);
   if (!ids) return evidenceValue(s, pool) >= n ? null : `you need cards with total mana value ${n} or more in your graveyard`;
-  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return "collect evidence with cards from your graveyard";
+  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return filter ? `exile ${filter.text}s from your graveyard` : "collect evidence with cards from your graveyard";
   if (evidenceValue(s, ids) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
   return null;
 }
 
 /** Cards to collect evidence N with when nobody picked them: the fewest, biggest mana values first (null if it can't be done). */
-export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] {
-  const pool = evidenceCandidates(s, pid, not, taken).sort((a, b) => cardMv(s, b) - cardMv(s, a));
+export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): ObjectId[] {
+  const pool = evidenceCandidates(s, pid, not, taken, filter).sort((a, b) => cardMv(s, b) - cardMv(s, a));
   const out: ObjectId[] = [];
   for (const id of pool) {
     if (evidenceValue(s, out) >= n) break;
@@ -6612,7 +6672,13 @@ export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: Objec
 }
 
 /** Collect evidence N with these cards (CR 701.59a): they're exiled, and "whenever you collect evidence" triggers. */
-export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number) {
+export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number, notEvidence?: true) {
+  // The Capitoline Triad: the cards exiled, but no evidence collected.
+  if (notEvidence) {
+    log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
+    for (const id of ids) moveObject(s, id, "exile");
+    return;
+  }
   log(s, `${p.name} collects evidence ${n}${ids.length ? `, exiling ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard` : ""}.`);
   for (const id of ids) moveObject(s, id, "exile");
   fireEvent(s, { type: "evidenceCollected", player: p.id });
@@ -6659,6 +6725,13 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
     if (choices.viaWay) return choices.viaWay.costs;
     const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
     if (s && o?.zone === "graveyard") return graveyardWay(s, o, "permission", pid)?.costs;
+  }
+  // Escape an effect gave the card (The Grim Captain's Locker): that way's exile, four cards rather than three.
+  if (choices?.via === "grantedEscape") {
+    if (choices.viaWay) return choices.viaWay.costs;
+    const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+    const way = s && o?.zone === "graveyard" ? graveyardWay(s, o, "grantedEscape", pid) : undefined;
+    if (way) return way.costs;
   }
   // Jump-start a permanent gave the card (Niv-Mizzet, Supreme): that way's discard, the card having none of its own.
   if (choices?.via === "jumpStart" && !graveyardCast(d, "jumpStart")) {
@@ -6755,7 +6828,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "collectEvidence") {
       // Each card pays one cost only: not also exiled for another cost, delve or the spell's own evidence.
       const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.evidence ?? [])];
-      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken);
+      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken, c.filter);
       if (problem) return `${problem} to ${doing}`;
       continue;
     }
@@ -7164,7 +7237,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} ${c.untap ? "untaps" : "taps"} ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       if (!c.n) continue; // "pay X life" with X = 0
-      loseLife(s, p.id, c.n);
+      payLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "craft") {
       // Craft's materials (CR 702.167a): exiled; the cards are "used to craft" what it becomes (702.167c). A token isn't
@@ -7258,7 +7331,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         moveObject(s, id, "exile");
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       }
-    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
+    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter), c.n, c.notEvidence);
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
@@ -7779,7 +7852,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
   }
-  loseLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
+  payLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) {
@@ -8101,6 +8174,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.differentNames && !namesDiffer(s, ids)) throw new RulesError("choose permanents with different names");
   if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
   if (pend.attackCost) {
     attackCostPaid(s, p, ids);
@@ -8414,7 +8488,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (pend.what === "lifeAsEnters") {
       // "As ~ enters, pay any amount of life" (CR 614.12, 119.4): that much life is paid now, as it enters.
       const n = Number(choice);
-      if (n) loseLife(s, p.id, n);
+      if (n) payLife(s, p.id, n);
       o.lifePaidAsEntered = n;
       log(s, `${p.name} pays ${n} life as ${pend.source} enters.`);
       invalidateCharacteristics(s);
@@ -9152,7 +9226,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
     const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
-    loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
+    payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     loseEnergy(s, p.id, energy);
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
   }
@@ -9222,7 +9296,7 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       for (const id of tap) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${tap.map((id) => nameOf(s, id)).join(", ")} to waterbend.`);
     }
-    loseLife(s, p.id, paid.lifePaid + life);
+    payLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
     if (pend.poison) {
       // "Ward—Get five poison counters": getting them is the payment (CR 118.3); ten or more loses as a state-based
@@ -9732,7 +9806,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (tax) {
     const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
     if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);
-    loseLife(s, p.id, paid.lifePaid);
+    payLife(s, p.id, paid.lifePaid);
     log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
   }
   for (const a of attacks) {
@@ -9752,6 +9826,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
   if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
+  if (attacks.some((a) => obj(s, a.attacker).isCommander)) p.commanderAttackedTurn = s.turn; // Neriv, Crackling Vanguard
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   const kinds = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.kinds : {}) };
@@ -9924,7 +9999,10 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
  */
 /** How many creatures it takes to block this attacker: two with menace (CR 702.111b), three or more with "can't be blocked except by three or more creatures" (509.1b). */
 export function blockersNeeded(s: GameState, at: GameObject): number {
-  return Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+  const n = Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+  // Tromokratis: every creature the player it attacks controls, tapped ones included, so one tapped means no block (rulings).
+  if (characteristics(s, at).blockedOnlyByAll && at.attacking !== undefined) return Math.max(n, creaturesOf(s, at.attacking).length);
+  return n;
 }
 
 export function maxBlocks(s: GameState, o: GameObject): number {
@@ -9968,6 +10046,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   }
   for (const [atId, n] of Object.entries(count)) {
     const need = blockersNeeded(s, obj(s, atId));
+    if (n < need && characteristics(s, obj(s, atId)).blockedOnlyByAll && need === creaturesOf(s, p.id).length) throw new RulesError(`${nameOf(s, atId)} can't be blocked unless all creatures you control block it`); // CR 509.1b
     if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
     if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
   }
@@ -11172,8 +11251,8 @@ function grantedForetell(s: GameState, pid: PlayerId, o: GameObject): number | u
  */
 export function foretellCostOf(s: GameState, o: GameObject, d: CardDef = defOf(s, o), pid: PlayerId = o.owner): string | undefined {
   const own = compileCard(d).foretell;
-  if (own) return own;
-  const reduce = o.zone === "exile" && o.mayPlay?.until === "foretell" ? o.mayPlay.foretellReduce : grantedForetell(s, pid, o);
+  const reduce = o.zone === "exile" && o.mayPlay?.until === "foretell" ? o.mayPlay.foretellReduce : own ? undefined : grantedForetell(s, pid, o);
+  if (own && (reduce === undefined || !d.manaCost)) return own;
   if (reduce === undefined || !d.manaCost) return undefined;
   let left = reduce;
   const cost = d.manaCost.replace(/\{(\d+)\}/g, (_, n: string) => {
@@ -11181,6 +11260,9 @@ export function foretellCostOf(s: GameState, o: GameObject, d: CardDef = defOf(s
     left = Math.max(0, left - Number(n));
     return k ? `{${k}}` : "";
   });
+  // Ethereal Valkyrie on a card with foretell of its own: two foretell costs, either of which may be paid (rulings); the
+  // one with the lower mana value, its own on a tie.
+  if (own) return manaValue(parseManaCost(cost || "{0}")) < manaValue(parseManaCost(own)) ? cost || "{0}" : own;
   return cost || "{0}";
 }
 

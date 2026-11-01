@@ -1,6 +1,6 @@
 # Roadmap
 
-28,949 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,974 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
 9,979 (93%).
 
@@ -1582,11 +1582,11 @@ line blocks.
    graveyard" (Choco, Seeker of Paradise); "Sacrifice X Zombies, then reveal cards ... until you reveal a number of
    Zombie creature cards equal to the number of Zombies sacrificed this way" (Empty the Laboratory); "When this
    creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome: trigger
-   selfExiledCrafting, CR 702.167a). +10 (COUNT of 31,936 with B71-B74).
+   selfExiledCrafting, CR 702.167a). +10 (28,974 of 31,936 with B71-B74).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
    on them: the protection quality would need the source's counters); Altar of the Wretched and The Enigma Jewel (their
    back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
-   statics don't support); Nethergoyf and Winter, Cursed Rider (exile any number of cards with four or more card types
+   statics don't support); Nethergoyf and Winter, Cynical Opportunist (exile any number of cards with four or more card types
    among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
    next loyalty ability, as before); Summoner's Grimoire, Jon Irenicus, Shattered One and Strago and Relm (looked at,
    several new pieces each).

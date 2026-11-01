@@ -315,6 +315,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
   }
+  // Disciple of Phenax, Cabal Interrogator (joined in body.ts): "Target player reveals a number of cards from their hand
+  // equal to your devotion to black and discards the one of them you choose": they reveal that many of their choice, you
+  // choose one (CR 701.9b), counted as it resolves (rulings).
+  if ((m = /^(.+?) reveals (X cards|a number of cards) from their hand(?: equal to (.+?))? and discards the one of them you choose$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const n = m[2] === "X cards" ? (m[3] ? null : X) : m[3] ? parseCount(m[3], ctx) : null;
+    return who && n ? [{ type: "takeFromHand", who, action: "discard", reveal: n }] : null;
+  }
   // Rag Man: "Target opponent reveals their hand and discards a creature card at random": one of the creature cards in it,
   // chosen at random (none if there are none).
   if ((m = /^(.+?) reveals their hand and discards an? ((?:(?!\bcards?\b).)+ card) at random$/i.exec(s))) {
@@ -513,6 +521,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (spec.kind !== "object" || spec.many || spec.types?.join() !== "Artifact") return null;
     const a = { ref: "target" as const, index: ctx.lastObjectTarget };
     return [{ type: "damage", amount: { count: { kind: "manaValue", of: a } }, to: { ref: "self" }, by: { target: a.index, lastKnown: true } }];
+  }
+  // Dizzying Gaze: "{R}: Enchanted creature deals 1 damage to target creature with flying": damage from the creature the
+  // Aura enchants as the ability resolves (as it last existed if the Aura has left, CR 608.2h), not from the Aura.
+  if ((m = /^Enchanted creature deals (\d+) damage to (target creature(?: with [a-z]+)?)$/.exec(s)) && !ctx.spell && ctx.activated) {
+    const to = parseDamageRecipient(m[2]!, ctx);
+    return to && "ref" in to && to.ref === "target" ? [{ type: "damage", amount: Number(m[1]), to, by: "attached" }] : null;
   }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last

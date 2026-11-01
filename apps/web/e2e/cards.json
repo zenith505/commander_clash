@@ -5223,6 +5223,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d7cbe54b-f217-45f5-8583-c254a1c80bb8",
+  "name": "Disciple of Phenax",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "When this creature enters, target player reveals a number of cards from their hand equal to your devotion to black. You choose one of them. That player discards that card. (Each {B} in the mana costs of permanents you control counts toward your devotion to black.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ths",
+  "releasedAt": "2013-09-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7e97fa9-4b72-4548-b854-5be5f18a6f1a",
   "name": "Disenchant",
   "manaCost": "{1}{W}",
@@ -16292,6 +16323,38 @@
   "set": "uds",
   "releasedAt": "1999-06-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d4c4ad11-7e71-4ad0-aee7-58ac7b1b38f8",
+  "name": "Rescuer Sphinx",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nAs this creature enters, you may return a nonland permanent you control to its owner's hand. If you do, this creature enters with a +1/+1 counter on it.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "war",
+  "releasedAt": "2019-05-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -149,6 +149,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { kind: "card", types: ["Land"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: phrase };
   }
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
+  // Tallowisp: "an Aura card with enchant creature" (TargetSpec.enchantCreature, as Rootwater Shaman's).
+  if (p === "Aura card with enchant creature") return { kind: "card", types: ["Enchantment"], notTypes: [], notColors: [], subtypes: ["Aura"], enchantCreature: true, text: p };
   // Call to the Kindred: "a creature card that shares a creature type with enchanted creature", bound as the look resolves.
   const kindred = /^(creature card) that shares a creature type with enchanted creature$/.exec(p);
   if (kindred) {
@@ -220,6 +222,16 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return head === null || head?.manaValue ? null : { ...(head ?? { kind: "card" }), manaValue: { parity: parity[1] as "even" | "odd" }, text: p };
   }
   if (/^card$/i.test(p)) return undefined;
+  // Paradox Surveyor: "a card with {X} in its mana cost" (CR 107.3, by the card's printed mana cost).
+  if (p === "card with {X} in its mana cost") return { kind: "card", xInCost: true, text: p };
+  // Coralhelm Chronicler: "a card with a kicker ability", multikicker too (rulings), by the card's own text (CR 702.33).
+  if (p === "card with a kicker ability") return { kind: "card", kickerAbility: true, text: p };
+  // Tezzeret's Gatebreaker: "a blue or artifact card": a card of that color or of that card type.
+  const colorOrType = /^(white|blue|black|red|green) or (artifact|creature|enchantment|instant|sorcery|land|planeswalker) card$/.exec(p);
+  if (colorOrType) {
+    const subs = [`${colorOrType[1]} card`, `${colorOrType[2]} card`].map((x) => plainFilter(x));
+    return subs.every((x) => x) ? { kind: "card", anyOf: subs as TargetSpec[], text: p } : null;
+  }
   if (p === "card that shares a color with a legendary creature you control") return { kind: "card", colorOfYourLegend: true, text: p };
   // "If it's a land or double-faced card" (Invasion of Pyrulea, CR 712.1).
   if (p === "double-faced card") return { kind: "card", doubleFaced: true, text: p };
@@ -282,7 +294,7 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const parts = p.split(/,? or an? |, an? /);
   // "An instant card or a card with flash" (Waterlogged Teachings). "A basic Plains card or a creature card with mana value
   // 1 or less" (Starfield Shepherd).
-  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$| card with mana value \d+ or (?:less|greater)$/.test(x))) {
+  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$| card with mana value \d+ or (?:less|greater)$|^card with \{X\} in its mana cost$/.test(x))) {
     const subs = parts.map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };

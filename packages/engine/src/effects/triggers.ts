@@ -746,6 +746,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, entering);
       auraToYours(entering, host);
     }
+    // Enormous Energy Blade: entering attached to a creature, it becomes attached to it.
+    if (host?.zone === "battlefield" && objIsType(s, host, "Creature")) add(entering, you, (e) => e === "selfBecomesAttached", undefined, undefined, host);
     locked = null;
     causedBy = null;
   } else if (ev.type === "controlChanged") {
@@ -759,6 +761,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, o);
       auraToYours(o, host);
     }
+    // "Whenever ~ becomes attached to a creature" (Enormous Energy Blade): the Aura's or Equipment's trigger, about that creature.
+    if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && objIsType(s, host, "Creature")) add(o, controllerOf(s, o), (e) => e === "selfBecomesAttached", undefined, undefined, host);
   } else if (ev.type === "unattached") {
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
@@ -950,6 +954,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           // "Whenever enchanted creature blocks or becomes blocked by a creature" (Mammoth Harness): once for each, that
           // creature the subject; the two of them the event's group ("destroy both creatures", Dead-Iron Sledge).
           if (at) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, w), undefined, at, { group: [o, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
+          // "Whenever equipped creature blocks a creature" (Shield of the Righteous): once for each, that creature the subject.
+          if (at) addHosted(o, (e, t, w) => e === "selfBlocksCreature" && fits(t, at, w), undefined, at);
         }
       }
       // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
@@ -2583,7 +2589,7 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   // Clement: "with lesser mana value" than a subject still on the battlefield: its mana value now (CR 202.3).
   const subj = t.subject && s.objects[t.subject.id];
   const lki = t.lki?.manaValue === undefined && subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? { ...t.lki, manaValue: evalAmount(s, { count: { kind: "manaValue", of: { ref: "subject" } } }, { controller: t.controller, objects: (r) => (r.ref === "subject" ? [subj] : []) }) } : t.lki;
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(lki ? { lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(lki ? { lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}), ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).

@@ -240,6 +240,8 @@ export function dealDamage(
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
     o.wasDealtDamage = true;
+    // Grisly Sigil: "If it was dealt noncombat damage this turn".
+    if (!opts.combat) o.wasDealtNoncombatDamage = true;
     // Aegar: what dealt damage to it this turn, as the source was then.
     (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n });
     // Wolverine: "if ~ dealt damage to another creature this turn".

@@ -1280,9 +1280,13 @@ export function compile(d: CardDef): CompiledCard {
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
       const that = /^creature you control that's an? ([A-Z]\w+) or an? ([A-Z]\w+)$/.exec(othersExtra[2]!);
-      const g = parseGroup(`each ${that ? `${that[1]} or ${that[2]} creature you control` : othersExtra[2]}`);
+      // Mysterious Pathlighter: "Each creature you control that has an Adventure": an adventurer card (CR 715.2), whether
+      // or not it went on an adventure first (rulings); this card has none, so it can't be one of them.
+      const adventurer = othersExtra[2] === "creature you control that has an Adventure";
+      const g0 = parseGroup(`each ${that ? `${that[1]} or ${that[2]} creature you control` : adventurer ? "creature you control" : othersExtra[2]}`);
+      const g = g0 && adventurer && g0.filter.kind === "object" ? { ...g0, filter: { ...g0.filter, hasAdventure: true as const, text: "creature you control that has an Adventure" } } : g0;
       const types = g?.filter.types ?? [];
-      const couldBeSelf = !othersExtra[1] && d.types.some((ty) => types.includes(ty) || (!types.length && ty === "Creature"));
+      const couldBeSelf = !othersExtra[1] && (!adventurer || d.layout === "adventure") && d.types.some((ty) => types.includes(ty) || (!types.length && ty === "Creature"));
       // "Each other creature you control of the chosen type" (Metallic Mimic): the type chosen as it entered.
       const chosenOk = !g?.filter.chosen || (g.filter.kind === "object" && g.filter.chosen === "type" && /^As ~ enters(?: the battlefield)?, choose a creature type\.$/m.test(normalizeSelf(d)));
       if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || !chosenOk) out.unsupported.push(raw);
@@ -1581,6 +1585,21 @@ export function compile(d: CardDef): CompiledCard {
       const fits = asSac[1] === "untapped Forests" ? !rider : asSac[1] === "permanents" ? rider === "counters" : rider === "total";
       if (out.devour || !fits) out.unsupported.push(raw);
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
+      continue;
+    }
+    // Devouring Hellion: "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters
+    // with twice that many +1/+1 counters on it.": devour 2's choice (CR 702.82a, 614.12), of either kind. Rescuer Sphinx:
+    // "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1
+    // counter on it.": the same choice of at most one, returned. Both only among permanents already on the battlefield
+    // (rulings).
+    if (line === "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters with twice that many +1/+1 counters on it." && !isSpell) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: 2, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" } };
+      continue;
+    }
+    if (line === "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1 counter on it." && !isSpell) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: 1, filter: { kind: "object", notTypes: ["Land"], text: "nonland permanent" }, bounce: true, max: 1 };
       continue;
     }
     // Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked." Part of how it enters, not a trigger
@@ -3620,6 +3639,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every
     // player, not only its controller (CR 702.8a).
+    // Rootwater Shaman: "You may cast Aura spells with enchant creature as though they had flash": only an Aura whose
+    // enchant ability is "enchant creature" (CR 702.5a, 702.8a).
+    if (line === "You may cast Aura spells with enchant creature as though they had flash.") {
+      (out.flashFor ??= []).push({ kind: "spell", subtypes: ["Aura"], enchantCreature: true, text: "Aura spells with enchant creature" });
+      continue;
+    }
     const flashFor = /^(You|Any player) may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.

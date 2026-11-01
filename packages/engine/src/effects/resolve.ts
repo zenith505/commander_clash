@@ -974,7 +974,7 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
             : // "Can't be blocked by creatures of that color this turn" (Skrelv): the color chosen as it resolved.
               m.kind === "cantBeBlockedBy" && m.filter.chosen === "color"
             ? { ...m, filter: (({ chosen: _, ...rest }) => (s.resolving?.chosen?.color ? { ...rest, colors: [s.resolving.chosen.color] } : { ...rest, controlledBy: -1 }))(m.filter) }
-            : m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
+            : (m.kind === "setLandTypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_LAND_TYPE)
             ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_LAND_TYPE ? [st] : s.resolving?.chosen?.landType ? [s.resolving.chosen.landType] : [])) }
             : // "Becomes the color or colors of your choice" (Prismatic Lace): the colors chosen as it resolved.
               m.kind === "setColors" && m.chosen === "colors"

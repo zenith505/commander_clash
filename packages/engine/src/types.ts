@@ -1032,6 +1032,8 @@ export interface DelayedTrigger {
   underControl?: true;
   /** With `dies`: "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only one `controller` owns. */
   ownedByController?: true;
+  /** With `dies`: "if it has an egg counter on it" (Xira, the Golden Sting): only if it had one as it last existed (CR 603.4). */
+  ifHadCounter?: string;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
    * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's
@@ -2508,6 +2510,8 @@ export interface Resolving {
     /** exileFaceDown: a hand card is being chosen, or with `pickOne` one of these cards from the top of a library. */
     faceDownPick?: true;
     faceDownLooked?: ObjectId[];
+    /** Clone Shell: the looked-at cards going to the bottom of the library in the order the actor chooses. */
+    faceDownBottom?: ObjectId[];
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
     linkedCopyPick?: true;

@@ -1151,6 +1151,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "phaseOut":
     case "proliferate":
     case "timeTravel":
+    case "removeTimeSuspended":
     case "amass":
     case "connive":
     case "recruit":

@@ -2713,6 +2713,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Emperor of Bones: "put a creature card exiled with ~ onto the battlefield under your control with a finality counter on
   // it. It gains haste. Sacrifice it at the beginning of the next end step." One instruction about that permanent.
   text = text.replace(/([Pp]ut a creature card exiled with ~ onto the battlefield under your control with a finality counter on it)\. It gains haste\. Sacrifice it at the beginning of the next end step\./, "$1, and it gains haste until it is sacrificed when the next end step begins.");
+  // Clone Shell: "look at the top four cards of your library, exile one face down, then put the rest on the bottom of your
+  // library in any order." One instruction.
+  text = text.replace(/^look at the top four cards of your library, exile one face down, then put the rest on the bottom of your library in any order\.$/, "Exile one of the top four cards of your library face down and put the rest on the bottom of your library in any order.");
+  // Clone Shell, Summoner's Egg: "turn the exiled card face up. If it's a creature card, put it onto the battlefield under
+  // your control." One instruction about the card its imprint exiled face down.
+  text = text.replace(/^turn the exiled card face up\. If it's a creature card, put it onto the battlefield under your control\.$/, "Turn the exiled card face up and put it onto the battlefield under your control if it's a creature card.");
+  // Tolarian Contempt: "for each opponent, choose up to one target creature they control with a rejection counter on it.
+  // That creature's owner puts it on their choice of the top or bottom of their library." One instruction for each
+  // opponent's creature.
+  text = text.replace(/^for each opponent, choose up to one target creature they control with a rejection counter on it\. That creature's owner puts it on their choice of the top or bottom of their library\.$/, "for each opponent, the owner of up to one target creature with a rejection counter on it that player controls puts it on their choice of the top or bottom of their library.");
+  // Skyship Weatherlight: "Choose a card at random that was exiled with ~. Put that card into its owner's hand." One
+  // instruction.
+  text = text.replace(/^Choose a card at random that was exiled with ~\. Put that card into its owner's hand\.$/, "Put a card exiled with ~ chosen at random into its owner's hand.");
+  // Yggdrasil, Rebirth Engine: "Put a creature card exiled with ~ onto the battlefield under your control. It gains haste
+  // until end of turn." One instruction about that permanent.
+  text = text.replace(/([Pp]ut a creature card exiled with ~ onto the battlefield under your control)\. It gains haste until end of turn\./, "$1, and it gains haste until end of turn.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
   // Mass Diminish: "Until your next turn, creatures target player controls have base power and toughness 1/1": the
@@ -10991,7 +11007,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // a bounty counter on it, it has "When this creature dies, each opponent draws a card and gains 2 life."": the ability
     // granted to what the counter was just put on, for as long as it has one (CR 611.2b), even after the source leaves, and
     // once however many counters were put (rulings). Its "each opponent" is its controller's, as it dies (rulings).
-    const grantCtr = new RegExp(`^For as long as that creature has an? ${COUNTER} counter on it, it has "([^"]+)"$`).exec(s);
+    const grantCtr = new RegExp(`^For as long as that (?:creature|land) has an? ${COUNTER} counter on it, it has "([^"]+)"$`).exec(s);
     if (grantCtr) {
       const prev = effects[effects.length - 1];
       const counter = counterKind(grantCtr[1]!);
@@ -11290,6 +11306,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
+      // Aven Mimeomancer: "you may put a feather counter on target creature. If you do, that creature has base power and
+      // toughness 3/1 and has flying for as long as it has a feather counter on it": an effect on the target, only if the
+      // counter was put, lasting while it has one (CR 611.2b; even after the source leaves, rulings).
+      const mayCounter = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 && prev.effects[0]!.type === "counters" ? prev.effects[0] : undefined;
+      const hasWhile = ifDid[1] === "do" && mayCounter?.type === "counters" && mayCounter.what.ref === "target" ? new RegExp(`^that creature has (.+) for as long as it has an? ${COUNTER} counter on it$`).exec(ifDid[2]!) : null;
+      if (hasWhile && mayCounter?.type === "counters") {
+        const counter = counterKind(hasWhile[2]!);
+        const mods = parseChanges(`has ${hasWhile[1]!}`.replace(/ and has ([a-z ]+)$/, " and gains $1"));
+        if (mayCounter.counter !== counter || !mods) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "continuous", what: mayCounter.what, mods, duration: "game", whileCounter: counter }] });
+        continue;
+      }
       // Gamekeeper: "you may exile it. If you do, reveal cards ... until you reveal a creature card. Put that card onto the
       // battlefield and ...": the whole reveal, only if the card was exiled.
       const mayExiled = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 && prev.effects[0]!.type === "exile" && checkableMay(prev.effects[0]!) ? prev.effects[0] : undefined;
@@ -13641,7 +13669,8 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const other = w?.[1] ? "another " : "";
   if (other && (!every || ctx.spell)) return null;
   const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from ${every ? "a" : "an opponent's"} graveyard`).trim() : ` ${m[1]!}`.replace(req ? whoRequired : who, every ? ` ${other}target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
-  if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
+  // Tolarian Contempt: "puts it on their choice of the top or bottom of their library" is the owner's, not that player's.
+  if (/\b(?:that player|that opponent|they|their)\b/.test(inner.replace(/ puts it on their choice of the top or bottom of their library$/, " puts it"))) return null;
   const before = ctx.targets.length;
   // "For each opponent, you may put ...": a choice for each of them, as it resolves.
   const may = /^you may (.+)$/.exec(inner);

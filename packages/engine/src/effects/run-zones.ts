@@ -179,7 +179,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     }
     // "Put a +1/+1 counter on each of up to two Soldiers you control": as many as they like, up to that many.
     if (e.upTo) {
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: Math.min(n, options.length), min: 0, ...(e.counter ? { counter: e.counter.kind } : {}), ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}) };
+      // Krenko's Buzzcrusher: you pick among each player's permanents in turn.
+      const picker = e.youChoose ? ctx.controller : pid;
+      // "{player}": whose permanents these are.
+      const prompt = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`);
+      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, what: e.filter.text, options, count: Math.min(n, options.length), min: 0, ...(e.counter ? { counter: e.counter.kind } : {}), ...(prompt ? { prompt } : {}), ...(picker !== pid ? { of: pid } : {}) };
       return "paused";
     }
     // "Each player who can't discards a card" (Plaguecrafter): who had none.
@@ -276,7 +280,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       if (e.action === "exile") {
         log(s, `${player(s, pid).name} exiles ${defOf(s, o).name}.`);
         // As it last existed, for "the power of the creature they exiled" (Olórin's Searing Light, CR 608.2h).
-        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
+        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         moveObject(s, id, "exile");
         if (s.objects[id]?.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
         continue;
@@ -1488,7 +1492,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "destroy":
       for (const o of objects(s, e.what, ctx)) {
         // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
-        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
+        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         // "If that creature dies this way": it was put into a graveyard (CR 700.4), not exiled or moved elsewhere instead.
         if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
@@ -1803,7 +1807,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "returnLinked": {
       // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
-      const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
+      // A Saga's chapter III (The Princess Takes Flight): the Saga is still there, the same object as its chapter I's.
+      const key = e.here ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.flickered) {
         sc.flickered = (s.linkedExile?.[key] ?? []).filter((l) => !s.objects[l.id]?.isToken);
@@ -2807,7 +2812,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
           // As it last existed, for "if a Pirate was exiled this way" (Siren's Ruse, CR 608.2h).
-          const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
+          const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
           moveObject(s, o.id, "exile");
           if (s.objects[o.id]?.zone === "exile") (s.resolving!.exiled ??= []).push(before);
           // A merged permanent comes back as all of its cards (CR 730.3c).

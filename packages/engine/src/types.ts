@@ -2118,7 +2118,7 @@ export interface Resolving {
    * battlefield ("for each creature destroyed this way"): one that went elsewhere instead of its owner's graveyard still
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
-  destroyed?: { o: GameObject; ch: Characteristics; /** Put into a graveyard: it died (CR 700.4). */ died?: true }[];
+  destroyed?: { o: GameObject; ch: Characteristics; /** Put into a graveyard: it died (CR 700.4). */ died?: true; /** Who controlled it as it last existed ("its controller", CR 608.2h). */ controller?: PlayerId }[];
   /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
   exiled?: { o: GameObject; ch: Characteristics }[];
   /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */

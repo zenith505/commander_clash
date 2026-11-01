@@ -1319,6 +1319,16 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const kw = any[2] ? { keywords: [any[2].replace(/^./, (c) => c.toUpperCase())] } : {};
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], ...kw, text: `creature${any[1] ?? ""}` }, anyone: true }, body, toOpponent: true };
   }
+  // The Clone Saga: "Whenever a creature with the chosen name deals combat damage to a player this turn, draw a card" (a
+  // delayed trigger, see floatingTrigger in body.ts): anyone's creature with that name (CR 201.2), the name bound as the
+  // delayed trigger is made.
+  const chosenName = /^Whenever a creature with the chosen name deals combat damage to a player, (.+)$/.exec(line);
+  if (chosenName) {
+    if (/\b(?:that player|defending player|that much|that many|it|its|their|they)\b/i.test(chosenName[1]!)) return "fail";
+    const body = parseBody(chosenName[1]!);
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "name", text: "creature with the chosen name" }, anyone: true }, body };
+  }
   // Archivist of Gondor: "When your commander deals combat damage to a player, if there is no monarch, you become the
   // monarch": the commander you own (CR 903.3), whoever controls it; an intervening "if" (CR 603.4).
   const yourCmdr = /^When(?:ever)? your commander deals combat damage to a player, (?:if (there is no monarch|you're not the monarch), )?(.+)$/.exec(line);

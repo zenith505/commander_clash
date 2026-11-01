@@ -6523,6 +6523,12 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
     const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
     if (s && o?.zone === "graveyard") return graveyardWay(s, o, "permission", pid)?.costs;
   }
+  // Jump-start a permanent gave the card (Niv-Mizzet, Supreme): that way's discard, the card having none of its own.
+  if (choices?.via === "jumpStart" && !graveyardCast(d, "jumpStart")) {
+    if (choices.viaWay) return choices.viaWay.costs;
+    const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+    if (s && o?.zone === "graveyard") return graveyardWay(s, o, "jumpStart", pid)?.costs;
+  }
   return graveyardCast(d, choices?.via)?.costs;
 }
 
@@ -7036,10 +7042,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       closeZoneBatch(s);
     } else if (c.kind === "sacrifice" && c.exile) {
       for (const id of choices.sacrifice ?? []) {
-        // "The exiled creature's mana value" (Food Chain): as it last existed (CR 608.2h).
+        // "The exiled creature's mana value" (Food Chain), "if the exiled creature was a Thrull" (Soul Exchange): as it
+        // last existed (CR 608.2h).
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} exiles ${nameOf(s, id)}.`);
         moveObject(s, id, "exile");
         // "Cards exiled with ~" (Mechtitan Core): the cards it became in exile (CR 400.7); a token is gone (CR 704.5d).

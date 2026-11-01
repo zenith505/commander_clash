@@ -2489,6 +2489,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
+  // Rassilon, the War President: "you lose 2 life and exile the top card of your library. You may play that card for as
+  // long as it remains exiled.": two instructions in that order, the second an impulse.
+  text = text.replace(/(^|\. )([Yy]ou lose \d+ life) and exile the top card of your library\. (?=You may play that card for as long as it remains exiled\.$)/, "$1$2. Exile the top card of your library. ");
   // "Create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card."
   // (Ragavan): two instructions, the second an impulse with its permission.
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
@@ -2522,6 +2525,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
   // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
   text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
+  // Howl of the Horde's raid paragraph: "If you attacked this turn, when you next cast an instant or sorcery spell this
+  // turn, copy that spell an additional time. You may choose new targets for the copy.": a second, identical delayed
+  // trigger, so the next one is copied twice (rulings).
+  text = text.replace(/(^|\n|\. )If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell an additional time\. You may choose new targets for the copy\./, "$1If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell, and you may choose new targets for the copy.");
+  // Believe (Reason // Believe): "Look at the top card of your library. You may put it onto the battlefield if it's a
+  // creature card. If you don't, put it into your hand.": the same as Risen Reef's wording; a card that isn't put onto
+  // the battlefield, for any reason, goes to your hand without being revealed (rulings).
+  text = text.replace(/^Look at the top card of your library\. You may put it onto the battlefield if it's a creature card\. If you don't, put it into your hand\.$/, "Look at the top card of your library. If it's a creature card, you may put it onto the battlefield. If you don't put the card onto the battlefield, put it into your hand.");
   // Anthroplasm: "Remove all +1/+1 counters from ~ and put X +1/+1 counters on it": one, then the other.
   text = text.replace(/^Remove all \+1\/\+1 counters from ~ and put X \+1\/\+1 counters on it\.$/, "Remove all +1/+1 counters from ~. Put X +1/+1 counters on ~.");
   // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
@@ -3109,6 +3120,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature
+    // token (you gain 5 life) instead." A replacement effect for the controller's next draw this turn (Player.nextDrawInstead).
+    // Words of War (a target), Waste and Wind (choices) aren't done.
+    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token) instead$/.exec(s);
+    if (wordsOf && !ctx.spell) {
+      if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
+      else {
+        const before = ctx.targets.length;
+        const fx = parseOne(capital(wordsOf[1]!), ctx);
+        const t = fx?.length === 1 && fx[0]!.type === "createToken" ? fx[0]! : undefined;
+        if (!t || ctx.targets.length !== before || t.n !== 1 || Object.keys(t).some((k) => !["type", "who", "token", "n"].includes(k)) || t.who.ref !== "you") return null;
+        effects.push({ type: "nextDrawInstead", token: t.token });
+      }
+      continue;
+    }
     // Urabrask, Heretic Praetor, at the beginning of each opponent's upkeep: "the next time they would draw a card this
     // turn, instead they exile the top card of their library. They may play it this turn." That player's next draw.
     if (ctx.eventPlayer && /^[Tt]he next time (?:they|that player) would draw a card this turn, instead they exile the top card of their library$/.test(s) && /^They may play (?:it|that card) this turn$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
@@ -3471,6 +3497,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(anyExile[2]!);
       if (!filter) return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
+      continue;
+    }
+    // Take (Give // Take): "Remove all +1/+1 counters from target creature you control. Draw that many cards.": as many as
+    // were removed as it resolved (none with no counters there, rulings: any creature you control can be the target).
+    if (/^[Rr]emove all (?:[+-]1\/[+-]1|[a-z]+) counters from target [^.]+$/.test(s) && /^Draw that many cards\.?$/.test(sentences[si + 1] ?? "")) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "removeCounters" || fx[0]!.n !== "all" || ctx.targets.length !== before + 1) return null;
+      effects.push(...fx, { type: "draw", who: { ref: "you" }, n: { count: { kind: "countersRemovedThisWay" } } });
+      si++;
       continue;
     }
     // Garnet, Princess of Alexandria: "you may remove a lore counter from each of any number of Sagas you control. Put a
@@ -4233,6 +4269,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       if (!added.length || added.some((e) => e.only || e.keep)) return null;
       for (const e of added) e.keep = "combat";
+      continue;
+    }
+    // Shizuko, Caller of Autumn: "that player adds {G}{G}{G}. Until end of turn, they don't lose this mana as steps and
+    // phases end": the same, for the player who added it.
+    if (/^Until end of turn, they don't lose this mana as steps and phases end$/.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      if (!added.length || added.some((e) => e.only || e.keep || e.who?.ref !== "eventPlayer")) return null;
+      for (const e of added) e.keep = "turn";
       continue;
     }
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
@@ -5036,6 +5080,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const castFilter = parseSearchFilter(castIfIs[1]!);
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: 1, until: castIfIs[2] === "this turn" ? "thisTurn" : "nextTurn", castOnly: true, castFilter });
+      si++;
+      continue;
+    }
+    // Possibility Technician: "For as long as that card remains exiled, you may play it if you control a Kavu.": whenever
+    // its controller controls one, whatever became of the Technician (rulings).
+    const ifKavu = exTop && !exTop[1] && !exEqual && !impulseIf ? /^For as long as that card remains exiled, you may play it if you control an? ([A-Z][a-z]+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (ifKavu && CREATURE_TYPES.has(ifKavu[1]!)) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", ifControl: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [ifKavu[1]!], controller: "you", text: ifKavu[1]! } });
       si++;
       continue;
     }
@@ -7559,7 +7611,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
     // Tawnos's Tinkering: "If it isn't a creature, it becomes a 0/0 creature in addition to its other types": the same.
-    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?: or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s.replace(/^If it isn't (an?) /, "If it's not $1 "));
+    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?:(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s.replace(/^If it isn't (an?) /, "If it's not $1 "));
     // Systems Override: "If it's a Spacecraft, put ten charge counters on it. If you do, remove ten charge counters from it
     // at the beginning of the next end step": the delayed trigger only for counters put on a Spacecraft.
     const spaceIf = /^If it's a (Spacecraft|Vehicle), (put (?:a|two|three|four|five|ten) charge counters? on it)$/.exec(s);
@@ -7573,7 +7625,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (ifIts[2]!.split(" or ").every((x) => CREATURE_TYPES.has(x)) && !ifIts[1]))) {
+    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (ifIts[2]!.split(/,? or |, /).every((x) => CREATURE_TYPES.has(x)) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
@@ -10435,6 +10487,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
+      // Behold the Unspeakable: "If you have one or fewer cards in hand, draw four cards. Otherwise, scry 2, then draw two cards."
       // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
       // "If you control a Demon, each opponent loses 2 life and you gain 2 life. Otherwise, you lose 2 life." (Unholy Annex).
       // Gravelighter: "draw a card if a creature died this turn. Otherwise, each player sacrifices a creature of their
@@ -10443,7 +10496,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Perfected Mind): counted after the mill before it.
       // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
       // Oko, the Ringleader: "If you've committed a crime this turn, discard a card. Otherwise, discard two cards" (CR 700.13).
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || prev.cond.cond.kind === "committedCrime" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "handAtLeast" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || prev.cond.cond.kind === "committedCrime" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
@@ -10459,6 +10512,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const otherText = prev.cond.kind === "state" && prev.cond.cond.kind === "selfPT" ? otherwise[1]!.replace(/("[^"]*")|\bit\b/g, (w, q) => q ?? "~") : otherwise[1]!;
       const inner = parseOne(otherText.charAt(0).toUpperCase() + otherText.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      // "Otherwise, scry 2, then draw two cards" (Behold the Unspeakable): the parts split off at ", then" are part of
+      // the otherwise too, not instructions after the whole "if".
+      while (si + 1 < sentences.length && thenParts.has(sentences[si + 1]!)) {
+        const part = sentences[si + 1]!.replace(/\.$/, "");
+        const more = parseOne(part.charAt(0).toUpperCase() + part.slice(1), ctx);
+        if (!more) return null;
+        inner.push(...more);
+        si++;
+      }
+      // (A pause in the middle is fine: an "if" branch resumes at the step it stopped at, run-choices runBranch.)
       prev.otherwise = inner;
       continue;
     }

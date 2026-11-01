@@ -231,6 +231,13 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: "Riot" });
       continue;
     }
+    // Unleash (CR 702.98a), "Other Dogs you control have unleash" (Tesak, Judith's Hellhound): its "enter with an
+    // additional +1/+1 counter" applies as the creature enters (CR 614.12, rulings: from anywhere), and its "can't block
+    // as long as it has a +1/+1 counter on it" while it has the ability; see finishEntering.
+    if (/^unleash$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Unleash" });
+      continue;
+    }
     // Ward is a triggered ability too (CR 702.21a); several instances each trigger (CR 702.21b).
     const ward = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(w) ?? /^ward—pay (\d+) life$/i.exec(w);
     if (ward) {

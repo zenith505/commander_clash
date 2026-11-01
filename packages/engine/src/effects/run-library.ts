@@ -77,6 +77,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `The next time ${p.name} would draw a card this turn, they exile the top card of their library instead and may play it this turn (${src}).`);
       }
       return;
+    case "nextDrawInstead": {
+      // The Words: a replacement effect for its controller's next draw this turn (CR 614.1a), used up by the draw it
+      // replaces (see draw in game.ts), even from an empty library (CR 614.11).
+      const p = player(s, ctx.controller);
+      if (p.lost) return;
+      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}) });
+      log(s, `The next time ${p.name} would draw a card this turn, ${e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : `they gain ${e.gain} life`} instead (${src}).`);
+      return;
+    }
     case "revealUntilLandToGraveyard":
       // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
       // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).

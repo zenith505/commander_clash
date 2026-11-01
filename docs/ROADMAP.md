@@ -1,7 +1,7 @@
 # Roadmap
 
-28,722 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,241 of
+28,764 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,242 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1203,8 +1203,8 @@ line blocks.
    Plains; Peri Brown and The Fifteenth Doctor count spells of that kind cast this turn, so a spell cast before either
    arrived uses up the turn's first one (as the rules say).
    Out after round 221 (looked at, not done): New Perspectives ({0} instead of every cycling cost, non-mana ones
-   included); Clay Golem (a die roll as a cost); Ian the Reckless (damage to you and any target at once); Tesak,
-   Judith's Hellhound (granted unleash); Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
+   included); Clay Golem (a die roll as a cost); Ian the Reckless (damage to you and any target at once);
+   Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
    Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles); Ib Halfheart, Goblin Tactician
@@ -1402,7 +1402,7 @@ line blocks.
    enchanted planeswalker, destroy that creature", combat or not (Liliana's Talent); "you may convert ~. When you do,
    ..." (Ratchet, Field Medic) and "you may transform it. If you do, ..." (Soul Seizer): only if it can turn over and
    hasn't transformed since the ability went on the stack (CR 701.27f, rulings). Browser tests for Stenn's choice and a
-   Talent's granted loyalty ability. +12 (28,722 of 31,936).
+   Talent's granted loyalty ability. +12 (28,748 of 31,936 with B67 and B68).
    Out after round 230 (looked at, not done): Abstruse Appropriation ("spend colorless mana as though it were mana of
    any color": a payment rule for colored symbols); War's Toll ("If a creature an opponent controls attacks, all
    creatures that opponent controls attack if able": a requirement that depends on the declaration); Kaito, Dancing
@@ -2642,7 +2642,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards destroyed this way), Fall from Favor (the monarch condition), Pestilent Spirit (deathtouch on instants and
   sorceries), Storyteller Pixie (Adventure spells), Wildgrowth Walker (explore triggers), Highcliff Felidar (the
   greatest power per opponent), Long Feng (a creature or a land put into a graveyard), Kraken of the Straits (blockers'
-  power against a count), Uphill Battle ("played" creatures), End Hostilities (permanents attached to creatures),
+  power against a count), End Hostilities (permanents attached to creatures),
   Eiganjo Uprising ("X minus one" tokens), Consume Spirit ("Spend only black mana on X"), Energy Field, Ill-Gotten
   Gains, Recall, Pyretic Rebirth, Viashino Heretic and Suffer the Past (not parsed yet).
 - Round B12 (the lanes have met; the harder templates earlier rounds skipped, least played first): kicker costs that
@@ -3814,7 +3814,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   artifact that's also a 1/1 Spirit creature with X more counters), Faith's Shield (fateful hour: you and your
   permanents gain protection), Chandra's Phoenix (damage dealt by a red instant or sorcery spell or red planeswalker you
   control), Heart-Shaped Herb, Meticulous Excavation (unearth check), Culmination of Studies, Psychotic Episode,
-  Skeletal Swarming, Lochmere Serpent.
+  Lochmere Serpent.
 - Round B62 (the unlisted ones from EDHREC rank about 19,700 up): affinity for historic permanents (Banish to Another
   Universe), "Activate only during your turn" on every player's spells and abilities (City of Solitude: you can't cast
   spells or activate abilities during another player's turn), "put a +1/+1 counter on target creature for each 1 life
@@ -3933,16 +3933,58 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of turn if you control a creature with X. The same is true for ..." (Majestic Myriarch, Thunderous Orator: each
   hexproof variant as that variant, rulings). +12 (28,673 of 31,936 with round 226).
 - Out after round B66 (looked at, not done): Swans of Bryn Argoll (its draws in the middle of damage could be replaced
-  by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Soul Exchange (the exiled
-  creature's last known types for "if it was a Thrull"), Domri, Chaos Bringer (riot on mana spent from a loyalty
+  by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (riot on mana spent from a loyalty
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way"), Murktide Regent (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
   Spinner, Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
+- Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
+  turn, create a 2/2 green Bear creature token (you gain 5 life) instead" (Words of Wilding, Words of Worship: one draw
+  replaced for each activation, from an empty library too, CR 614.11; a bot uses one in its upkeep for its draw step),
+  "You may look at face-down creatures you don't control any time" (Lens of Clarity, also the top of your library;
+  Found Footage, Keeper of the Lens: the UI shows what they are, not face-down spells, rulings; browser test),
+  "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield
+  during their last turn" (Arboria: who put it, the controller of what resolved, rulings; not their planeswalkers),
+  "When one or more of your opponents are dealt combat damage during your turn, draw two cards. If your library has no
+  cards in it, you win the game" (Fblthp, Impossibly Lost), "Then if that creature is a Mutant, Ninja, or Turtle"
+  (Turtle Van), Take's "Remove all +1/+1 counters ... Draw that many cards" (Give // Take, fused too), Believe's "You may
+  put it onto the battlefield if it's a creature card. If you don't, put it into your hand" (Reason // Believe), "a
+  noncreature or Robot spell from your hand without paying its mana cost" once each of your turns (Vision, Spectral
+  Synthezoid), Howl of the Horde's raid copy "an additional time" (a second delayed trigger, rulings), "Whenever a player
+  taps a Mountain, Forest, or Plains for mana" (Keeper of Progenitus), "that player adds {G}{G}{G}. Until end of turn,
+  they don't lose this mana" (Shizuko, Caller of Autumn). +14 (28,724 of 31,936 with round 229).
+- Round B68 (from EDHREC rank about 19,700 up and the B10 and B11 lists): B67's Words gap fixed: with shields of
+  different kinds waiting (two different Words, or a Words and Urabrask, Heretic Praetor), the drawing player chooses
+  which one replaces the draw (CR 616.1; bots take their own Words, life at 10 or less, a token otherwise; a picker
+  in the UI, browser test); the others wait for the next draw. "Look at the top three cards of your library instead.
+  Put one of those cards into your hand and the rest on the bottom of your library in any order" (Tomorrow, Azami's
+  Familiar; browser test), "Target creature attacks target opponent this turn if able" (Dulcet Sirens), "Creatures
+  played by your opponents enter tapped" (Uphill Battle: cast creature spells only), Skeletal Swarming, "For as long as
+  that card remains exiled, you may play it if you control a Kavu" (Possibility Technician), "If the exiled creature was
+  a Thrull" (Soul Exchange: the exiled creature's last known types), "Noncreature spells you control have conspire"
+  (Raiding Schemes), "Each red or green instant or sorcery spell you cast has conspire" (Wort, the Raidmother: no copy
+  if Wort is gone as it's cast, rulings), Rassilon, the War President, Behold the Unspeakable (chapter II's
+  "Otherwise, scry 2, then draw two cards"), "Each other Dog you control has unleash" (Tesak, Judith's Hellhound),
+  "Each instant and sorcery card in your graveyard that's exactly two colors has jump-start" (Niv-Mizzet, Supreme).
+  +12 (28,736 of 31,936 with B67).
+- Known gaps from round B68: one spell with two instances of conspire (two Raiding Schemes, or Wort on a card with
+  printed conspire) copies once (CR 702.78b); a Words or Urabrask shield waiting with Underrealm Lich, Tomorrow, dredge,
+  Archives or Notion Thief is not offered as a choice against them (the shield goes first); Underrealm Lich and
+  Tomorrow together use the first one found.
+- Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
+  Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment ("up to one Equipment"
+  chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard), Daredevil, Man
+  Without Fear ("you may exile ... if it's a Hero").
+- Out after round B67 (looked at, not done): Words of War, Words of Waste and Words of Wind (a target or choices in the
+  middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
+  Lumbering Battlement, Wall of Mourning, Kayla's Music Box and Serpent's Soul-Jar (cards exiled with ~ from abilities
+  not linked yet), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
+  so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
+  from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 110
-  there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
+  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 100
+  there are still unsupported and unlisted; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
@@ -3952,8 +3994,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
   Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
-  Curse of Inertia, Dreamshaper Shaman, Nefarious Lich, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's
-  Sanction, Kathril, Words of Wilding, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli; then on up from 13,200.
+  Curse of Inertia, Dreamshaper Shaman, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's Sanction, Kathril,
+  Jump Scare, Feral Encounter, Gimli; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

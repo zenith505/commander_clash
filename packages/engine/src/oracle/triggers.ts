@@ -431,6 +431,14 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
     if (spec?.kind !== "object" || spec.controller || !body || /\b(?:that|those|they|them|it)\b/.test(render[2]!)) return "fail";
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
   }
+  // Fblthp, Impossibly Lost: "When one or more of your opponents are dealt combat damage during your turn, ...": once for
+  // each combat damage step of its controller's turn that deals combat damage to one or more of them, from any source.
+  const lost = /^When one or more of your opponents are dealt combat damage during your turn, (.+)$/.exec(line);
+  if (lost) {
+    const body = parseBody(lost[1]!);
+    if (!body || /\b(?:that|those|they|them)\b/.test(lost[1]!.replace(/\binto their library\b/, ""))) return "fail";
+    return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "source" }, opponents: true, combat: true, anyController: true, yourTurn: true } };
+  }
   // Puppet Master, String Puller: "Whenever one or more goaded creatures deal combat damage to one of your opponents, ...":
   // anyone's goaded creatures (CR 701.15), once for each opponent they deal combat damage to at once (CR 603.2c).
   const goaded = /^Whenever one or more goaded creatures deal combat damage to one of your opponents, (.+)$/.exec(line);

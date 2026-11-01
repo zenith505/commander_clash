@@ -1592,7 +1592,7 @@ export type Modification =
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
   /** Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able" (CR 508.1d). */
   | { kind: "mustAttackMostLife" }
-  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
+  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen" | /** "Attacks target opponent this turn if able" (Dulcet Sirens): that target, bound as it resolves. */ { target: number }; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
@@ -2830,7 +2830,7 @@ export type Effect =
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -3324,6 +3324,8 @@ export type Effect =
   | { type: "surveil"; n: Amount } // CR 701.25
   /** Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn." (Player.nextDrawExiles) */
   | { type: "nextDrawExile"; who: PlayerRef }
+  /** Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature token (you gain 5 life) instead." (Player.nextDrawInstead) */
+  | { type: "nextDrawInstead"; gain?: number; token?: TokenSpec }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
   /**
@@ -4814,7 +4816,7 @@ export interface TriggeredAbility {
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
    * once for each player dealt damage, "that player" them.
    */
-  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true; /** "During your turn" (Fblthp, Impossibly Lost): only while its controller is the active player. */ yourTurn?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity); for "selfIsDealtDamage", "is dealt 3 or more damage" at once (Innocent Bystander). */
@@ -5814,7 +5816,7 @@ export interface CompiledCard {
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
    */
-  othersEnterTapped?: { filter: TargetSpec; text: string }[];
+  othersEnterTapped?: { filter: TargetSpec; text: string; /** Only one that was cast, entering from the stack (Uphill Battle's "played"). */ cast?: true }[];
   /**
    * "Lands you control enter untapped" (Spelunking, Horizon Explorer), "Gates you control enter untapped" (Gond Gate): a
    * replacement effect on other permanents entering; against an "enters tapped" one, the permanent's controller orders them
@@ -6254,6 +6256,8 @@ export interface CompiledCard {
    * your hand and the rest into your graveyard." (CR 614.1a): how many it looks at; each draw of several separately (rulings).
    */
   drawDig?: number;
+  /** Tomorrow, Azami's Familiar: drawDig's other cards go on the bottom of the library in any order, not into the graveyard. */
+  drawDigBottom?: true;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
   /**
@@ -6463,6 +6467,8 @@ export interface CompiledCard {
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
+  /** "Each noncreature spell you cast has conspire" (Raiding Schemes, Wort, Rassilon): as for spellsHaveConvoke (CR 702.78a). */
+  spellsHaveConspire?: { filter: TargetSpec; fromExile?: true; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];
@@ -6762,6 +6768,13 @@ export interface CompiledCard {
   lookTop?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   lookTopIf?: StaticCondition;
+  /**
+   * "You may look at face-down creatures you don't control (your opponents control) any time" (Lens of Clarity, Found
+   * Footage): its controller sees what those face-down permanents are (CR 708.5), not face-down spells (rulings).
+   */
+  lookFaceDown?: true;
+  /** Arboria: "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn" (attackProblem). */
+  attackOnlyActive?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
   /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */

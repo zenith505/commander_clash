@@ -1151,6 +1151,9 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Telim'Tor's Edict: "target permanent you own or control": yours by either (CR 108.3, 110.2).
+  if (phrase.trim() === "permanent you own or control")
+    return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: [], notTypes: [], notColors: [], owner: "you", text: "permanent you own" }, { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }], text: "target permanent you own or control" };
   // Ice Cream Kitty: "Sacrifice another creature or token": a permanent that's either (a token of any type too).
   const orToken = /^(artifact|creature|enchantment|land) or token$/.exec(phrase.trim());
   if (orToken) {

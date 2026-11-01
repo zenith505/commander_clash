@@ -421,3 +421,16 @@ export function landwalkLand(keyword: string): ((land: { types: string[]; subtyp
 
 /** Is this keyword a landwalk ability (CR 702.14a)? */
 export const isLandwalk = (keyword: string): boolean => !!landwalkLand(keyword);
+
+const everyTypeText = new Map<string, boolean>();
+/** Whether one of the card's own lines is "<its name> is every creature type". */
+export const isEveryCreatureTypeText = (d: { name: string; oracleText?: string }): boolean => {
+  const key = `${d.name}\u0000${d.oracleText}`;
+  let v = everyTypeText.get(key);
+  if (v === undefined) {
+    const name = d.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    v = new RegExp(`(?:^|\n)${name} is every creature type\\b`).test(d.oracleText ?? "");
+    everyTypeText.set(key, v);
+  }
+  return v;
+};

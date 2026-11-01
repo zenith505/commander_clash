@@ -1244,6 +1244,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you (?:control fewer (lands|creatures)|have (less life|fewer cards in hand)) than each opponent$/.exec(text)))
     return { kind: "youMost", what: (m[1] ?? (m[2] === "less life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand", fewer: true };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
+  // Erebos's Emissary: "If ~ is an Aura" (a bestowed permanent attached to a creature, CR 702.103b).
+  if (/^~ is an Aura$/.test(text)) return { kind: "self", is: "aura" };
   if (text === "an opponent owns a card in exile") return { kind: "opponentOwnsExiled" };
   // Zealots en-Dal: "if all nonland permanents you control are white": none of them isn't (a colorless one isn't white).
   if ((m = /^all nonland permanents you control are (white|blue|black|red|green)$/.exec(text)))
@@ -1628,6 +1630,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const c = parseStaticCondition(`you don't control another ${m[1]}`, st);
     return c?.kind === "control" && c.who === "you" && c.other ? { ...c, who: "attached" } : null;
   }
+  // So Tiny: "It gets -6/-0 instead as long as its controller has seven or more cards in their graveyard": the enchanted
+  // creature's controller's graveyard (rulings: checked continuously).
+  if ((m = new RegExp(`^its controller has ${NUM} or more cards in their graveyard$`).exec(text)) && st.affects.kind === "attached") return { kind: "graveyardAtLeast", n: num(m[1]!), who: "attached" };
   // Favorable Destiny: "Enchanted creature has shroud as long as its controller controls another creature": the same.
   if ((m = /^its controller controls another (artifact|creature|land|enchantment)$/.exec(text)) && st.affects.kind === "attached") {
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
@@ -1683,14 +1688,17 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
  * sources]": X as written, and what's prevented (CR 615.1).
  */
 export function parsePreventAll(text: string): { subject: string; mod: Extract<Modification, { kind: "preventDamage" }> } | null {
-  const m = /^Prevent all (combat |noncombat )?damage that would be dealt (to and dealt by|to|by) (.+?)(?: by (creatures|artifact creatures|artifact sources))?$/i.exec(text);
+  const m = /^Prevent all (combat |noncombat )?damage that would be dealt (to and dealt by|to|by) (.+?)(?: by (creatures|artifact creatures|artifact sources|sources of the chosen color))?$/i.exec(text);
   if (!m) return null;
+  // Prismatic Ward: "by sources of the chosen color", the color chosen as its source entered (see layers.ts).
+  const chosenColor = m[4] === "sources of the chosen color";
+  if (chosenColor && m[2] !== "to") return null;
   const fromTypes = m[4] === "creatures" ? ["Creature"] : m[4] === "artifact creatures" ? ["Artifact", "Creature"] : m[4] === "artifact sources" ? ["Artifact"] : undefined;
   if (fromTypes && m[2] !== "to") return null;
   const combat = m[1] === "combat " ? ("only" as const) : m[1] === "noncombat " ? ("non" as const) : undefined;
   return {
     subject: m[3]!,
-    mod: { kind: "preventDamage", ...(m[2] !== "by" ? { to: true as const } : {}), ...(m[2] !== "to" ? { by: true as const } : {}), ...(combat ? { combat } : {}), ...(fromTypes ? { fromTypes } : {}) },
+    mod: { kind: "preventDamage", ...(m[2] !== "by" ? { to: true as const } : {}), ...(m[2] !== "to" ? { by: true as const } : {}), ...(combat ? { combat } : {}), ...(fromTypes ? { fromTypes } : {}), ...(chosenColor ? { fromChosenColor: true as const } : {}) },
   };
 }
 

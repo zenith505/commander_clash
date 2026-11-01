@@ -1,6 +1,6 @@
 # Roadmap
 
-28,826 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,845 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,247 of
 9,979 (92%).
 
@@ -4064,6 +4064,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   suspended card you own and remove that many time counters from it" (Amy Pond: picked as it resolves, the last counter
   casts it, CR 702.62; browser test). Engine fix: a "top or bottom of their library" effect with several targets
   looped forever (it moved the cards already put there again). +14 (28,826 of 31,936 with rounds 230 to 232).
+- Round B73 (from EDHREC rank about 27,700 up to 22,500; cards whose one blocking line a small template covers): "~ is every
+  creature type (even if this card isn't on the battlefield)" (Mistform Ultimus: a characteristic-defining ability like
+  changeling, in every zone, kept when it loses its abilities, CR 604.3, 613.3), "It gets -6/-0 instead as long as its
+  controller has seven or more cards in their graveyard" (So Tiny: the enchanted creature's controller), "that player
+  sacrifices that creature unless they pay {2}" at the upkeep of the enchanted creature's controller (Slow Motion: not
+  once someone else controls it, CR 701.21a), "Whenever enchanted land becomes tapped, ~ deals 2 damage to that land's
+  controller" (Psychic Venom), "if that player controls more lands than each other player, the player creates" (Greener
+  Pastures, checked again as it resolves, CR 603.4), "unless one of their opponents was dealt damage this turn"
+  (Antagonism: the end step's player, the whole turn looked back on), "if ~ is the only creature card in your graveyard,
+  you may return ~ to the battlefield" (Nether Spirit: two of them stop each other, rulings), "Choose three target
+  nonenchantment permanents. Destroy one of them at random." (Wild Swing: among the targets still legal as it resolves),
+  "X damage divided evenly, rounded down, among all creatures target opponent controls" (Dwarven Catapult: none if there
+  are more creatures than X), "target opponent gains control of all other permanents you control" (Sky Swallower),
+  "Enchanted land is the chosen type" (Convincing Mirage, Phantasmal Terrain: the basic land type chosen as the Aura
+  entered, in place of its land types and their abilities, CR 305.7; browser test), "Prevent all damage that would be
+  dealt to enchanted creature by sources of the chosen color" (Prismatic Ward; browser test), "Players (Your opponents)
+  can't cast spells with the same name as the exiled card" (Exclusion Ritual, Ixalan's Binding: the card the enters
+  ability exiled, while it stays exiled, CR 607.2a), "The owner of target spell or nonland permanent puts it on their
+  choice of the top or bottom of their library" (Sudden Setback: a spell leaves the stack without being countered),
+  "If it's (~ is) an Aura, enchanted creature gets ... instead" (Everflame Eidolon, Erebos's Emissary: bestowed, CR
+  702.103), "target permanent you own or control" (Telim'Tor's Edict). +19 (28,845 of 31,936 with rounds 230 to 232).
+- Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
+  payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land
+  types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight
+  counters).
 - Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 is adding escape
   until end of turn, after it), Kheru Mind-Eater (whoever controls it may look at and play the face-down card),
   Lodestone Bauble (up to four basic land cards from one player's graveyard, the player chosen even with no target),
@@ -4105,10 +4130,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
-- Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 100
-  there are still unsupported and unlisted; `npm run popular -- --least`, minus the names
-  already in ROADMAP and HISTORY), then the lists below.
+- Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,
+  minus the names already in ROADMAP and HISTORY). After round B73 about 270 of those are ranked below 25,000 and about
+  440 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
+  replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of

@@ -102,6 +102,8 @@ export interface AmountExpr {
   pow2?: true;
   /** "This effect can't reduce the amount of mana ~ costs by more than {5}" (Valiant Changeling): never more than this. */
   max?: number;
+  /** "X damage divided evenly, rounded down, among all creatures target opponent controls" (Dwarven Catapult): divided by this count as it's worked out, rounded down; none when it's 0. */
+  divBy?: Count;
 }
 
 /** What an amount counts. */
@@ -1609,7 +1611,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only damage from sources of the color chosen as the static ability's source entered (none chosen: none prevented). */ fromChosenColor?: true; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -1772,7 +1774,7 @@ export interface StaticAbility {
  * artifacts", delirium's "four or more card types among cards in your graveyard", and so on.
  */
 export type StaticCondition =
-  | { kind: "graveyardAtLeast"; n: number }
+  | { kind: "graveyardAtLeast"; n: number; /** So Tiny: "its controller has seven or more cards in their graveyard", the enchanted creature's controller. */ who?: "attached" }
   /** "If you haven't added mana with this ability this turn" (Carpet of Flowers): the source's addMana with `markSource` this turn. */
   | { kind: "addedManaThisTurn"; not?: true }
   /** Krovikan Vampire: "if a creature dealt damage by ~ this turn died" (see TurnLog.diedDamaged). */
@@ -1814,7 +1816,7 @@ export type StaticCondition =
   /** `parity`: "as long as ~'s power is even" (Kianne, Corrupted Memory): 0 counts as even. */
   | { kind: "amount"; amount: Amount; min?: number; max?: number; moreThan?: Amount; parity?: "even" | "odd" }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
-  | { kind: "selfInGraveyard"; creatureAbove?: true }
+  | { kind: "selfInGraveyard"; creatureAbove?: true; /** Nether Spirit: "if ~ is the only creature card in your graveyard". */ onlyCreature?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
   | { kind: "selfInExile" }
   /** Firemane Angel's "if ~ is in your graveyard or on the battlefield", one ability for each zone: still there, the same object (CR 400.7, 603.4). */
@@ -1838,7 +1840,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1949,7 +1951,7 @@ export type StaticCondition =
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
   | { kind: "discardedThisTurn"; /** "If an opponent discarded a card this turn" (Tinybones, Trinket Thief): an opponent of `you`. */ opponent?: true; /** "If you've discarded a card this turn" (Recalibrate): `you`. */ yours?: true }
-  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true; /** "Noncombat damage" (Grim Repriser): with `damaged`, only damage that wasn't combat damage (CR 120.2b). */ noncombat?: true }
+  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true; /** With `damaged`, "one of their opponents" (Antagonism): an opponent of the trigger's player. */ of?: "eventPlayer"; /** "Noncombat damage" (Grim Repriser): with `damaged`, only damage that wasn't combat damage (CR 120.2b). */ noncombat?: true }
   /** "If you've scried or surveilled this turn" (Proctor of Potential): `you` scried or surveilled at least once this turn (CR 701.22, 701.25). */
   | { kind: "scriedThisTurn"; /** "As long as you've surveilled this turn" (Darkblade Agent): surveilling only. */ surveil?: true }
   /**
@@ -2518,6 +2520,8 @@ export type Effect =
   | { type: "surge" }
   /** Sinister Waltz: of the target cards still legal, all but `keep` chosen at random go to the bottom of their owner's library. */
   | { type: "randomTargetsToBottom"; what: ObjRef; keep: number }
+  /** Wild Swing: one of the target permanents still legal, chosen at random as it resolves, is destroyed. */
+  | { type: "destroyRandomTarget"; what: ObjRef }
   | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Tariel, Reckoner of Souls: "from target opponent's graveyard", onto the battlefield under your control. */ from?: PlayerRef; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand; Reap the Past's X. */ n?: Amount; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
@@ -6169,7 +6173,7 @@ export interface CompiledCard {
    */
   nameBans?: ({ kind: "cast"; who: "all" | "opponents" } | { kind: "activate"; exceptMana?: true })[];
   /** Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~" (its linked exiled cards, face up). */
-  linkedNameCastBan?: true;
+  linkedNameCastBan?: true | /** Exclusion Ritual: "Players can't cast spells with the same name as the exiled card": you too. */ "players";
   /** "You have protection from the chosen card name" (Runed Halo, CR 702.16a): see playerProtectedFrom. */
   protectionFromChosenName?: true;
   /**

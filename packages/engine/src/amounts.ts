@@ -86,7 +86,10 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   const c = evalCount(s, a.count, ctx);
   // Two to the power of it (Mathemagics); past 1024 the number can't matter, it's more than all the cards in the game.
   const v0 = a.pow2 ? 2 ** Math.min(Math.max(0, c), 10) : Math.floor(c / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
-  const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
+  const v1 = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
+  // Dwarven Catapult: split evenly among that many, rounded down (rulings: none if there are more of them than X).
+  const by = a.divBy ? evalCount(s, a.divBy, ctx) : 1;
+  const v = a.divBy ? (by > 0 ? Math.floor(v1 / by) : 0) : v1;
   const n0 = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
   const n = a.max !== undefined ? Math.min(n0, a.max) : n0;
   return a.negate ? -n : n;
@@ -1041,7 +1044,8 @@ export function describeAmount(a: Amount): string {
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
   const v1 = a.half ? `${a.third ? "a third of" : a.tenth ? "a tenth of" : "half"} ${v0}, rounded ${a.half}` : v0;
-  const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
+  const v2 = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
+  const v = a.divBy ? `${v2} / ${describeCount(a.divBy)}, rounded down` : v2;
   return a.negate ? `-(${v})` : v;
 }
 

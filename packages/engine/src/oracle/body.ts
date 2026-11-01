@@ -1274,6 +1274,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sinister Waltz: "Choose three target creature cards in your graveyard. Return two of them at random to the battlefield
   // and put the other on the bottom of your library." One sentence, so the targets are the "them".
   text = text.replace(/^Choose three target creature cards in your graveyard\. Return two of them at random to the battlefield and put the other on the bottom of your library\.$/, "Return two of three target creature cards from your graveyard at random to the battlefield and put the other on the bottom of your library.");
+  // Everflame Eidolon: "~ gets +1/+0 until end of turn. If it's an Aura, enchanted creature gets ... instead": "it" is ~.
+  text = text.replace(/^(~ gets [+-]\d+\/[+-]\d+ until end of turn\.) If it's an Aura, (?=enchanted creature gets [+-]\d+\/[+-]\d+ until end of turn instead\.$)/, "$1 If ~ is an Aura, ");
+  // Wild Swing: "Choose three target nonenchantment permanents. Destroy one of them at random." One sentence, the same way.
+  text = text.replace(/^Choose three target nonenchantment permanents\. Destroy one of them at random\.$/, "Destroy one of three target nonenchantment permanents at random.");
   // Decree of Annihilation: "Exile all artifacts, creatures, and lands from the battlefield, all cards from all graveyards,
   // and all cards from all hands." Nothing moves between those zones, so one after the other is the same (CR 406.3).
   text = text.replace(/^Exile all artifacts, creatures, and lands from the battlefield, all cards from all graveyards, and all cards from all hands\.$/, "Exile all artifacts, creatures, and lands. Exile all cards from all graveyards. Exile all cards from all hands.");
@@ -11961,7 +11965,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const theyControl = unlessState && ctx.eventPlayer ? /^(?:they control|that player controls) (.+)$/.exec(unlessState[2]!) : null;
     const theirCond = theyControl ? parseStaticCondition(`you control ${theyControl[1]}`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // Crimson Honor Guard: "unless they control a commander".
-    const unlessCond = theirCond ? (theirCond.kind === "control" && theirCond.who === "you" && !theirCond.other ? { ...theirCond, who: "eventPlayer" as const } : theirCond.kind === "controlCommander" && !theirCond.own ? { ...theirCond, eventPlayer: true as const } : null) : unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Antagonism: "unless one of their opponents was dealt damage this turn": any player other than the trigger's player
+    // (looked back over the whole turn, rulings).
+    const theirOpp = unlessState && ctx.eventPlayer && /^one of their opponents (?:was|has been) dealt damage this turn$/.test(unlessState[2]!);
+    const unlessCond: StaticCondition | null = theirOpp ? { kind: "opponentLostLife", damaged: true, of: "eventPlayer" } : theirCond ? (theirCond.kind === "control" && theirCond.who === "you" && !theirCond.other ? { ...theirCond, who: "eventPlayer" as const } : theirCond.kind === "controlCommander" && !theirCond.own ? { ...theirCond, eventPlayer: true as const } : null) : unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (unlessState && unlessCond) {
       const inner = parseOne(unlessState[1]!, ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;

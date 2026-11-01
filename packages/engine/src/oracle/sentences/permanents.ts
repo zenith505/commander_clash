@@ -1407,7 +1407,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
   // Creator): the same as with the duration after it.
-  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+  // Hydro-Man, Fluid Felon: "Until your next turn, ~ becomes a land and gains "{T}: Add {U}."": itself.
+  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     const mods = what && parseChanges(m[3]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;

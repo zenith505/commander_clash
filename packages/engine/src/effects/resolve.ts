@@ -973,6 +973,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noLifeGain":
     case "noLifeGainForGame":
     case "turnRules":
+    case "blockTaxThisTurn":
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
     case "graveyardCastThisTurn":
@@ -1101,6 +1102,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "soulbond":
     case "ninjutsu":
     case "impulse":
+    case "playLinkedThisTurn":
     case "castLinkedFree":
     case "madness":
     case "miracle":

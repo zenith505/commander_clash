@@ -1,4 +1,4 @@
-import { playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -113,7 +113,7 @@ import {
   landUntappedOffer,
   creatureTypesOf,
   mustAttackPlayers,
-  hasConspire,
+  conspireInstances,
   walkersFreeToAttack,
   attackTargetScore,
 } from "./game";
@@ -203,7 +203,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const words = pend.options.filter((k) => k.startsWith("words:"));
       const w = (k: string) => player(s, pid).nextDrawInstead?.[Number(k.slice("words:".length))];
       const low = player(s, pid).life <= 10;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? pend.options[0]!;
+      // Then our own replacements: the Archive's two cards, a look (Underrealm Lich, Tomorrow, Scion), a dredge we'd take;
+      // an opponent's Notion Thief last.
+      const has = (k: string) => pend.options.find((o) => o === k || o.startsWith(`${k}:`));
+      const dredges = pend.options.filter((k) => k.startsWith("dredge:")).map((k) => k.slice("dredge:".length));
+      const dredge = dredges.length ? chooseDredge(s, pid, dredges) : undefined;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? pend.options.find((k) => k !== "thief" && !k.startsWith("dredge:")) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -2642,8 +2647,8 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : c.kind === "tap" || c.kind === "reveal"
-                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand" are activated abilities' costs only
+              : c.kind === "tap" || c.kind === "reveal" || c.kind === "removeCounters"
+                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand", "Remove X +1/+1 counters from among ..." are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
@@ -2774,10 +2779,12 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both && must("teamwork") !== false ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);
     if (tw) extra.teamwork = tw;
     if (must("teamwork") && !tw) return null;
-    // Conspire (CR 702.78a): two such creatures for a copy of the spell.
-    if (hasConspire(s, pid, obj(s, id))) {
-      const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
-      if (two.length === 2) extra.conspire = two;
+    // Conspire (CR 702.78a): two such creatures for a copy of the spell, for each instance it has (702.78b).
+    const conspires = conspireInstances(s, pid, obj(s, id));
+    if (conspires > 0) {
+      const spareOnes = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o));
+      const pairs = Math.min(conspires, Math.floor(spareOnes.length / 2));
+      if (pairs > 0) extra.conspire = spareOnes.slice(0, 2 * pairs);
     }
     // Harmonize (CR 702.180a): the strongest creature we can spare, for the most generic mana off.
     if (via === "harmonize") {
@@ -4223,7 +4230,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
       const fixedX = definedX(s, o, ab);
-      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      // Kaho, Minamo Historian: "cast a spell with mana value X from among cards exiled with ~": X matching one of them.
+      const linkedMvX = cost.hasX && body.effects.some((e) => e.type === "castFromAmong" && e.fromLinked && e.exactMv !== undefined) ? [...new Set(linkedCards(s, id).map((l) => defMv(defOf(s, obj(s, l.id)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a) : undefined;
+      if (linkedMvX && !linkedMvX.length) continue;
+      const xs = fixedX != null ? [fixedX] : linkedMvX ? linkedMvX : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.

@@ -987,6 +987,8 @@ export interface StackItem {
   casualty?: boolean;
   /** For a spell: its conspire cost was paid (CR 702.78a). */
   conspired?: boolean;
+  /** For a spell: how many instances of conspire were paid, when more than one (CR 702.78b). */
+  conspiredTimes?: number;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
@@ -1055,6 +1057,8 @@ export interface ExtraTurn {
   loseAtEnd?: { controller: PlayerId; sourceCardId: string; subject: { id: ObjectId; zc: number } };
   /** "Skip the untap step of that turn" (Savor the Moment, CR 614.10). */
   skipUntap?: true;
+  /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror): anyone's (CR 702.193). */
+  noPowerUp?: true;
 }
 
 /** A triggered ability waiting to be put on the stack. CR 603.3 */
@@ -1360,11 +1364,23 @@ export type PendingDecision =
    */
   | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
   /**
-   * Different shields wait to replace this draw (Urabrask, Heretic Praetor, the Words): the drawing player chooses which
-   * applies (CR 616.1). `options` are game.ts drawShields keys, `labels` what each does; `left`, `made` and `after` are
-   * the draws after this one, as for "drawEmptyReturn".
+   * Different replacements could apply to this draw (shields of Urabrask, Heretic Praetor and the Words, with each other
+   * or with Underrealm Lich, Tomorrow, dredge, Notion Thief, Alhammarret's Archive, Scion of Halaster or Abundance; two
+   * looks): the drawing player chooses which applies (CR 616.1). `options` are game.ts drawReplacementChoices keys,
+   * `labels` what each does; `left`, `made` and `after` are the draws after this one, as for "drawEmptyReturn".
    */
-  | { kind: "drawInstead"; player: PlayerId; options: string[]; labels: string[]; left: number; made?: number[]; after?: "drawStep" }
+  | {
+      kind: "drawInstead";
+      player: PlayerId;
+      /** drawReplacementChoices' keys: a shield ("exile", "words:<i>"), "thief", "dig:<id>", "dredge:<id>", "archive", "look", "abundance:<land|nonland>". */
+      options: string[];
+      labels: string[];
+      left: number;
+      made?: number[];
+      after?: "drawStep";
+      /** This draw is one a replacement made: how many Alhammarret's Archives can still replace it (CR 614.5). */
+      archives?: number;
+    }
   | {
       kind: "dredge";
       player: PlayerId;
@@ -1777,11 +1793,20 @@ export interface GameState {
    * cost": one each, for `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile), this turn only.
    */
   linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string; /** "A creature spell" (Idol of Endurance). */ filter?: TargetSpec }[];
+  /**
+   * "Until end of turn, you may play a card exiled with ~" (Raphael, Most Attitude), "you may cast a creature spell from
+   * among cards exiled with ~" (Serpent's Soul-Jar), "you may play cards you own exiled with ~" (Kayla's Music Box): for
+   * `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile, CR 607.2a), this turn only, paying the
+   * usual costs with the usual timing (rulings). One card each unless `all`.
+   */
+  linkedPlays?: { player: PlayerId; source: string; turn: number; sourceName: string; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
+  /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
+  blockTaxes?: { turn: number; n: number }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** "Until end of turn, if one or more tokens would be created under your control, twice that many ..." (Kaya, Geist Hunter): replacements made by a resolved ability, for the turn they were made in (CR 614.1a). */

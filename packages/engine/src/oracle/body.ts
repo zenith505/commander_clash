@@ -2543,6 +2543,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // turn, copy that spell an additional time. You may choose new targets for the copy.": a second, identical delayed
   // trigger, so the next one is copied twice (rulings).
   text = text.replace(/(^|\n|\. )If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell an additional time\. You may choose new targets for the copy\./, "$1If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell, and you may choose new targets for the copy.");
+  // Kayla's Music Box: "Look at the top card of your library, then exile it face down": one instruction (see zones.ts).
+  text = text.replace(/^Look at the top card of your library, then exile it face down\.$/, "Look at and exile the top card of your library face down.");
   // Believe (Reason // Believe): "Look at the top card of your library. You may put it onto the battlefield if it's a
   // creature card. If you don't, put it into your hand.": the same as Risen Reef's wording; a card that isn't put onto
   // the battlefield, for any reason, goes to your hand without being revealed (rulings).
@@ -4886,6 +4888,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!n || !who) return null;
       effects.push({ type: "impulse", n, until: "yourNextEndStep", who, ...(tgtEqualPlay[1] ? { anyType: true as const } : {}) });
       si++;
+      continue;
+    }
+    // Xander's Pact: "Each opponent exiles the top card of their library. You may cast spells from among those cards this
+    // turn. If you cast a spell this way, pay life equal to that spell's mana value rather than pay its mana cost." Any
+    // number of them, spells only (lands can't be cast), with X as 0 (rulings).
+    if (
+      /^Each opponent exiles the top card of their library$/.test(s) &&
+      sentences[si + 1]?.replace(/\.$/, "") === "You may cast spells from among those cards this turn" &&
+      sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to that spell's mana value rather than pay its mana cost"
+    ) {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, life: true });
+      si += 2;
       continue;
     }
     // Nashi, Moon Sage's Scion: "Exile the top card of each player's library. Until end of turn, you may play one of those
@@ -11998,7 +12012,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -12743,6 +12757,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
       last.skipUntap = true;
+      continue;
+    }
+    // Kang the Conqueror: "Take an extra turn after this one. During that turn, power-up abilities can't be activated."
+    // Every power-up ability, whoever controls it, during that extra turn (CR 702.193).
+    if (/^During that turn, power-up abilities can't be activated$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1 || last.noPowerUp) return null;
+      last.noPowerUp = true;
       continue;
     }
     // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger
@@ -13838,7 +13860,7 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "preventNext":
     case "extraTurn":
     case "pick": {
-      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd))) return null;
+      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd || e.noPowerUp))) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

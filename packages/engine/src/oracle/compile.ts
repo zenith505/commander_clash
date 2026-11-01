@@ -1480,6 +1480,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.nameBans ??= []).push(nameBan);
       continue;
     }
+    // Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~": the names of
+    // the cards its exile abilities exiled that are still exiled (CR 607.2a, 201.2).
+    if (line === "Your opponents can't cast spells with the same name as a card exiled with ~." && !out.linkedNameCastBan) {
+      out.linkedNameCastBan = true;
+      continue;
+    }
     if (line === "You have protection from the chosen card name.") {
       out.protectionFromChosenName = true;
       continue;
@@ -1931,6 +1937,14 @@ export function compile(d: CardDef): CompiledCard {
       const token = e?.type === "createToken" && e.n === 1 && e.who.ref === "you" && Object.keys(e).every((k) => ["type", "n", "who", "token"].includes(k)) ? e.token : undefined;
       if (filter?.kind !== "object" || (!life && !token)) out.unsupported.push(raw);
       else out.exileInsteadOfDying = { filter, linked: true, ...(life ? { gainLife: Number(life[1]) } : {}), ...(token ? { token } : {}) };
+      continue;
+    }
+    // Ravenous Slime: "If a creature an opponent controls would die, instead exile it and put a number of +1/+1 counters
+    // equal to that creature's power on ~": one replacement (CR 614.1a), the power as it last existed (rulings).
+    if (line === "If a creature an opponent controls would die, instead exile it and put a number of +1/+1 counters equal to that creature's power on ~.") {
+      const filter = parseTargetPhrase("creature an opponent controls");
+      if (filter?.kind !== "object") out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, countersPower: true };
       continue;
     }
     // Nemata, Primeval Warden: "If a creature an opponent controls would die, exile it instead. When you do, create a 1/1
@@ -3087,6 +3101,15 @@ export function compile(d: CardDef): CompiledCard {
       const f = colored ? (byColor?.kind === "spell" && byType?.kind === "spell" && byColor.colors?.length && !byType.colors?.length && byType.types?.length ? { ...byType, colors: byColor.colors } : null) : parseTargetPhrase(`${giveConspire[1]} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveConspire ??= []).push({ filter: { ...f, text: `${giveConspire[1]} spell` }, ...(giveConspire[2] ? { fromExile: true as const } : {}), text: line });
+      continue;
+    }
+    // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this
+    // spell, you may copy it ...", one for each instance (702.144b), while the permanent is there as it's cast.
+    const giveDemonstrate = /^([A-Z][a-z]+) spells you cast have demonstrate\.$/.exec(line);
+    if (giveDemonstrate) {
+      const f = parseTargetPhrase(`${giveDemonstrate[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveDemonstrate ??= []).push({ filter: { ...f, text: `${giveDemonstrate[1]!.toLowerCase()} spell` }, text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
@@ -4801,6 +4824,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever your commander enters or attacks, ..." (Tome of Legends, Search for Dagger).
       /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
+      // Rhuk, Hexgold Nabber: "Whenever an equipped creature you control other than ~ attacks or dies, ...": an attack and
+      // a death are never one event.
+      /^Whenever (an equipped creature you control other than ~) attacks or dies, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
       // Jerren, Corrupted Bishop: "Whenever ~ enters or another nontoken Human you control dies, ...": entering and another
@@ -4900,6 +4926,8 @@ export function compile(d: CardDef): CompiledCard {
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
+            : /^Whenever an equipped creature you control other than ~ attacks or dies, /.test(line)
+              ? [`Whenever another equipped creature you control attacks, ${effect}`, `Whenever another equipped creature you control dies, ${effect}`]
             : /^Whenever ~ deals combat damage to a player or dies, /.test(line)
               ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
@@ -5377,6 +5405,39 @@ function linkExile(out: CompiledCard) {
     if (others || out.spell || exiles.length !== 1) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
+  // Triarch Stalker, Beckoning Will-o'-Wisp: "the last chosen player" is the one its "At the beginning of combat on your
+  // turn, choose an opponent" chose last, kept on the permanent; with no such trigger it isn't known.
+  if (out.statics.some((st) => st.affects.kind === "filter" && st.affects.spec?.chosen === "attackingPlayer")) {
+    const chooses = out.triggers.flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "choose" }> => e.type === "choose" && e.choice === "opponent");
+    if (chooses.length !== 1 || out.spell || out.entersChoose) out.unsupported.push("(the last chosen player isn't chosen by one triggered ability)");
+    else chooses[0]!.keepOnSource = true;
+  }
+  // Circu: both of its "exile the top card of target player's library" triggers are linked to its ban (CR 607.2a).
+  if (out.linkedNameCastBan) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile) || e.type === "castFromAmong");
+    if (others || out.spell || !tops.length || out.activated.length) out.unsupported.push("(bans names of cards exiled with it that it can't link to its exile abilities)");
+    else for (const e of tops) e.linked = true;
+  }
+  // Kaho, Minamo Historian; Jeleva, Nephalia's Scourge; Shell of the Last Kappa: "cast a spell from among cards exiled
+  // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
+  // exiles the top X cards", Shell's exiled spell.
+  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked) || e.type === "playLinkedThisTurn"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
+    // Kayla's Music Box: "exile it face down", always linked to its source.
+    const faceDown = all.filter((e) => e.type === "exileFaceDown");
+    const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked));
+    if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+    else if (faceDown.length) {
+      // Linked as it's exiled.
+    } else if (tops[0]) tops[0].linked = true;
+    else if (exiles[0]) exiles[0].linked = true;
+    else searches[0]!.dest = { ...searches[0]!.dest, linked: true };
+  }
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
@@ -5393,6 +5454,14 @@ function linkExile(out: CompiledCard) {
     else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
     else if (!others && exiles.length === 1) exiles[0]!.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
+  }
+  // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
+  // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).
+  if (out.delve && !out.spell && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const others = all.some((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile) || e.type === "castFromAmong");
+    if (others || out.additionalCosts?.some((c) => "exile" in c && c.exile) || out.exileInsteadOfDying) out.unsupported.push("(returns cards exiled with it that it can't link to its delve)");
+    else out.delveLinked = true;
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
@@ -5520,7 +5589,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

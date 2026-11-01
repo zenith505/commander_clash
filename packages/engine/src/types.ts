@@ -531,6 +531,8 @@ export interface GameObject {
   enteredFromHand?: true;
   /** It entered the battlefield from exile (Faldorn's "a land you control enters from exile", CR 603.6a). */
   enteredFromExile?: true;
+  /** Sigarda's Splendor: the life total last noted for it, its controller's (as it entered, then at each of their upkeeps). */
+  notedLife?: number;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** A resolving spell's "return ~ to its owner's hand" (Cerebral Eruption): it goes there as it finishes resolving. */
@@ -1935,7 +1937,7 @@ export interface GameState {
   /** How much damage each damage rule with a tallied `countersOn` has prevented (Sacred Boon), by rule id. */
   preventedTally?: Record<string, number>;
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
-  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[] };
+  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[]; /** The creatures that entered the battlefield during it, with their controllers then (Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn"). */ creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
@@ -2434,6 +2436,7 @@ export interface Resolving {
     targetSlot?: number; // "change a target of target spell or ability to ~": which of its targets (Spellskite)
     retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
+    exploresLeft?: number; // explores still to do for one instruction (Topography Tracker doubles them)
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast

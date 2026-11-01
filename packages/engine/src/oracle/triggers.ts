@@ -3626,6 +3626,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(text, { eventPlayer: true });
     return body ? { event: "opponentCreaturesUnblocked", body: { ...body, text: unblocked[1]! } } : "fail";
   }
+  // Psychic Surgery: "you may look at the top two cards of that library. You may exile one of those cards. Then put the
+  // rest on top of that library in any order": that player's library.
+  const shuffles = /^Whenever an opponent shuffles their library, (.+)$/.exec(line);
+  if (shuffles) {
+    const body = parseBody(theyAreThatPlayer(shuffles[1]!.replace(/\bthat library\b/g, "that player's library")), { eventPlayer: true });
+    return body ? { event: "opponentShufflesLibrary", body: { ...body, text: shuffles[1]! } } : "fail";
+  }
   const searches = /^Whenever an opponent searches their library, (.+)$/.exec(line);
   if (searches) {
     const body = parseBody(theyAreThatPlayer(searches[1]!), { eventPlayer: true });

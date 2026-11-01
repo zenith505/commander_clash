@@ -5909,7 +5909,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "... and put it onto the battlefield with X additional +1/+1 counters on it. If X is 4 or greater, it gains haste
     // until end of turn. If you search your library this way, shuffle." (Vision Quest): the shuffle doesn't depend on
     // what's between, so it goes with the search.
-    const orYard = new RegExp(`^(?:([Yy]ou may) )?[Ss]earch your library and\\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)(?: with (X|an|a|one|two|three) additional ${COUNTER} counters? on it)?$`).exec(s);
+    // Arachnus Spinner: "Search your graveyard and/or library for a card named Arachnus Web and put it onto the battlefield
+    // attached to target creature": the Aura only onto that creature, if it could enchant it, or it stays where it is (CR
+    // 303.4f-g); the library's still shuffled if it was searched (rulings).
+    const orYard = new RegExp(`^(?:([Yy]ou may) )?[Ss]earch your (?:library and\\/or graveyard|graveyard and\\/or library) for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?(?: attached to target creature)?)(?: with (X|an|a|one|two|three) additional ${COUNTER} counters? on it)?$`).exec(s);
     const isShuffle = (i: number) => sentences[i]?.replace(/\.$/, "") === "If you search your library this way, shuffle";
     const shuffleAt = isShuffle(si + 1) ? si + 1 : orYard && !orYard[1] && isShuffle(si + 2) ? si + 2 : undefined;
     if (orYard && shuffleAt !== undefined) {
@@ -5918,8 +5921,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const dest: SearchDest =
         orYard[5] === "into your hand"
           ? { zone: "hand" }
-          : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}), ...(orYard[6] ? { counters: { counter: counterKind(orYard[7]!), n: /^an?$/.test(orYard[6]) ? 1 : amt(orYard[6]) } } : {}) };
+          : { zone: "battlefield", ...(/tapped\b/.test(orYard[5]!) ? { tapped: true } : {}), ...(orYard[6] ? { counters: { counter: counterKind(orYard[7]!), n: /^an?$/.test(orYard[6]) ? 1 : amt(orYard[6]) } } : {}) };
       if (orYard[6] === "X" && !ctx.spell && !ctx.ownX) return null;
+      if (/attached to target creature$/.test(orYard[5]!)) {
+        // Only an Aura, by name: what it can enchant is checked as it enters.
+        if (!filter?.named || orYard[6]) return null;
+        const host = parseObject("target creature", ctx);
+        if (host?.ref !== "target") return null;
+        dest.attachTo = host;
+      }
       const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: !!orYard[4], dest, orGraveyard: true };
       const fx: Effect = orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
       effects.push(fx);
@@ -5938,6 +5948,43 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx: Effect = { type: "search", filter, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" }, andGraveyard: true, andHand: true };
       effects.push(fx);
       noteLast(ctx, [fx]);
+      continue;
+    }
+    // Journey for the Elixir: "Search your library and graveyard for a basic land card and a card named Jiang Yanggu,
+    // reveal them, put them into your hand, then shuffle"; Nissa's Encouragement: "... for a card named Forest, a card named
+    // Brambleweft Behemoth, and a card named Nissa, Genesis Mage. Reveal those cards, put them into your hand, then
+    // shuffle.": both zones together, up to one card for each (any or all of them may be found, rulings, CR 701.23b); a
+    // card named Forest is only that, not any Forest (rulings).
+    const libAndYard = /^Search your library and graveyard for (an? .+?)(, reveal them, put them into your hand, then shuffle)?$/.exec(s);
+    if (libAndYard && (libAndYard[2] || sentences[si + 1]?.replace(/\.$/, "") === "Reveal those cards, put them into your hand, then shuffle")) {
+      const parts = libAndYard[1]!.split(/,? and (?=an? )|, (?=an? )/);
+      const specs = parts.map((p) => {
+        const named = /^a card named ([A-Z][^~]*)$/.exec(p);
+        if (named) return { kind: "card" as const, named: named[1]!, text: `card named ${named[1]}` };
+        return /^an? [a-z ]+ card$/.test(p) ? parseSearchFilter(p.replace(/^an? /, "")) : null;
+      });
+      if (parts.length < 2 || specs.some((f) => !f) || !parts.some((p) => /^a card named /.test(p))) return null;
+      const anyOf = specs as TargetSpec[];
+      const fx: Effect = { type: "search", filter: { kind: "card", anyOf, text: parts.map((p) => p.replace(/^an? /, "")).join(", ") }, n: parts.length, upTo: true, oneOfEach: anyOf, reveal: true, dest: { zone: "hand" }, andGraveyard: true };
+      effects.push(fx);
+      noteLast(ctx, [fx]);
+      if (!libAndYard[2]) si++;
+      continue;
+    }
+    // Dark Supplicant, Gate to the Afterlife: "Search your graveyard, hand, and/or library for a card named Scion of
+    // Darkness and put it onto the battlefield. If you search your library this way, shuffle.": the graveyard and the
+    // hand, and the library too if you choose; only then a shuffle (rulings, CR 701.23). Agency Outfitter: "a card named A
+    // and/or a card named B and put them onto the battlefield": up to one of each name.
+    const andOrLib = /^(?:([Yy]ou may) )?[Ss]earch your graveyard, hand,? and\/or library for a card named ([A-Z][^,~]*?)(?: and\/or a card named ([A-Z][^,~]*?))? and put (it|them) onto the battlefield$/.exec(s);
+    if (andOrLib && isShuffle(si + 1) && (andOrLib[4] === "them") === !!andOrLib[3]) {
+      const names = [andOrLib[2]!, ...(andOrLib[3] ? [andOrLib[3]] : [])];
+      if (names.some((n) => / or |\band\b/.test(n))) return null;
+      const filter: TargetSpec = names.length === 1 ? { kind: "card", named: names[0]!, text: `card named ${names[0]}` } : { kind: "card", anyOf: names.map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: names.map((n) => `card named ${n}`).join(" and/or ") };
+      const search: Effect = { type: "search", filter, n: names.length, upTo: names.length > 1, reveal: false, dest: { zone: "battlefield" }, orGraveyard: true, andHand: true, ...(names.length > 1 ? { oneEach: true as const } : {}) };
+      const fx: Effect = andOrLib[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
+      effects.push(fx);
+      noteLast(ctx, [fx]);
+      si++;
       continue;
     }
     // Doomsday: "Search your library and graveyard for five cards and exile the rest. Put the chosen cards on top of your
@@ -8057,6 +8104,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.lastPlayerTarget = index;
       dig = { type: "dig", n: amt(theirLook[1]!), reveal: true, library: { ref: "target", index } };
       sentences.splice(si + 1, 2, put[1]!, "Put the rest on the bottom in a random order");
+      continue;
+    }
+    // Psychic Surgery: "you may look at the top two cards of that library. You may exile one of those cards. Then put the
+    // rest on top of that library in any order.": that player's library (the one shuffled); you choose the card exiled and
+    // the order of the rest, if two are left.
+    const surgery = !dig && ctx.eventPlayer ? /^([Yy]ou may )?[Ll]ook at the top two cards of that player's library$/.exec(s) : null;
+    if (surgery && /^You may exile one of those cards\.?$/.test(sentences[si + 1] ?? "") && /^Then put the rest on top of that player's library in any order\.?$/.test(sentences[si + 2] ?? "")) {
+      const who: PlayerRef = { ref: "eventPlayer" };
+      const look: Effect[] = [{ type: "dig", n: 2, count: 1, upTo: true, into: "exile", rest: "keep", reveal: false, library: who }, { type: "orderTop", who, n: 2, digRest: true }];
+      effects.push(surgery[1] ? { type: "may", effects: look, text: s.replace(/^[Yy]ou may /, "") } : look[0]!, ...(surgery[1] ? [] : [look[1]!]));
+      si += 2;
       continue;
     }
     // Wu Spy: "Look at the top two cards of target player's library. Put one of them into their graveyard."; Cruel Fate:

@@ -614,7 +614,8 @@ export function compile(d: CardDef): CompiledCard {
       .replace(/\b([Ee])nchanted (Forest|Island|Swamp|Mountain|Plains)(?= becomes | is put into a graveyard| is an? )/g, (x, e: string, t: string, _i, text: string) => (new RegExp(`^Enchant ${t}$`, "m").test(text) ? `${e}nchanted land` : x))
       .split("\n")
       .map((l) => {
-        const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
+        // Moment of Reckoning: "Choose up to four. You may choose the same mode more than once.": none to four of them.
+        const same = /^Choose (one|two|three|four|five|up to four)\. You may choose the same mode more than once\.$/.exec(l.trim());
         if (same && isSpell) {
           repeat = true;
           return `Choose ${same[1]} —`;
@@ -746,6 +747,14 @@ export function compile(d: CardDef): CompiledCard {
     const topBorrow = /^As long as the top card of your library is an? ([A-Z][a-z]+) card, ~ has all activated abilities of that card\.$/.exec(line);
     if (topBorrow && !out.borrows) {
       out.borrows = { filter: { kind: "object", subtypes: [topBorrow[1]!], text: `${topBorrow[1]} card` }, top: true };
+      continue;
+    }
+    // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
+    // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
+    const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
+    if (borrowLinked && !out.borrows) {
+      const kind = borrowLinked[1] ? capital(borrowLinked[1]) : undefined;
+      out.borrows = { filter: { kind: "card", ...(kind ? { types: [kind], notTypes: [], notColors: [] } : {}), text: `${borrowLinked[1] ? `${borrowLinked[1]} ` : ""}cards exiled with ~` }, linked: true };
       continue;
     }
     if (borrow && !out.borrows) {
@@ -1417,11 +1426,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
-    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type(?: other than (?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?: or (?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))?)?)\.$/.exec(line);
     if (asCardType) {
+      // Stenn, Paranoid Partisan: "a card type other than creature or land": any of the others.
+      const other = /^a card type other than (\w+)(?: or (\w+))?$/.exec(asCardType[1]!);
+      const not = other ? [capital(other[1]!), ...(other[2] ? [capital(other[2])] : [])] : [];
       if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
       // "Choose a card type" (Serra's Emissary): any that a card here can have (rulings).
-      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1] === "a card type" ? Object.keys(CARD_TYPE_PLURAL) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.startsWith("a card type") ? Object.keys(CARD_TYPE_PLURAL).filter((t) => !not.includes(t)) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
@@ -5016,11 +5028,16 @@ export function compile(d: CardDef): CompiledCard {
   }
   if (repeat) {
     const modal = out.spell?.modal;
-    if (modal && !modal.costs && !modal.pawprints && modal.min === modal.max && modal.min > 1) modal.repeat = true;
+    if (modal && !modal.costs && !modal.pawprints && ((modal.min === modal.max && modal.min > 1) || (modal.min === 0 && modal.max > 1))) modal.repeat = true;
     else if (out.spell) {
       delete out.spell;
       out.unsupported.push("You may choose the same mode more than once.");
     }
+  }
+  // More modes to choose than there are, without "the same mode more than once": not a list we read.
+  if (out.spell?.modal && !out.spell.modal.repeat && !out.spell.modal.pawprints && out.spell.modal.max > out.spell.modal.modes.length) {
+    delete out.spell;
+    out.unsupported.push("(chooses more modes than it has)");
   }
   if (escalate && escalate !== "fail") {
     // A "Choose one or more" (or "one or both") list without other mode costs.
@@ -5302,6 +5319,14 @@ function linkExile(out: CompiledCard) {
     if ((exiles.length !== 1 && !oneAbility) || exiles.some((e) => e.type !== "exile" || e.until)) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
     else for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
   }
+  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a).
+  if (out.borrows?.linked) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1 || exiles[0]!.until) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
@@ -5404,7 +5429,12 @@ function linkExile(out: CompiledCard) {
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     // Endless Horizons: "search your library for any number of Plains cards, exile them" as its one exile instruction.
     const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
-    if (!others && exiles.length === 1) exiles[0]!.linked = true;
+    // Ashiok, Nightmare Weaver: "a creature card ... exiled with ~" is any card exiled by its "exile the top three cards" and
+    // its "exile all cards from all opponents' hands and graveyards" abilities (CR 607.2a, rulings), all linked to it.
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    if (!others && tops.length && out.activated.every((a) => a.loyalty !== undefined || a.loyaltyX) && !out.triggers.length && !out.spell) for (const e of [...exiles, ...tops]) e.linked = true;
+    else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
+    else if (!others && exiles.length === 1) exiles[0]!.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
@@ -5437,7 +5467,8 @@ function linkExile(out: CompiledCard) {
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
-  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && e.what.ref === "target");
+  // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it": the card the sacrifice put in a graveyard.
+  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice"))));
   // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
   // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
   // that became this permanent (CR 607.2q, recorded as it's cast).
@@ -5738,8 +5769,18 @@ function joinRollTables(lines: string[]): void {
  * A modal ability is a "choose ... —" line followed by one line per mode, each starting
  * with a bullet (CR 700.2). Join them into one line so the ability is compiled as a whole.
  */
-function joinModes(lines: string[]): string[] {
+function joinModes(lines0: string[]): string[] {
   const out: string[] = [];
+  // Genku, Future Shaper: "choose one that hasn't been chosen this turn. Create a creature token with those
+  // characteristics." then "• 2/2 white Fox with vigilance." and so on: each mode creates that token.
+  const lines = lines0.map((l, i) => {
+    const head = /^(.+, choose one that hasn't been chosen this turn)\. Create a creature token with those characteristics\.$/.exec(l);
+    if (head && /^\s*•/.test(lines0[i + 1] ?? "")) return `${head[1]} —`;
+    const tokenMode = /^\s*• (\d+\/\d+ (?:white|blue|black|red|green) [A-Z][a-z]+)( with [a-z ]+)?\.$/.exec(l);
+    const header = lines0.slice(0, i).reverse().find((x) => !/^\s*•/.test(x));
+    if (tokenMode && header && /, choose one that hasn't been chosen this turn\. Create a creature token with those characteristics\.$/.test(header)) return `• Create a ${tokenMode[1]} creature token${tokenMode[2] ?? ""}.`;
+    return l;
+  });
   // "{4}, {T}: Choose one. Activate only as a sorcery." then the modes (Aetheric Amplifier): the restriction goes after
   // the last mode, where the activated ability's parser reads it.
   let restriction: string | undefined;
@@ -5769,7 +5810,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
     // Glorfindel, Dauntless Rescuer: "..., choose one and ~ gets +1/+1 until end of turn." too.
-    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random(?:\. If [^.]+, you choose one instead)?|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
     else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);

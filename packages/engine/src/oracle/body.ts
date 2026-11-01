@@ -409,6 +409,8 @@ const checkableMay = (e: Effect): boolean =>
   (e.type === "continuous" && e.what.ref === "target" && !e.what.n && e.duration === "game" && e.mods.some((m) => m.kind === "addTypes")) ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
+  // "You may convert ~. When you do, ..." (Ratchet, Field Medic): only if it turns over (run-choices canDoNow).
+  (e.type === "transform" && e.what.ref === "self") ||
   // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
   // there and tapped.
   (e.type === "untap" && e.what.ref === "target" && !("n" in e.what && e.what.n)) ||
@@ -1109,6 +1111,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const body = maxCount && parseModal("any number", upToX[2]!, text.trim(), opts);
     if (!body || usesX(body.modal!.modes)) return null;
     return { ...body, modal: { ...body.modal!, maxCount } };
+  }
+  // Typhoid Mary, Fractured: "choose one at random. If you discarded a card this turn, you choose one instead. • ...":
+  // checked as the trigger is put on the stack, when its mode is chosen (CR 603.3c).
+  const randomUnless = !opts.spell && !opts.activated ? /^[Cc]hoose one at random\. If ([^.]+), you choose one instead(?:\.| —)\s*((?:•[^•]+)+)$/.exec(text.trim()) : null;
+  if (randomUnless) {
+    const cond = parseStaticCondition(randomUnless[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    const body = cond ? parseModal("one", randomUnless[2]!, text.trim(), opts) : null;
+    if (!body) return null;
+    return { ...body, modal: { ...body.modal!, random: true, randomUnless: cond! } };
   }
   const modal = MODAL.exec(text.trim());
   if (modal) {
@@ -2036,6 +2047,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
+  // Bring to Light: "Search your library for a creature, instant, or sorcery card with mana value less than or equal to
+  // ..., exile that card, then shuffle. You may cast that card without paying its mana cost.": cast as this resolves or
+  // not at all, and it stays exiled if it isn't cast (rulings, CR 608.2g).
+  const searchCastExiled = /^((?:[A-Z][a-z]+ — )?Search your library for an? [^.]+?, exile that card, then shuffle\.) You may cast that card without paying its mana cost\.$/.exec(text.trim());
+  if (searchCastExiled) {
+    const first = parseBody(searchCastExiled[1]!, opts);
+    const fx = first?.effects[0];
+    if (!first || first.effects.length !== 1 || fx?.type !== "search" || fx.dest.zone !== "exile" || fx.n !== 1 || fx.dest.faceDown || fx.dest.play || fx.dest.linked || fx.others || fx.who || fx.library) return null;
+    const { away: _away, ...search } = fx;
+    return { ...first, effects: [{ ...search, dest: { ...fx.dest, castFree: true } }, { type: "castSearched" }], text };
+  }
   // Ugin, Eye of the Storms: "Search your library for any number of colorless nonland cards, exile them, then shuffle.
   // Until end of turn, you may cast those cards without paying their mana costs." With the normal timing (rulings).
   const ugin = /^Search your library for any number of (.+? cards), exile them, then shuffle\. Until end of turn, you may cast those cards without paying their mana costs\.$/.exec(text.trim());
@@ -2580,6 +2602,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Each of your opponents discards\b/g, "$1Each opponent discards");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
+  // Kaya, Orzhov Usurper: "~ deals damage to target player equal to the number of cards that player owns in exile and you
+  // gain that much life": that number, whatever damage is dealt (rulings).
+  text = text.replace(/^(~ deals damage to target player equal to (the number of cards that player owns in exile)) and you gain that much life\./, "$1. You gain life equal to $2.");
   // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
   // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
   // Ziatora: "~ deals damage equal to that creature's power to any target and you create three Treasure tokens": two
@@ -2899,6 +2924,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // Unexpected Results: "Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without
+    // paying its mana cost. If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand." Cast
+    // as this resolves (ignoring card-type timing), or it stays on top; the spell goes to your hand from the stack only if
+    // the land was put onto the battlefield (rulings).
+    if (ctx.spell && s === "Shuffle your library" && sentences[si + 1] === "Reveal the top card" && sentences[si + 2] === "If it's a nonland card, you may cast it without paying its mana cost" && sentences[si + 3] === "If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand") {
+      const land: TargetSpec = { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" };
+      effects.push(
+        { type: "shuffle", who: { ref: "you" } },
+        { type: "revealTop" },
+        { type: "if", cond: { kind: "revealedIs", filter: land, not: true }, effects: [{ type: "playLinked", revealed: true }] },
+        { type: "if", cond: { kind: "revealedIs", filter: land }, effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" } }, { type: "spellToHand" }], text: "put the revealed land onto the battlefield and return ~ to its owner's hand" }] },
+      );
+      si += 3;
+      continue;
+    }
     // Spinal Embrace: "At the beginning of the next end step, sacrifice it. If you do, you gain life equal to its toughness":
     // one delayed trigger (CR 603.7) about the creature; you sacrifice it only if you still control it then (rulings, CR
     // 701.21a), and gain life only if you did, its toughness as it last existed (CR 608.2h).
@@ -4758,6 +4798,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += any ? 2 : 1;
       continue;
     }
+    // Inside Information: "Exile the top X cards of target opponent's library. You may play those cards this turn. If you
+    // cast a spell this way, pay life equal to its mana value rather than pay its mana cost." Face up, the permission
+    // yours with the normal timing; a spell for life only, no alternative cost (rulings, CR 118.9).
+    const tgtTop = new RegExp(`^Exile the top ${NUMX} cards of (target opponent|target player)'s library$`).exec(s);
+    if (tgtTop && sentences[si + 1]?.replace(/\.$/, "") === "You may play those cards this turn" && sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost") {
+      const who = parsePlayer(tgtTop[2]!.toLowerCase(), ctx);
+      if (!who) return null;
+      effects.push({ type: "impulse", n: amt(tgtTop[1]!), until: "thisTurn", who, life: true });
+      si += 2;
+      continue;
+    }
     // Rakdos, the Muscle: "exile cards equal to its mana value from the top of target player's library. Until your next
     // end step, you may play those cards, and mana of any type can be spent to cast those spells." The sacrificed
     // creature's mana value as it last existed (rulings); the permission yours, with the normal timing (rulings).
@@ -6246,6 +6297,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         may.effects.push(...then);
         si++;
       }
+      continue;
+    }
+    // Amareth, the Lustrous: "Whenever another permanent you control enters, look at the top card of your library. If it
+    // shares a card type with that permanent, you may reveal that card and put it into your hand." Card types only (CR
+    // 205.2a, rulings); not revealed, the card stays on top.
+    if (lookTop?.[1] === "your" && (ctx.subject || ctx.subjectIt) && sentences[si + 1]?.replace(/\.$/, "") === "If it shares a card type with that permanent, you may reveal that card and put it into your hand") {
+      effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedSharesCardTypeWithSubject" }, effects: revealedAction("you may reveal it and put it into your hand", ctx)! });
+      si++;
       continue;
     }
     // Sorin the Mirthless: "Look at the top card of your library. You may reveal that card and put it into your hand. If you
@@ -8914,6 +8973,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = sentences.length;
       continue;
     }
+    // Kaya, Orzhov Usurper: "Exile up to two target cards from a single graveyard. You gain 2 life if at least one creature
+    // card was exiled this way": any of those targets, chosen and still legal as this resolves (so exiled).
+    const atLeastOne = /^(.+) if at least one ([a-z]+) card was exiled this way$/.exec(s);
+    if (atLeastOne) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${atLeastOne[2]!} card`);
+      if (prev?.type !== "exile" || prev.what.ref !== "target" || !prev.what.n || prev.what.index + prev.what.n !== ctx.targets.length || !filter) return null;
+      const first = prev.what.index;
+      if (ctx.targets.slice(first).some((t) => t.kind !== "card" || t.many)) return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(atLeastOne[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: first, n: prev.what.n, filter }, effects: inner });
+      continue;
+    }
     const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card (?:was|is) exiled this way, (.+)$/.exec(s);
     if (ifCardExiled) {
       const i = ctx.targets.length - 1;
@@ -10700,6 +10774,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Shadow of the Enemy: "Exile all creature cards from target player's graveyard. You may cast spells from among those
+    // cards for as long as they remain exiled, and mana of any type can be spent to cast them." The same, from that one
+    // graveyard and those cards only, with no end.
+    const yardSpells = /^Exile all ([a-z]+) cards from (target player's|target opponent's) graveyard$/.exec(s);
+    if (yardSpells && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards for as long as they remain exiled, and mana of any type can be spent to cast them") {
+      const filter = parseSearchFilter(`${yardSpells[1]!} card`);
+      const who = filter && parsePlayer(yardSpells[2]!.replace(/'s$/, ""), ctx);
+      if (!filter || !who || who.ref !== "target") return null;
+      effects.push({ type: "impulse", n: 0, until: "exiled", who, castOnly: true, anyType: true, graveyards: true, graveyardFilter: filter });
+      si++;
+      continue;
+    }
     // "At the beginning of the next end step, if any of those cards remain exiled, return them to their owners'
     // graveyards" (Mnemonic Betrayal): a delayed trigger (CR 603.7) with an intervening if (CR 603.4) about those cards.
     if (/^At the beginning of the next end step, if any of those cards remain exiled, return them to their owners' graveyards$/.test(s) && effects[effects.length - 1]?.type === "impulse") {
@@ -10918,6 +11004,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mods = parseBecomes(`a ${theyAre[1]} in addition to its other types`);
       if (prev?.type !== "putOntoBattlefield" || !spec?.perOpponent || !mods || prev.alsoMods) return null;
       prev.alsoMods = mods;
+      continue;
+    }
+    // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it. If that creature was a token, put a +1/+1
+    // counter on ~": whether the sacrificed permanent was a token as it last existed (a token can't be exiled, CR 704.5d).
+    const wasToken = /^If that creature was a token, (.+)$/.exec(s);
+    if (wasToken && ctx.subjectIt) {
+      const prev = effects[effects.length - 1];
+      const before = ctx.targets.length;
+      const then = prev?.type === "exile" && prev.what.ref === "subjectCard" ? parseOne(capital(wasToken[1]!), ctx) : null;
+      if (!then || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "subjectWasToken" }, effects: then });
+      continue;
+    }
+    // Ashiok, Nightmare Weaver: "Put a creature card with mana value X exiled with ~ onto the battlefield under your
+    // control. That creature is a Nightmare in addition to its other types": as it enters, from then on.
+    const nightmare = /^That creature is an? ([A-Z][a-z]+) in addition to its other types$/.exec(s);
+    const nightmarePrev = effects[effects.length - 1];
+    if (nightmare && CREATURE_TYPES.has(nightmare[1]!) && nightmarePrev?.type === "moveLinked") {
+      const prev = nightmarePrev;
+      if (prev.dest !== "battlefield" || !prev.one || prev.alsoMods || prev.ownersControl) return null;
+      prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [nightmare[1]!] }];
       continue;
     }
     // Oriq Loremage: "Search your library for a card, put it into your graveyard, then shuffle. If it's an instant or
@@ -13686,7 +13793,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
 
 // "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
 // "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
-const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
+const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|up to four|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
@@ -13701,6 +13808,8 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "up to one": () => [0, 1],
   // Call Damage Control: "Choose up to two." on a spell: none, one or two (CR 700.2).
   "up to two": () => [0, 2],
+  // Moment of Reckoning: "Choose up to four. You may choose the same mode more than once." (two modes).
+  "up to four": () => [0, 4],
   // "Choose any number —" (Rankle and Torbran): none, some or all, in the order printed (rulings).
   "any number": (n) => [0, n],
 };
@@ -13710,14 +13819,15 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
   for (const b of bullets.split("•").map((x) => x.trim()).filter(Boolean)) {
     // "Street Justice — Exile target creature ...": a mode's name is a flavor word, with no rules meaning (CR 207.2d).
     // A trigger's modes can say what its event was about: "Create a Royal Role token attached to that creature".
-    const body = parseBody(b.replace(/^[A-Z][A-Za-z' ,!-]* — /, ""), opts);
+    // Typhoid Mary, Fractured: "Typhoid Mary — Draw a card", the card's own name (so "~") as the flavor word.
+    const body = parseBody(b.replace(/^(?:[A-Z][A-Za-z' ,!-]*|~) — /, ""), opts);
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }
   // Only a triggered ability's, whose modes may all be left out (CR 700.2b, 603.3c).
   if (count === "any number" && (opts.spell || opts.activated)) return null;
   const [min, max] = MODE_COUNTS[count]!(modes.length);
-  if (modes.length < 2 || max > modes.length) return null;
+  if (modes.length < 2 || (max > modes.length && count !== "up to four")) return null;
   return { targets: [], effects: [], text, modal: { min, max, modes } };
 }
 

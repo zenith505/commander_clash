@@ -3589,7 +3589,8 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
     }
   } else if (m.repeat && scored.length) {
     // "You may choose the same mode more than once" (CR 700.2d): the useful modes in turn, until there are enough.
-    modes = Array.from({ length: m.max }, (_, k) => scored[k % scored.length]!.i);
+    // "Choose up to four" (Moment of Reckoning): each useful mode once, so no two of them aim at the same target.
+    modes = m.min === 0 ? scored.slice(0, m.max).map((x) => x.i) : Array.from({ length: m.max }, (_, k) => scored[k % scored.length]!.i);
   }
   if (modes.length < m.min) {
     if (!forced) return null;

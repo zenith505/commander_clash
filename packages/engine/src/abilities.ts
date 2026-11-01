@@ -348,6 +348,8 @@ export type Count =
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes"; /** Allied Strategies: "among lands they control", that player's. */ whose?: PlayerRef }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
+  /** Loot, the Key to Everything: "the number of card types among other nonland permanents you control" (CR 205.2a). */
+  | { kind: "cardTypesAmongPermanents"; other?: true; nonland?: true }
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
@@ -1040,6 +1042,8 @@ export interface SearchDest {
   linked?: true;
   /** "Exile the other with a silver counter on it" (Karn, Scion of Urza): a counter of this kind on each card exiled (CR 122.1). */
   counter?: CounterKind;
+  /** With "exile": "exile that card, then shuffle. You may cast that card without paying its mana cost" (Bring to Light): the card exiled is the one a castSearched that follows offers. */
+  castFree?: true;
   /** "Put it onto the battlefield tapped under target player's control" (Yavimaya Dryad): that player controls it, the searcher still its owner's library's searcher. */
   under?: PlayerRef;
 }
@@ -2291,7 +2295,7 @@ export type Effect =
    */
   | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
-  | { type: "returnLinked"; dest: "battlefield" | "hand" }
+  | { type: "returnLinked"; dest: "battlefield" | "hand"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
    * (Skyclave Apparition): the cards this object's linked exile took (CR 607.2a) that are still in exile. Each of their
@@ -2828,7 +2832,7 @@ export type Effect =
   /** "Until end of turn, you may play a card exiled with ~" (Raphael): a GameState.linkedPlays grant (see there). */
   | { type: "playLinkedThisTurn"; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -4169,7 +4173,8 @@ export type SpellCondition =
    * "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze): the target card `index`, by its
    * printed characteristics, which are the ones it had in the graveyard (CR 608.2h).
    */
-  | { kind: "targetCardWas"; index: number; filter: TargetSpec }
+  /** `n`: any of targets `index` to `index + n - 1` (Kaya, Orzhov Usurper: "if at least one creature card was exiled this way"). */
+  | { kind: "targetCardWas"; index: number; filter: TargetSpec; n?: number }
   /** "Counter target spell unless its controller pays {4}. If they do, you incubate 2." (Assimilate Essence): it was paid. */
   | { kind: "unlessPaid" }
   /** Fold into Aether: "If that spell is countered this way, ...": the counter just before this one countered a spell (not one that can't be countered, rulings). */
@@ -4182,6 +4187,10 @@ export type SpellCondition =
   | { kind: "movedLinkedIs"; filter: TargetSpec }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
   | { kind: "revealedSharesCreatureType" }
+  /** Prowling Geistcatcher: "If that creature was a token": the sacrificed permanent of a "whenever you sacrifice" trigger, as it last existed. */
+  | { kind: "subjectWasToken" }
+  /** Amareth, the Lustrous: "if it shares a card type with that permanent": the revealed card and the trigger's subject (as it last existed if it's gone, CR 608.2h). */
+  | { kind: "revealedSharesCardTypeWithSubject" }
   /** "If a card named ~ was revealed this way" (Stomping Slabs): one of the cards a revealTop of several revealed is, by its printed characteristics. */
   | { kind: "revealedTopIs"; filter: TargetSpec }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
@@ -4262,6 +4271,8 @@ export interface AbilityBody {
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
     unchosen?: "ever" | "turn";
     random?: true;
+    /** With `random`: "If you discarded a card this turn, you choose one instead" (Typhoid Mary, Fractured): chosen by the controller while this holds. */
+    randomUnless?: StaticCondition;
     /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
     optional?: true;
     /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */
@@ -4295,6 +4306,7 @@ export type TriggerEvent =
   /** "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject; see TriggeredAbility.dealtFilter. */
   | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
+  | "creatureDealsDamageToAttached" // "Whenever a creature deals damage to enchanted planeswalker" (Liliana's Talent): once for each creature dealing damage, combat or not (rulings), to the permanent this is attached to; "that creature" is it
   | "creatureDealsCombatDamageToSelf" // "Whenever a creature deals combat damage to ~" (Vraska the Unseen): once for each creature dealing it combat damage, which "that creature" means
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
@@ -5720,7 +5732,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while

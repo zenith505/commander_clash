@@ -1277,6 +1277,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many ...":
           // the cards this exiled (Count "cardsExiledThisWay").
           if (to.zone === "exile" && obj(s, id).zone === "exile" && e.dest.zone === "exile" && exiledFor(pid) === undefined) (r.exiledCards ??= []).push(id);
+          // Bring to Light: the card exiled is the one to cast (castSearched).
+          if (to.castFree && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) r.searchCast = id;
           // Endless Horizons: linked to the source as it is (CR 607.2a).
           if (to.linked && to.zone === "exile" && obj(s, id).zone === "exile" && ctx.sourceId && exiledFor(pid) === undefined) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.

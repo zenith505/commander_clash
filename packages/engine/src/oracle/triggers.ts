@@ -3714,6 +3714,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(fightOrBlocked[1]!, {});
     return body ? { event: "yourCreaturesFightOrBlocked", body } : "fail";
   }
+  // Hezrou: "Whenever one or more creatures you control become blocked, each blocking creature gets -1/-1 until end of
+  // turn": once as blockers are declared (CR 509.3c), every creature blocking then.
+  const becomeBlocked = /^Whenever one or more creatures you control become blocked, (.+)$/.exec(line);
+  if (becomeBlocked) {
+    const body = parseBody(becomeBlocked[1]!, {});
+    return body ? { event: "yourCreaturesBecomeBlocked", body } : "fail";
+  }
   const unblocked = /^Whenever one or more creatures an opponent controls attack you and aren't blocked, (.+)$/.exec(line);
   if (unblocked) {
     const text = unblocked[1]!.replace(/^that player (draws [a-z]+ cards?) and (gains control of ~)\. Untap it\.$/, "That player $1. That player $2. Untap ~.");
@@ -4015,6 +4022,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifBargained = true;
         body0 = bargained[1]!;
       }
+      // "When it enters this way" after "~ escapes with ..." (Pharika's Spawn), written here as "if it escaped": it triggers
+      // only when it escaped (CR 702.138c), with no check as it resolves.
+      let ifEscaped = false;
+      const escapedM = /^if it escaped, (.+)$/i.exec(body0);
+      if (escapedM) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifEscaped = true;
+        body0 = escapedM[1]!;
+      }
       // "When ~ enters, if evidence was collected, ..." (CR 701.59c).
       let ifEvidence = false;
       const evidence = /^if evidence was collected, (.+)$/i.exec(body0);
@@ -4125,6 +4141,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (event !== "selfDies" && event !== "selfEnters") return "fail" as const;
         ifNotToken = true;
         body0 = notToken[1]!;
+      }
+      // Otherworldly Escort: "When ~ dies, if it's not a Spirit, ...": an intervening if (CR 603.4) on the creature as it last
+      // existed (CR 603.10a), which can't change.
+      let ifNotSubtype: string | undefined;
+      const notSub = /^if it's not an? ([A-Z][a-z]+), (.+)$/.exec(body0);
+      if (notSub && CREATURE_TYPES.has(notSub[1]!)) {
+        if (event !== "selfDies") return "fail" as const;
+        ifNotSubtype = notSub[1]!;
+        body0 = notSub[2]!;
       }
       // Guildsworn Prowler: "When ~ dies, if it wasn't blocking, ...": an intervening if (CR 603.4) on the creature as it last
       // existed (CR 603.10a).
@@ -4269,7 +4294,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: ifNoCounters } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: ifNoCounters } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotSubtype ? { ifNotSubtype } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEscaped ? { ifEscaped: true as const } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

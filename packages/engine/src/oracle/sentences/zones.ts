@@ -1331,6 +1331,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
+  // Grasping Giant: "Whenever ~ becomes blocked by a creature, exile that creature until ~ leaves the battlefield": the
+  // blocking creature the trigger is about (CR 610.3).
+  if (/^Exile that creature until ~ leaves the battlefield$/i.test(s) && ctx.subject && !ctx.spell) {
+    const what = parseObject("that creature", ctx);
+    return what?.ref === "subject" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
+  }
   // Calix, Destiny's Hand: "Exile target creature or enchantment you don't control until target enchantment you control
   // leaves the battlefield" (CR 610.3): the card returns when that permanent leaves; if it's an illegal target as this
   // resolves (it left), nothing is exiled (rulings, CR 610.3a).

@@ -1286,6 +1286,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Jet's Brainwashing: "If ~ was kicked, gain control of that creature until end of turn": the target before.
   // Crown of Empires: "Tap target creature. Gain control of that creature instead if ...": an activated ability's target the
   // same way, for good (CR 611.2a).
+  // Tolarian Entrancer: "Whenever ~ becomes blocked by a creature, gain control of that creature at end of combat": the
+  // blocking creature the trigger is about (the delayed part is "at end of combat", see sentences/basics.ts), for good,
+  // whether or not ~ is still around then (rulings).
+  if (/^Gain control of that creature$/.test(s) && ctx.subject && !ctx.spell && !ctx.activated) {
+    const what = parseObject("that creature", ctx);
+    return what?.ref === "subject" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game" }] : null;
+  }
   if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && (ctx.spell || ctx.activated)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;

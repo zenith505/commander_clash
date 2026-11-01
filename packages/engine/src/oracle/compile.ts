@@ -3630,6 +3630,17 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Pharika's Spawn: "~ escapes with two +1/+1 counters on it. When it enters this way, each opponent sacrifices ...": the
+    // counters (CR 702.138c) and a trigger only when it escaped.
+    const escThisWay = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\. When it enters this way, (.+)$`).exec(line);
+    if (escThisWay) {
+      const t = parseTrigger(`When ~ enters, if it escaped, ${escThisWay[2]}`);
+      if (t && t !== "fail" && !out.escapesWith) {
+        out.escapesWith = num(escThisWay[1]!);
+        out.triggers.push(t);
+        continue;
+      }
+    }
     // Heaped Harvest: "When ~ enters and when you sacrifice it, ...": two triggers doing the same.
     const andSac = /^When ~ enters and when you sacrifice it, (.+)$/.exec(line);
     if (andSac) {

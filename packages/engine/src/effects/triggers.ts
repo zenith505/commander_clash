@@ -144,7 +144,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
@@ -793,6 +793,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       (e, t) =>
         (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
+        (e === "selfExiledCrafting" && ev.to === "exile" && !!ev.crafted) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
       lastAbilities,

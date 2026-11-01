@@ -12,8 +12,8 @@
 // number of Zombies sacrificed this way").
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
-import { altCostsFor, applyAction, castProblem, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, forest, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { altCostsFor, applyAction, castProblem, characteristics, invalidateCharacteristics, isFullySupported, moveObject, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { abilitiesOf } from "../src/cards";
 import { topVisible } from "../src/game";
 import { manaAbilitiesOn } from "../src/manaabilities";
@@ -54,6 +54,7 @@ const moritte = (): CardDef => ({"oracleId":"78699161-fc14-4a44-8a15-0f7c08be034
 const metamorph = (): CardDef => ({"oracleId":"b2b09dc3-8239-4f3b-91d2-e7cbbdc062f7","name":"Hulking Metamorph","manaCost":"{9}","cmc":9,"typeLine":"Artifact Creature — Shapeshifter","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Shapeshifter"],"oracleText":"Prototype {2}{U}{U} — 3/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nYou may have this creature enter as a copy of an artifact or creature you control, except it's an artifact creature in addition to its other types, and its power and toughness are equal to this creature's power and toughness.","power":"7","toughness":"7","colors":[],"colorIdentity":["U"],"keywords":["Prototype"],"commanderLegal":"legal","set":"bro","releasedAt":"2022-11-18","rarity":"uncommon","layout":"prototype","gameChanger":false}) as CardDef;
 const obligation = (): CardDef => ({"oracleId":"b34080fe-69d1-4cc9-9feb-c37762f26a23","name":"Immortal Obligation","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Return target creature card from an opponent's graveyard to the battlefield under their control with a duty counter on it. For as long as that creature has a duty counter on it, it is goaded, can't attack you or a permanent you control, and can't block creatures you control.","colors":["W"],"colorIdentity":["W"],"keywords":["Goad"],"commanderLegal":"legal","set":"mkc","releasedAt":"2024-02-09","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const choco = (): CardDef => ({"oracleId":"7979bf83-5091-4e62-8885-ca1833a97306","name":"Choco, Seeker of Paradise","manaCost":"{1}{G}{W}{U}","cmc":4,"typeLine":"Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Bird"],"oracleText":"Whenever one or more Birds you control attack, look at that many cards from the top of your library. You may put one of them into your hand. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard.\nLandfall — Whenever a land you control enters, Choco gets +1/+0 until end of turn.","power":"3","toughness":"5","colors":["G","U","W"],"colorIdentity":["G","U","W"],"keywords":["Landfall"],"commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const gnome = (): CardDef => ({"oracleId":"12fa17b2-158e-4d53-897f-81111f912b00","name":"Market Gnome","manaCost":"{W}","cmc":1,"typeLine":"Artifact Creature — Gnome","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Gnome"],"oracleText":"When this creature dies, you gain 1 life and draw a card.\nWhen this creature is exiled from the battlefield while you're activating a craft ability, you gain 1 life and draw a card.","power":"0","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/3/6/36dafcd6-ce4e-4a27-bd8c-fa1a3bffc99e.jpg?1783913810","artUrl":"https://cards.scryfall.io/art_crop/front/3/6/36dafcd6-ce4e-4a27-bd8c-fa1a3bffc99e.jpg?1783913810","commanderLegal":"legal","set":"lci","releasedAt":"2023-11-17","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const laboratory = (): CardDef => ({"oracleId":"84f3736f-5b2a-40f9-8c3b-c18f8c637c22","name":"Empty the Laboratory","manaCost":"{X}{U}{U}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Sacrifice X Zombies, then reveal cards from the top of your library until you reveal a number of Zombie creature cards equal to the number of Zombies sacrificed this way. Put those cards onto the battlefield and the rest on the bottom of your library in a random order.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"mic","releasedAt":"2021-09-24","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const ogre = card("Hill Ogre", "Creature — Ogre", "{3}{R}", { power: "3", toughness: "3" });
@@ -63,7 +64,7 @@ const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 
 const automaton = card("Blitz Automaton", "Artifact Creature — Construct", "{7}", { power: "6", toughness: "4", keywords: ["Haste", "Prototype"], oracleText: "Prototype {2}{R} — 3/2 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nHaste" });
 
 describe("round 240 cards", () => {
-  it("are fully supported", () => supported(belligerent(), limb(), nissa(), feast(), moritte(), metamorph(), obligation(), choco(), laboratory()));
+  it("are fully supported", () => supported(belligerent(), limb(), nissa(), feast(), moritte(), metamorph(), obligation(), choco(), laboratory(), gnome()));
 });
 
 describe("The Belligerent", () => {
@@ -337,5 +338,45 @@ describe("Empty the Laboratory", () => {
     if (s.pending?.kind === "pickPermanents") s = settle(act(s, { type: "pickPermanents", player: ap, ids: s.pending.options ?? [] }));
     expect(s.objects[z1]!.zone).toBe("battlefield");
     expect(s.objects[z2]!.zone).toBe("library");
+  });
+});
+
+describe("Market Gnome", () => {
+  const blade = scry("transform", [
+    { name: "Tithing Blade", mana_cost: "{1}{B}", type_line: "Artifact", oracle_text: "When this artifact enters, each opponent sacrifices a creature of their choice.\nCraft with creature {4}{B} ({4}{B}, Exile this artifact, Exile a creature you control or a creature card from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)" },
+    { name: "Consuming Sepulcher", type_line: "Artifact", oracle_text: "At the beginning of your upkeep, each opponent loses 1 life and you gain 1 life." },
+  ]);
+  const craftIndex = (s: GameState, id: string) => abilitiesOf(s, s.objects[id]!).activated.findIndex((a) => a.keyword === "Craft");
+  it("exiled as a craft material: you gain 1 life and draw a card, before the crafted card returns (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, blade);
+    const g = putOnBattlefield(s0, ap, gnome());
+    const life = s0.players[ap]!.life;
+    const hand = s0.players[ap]!.hand.length;
+    let s = run(s0, planActivate(s0, ap, b, craftIndex(s0, b), undefined, undefined, undefined, undefined, { craft: [g] }));
+    expect(s.objects[g]!.zone).toBe("exile");
+    // Its trigger goes on the stack above the craft ability.
+    for (let i = 0; i < 10 && s.triggerQueue.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.length).toBe(2);
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    for (let i = 0; i < 10 && s.stack.length === 2; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[ap]!.life).toBe(life + 1);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.objects[b]!.zone).toBe("exile");
+    s = settle(s);
+    expect(characteristics(s, s.objects[b]!).name).toBe("Consuming Sepulcher");
+  });
+  it("exiled any other way it doesn't trigger; dying does", () => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, gnome());
+    const life = s0.players[ap]!.life;
+    let s = structuredClone(s0);
+    moveObject(s, g, "exile");
+    s = settle(s);
+    expect(s.players[ap]!.life).toBe(life);
+    s = structuredClone(s0);
+    moveObject(s, g, "graveyard");
+    s = settle(s);
+    expect(s.players[ap]!.life).toBe(life + 1);
   });
 });

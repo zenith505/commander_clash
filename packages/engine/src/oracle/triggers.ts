@@ -22,6 +22,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever a player wins a coin flip, (.+)$/, "playerWinsFlip"],
   // The God-Eternals: "When ~ dies or is put into exile from the battlefield" (CR 700.4: "dies" is going to a graveyard).
   [/^When(?:ever)? ~ dies or is put into exile from the battlefield, (.+)$/, "selfDiesOrExiled"],
+  // Exiled as a craft material (CR 702.167a). The rulings' other case, exiled by a mana ability activated while paying
+  // for the craft ability, can't happen here: mana abilities are activated before the craft ability is.
+  [/^When ~ is exiled from the battlefield while you're activating a craft ability, (.+)$/, "selfExiledCrafting"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
   [/^When you lose control of ~, (.+)$/, "selfLostControl"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
@@ -163,7 +166,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
+  "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
@@ -4188,7 +4191,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       text = text.replace(/THAT_MUCH/g, "that much").replace(/THAT_MANY/g, "that many");
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
-      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";
+      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfExiledCrafting" || event === "selfToGraveyard" || event === "selfLeaves";
       if (event === "selfDealtDamageBySource") text = text.replace(/\bthat source's controller\b/g, "that player");
       if (event === "selfAttacksUnblocked" && /^Whenever ~ attacks a player and isn't blocked, /.test(line)) text = text.replace(/\b[Tt]hat player\b/g, (w) => (w[0] === "T" ? "Defending player" : "defending player"));
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.

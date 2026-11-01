@@ -4365,6 +4365,7 @@ export type TriggerEvent =
   | "chapter"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
+  | "selfExiledCrafting" // "When this creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome)
   | "selfDiesOrExiled" // "When this dies or is put into exile from the battlefield" (the God-Eternals)
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)

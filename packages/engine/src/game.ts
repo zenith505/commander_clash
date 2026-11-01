@@ -729,6 +729,8 @@ export function moveObject(
     destroyedBy?: PlayerId;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
     exploitedBy?: { id: ObjectId; zc: number };
+    /** Exiled as a material while its controller activates a craft ability (CR 702.167a): Market Gnome. */
+    crafted?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1255,7 +1257,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -7307,7 +7309,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} exiles ${ids.map((id) => `${nameOf(s, id)}${obj(s, id).zone === "graveyard" ? " from their graveyard" : ""}`).join(", ")} to craft.`);
       for (const id of ids) {
         const o = obj(s, id);
-        moveObject(s, id, "exile");
+        moveObject(s, id, "exile", { crafted: true });
         if (o.zone === "exile" && !o.isToken) exiled?.push({ id, zc: o.zoneChanges ?? 0 });
       }
       closeZoneBatch(s);

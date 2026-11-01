@@ -1564,6 +1564,32 @@ line blocks.
    that returns every card put into your graveyard from anywhere); Scion of the Ur-Dragon (becomes a copy of a card in
    your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
    mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
+   Round 240 (top of the list, now done): "Until end of turn, you may look at the top card of your library any time,
+   and you may play lands and cast spells from the top of your library" (The Belligerent); "All Forests and all
+   Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their other types" (Life and Limb,
+   layers 4, 5 and 7b); "You may pay eight {E} rather than pay the mana cost for permanent spells you cast" (Nissa,
+   Worldsoul Speaker: alternative cost energyForSpell with additional cost payEnergy, X is 0, CR 118.9 and 107.3g; a
+   "Cast it: pay 8 energy" button with a browser test); "Creature cards in your graveyard gain "You may cast this card
+   from your graveyard" until end of turn" (Case of the Uneaten Feast: grantFlashback cast, browser test); "enter as a
+   copy ..., except it's legendary and snow ... and, if it's a creature, it enters with two additional +1/+1 counters
+   on it and has changeling" (Moritte of the Frost: CopyExcept snow, keywordsIfCreature, enterCounters n); "its power
+   and toughness are equal to this creature's power and toughness" (Hulking Metamorph: CopyExcept ptOwn, prototyped
+   3/3 included; a copy of a prototyped permanent now keeps the copied prototype values, CR 718.3d); "Return target
+   creature card from an opponent's graveyard to the battlefield under their control with a duty counter on it. For as
+   long as that creature has a duty counter on it, it is goaded, can't attack you ... and can't block creatures you
+   control" (Immortal Obligation: alsoModsWhileCounter); "look at that many cards ... You may put one of them into your
+   hand. Then put any number of land cards from among them onto the battlefield tapped and the rest into your
+   graveyard" (Choco, Seeker of Paradise); "Sacrifice X Zombies, then reveal cards ... until you reveal a number of
+   Zombie creature cards equal to the number of Zombies sacrificed this way" (Empty the Laboratory); "When this
+   creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome: trigger
+   selfExiledCrafting, CR 702.167a). +10 (COUNT of 31,936 with B71-B74).
+   Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
+   on them: the protection quality would need the source's counters); Altar of the Wretched and The Enigma Jewel (their
+   back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
+   statics don't support); Nethergoyf and Winter, Cursed Rider (exile any number of cards with four or more card types
+   among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
+   next loyalty ability, as before); Summoner's Grimoire, Jon Irenicus, Shattered One and Strago and Relm (looked at,
+   several new pieces each).
    Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
    Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent

@@ -777,7 +777,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const lib = player(s, owner);
       const arranged = r.scratch?.arranged;
       if (!arranged) {
-        const n = amountNow(s, e.n, ctx);
+        const n = e.digRest ? Math.min(amountNow(s, e.n, ctx), r.digRest ?? 0) : amountNow(s, e.n, ctx);
+        if (e.digRest && n < 2) return;
         const cards = lib.library.slice(0, n);
         // "Look at the top card of your library" (Brutal Deceiver): the player sees it; with more asked for, one card
         // has nothing to order.
@@ -1141,8 +1142,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // asked when the graveyard has a card that fits; otherwise both are searched.
         const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
         if (e.orGraveyard && sc.searchZones === undefined) {
-          if (!barred(p.id) && p.graveyard.some(fits)) {
-            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: ["Library and graveyard", "Graveyard only"], prompt: "search your library too (then shuffle), or only your graveyard?" };
+          // Dark Supplicant: the hand is searched with the graveyard ("graveyard, hand, and/or library").
+          if (!barred(p.id) && (e.andHand ? [...p.graveyard, ...p.hand] : p.graveyard).some(fits)) {
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: e.andHand ? ["Graveyard, hand, and library", "Graveyard and hand only"] : ["Library and graveyard", "Graveyard only"], prompt: e.andHand ? "search your library too (then shuffle), or only your graveyard and hand?" : "search your library too (then shuffle), or only your graveyard?" };
             return "paused";
           }
           // Ashiok, Dream Render: only the graveyard.
@@ -1233,7 +1235,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.id : null;
       // "Attached to target player" (Bitterheart Witch): that player, if still a legal target.
       const toPlayer = e.dest.attachToPlayer ? (players(s, e.dest.attachToPlayer, ctx)[0] ?? null) : undefined;
-      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : undefined, undefined, toPlayer);
+      // "Attached to target creature" (Arachnus Spinner): that creature, if still a legal target.
+      const toObject = e.dest.attachTo ? (objects(s, e.dest.attachTo, ctx).find((o) => o.zone === "battlefield")?.id ?? null) : undefined;
+      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : toObject, undefined, toPlayer);
       if (hosts === "paused") return "paused";
       const moves: { pid: PlayerId; id: ObjectId }[] = [];
       for (const pid of searchers) {
@@ -1678,7 +1682,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           s.resolving.movedLinkedIds = rest.filter((id) => s.objects[id]?.zone === "graveyard");
         }
       } else if (e.rest === "keep") {
-        // They stay on top, in the order they were in.
+        // They stay on top, in the order they were in (an orderTop's digRest).
+        r.digRest = rest.length;
       } else if (e.rest === "hand") {
         if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
         for (const id of rest) moveObject(s, id, "hand");

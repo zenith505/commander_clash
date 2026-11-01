@@ -58,9 +58,11 @@ export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef): string | n
   // CR 708.2a); a name in common is the same name (CR 201.2a).
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (!abilitiesOf(s, o).linkedNameCastBan || controllerOf(s, o) === pid) continue;
+    // Exclusion Ritual: every player, its controller too.
+    const ban = abilitiesOf(s, o).linkedNameCastBan;
+    if (!ban || (ban !== "players" && controllerOf(s, o) === pid)) continue;
     const named = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).map((l) => s.objects[l.id]).find((c) => c?.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === (s.linkedExile![`${o.id}@${o.zoneChanges ?? 0}`]!.find((l) => l.id === c.id)!.zc) && defOf(s, c).name.split(" // ").some((n) => hasName(d.name, n)));
-    if (named) return `${characteristics(s, o).name}: its controller's opponents can't cast spells named ${defOf(s, named).name}`;
+    if (named) return `${characteristics(s, o).name}: ${ban === "players" ? "players" : "its controller's opponents"} can't cast spells named ${defOf(s, named).name}`;
   }
   for (const { o, ban } of bansOn(s, d.name)) {
     if (ban.kind !== "cast") continue;

@@ -401,6 +401,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const inner = parseSentence(capital(m[2]!), ctx);
     return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}), ...(/^When the permanent/.test(s) ? { anyPermanent: true as const } : {}) }] : null;
   }
+  // Xira, the Golden Sting: "When that creature dies, if it has an egg counter on it, draw a card and create ...": a delayed
+  // trigger about the creature it targeted, for as long as it's that object (CR 603.7c, 400.7), even after ~ leaves
+  // (rulings); its intervening if checked as it last existed (CR 603.4, 603.10a).
+  if ((m = new RegExp(`^When that creature dies, if it has an? ${COUNTER} counter on it, (.+)$`).exec(s)) && ctx.lastObjectTarget !== undefined && !ctx.spell && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many && !/\b(?:it|its|that creature|that card|target|this way|~)\b/i.test(m[2]!)) {
+    const before = ctx.targets.length;
+    // "Draw a card and create ...": both instructions.
+    const parts = /^(draw a card) and (create .+)$/.exec(m[2]!)?.slice(1) ?? [m[2]!];
+    const fx = parts.map((x) => parseSentence(capital(x), ctx));
+    const inner = fx.every((x) => !!x) ? fx.flatMap((x) => x!) : null;
+    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: inner, text: m[2]!, ifHadCounter: counterKind(m[1]!) }] : null;
+  }
   // Virulent Wound: "When that creature dies this turn, its controller gets a poison counter": the player who controlled
   // it as it last existed on the battlefield (CR 603.10a, 608.2h).
   if (/^When that creature dies this turn, its controller gets a poison counter$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
@@ -1139,6 +1150,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
+  // Sky Swallower: "target opponent gains control of all other permanents you control": each of them at once, the ones you
+  // control as it resolves (CR 611.2c), for the rest of the game (rulings: Auras stay where they are; they don't come
+  // back when ~ leaves).
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) gains control of all other permanents you control$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const what = who && parseObject("all other permanents you control", ctx);
+    return who?.ref === "target" && what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // Starke of Rath: "Destroy target artifact or creature. That permanent's controller gains control of ~": whoever
   // controlled it as it last existed (CR 608.2h), destroyed or not; nobody if it's an illegal target (CR 608.2b). For the

@@ -19,6 +19,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   // Sacrificing (CR 701.21): "sacrifice ~", "sacrifice it" (the permanent itself)
+  // "You may sacrifice Sunfire Torch" in an ability it gives: that Equipment, only if you control it (CR 701.21a).
+  if (s === "Sacrifice \u27easource\u27eb") return [{ type: "sacrifice", what: { ref: "grantSource" } }];
   if ((m = /^Sacrifice (~|it)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
@@ -518,6 +520,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[1] === "~") {
       const to = parseDamageRecipient(m[2]!, ctx);
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: { ref: "self" } } }, to }] : null;
+    }
+    // Flourishing Grapple: "Target creature you control deals damage equal to its power to that permanent": "that
+    // permanent" is the one named before, not this new target, so it's read first.
+    const thatOne = /^target /i.test(m[1]!) && /^that (?:permanent|creature|planeswalker)$/i.test(m[2]!) ? parseObject(m[2]!, ctx) : undefined;
+    if (thatOne !== undefined) {
+      const a = parseObject(m[1]!, ctx);
+      return a?.ref === "target" && !a.n && thatOne?.ref === "target" && !thatOne.n && thatOne.index !== a.index ? [{ type: "bite", a, b: thatOne }] : null;
     }
     const a = parseObject(m[1]!, ctx);
     // "Enchanted creature deals damage equal to its power to any other target" (Pain for All): damage from that creature,

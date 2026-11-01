@@ -37,7 +37,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
-    if (["destroy", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     // "Destroy target blocking creature at end of combat" (Silent Assassin): later, but aimed at an opponent's creature.
     if (e.type === "delayed" && e.when === "endOfCombat" && e.of?.ref === "target" && e.effects.length === 1 && e.effects[0]!.type === "destroy") mark(e.of.index, e.of.n);
     // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".
@@ -65,6 +65,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "castFromAmong" && e.who.ref === "target") mark(e.who.index);
     // "Put it onto the battlefield attached to target player" (Bitterheart Witch): a Curse, for an opponent.
     if (e.type === "search" && e.dest.attachToPlayer?.ref === "target") mark(e.dest.attachToPlayer.index);
+    // "Put it onto the battlefield attached to target creature" (Arachnus Spinner, the only one): Arachnus Web, which stops
+    // that creature attacking or blocking, for an opponent's creature.
+    if (e.type === "search" && e.dest.attachTo?.ref === "target") mark(e.dest.attachTo.index, e.dest.attachTo.n);
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);

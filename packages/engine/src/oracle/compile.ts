@@ -1,8 +1,8 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -1493,6 +1493,20 @@ export function compile(d: CardDef): CompiledCard {
       out.linkedNameCastBan = true;
       continue;
     }
+    // Exclusion Ritual: "Players can't cast spells with the same name as the exiled card", Ixalan's Binding: "Your opponents
+    // can't ...": the card its enters ability exiled, linked to it (CR 607.2a), while it's still exiled (rulings: once it
+    // leaves exile, or a commander goes to the command zone, nothing is banned).
+    const exiledBan = /^(Players|Your opponents) can't cast spells with the same name as the exiled card\.$/.exec(line);
+    if (exiledBan && !out.linkedNameCastBan) {
+      const exiles = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.what.ref === "target" && !e.what.n && (!e.until || e.until === "sourceLeaves"));
+      const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "exileTop" || e.type === "exileFaceDown" || e.type === "takeFromHand" || e.type === "hideaway");
+      if (exiles.length !== 1 || all.length !== 1) out.unsupported.push(raw);
+      else {
+        exiles[0]!.linked = true;
+        out.linkedNameCastBan = exiledBan[1] === "Players" ? "players" : true;
+      }
+      continue;
+    }
     if (line === "You have protection from the chosen card name.") {
       out.protectionFromChosenName = true;
       continue;
@@ -1909,7 +1923,8 @@ export function compile(d: CardDef): CompiledCard {
     // addition to its other types.": it keeps its Gate type and gets the chosen one, with that type's mana ability (CR
     // 305.6, rulings). With no type chosen, it gets none (rulings).
     // Realmwright: the same choice on a creature, for "Lands you control are the chosen type in addition to their other types."
-    if (line === "As ~ enters, choose a basic land type." && (d.types.includes("Land") || lines.includes("Lands you control are the chosen type in addition to their other types.")) && !out.entersChoose?.length) {
+    // Convincing Mirage, Phantasmal Terrain: the same choice on an Aura, for "Enchanted land is the chosen type."
+    if (line === "As ~ enters, choose a basic land type." && (d.types.includes("Land") || lines.includes("Lands you control are the chosen type in addition to their other types.") || (d.subtypes.includes("Aura") && lines.includes("Enchanted land is the chosen type."))) && !out.entersChoose?.length) {
       out.entersChoose = [{ what: "basicLandType" }];
       continue;
     }
@@ -1918,6 +1933,13 @@ export function compile(d: CardDef): CompiledCard {
     // chosen.
     if (line === "Lands you control are the chosen type in addition to their other types." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
       out.statics.push({ affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
+      continue;
+    }
+    // Convincing Mirage: "Enchanted land is the chosen type.": that basic land type instead of its others, with that type's
+    // mana ability and none of the abilities from its rules text (CR 305.7, rulings); its supertypes (basic, legendary,
+    // snow) and name stay.
+    if (line === "Enchanted land is the chosen type." && out.enchant && out.entersChoose?.some((c) => c.what === "basicLandType")) {
+      out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }], text: raw });
       continue;
     }
     if (line === "~ is the chosen type in addition to its other types." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
@@ -2296,6 +2318,12 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "You may play lands and cast spells from among cards exiled with ~.") {
       if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else out.playLinkedWhile = { kind: "allOf", conds: [] };
+      continue;
+    }
+    // Rona, Disciple of Gix: "You may cast spells from among cards exiled with ~": the same, spells only (not lands).
+    if (line === "You may cast spells from among cards exiled with ~.") {
+      if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedCastOnly = true);
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -3339,6 +3367,12 @@ export function compile(d: CardDef): CompiledCard {
     // is what every zone reads.
     if (line === "~ is colorless.") {
       if (d.colors.length) out.unsupported.push(raw);
+      continue;
+    }
+    // "~ is every creature type (even if this card isn't on the battlefield)" (Mistform Ultimus): a characteristic-defining
+    // ability like changeling (CR 604.3, 702.73a), read from the card in every zone by everyCreatureType (layers.ts).
+    if (line === "~ is every creature type.") {
+      if (!isEveryCreatureTypeText(d)) out.unsupported.push(raw);
       continue;
     }
     // "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), so it works in every
@@ -4544,11 +4578,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Enchanted creature has protection from the chosen color. This effect doesn't remove ~." (Cho-Manno's Blessing)
-    const spare = /^(Enchanted creature has protection from .+?\.) This effect doesn't remove ~\.$/.exec(line);
+    // Tattoo Ward: "Enchanted creature gets +1/+1 and has protection from enchantments. This effect doesn't remove ~.";
+    // Spectra Ward: "... protection from each color. This effect doesn't remove Auras.": no Aura falls off for it, this
+    // one or another (rulings), though one from elsewhere still does (CR 702.16c).
+    const spare = /^(Enchanted creature (?:gets [+-]\d+\/[+-]\d+ and )?has protection from .+?\.) This effect doesn't remove (~|Auras)\.$/.exec(line);
     if (spare) {
       const st = parseStatic(spare[1]!);
-      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
-      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
+      const prot = (m: Modification) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k));
+      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.some(prot) && st.mods.every((m) => prot(m) || m.kind === "modifyPT");
+      const spares = spare[2] === "Auras" ? ("auras" as const) : (true as const);
+      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => (prot(m) ? { ...m, spares } : m)) as typeof st.mods, text: line });
       else out.unsupported.push(raw);
       continue;
     }
@@ -5448,7 +5487,16 @@ function linkExile(out: CompiledCard) {
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
   // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.
-  if (out.playLinkedWhile) {
+  if (out.playLinkedWhile && out.playLinkedCastOnly) {
+    // Rona, Disciple of Gix: its "exile target historic card from your graveyard" as it enters and its "exile the top card
+    // of your library" both (CR 607.2a: each ability printed on it that exiles cards; rulings).
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "you" && !e.putAll);
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong");
+    if (others || out.spell || tops.length + exiles.length === 0) out.unsupported.push("(casts cards exiled with it that it can't link to its exile abilities)");
+    else for (const e of [...tops, ...exiles]) e.linked = true;
+  } else if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     // Nightveil Specter: "that player exiles the top card of their library", the damaged player's card, linked the same.
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && (e.who.ref === "you" || e.who.ref === "eventPlayer") && !e.putAll);
@@ -5482,7 +5530,9 @@ function linkExile(out: CompiledCard) {
     else chooses[0]!.keepOnSource = true;
   }
   // Circu: both of its "exile the top card of target player's library" triggers are linked to its ban (CR 607.2a).
-  if (out.linkedNameCastBan) {
+  // Exclusion Ritual, Ixalan's Binding: "the exiled card" lines linked their one exile as they were read; nothing more to do.
+  const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" && e.linked).length === 1 && out.triggers.length === 1 && !out.activated.length && !out.spell;
+  if (out.linkedNameCastBan && !exiledCardBan) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile) || e.type === "castFromAmong");
@@ -5519,10 +5569,22 @@ function linkExile(out: CompiledCard) {
     // Ashiok, Nightmare Weaver: "a creature card ... exiled with ~" is any card exiled by its "exile the top three cards" and
     // its "exile all cards from all opponents' hands and graveyards" abilities (CR 607.2a, rulings), all linked to it.
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    // Yggdrasil, Rebirth Engine: its "exile all creature cards from your graveyard" as it enters and its "exile the top three
+    // cards of your library" both (CR 607.2a: each ability printed on it that exiles cards).
+    const permanentTops = !others && tops.length && !out.spell && !searches.length && exiles.every((e) => !e.until) && !all.some((e) => e.type === "impulse" || e.type === "castFromAmong" || (e.type === "chooseFromGraveyard" && e.dest === "exile") || e.type === "exileHand");
     if (!others && tops.length && out.activated.every((a) => a.loyalty !== undefined || a.loyaltyX) && !out.triggers.length && !out.spell) for (const e of [...exiles, ...tops]) e.linked = true;
+    else if (permanentTops) for (const e of [...exiles, ...tops]) e.linked = true;
     else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
     else if (!others && exiles.length === 1) exiles[0]!.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
+  }
+  // Clone Shell, Summoner's Egg: "turn the exiled card face up" is about the one card its imprint exiled face down as it
+  // entered (CR 607.2a), its only exile instruction.
+  if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked" && e.turnFaceUp))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const faceDown = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "exileFaceDown" && (e.from === "handCard" || (e.pickOne && !e.who)));
+    const exiles = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (out.spell || faceDown.length !== 1 || exiles.length !== 1) out.unsupported.push("(turns face up an exiled card it can't link to one imprint ability)");
   }
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
   // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).

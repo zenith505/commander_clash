@@ -15,15 +15,45 @@ export const innerQuotes = (text: string) => text.replace(/ (with|and) '(.+?\.)'
 
 /** Can we run an ability given in quotes (a token's or one granted to something)? */
 export function compileQuoted(text: string): boolean {
+  // A token's ability naming the permanent that made it (Gutter Grime's Ooze: "slime counters on Gutter Grime"): nothing
+  // binds that name to it here, unlike an ability an Equipment or Aura gives (bindGrantSource).
+  if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compile({ name: "Quoted Ability Source", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", oracleId: "" } as unknown as CardDef);
   return c.unsupported.length === 0;
 }
 
 const grantedCache = new Map<string, CompiledCard>();
+/** A granted ability's name for the permanent that gave it, bound to that object: "⟪source t12 3⟫" (see bindGrantSource). */
+const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
+/**
+ * An ability given by an Equipment or Aura that names it ('Equipped creature has "{T}, Sacrifice Blazing Torch: ..."',
+ * its name "⟪source⟫" here): as the layers give it, the name is bound to the permanent giving it (`id`, as the object it is
+ * now, `zc`), so each copy of the ability is about its own Equipment (CR 400.7).
+ */
+export const bindGrantSource = (text: string, id: string, zc: number, name: string) => text.replaceAll(QUOTED_SOURCE_NAME, `\u27easource ${id} ${zc}|${name}\u27eb`);
+/** A granted ability's text as players read it: the permanent that gave it by its name. */
+export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3");
+/** Fills in `id` and `zc` of each ObjRef grantSource in a compiled granted ability, and its name in the text it shows. */
+function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): T {
+  if (typeof x === "string") return (key === "text" ? x.replaceAll(QUOTED_SOURCE_NAME, name) : x) as T;
+  if (Array.isArray(x)) return x.map((v) => bindRefs(v, id, zc, name)) as T;
+  if (!x || typeof x !== "object") return x;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(x)) out[k] = bindRefs(v, id, zc, name, k);
+  if (out.ref === "grantSource") Object.assign(out, { id, zc });
+  return out as T;
+}
 /** The compiled form of an ability an effect gave an object (`addAbility`): "~" in it is that object. */
 export function compileGranted(text: string): CompiledCard {
   let hit = grantedCache.get(text);
   if (!hit) {
+    const bound = [...text.matchAll(BOUND_SOURCE)];
+    if (bound.length) {
+      const [, id, zc, name] = bound[0]!;
+      hit = bindRefs(compileGranted(text.replace(BOUND_SOURCE, QUOTED_SOURCE_NAME)), id!, Number(zc), name!);
+      grantedCache.set(text, hit);
+      return hit;
+    }
     // A quoted ability inside the granted one is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's
     // Saga): double quotes once it's an ability of its own.
     const own = innerQuotes(text);
@@ -34,6 +64,27 @@ export function compileGranted(text: string): CompiledCard {
     grantedCache.set(text, hit);
   }
   return hit;
+}
+
+/**
+ * Did every "⟪source⟫" of a granted ability become an ObjRef grantSource? None may be left in what it does (only in the
+ * text it shows), and there must be at least one reference.
+ */
+function namesGrantSource(c: CompiledCard): boolean {
+  let refs = 0;
+  let left = false;
+  const walk = (x: unknown, key?: string): void => {
+    if (typeof x === "string") {
+      if (key !== "text" && x.includes(QUOTED_SOURCE_NAME)) left = true;
+      return;
+    }
+    if (Array.isArray(x)) return x.forEach((v) => walk(v));
+    if (!x || typeof x !== "object") return;
+    if ((x as { ref?: string }).ref === "grantSource") refs++;
+    for (const [k, v] of Object.entries(x)) walk(v, k);
+  };
+  walk(c);
+  return refs > 0 && !left;
 }
 
 /**
@@ -54,8 +105,9 @@ export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.ki
  * ("When this creature enters or leaves the battlefield" compiles to two triggers), or a static ability of the kinds above.
  */
 function grantable(text: string): boolean {
-  if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
+  // Naming the permanent that gives it ("Sacrifice Blazing Torch"): only where each mention became a reference to it.
+  if (text.includes(QUOTED_SOURCE_NAME) && !namesGrantSource(c)) return false;
   const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, ...rest } = c;
   const n = triggers.length + activated.length + mana.length + statics.length + Object.keys(rest).length;
   if (n === 0 || entersTapped || unsupported.length || textKeywords.length) return false;

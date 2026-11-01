@@ -1,7 +1,7 @@
 # Roadmap
 
-28,698 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,946 of 4,988 (99%), top 10,000: 9,223 of
+28,710 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,235 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1374,6 +1374,23 @@ line blocks.
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
+   Round 229 (fresh cards from the top): "Cumulative upkeep—Add {R}" (Braid of Fire; the bot keeps it); "Auras
+   attached to permanents you control have umbra armor" (Umbra Mystic); "Other nonblack creatures you control" and
+   "Players can't pay life or sacrifice creatures to cast spells or activate abilities", mana abilities included (Angel
+   of Jubilation; Yasharn, Implacable Earth with nonland permanents; CR 119.4, 701.21); "You may put any number of land
+   cards from among them onto the battlefield" after exiling the top N (Xenagos, the Reveler); "If you control a Squirrel
+   or returned a Squirrel card to your hand this way" (Cache Grab); "Whenever an opponent attacks another one of your
+   opponents, you and the attacking player each draw a card and lose 1 life" and "goad target creature defending player
+   controls" (Karazikar, the Eye Tyrant); "exile target nonland permanent an opponent controls until target enchantment
+   you control leaves the battlefield" (Calix, Guided by Fate); "Whenever one or more cards are discarded, ... for each
+   card discarded this way" (Captain Howler, Sea Scourge); "you may exile one of them from your graveyard. If you do,
+   you may cast it this turn" (Conspiracy Theorist); "ward {X}, where X is the number of experience counters you have"
+   (Minthara, Merciless Soul); "All damage is dealt as though its source had wither" (Everlasting Torment). +12 (28,710
+   of 31,936).
+   Out after round 229 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability, only one
+   is supported); Mariposa Military Base (an opt-in "enter tapped with rad counters" choice when the land is played;
+   "rad counters you have" now counts); Font of Agonies (no "whenever you pay life" event yet); Tromokratis ("can't be
+   blocked unless all creatures defending player controls block it": a block legality rule and bot blocking).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

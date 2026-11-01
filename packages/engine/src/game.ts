@@ -557,7 +557,7 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
-  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : compileCard(defOf(s, obj(s, id))).madness;
+  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? (pend.miracleCost ?? compileCard(defOf(s, obj(s, id))).miracle) : (compileCard(defOf(s, obj(s, id))).madness ?? pend.madnessCost);
 }
 
 /**
@@ -2682,6 +2682,21 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * graveyard have dredge 2", The Necrobloom). Every such grant says dredge 2 and no land card has dredge of its own, so
  * there's never a choice between two Ns.
  */
+/**
+ * Madness a permanent its owner controls gives this card (Falkenrath Gorger: "Each Vampire creature card you own that
+ * isn't on the battlefield has madness. The madness cost is equal to its mana cost."): that cost, if the card has a mana
+ * cost (CR 702.35a; with none there's no cost to pay, CR 118.6).
+ */
+export function grantedMadness(s: GameState, o: GameObject): string | undefined {
+  const d = defOf(s, o);
+  if (o.zone === "battlefield" || !d.manaCost) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) === o.owner && abilitiesOf(s, p).madnessGrants?.some((f) => printedMatches(f, d))) return d.manaCost;
+  }
+  return undefined;
+}
+
 export function dredgeAmount(s: GameState, pid: PlayerId, id: ObjectId): number | undefined {
   const d = defOf(s, obj(s, id));
   const own = compileCard(d).dredge;
@@ -4080,6 +4095,7 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
+  if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
   // Possibility Technician: only while that player controls a Kavu.
   if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
@@ -6084,7 +6100,15 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 }
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
-export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0));
+export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape);
+/**
+ * Escape an effect gave this card until end of turn with a cost of its own (The Grim Captain's Locker): a grantedEscape
+ * way, unless a permanent already gives it escape (one escape way is offered for each kind, see grantedWays).
+ */
+const grantedEscapeUntilEot = (s: GameState, o: GameObject): CastFromGraveyard[] => {
+  const g = o.zone === "graveyard" ? s.flashbackGrants?.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.escape) : undefined;
+  return g?.escape ? [{ kind: "grantedEscape", mana: g.escape.mana, costs: [{ kind: "exileFromGraveyard", n: g.escape.exile }], exile: false }] : [];
+};
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 /** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
@@ -6106,7 +6130,9 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   // An adventurer card its owner may cast only as its Adventure (Mosswood Dreadknight): that way, as that face.
   const face = o.face === undefined && o.mayPlay?.face !== undefined && layoutOf(s, o) === "adventure" ? o.mayPlay.face : undefined;
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner), ...asAdventure];
+  const granted = grantedWays(s, o, d, caster ?? o.owner);
+  const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...granted, ...escapeEot, ...asAdventure];
 }
 
 /**
@@ -6522,6 +6548,13 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
     if (choices.viaWay) return choices.viaWay.costs;
     const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
     if (s && o?.zone === "graveyard") return graveyardWay(s, o, "permission", pid)?.costs;
+  }
+  // Escape an effect gave the card (The Grim Captain's Locker): that way's exile, four cards rather than three.
+  if (choices?.via === "grantedEscape") {
+    if (choices.viaWay) return choices.viaWay.costs;
+    const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+    const way = s && o?.zone === "graveyard" ? graveyardWay(s, o, "grantedEscape", pid) : undefined;
+    if (way) return way.costs;
   }
   // Jump-start a permanent gave the card (Niv-Mizzet, Supreme): that way's discard, the card having none of its own.
   if (choices?.via === "jumpStart" && !graveyardCast(d, "jumpStart")) {
@@ -9613,6 +9646,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
   if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
+  if (attacks.some((a) => obj(s, a.attacker).isCommander)) p.commanderAttackedTurn = s.turn; // Neriv, Crackling Vanguard
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   const kinds = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.kinds : {}) };
@@ -11033,8 +11067,8 @@ function grantedForetell(s: GameState, pid: PlayerId, o: GameObject): number | u
  */
 export function foretellCostOf(s: GameState, o: GameObject, d: CardDef = defOf(s, o), pid: PlayerId = o.owner): string | undefined {
   const own = compileCard(d).foretell;
-  if (own) return own;
-  const reduce = o.zone === "exile" && o.mayPlay?.until === "foretell" ? o.mayPlay.foretellReduce : grantedForetell(s, pid, o);
+  const reduce = o.zone === "exile" && o.mayPlay?.until === "foretell" ? o.mayPlay.foretellReduce : own ? undefined : grantedForetell(s, pid, o);
+  if (own && (reduce === undefined || !d.manaCost)) return own;
   if (reduce === undefined || !d.manaCost) return undefined;
   let left = reduce;
   const cost = d.manaCost.replace(/\{(\d+)\}/g, (_, n: string) => {
@@ -11042,6 +11076,9 @@ export function foretellCostOf(s: GameState, o: GameObject, d: CardDef = defOf(s
     left = Math.max(0, left - Number(n));
     return k ? `{${k}}` : "";
   });
+  // Ethereal Valkyrie on a card with foretell of its own: two foretell costs, either of which may be paid (rulings); the
+  // one with the lower mana value, its own on a tie.
+  if (own) return manaValue(parseManaCost(cost || "{0}")) < manaValue(parseManaCost(own)) ? cost || "{0}" : own;
   return cost || "{0}";
 }
 

@@ -2116,6 +2116,18 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Falkenrath Gorger: "Each Vampire creature card you own that isn't on the battlefield has madness. The madness cost is
+    // equal to its mana cost." (CR 702.35a): only a card being discarded from a hand uses it.
+    const madnessGrant = /^Each ([A-Z][a-z]+ creature|[a-z]+) card you own that isn't on the battlefield has madness\. The madness cost is equal to its mana cost\.$/.exec(line);
+    if (madnessGrant) {
+      const filter = parseTargetPhrase(`${madnessGrant[1]} card from a graveyard`);
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.madnessGrants ??= []).push({ ...f, text: `${madnessGrant[1]} cards` });
+      }
+      continue;
+    }
     // Niv-Mizzet, Supreme: "Each instant and sorcery card in your graveyard that's exactly two colors has jump-start": cast
     // from your graveyard for its mana cost and a card discarded, then exiled (CR 702.133a), only an instant or sorcery.
     const jumpGrant = /^Each ([a-z]+(?: and [a-z]+)?) card in your graveyard( that's exactly two colors)? has jump-start\.$/.exec(line);

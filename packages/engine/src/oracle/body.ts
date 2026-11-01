@@ -68,6 +68,8 @@ export interface Ctx {
   /** "Each opponent discards a card" came just before: "for each opponent who can't". */
   opponentsDiscarded?: boolean;
   opponentsDiscardedTwo?: boolean;
+  /** "Each player discards a card" came just before: "each player who didn't discard a creature card this way" (Strongarm Tactics). */
+  playersDiscarded?: boolean;
   /** A "manifest N cards from their hands" instruction came before: "for each card manifested this way". */
   manifested?: boolean;
   /** Parley's "each player reveals the top card of their library" came before: "for each nonland card revealed this way". */
@@ -395,6 +397,8 @@ const checkableMay = (e: Effect): boolean =>
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
   (e.type === "createToken" && e.who.ref === "you" && typeof e.n === "number" && e.n > 0 && !e.attachTo) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "Whenever this creature attacks, you may sacrifice Sunfire Torch. When you do, ...": the Equipment that gave it.
+  (e.type === "sacrifice" && e.what.ref === "grantSource") ||
   // "Whenever a Goblin or Orc you control deals combat damage to a player, you may sacrifice it." (Gorbag): the subject.
   (e.type === "sacrifice" && e.what.ref === "subject") ||
   // "When ~ dies, you may exile it. When you do, ..." (Undead Butler): only while it's still that card in the graveyard.
@@ -7720,6 +7724,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, effects: [{ type: "continuous", what: { ref: "target", index: i }, mods: [{ kind: "cantBlock" }], duration: "endOfTurn" }] });
       continue;
     }
+    // Lifecraft Awakening: "Put X +1/+1 counters on target artifact you control. If it isn't a creature or Vehicle, it
+    // becomes a 0/0 Construct artifact creature": neither as it resolves; a noncreature Vehicle just keeps the counters
+    // (rulings). It keeps its other types and subtypes but its creature types (CR 205.1b).
+    const notCreatureOrVehicle = /^If it isn't a creature or Vehicle, (it becomes an? \d+\/\d+ .+)$/.exec(s);
+    const nvPrev = effects.at(-1);
+    if (notCreatureOrVehicle && nvPrev?.type === "counters" && ctx.targets.length && mentionsTarget(nvPrev, ctx.targets.length - 1) && ctx.targets.at(-1)!.kind === "object" && !ctx.targets.at(-1)!.many && !ctx.targets.at(-1)!.optional) {
+      const i = ctx.targets.length - 1;
+      const fx = parseOne(capital(notCreatureOrVehicle[1]!), ctx);
+      if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => e.type === "continuous" && mentionsTarget(e, i))) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: ["Creature"], notSubtypes: ["Vehicle"], notColors: [], text: "not a creature or Vehicle" } }, effects: fx });
+      continue;
+    }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
     // Tawnos's Tinkering: "If it isn't a creature, it becomes a 0/0 creature in addition to its other types": the same.
     const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?:(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s.replace(/^If it isn't (an?) /, "If it's not $1 "));
@@ -13622,6 +13638,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.
     ctx.opponentsDiscarded = last?.type === "discard" && (last.who.ref === "eachOpponent" || last.who.ref === "eachPlayer") && last.n === 1 && !last.random && !last.filter;
+    ctx.playersDiscarded = ctx.opponentsDiscarded && last?.type === "discard" && last.who.ref === "eachPlayer";
     // Garruk, Veiled Butcher: "Each opponent discards two cards. For each opponent who didn't discard two nonland cards this way".
     ctx.opponentsDiscardedTwo = last?.type === "discard" && last.who.ref === "eachOpponent" && last.n === 2 && !last.random && !last.filter;
     if (last?.type === "amass") ctx.amassed = true;

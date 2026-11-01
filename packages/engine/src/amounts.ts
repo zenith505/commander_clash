@@ -108,6 +108,11 @@ function selfObject(s: GameState, ctx: AmountCtx): GameObject | undefined {
 
 function refObjects(s: GameState, ref: ObjRef, ctx: AmountCtx): GameObject[] {
   if (ctx.objects) return ctx.objects(ref);
+  // The Equipment or Aura that gave this ability (grants.ts), while it's still that permanent (CR 400.7).
+  if (ref.ref === "grantSource") {
+    const g = ref.id ? s.objects[ref.id] : undefined;
+    return g?.zone === "battlefield" && (g.zoneChanges ?? 0) === ref.zc ? [g] : [];
+  }
   // "Equipped creature's power" in a static ability (Glamdring, Foe-hammer): what the source is attached to.
   const host = ref.ref === "attached" ? selfObject(s, ctx)?.attachedTo : undefined;
   const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : host !== undefined ? s.objects[host] : undefined;

@@ -42,6 +42,7 @@ import {
   lureBinds,
   withoutCompany,
   blockWithoutCompany,
+  lonelyBlocker,
   tapCostCandidates,
   craftCandidates,
   untapViaMana,
@@ -4131,6 +4132,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const xTarget = !!ab.energyX && ab.body.targets.some((t) => t.xRange?.key === "manaValue");
       const energyTargetX = xTarget ? Math.min(player(s, pid).energy ?? 0, 15) : 0;
       if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
+      if (ab.grantSourceCost?.action === "sacrifice") continue;
       // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when
       // those four have less total power than the token, below).
       const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
@@ -5807,8 +5810,8 @@ function withCompany<B extends { blocker: ObjectId; attacker: ObjectId }>(s: Gam
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
   for (let out = blocks; ; ) {
     if (!blockWithoutCompany(s, out, earlier)) return out;
-    const lonely = out.find((b) => (characteristics(s, obj(s, b.blocker)).blockWithOthers ?? 0) > earlier + new Set(out.map((x) => x.blocker)).size - 1)!;
-    out = out.filter((b) => b.blocker !== lonely.blocker);
+    const lonely = lonelyBlocker(s, out, earlier)!;
+    out = out.filter((b) => b.blocker !== lonely);
     out = out.filter((b) => out.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
   }
 }

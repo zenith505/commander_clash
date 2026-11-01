@@ -1131,6 +1131,12 @@ export type ObjRef =
       card?: true;
     }
   | { ref: "self" } // the source permanent ("this creature")
+  /**
+   * The permanent that gave this ability, in an ability an Equipment or Aura gives ('Equipped creature has "{T}, Sacrifice
+   * Blazing Torch: Blazing Torch deals 2 damage to any target."'): while it's still that object (CR 400.7). `id` and `zc`
+   * are filled in when the ability is granted (grants.ts compileGranted); unbound, it's no object.
+   */
+  | { ref: "grantSource"; id?: ObjectId; zc?: number }
   | { ref: "ringBearer" } // "your Ring-bearer" (CR 701.54a): the controller's, if they have one
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
@@ -1338,7 +1344,7 @@ export type PlayerRef =
   /** "The player who controls the most Wizards" (Thoughtbound Primoc): the one player with the most, none if two or more tie (rulings on Sokenzan Renegade). */
   | { ref: "uniqueMost"; stat: MostStat }
   /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
-  | { ref: "opponentsNotDiscarded"; filter: TargetSpec }
+  | { ref: "opponentsNotDiscarded"; filter: TargetSpec; players?: true }
   /** "Each player who controls an artifact or enchantment" (Fade from History): as this instruction is carried out. */
   | { ref: "playersControlling"; filter: TargetSpec };
 
@@ -1637,6 +1643,9 @@ export type Modification =
   /** Orcish Conscripts: "can't attack (block) unless at least two other creatures attack (block)": in the same combat (CR 508.1c, 509.1b). */
   | { kind: "cantAttackUnlessOthers"; n: number }
   | { kind: "cantBlockUnlessOthers"; n: number }
+  /** Okk: "can't attack (block) unless a creature with greater power also attacks (blocks)". */
+  | { kind: "cantAttackUnlessGreater" }
+  | { kind: "cantBlockUnlessGreater" }
   /**
    * "Creatures with power less than ~'s power can't block it" (CR 509.1b). `than: "source"`: less than the power of the
    * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
@@ -2200,7 +2209,8 @@ export type Effect =
       /** `castSpell`: "that spell deals ..." in a cast trigger (Sorcerer Class): the spell, as it last existed if it has left the stack (rulings, CR 608.2h). */
       /** `created`: "That creature deals ..." after putting a card onto the battlefield (Too Greedily, Too Deep): the one permanent this resolution put there, if it's still there. */
       /** `lastKnown`: "Destroy target artifact. That artifact deals damage ..." (Goblin Tinkerer): the target as it last existed on the battlefield once this has moved it (CR 608.2h). */
-      by?: "subject" | "attached" | "castSpell" | "created" | { target: number; lastKnown?: true };
+      /** `grantSource`: "Blazing Torch deals 2 damage" in an ability it gave: that permanent, as it last existed if it's gone (CR 608.2h). */
+      by?: "subject" | "attached" | "castSpell" | "created" | { target: number; lastKnown?: true } | { ref: "grantSource"; id?: ObjectId; zc?: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
       /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
@@ -5116,6 +5126,12 @@ export interface ActivatedAbility {
   waterbend?: number | "X";
   tap: boolean;
   sacrificeSelf: boolean;
+  /**
+   * "Sacrifice Blazing Torch", "Unattach Leonin Bola" in an ability an Equipment gives: done to the permanent that gave it
+   * (ObjRef grantSource), which must still be that object, under the activating player's control to be sacrificed (CR
+   * 701.21a) or attached to this permanent to be unattached (CR 701.3d, 602.2b).
+   */
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach"; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;

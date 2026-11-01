@@ -187,6 +187,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card") return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: each || encore ? "eachPlayer" : "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${what ? `${what} ` : ""}card that was put there from the battlefield this turn` }, ...(tapped ? { tapped: true } : {}), ...(each ? { owners: true as const } : {}), ...(/hand$/.test(how!) ? { toHand: true as const } : {}) }];
   }
+  // Trusty Boomerang: "Return Trusty Boomerang to its owner's hand" in an ability it gives: that Equipment, if it's still
+  // on the battlefield as the same object (rulings on Razor Boomerang).
+  if (s === "Return \u27easource\u27eb to its owner's hand") return [{ type: "bounce", what: { ref: "grantSource" } }];
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);

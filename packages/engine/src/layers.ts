@@ -25,7 +25,7 @@ import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
 import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
-import { compileCard, compileGranted } from "./oracle";
+import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
 export type Layer = "2" | "3" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
@@ -210,6 +210,10 @@ export interface Characteristics {
   attackWithOthers?: number;
   /** "... can't block unless at least two other creatures block": that many other blockers this combat. */
   blockWithOthers?: number;
+  /** Okk: "can't attack unless a creature with greater power also attacks": another attacker with greater power. */
+  attackWithGreater?: boolean;
+  /** Okk: "can't block unless a creature with greater power also blocks": another blocker this combat with greater power. */
+  blockWithGreater?: boolean;
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -1532,7 +1536,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addAbility":
       if (/^ward\b/i.test(m.text)) delete c.wardLost;
-      c.grantedAbilities.push(m.text);
+      // An ability that names the permanent giving it ("Sacrifice Blazing Torch"): bound to that object (grants.ts).
+      c.grantedAbilities.push(m.text.includes(QUOTED_SOURCE_NAME) && e.sourceId && s.objects[e.sourceId] ? bindGrantSource(m.text, e.sourceId, s.objects[e.sourceId]!.zoneChanges ?? 0, e.sourceName) : m.text);
       (c.grantedAt ??= []).push(e.timestamp);
       return;
     case "definePT":
@@ -1729,6 +1734,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBlockUnlessOthers":
       c.blockWithOthers = Math.max(c.blockWithOthers ?? 0, m.n);
+      return;
+    case "cantAttackUnlessGreater":
+      c.attackWithGreater = true;
+      return;
+    case "cantBlockUnlessGreater":
+      c.blockWithGreater = true;
       return;
     case "cantAttackUnlessMore":
       if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];

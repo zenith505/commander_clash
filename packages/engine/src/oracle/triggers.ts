@@ -1179,6 +1179,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // its owner's hand (CR 404.2), a token too before it ceases to exist (rulings). Justice, Vance Astrovik: "Whenever another
   // nonland permanent you control is returned to its owner's hand": from the battlefield, the only place a permanent is.
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) [a-z]+) is returned to your hand from the battlefield, /, "$1 you own is returned to its owner's hand, ");
+  // Azorius Aethermage: "Whenever a permanent is returned to your hand", any permanent you own, a token too, whoever
+  // controlled it (rulings); a permanent is only ever on the battlefield (CR 110.1) and goes to its owner's hand (CR
+  // 404.2). Warped Devotion: "Whenever a permanent is returned to a player's hand, that player discards a card": its owner.
+  line = line.replace(/^Whenever a permanent is returned to your hand, /, "Whenever a permanent you own is returned to its owner's hand, ");
+  line = line.replace(/^Whenever a permanent is returned to a player's hand, that player /, "Whenever a permanent is returned to its owner's hand, its owner ");
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -1988,7 +1993,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library))( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c). Kishla Skimmer: "Whenever a card leaves your graveyard
     // during your turn".
@@ -1997,7 +2002,9 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
     // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
     // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
-    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / a library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true };
+    // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
+    // graveyard, CR 400.3).
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / (?:a|your) library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true };
     yourTurn = !!m[3];
     rest = m[4]!;
     eachOwner = true;

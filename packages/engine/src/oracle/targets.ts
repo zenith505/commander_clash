@@ -204,10 +204,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   // Kroxa: "each opponent discards a card, then each opponent who didn't discard a nonland card this way loses 3 life":
   // those who discarded a land card or nothing (rulings).
-  const notDiscarded = ctx.opponentsDiscarded ? /^each opponent who didn't discard an? (.+? card) this way$/.exec(x) : null;
-  if (notDiscarded) {
-    const filter = parseSearchFilter(notDiscarded[1]!);
-    return filter ? { ref: "opponentsNotDiscarded", filter } : null;
+  // Strongarm Tactics: "Each player discards a card. Then each player who didn't discard a creature card this way loses 4
+  // life": you too.
+  const notDiscarded = ctx.opponentsDiscarded ? /^each (opponent|player) who didn't discard an? (.+? card) this way$/.exec(x) : null;
+  if (notDiscarded && (notDiscarded[1] === "opponent" || ctx.playersDiscarded)) {
+    const filter = parseSearchFilter(notDiscarded[2]!);
+    return filter ? { ref: "opponentsNotDiscarded", filter, ...(notDiscarded[1] === "player" ? { players: true as const } : {}) } : null;
   }
   // "Each opponent discards a card. Each opponent who can't loses 3 life." (Entropic Battlecruiser): those who had no
   // card to discard (CR 701.9b), so discarded none.
@@ -446,6 +448,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
+  // "Return Trusty Boomerang to its owner's hand" in an ability it gives: that Equipment (grants.ts binds it).
+  if (x === "\u27easource\u27eb") return { ref: "grantSource" };
   if (ctx.subjectIt && /^that (land|artifact|enchantment|planeswalker|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
   // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
   if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };

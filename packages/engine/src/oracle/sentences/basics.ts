@@ -285,6 +285,20 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[6]) ctx.eachSearched = true;
     return [{ ...fx[0]!, who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, may: true }];
   }
+  // From the Ashes: "For each land destroyed this way, its controller may search their library for a basic land card and
+  // put it onto the battlefield. Then each player who searched their library this way shuffles"; Krenko's Buzzcrusher:
+  // "..., put it onto the battlefield tapped, then shuffle". Each of those players searches once (or chooses not to), in
+  // APNAP order, for up to one card for each of their lands destroyed (as they last existed, CR 608.2h), then shuffles.
+  // Wave of Vitriol: "For each land sacrificed this way, ..." the same, for the lands its sacrifice took.
+  if ((m = /^[Ff]or each (land|nonbasic land) (destroyed|sacrificed) this way, its controller may search their library for (a basic land card)(?:, put it (onto the battlefield(?: tapped)?), then shuffle| and put it (onto the battlefield(?: tapped)?))$/.exec(s))) {
+    const fx = parseSearch(`Search your library for ${m[3]!}, put it ${m[4] ?? m[5]!}, then shuffle`);
+    const filter = parseTargetPhrase(m[1]!, { chosen: true });
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others || filter?.kind !== "object") return null;
+    // A sacrifice's record has only the card types, so "nonbasic land sacrificed this way" isn't read.
+    if (m[2] === "sacrificed" && m[1] !== "land") return null;
+    if (m[5]) ctx.eachSearched = true;
+    return [{ ...fx[0]!, upTo: true, may: true, perDestroyed: { ...filter, text: m[1]! }, ...(m[2] === "sacrificed" ? { perSacrificed: true as const } : {}) }];
+  }
   // Its "Then each player who searched their library this way shuffles": the search above does that.
   if (ctx.eachSearched && /^(?:Then )?[Ee]ach player who searched their library this way shuffles$/.test(s)) {
     ctx.eachSearched = false;

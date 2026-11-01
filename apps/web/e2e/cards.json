@@ -10764,6 +10764,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "79a63064-f25b-4c34-867e-a9d32da97b14",
+  "name": "Krenko's Buzzcrusher",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Insect Thopter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect",
+   "Thopter"
+  ],
+  "oracleText": "Flying, trample\nWhen this creature enters, for each player, destroy up to one nonbasic land that player controls. For each land destroyed this way, its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0ff742b-f709-43ac-84d2-dc00c723bad6",
   "name": "Krosan Cloudscraper",
   "manaCost": "{7}{G}{G}{G}",
@@ -15567,6 +15602,31 @@
   "set": "ala",
   "releasedAt": "2008-10-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c23e5b80-08d2-4e24-9908-fe2aa4f30f6f",
+  "name": "Reliquary Tower",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "You have no maximum hand size.\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -3339,8 +3339,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control": only a noncreature
   // token (a Food, a Treasure), for the Ally token it makes.
   const gift = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.giveTo ? e.effects[0]! : undefined;
-  if (r && gift?.type === "continuous") {
-    const t = gift.what.ref === "target" ? r.item.targets?.[gift.what.index] : undefined;
+  if (r && gift?.type === "continuous" && gift.what.ref === "target") {
+    const t = r.item.targets?.[gift.what.index];
     const o = t?.kind === "object" ? s.objects[t.id] : undefined;
     return !!o && o.zone === "battlefield" && o.isToken && !objIsType(s, o, "Creature");
   }

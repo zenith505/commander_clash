@@ -8047,6 +8047,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.crew !== undefined && tapCreatures?.length) {
     const list = (((s.turnLog ??= {})[ab.saddle ? "saddledBy" : "crewedBy"] ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
     for (const c of tapCreatures) if (!list.includes(`${c}@${obj(s, c).zoneChanges ?? 0}`)) list.push(`${c}@${obj(s, c).zoneChanges ?? 0}`);
+    // Adrestia: what the crewing creatures were as they were tapped (rulings).
+    if (!ab.saddle) {
+      const types = (((s.turnLog ??= {}).crewedTypes ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
+      for (const c of tapCreatures) for (const t of characteristics(s, obj(s, c)).subtypes) if (!types.includes(t)) types.push(t);
+    }
   }
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
@@ -10219,7 +10224,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   if (mineEarlier + seen.size > mineLimit) throw new RulesError(`${p.name} can't block with more than ${mineLimit === 1 ? "one creature" : `${mineLimit} creatures`} this combat`);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
-    return at.allMustBlock || at.mustBeBlocked || lureBinds(s, obj(s, b.attacker), obj(s, b.blocker)) || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
+    return at.allMustBlock || at.mustBeBlocked || lureBinds(s, obj(s, b.attacker), obj(s, b.blocker)) || mustBeBlockedByFits(s, obj(s, b.attacker), obj(s, b.blocker)) || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
   };
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
@@ -10294,7 +10299,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
  */
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
-  const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked || !!characteristics(s, a).allMustBlockBy);
+  const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked || !!characteristics(s, a).allMustBlockBy || !!characteristics(s, a).mustBeBlockedBy);
   const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock);
   if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
@@ -10338,11 +10343,22 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
       const shirk = could.find((b) => lureBinds(s, at, b) && !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
       if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (${ac.allMustBlockBy.map((f) => f.text).join(" and ")} able to block it do so)`;
     }
+    // Slayer's Cleaver: "must be blocked by an Eldrazi if able": an Eldrazi among its blockers, if one not already obeying
+    // a requirement is able to block it (CR 509.1c).
+    for (const f of ac.mustBeBlockedBy ?? []) {
+      if (blocks.some((b) => b.attacker === at.id && objectMatches(s, f, obj(s, b.blocker), controllerOf(s, at), false))) continue;
+      if (could.some((b) => objectMatches(s, f, b, controllerOf(s, at), false) && !full(b))) return `${ac.name} must be blocked by ${/^[AEIOU]/.test(f.text) ? "an" : "a"} ${f.text} if able`;
+    }
     if (!ac.allMustBlock && !ac.mustBeBlocked) continue;
     const blocked = blocks.some((b) => b.attacker === at.id);
     if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
   }
   return null;
+}
+
+/** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): is this blocker one that obeys it (CR 509.1c)? */
+export function mustBeBlockedByFits(s: GameState, at: GameObject, b: GameObject): boolean {
+  return !!characteristics(s, at).mustBeBlockedBy?.some((f) => objectMatches(s, f, b, controllerOf(s, at), false));
 }
 
 /** "All Walls able to block ~ do so" (Marble Priest): is this blocker one the attacker's requirement binds (CR 509.1c)? */

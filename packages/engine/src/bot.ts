@@ -3336,6 +3336,14 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control": only a noncreature
+  // token (a Food, a Treasure), for the Ally token it makes.
+  const gift = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.giveTo ? e.effects[0]! : undefined;
+  if (r && gift?.type === "continuous") {
+    const t = gift.what.ref === "target" ? r.item.targets?.[gift.what.index] : undefined;
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && o.zone === "battlefield" && o.isToken && !objIsType(s, o, "Creature");
+  }
   // World Queller: "you may choose a card type. If you do, each player sacrifices ...": only for a type that costs the
   // opponents more than us.
   if (e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "choose" && e.effects[0]!.choice === "cardType" && edictsChosenType(s)) return (e.effects[0]!.options ?? []).some((ty) => edictTypeScore(s, pid, ty) > 0);
@@ -5903,6 +5911,21 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });
+    }
+  }
+  // Slayer's Cleaver: "must be blocked by an Eldrazi if able": our sturdiest one of those blocks it, with helpers against
+  // menace.
+  for (const at of incoming.filter((a) => !!characteristics(s, a).mustBeBlockedBy)) {
+    for (const f of characteristics(s, at).mustBeBlockedBy!) {
+      if (blocks.some((b) => b.attacker === at.id && objectMatches(s, f, obj(s, b.blocker), controllerOf(s, at), false))) continue;
+      const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
+      const fits = able.find((b) => objectMatches(s, f, b, controllerOf(s, at), false));
+      const n = blockersNeeded(s, at) - blocks.filter((b) => b.attacker === at.id).length;
+      if (!fits || able.length < n) continue;
+      for (const b of [fits, ...able.filter((x) => x !== fits)].slice(0, Math.max(1, n))) {
+        used.add(b.id);
+        blocks.push({ blocker: b.id, attacker: at.id });
+      }
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {

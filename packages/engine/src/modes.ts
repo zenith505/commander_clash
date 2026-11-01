@@ -268,6 +268,11 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
   if (Array.isArray(x)) return x.map((y) => spreadRefs(y, i, n)) as T;
   if (!x || typeof x !== "object") return x;
   const o = x as Record<string, unknown>;
+  // A reflexive trigger's body has targets of its own (CR 603.12); only what it's about refers to these (Thorin).
+  if (o.type === "reflexive") {
+    const about = o.about as { target?: number } | undefined;
+    return { ...o, ...(about && typeof about === "object" && typeof about.target === "number" && about.target > i ? { about: { ...about, target: about.target + n - 1 } } : {}) } as T;
+  }
   const copy: Record<string, unknown> = {};
   for (const [key, v] of Object.entries(o)) copy[key] = spreadRefs(v, i, n);
   // Every reference to a target by its number: { ref: "target", index }, "its controller", "any target", the spell a

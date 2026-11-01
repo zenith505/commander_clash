@@ -147,6 +147,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.x ?? 0;
     case "chosenNumber":
       return ctx.chosen?.number ?? 0;
+    case "crewedSource": {
+      // The source as the object it is now or, gone, as it last was (CR 400.7, 608.2h); each creature counted once.
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const zc = ctx.sourceZc ?? (src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[ctx.sourceId!]?.zc);
+      const by = ctx.sourceId && zc !== undefined ? (s.turnLog?.[c.saddled ? "saddledBy" : "crewedBy"]?.[`${ctx.sourceId}@${zc}`] ?? []) : [];
+      return new Set(by).size;
+    }
     case "eventAmount":
       return ctx.event?.amount ?? 0;
     case "castShortfall": {

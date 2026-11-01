@@ -487,6 +487,9 @@ const checkableMay = (e: Effect): boolean =>
   // as you control ~", Orcish Squatters): done if that target is still legal, which a lone target must be for the
   // ability to resolve at all (CR 608.2b).
   (e.type === "continuous" && e.what.ref === "target" && !e.what.n && !e.giveTo && e.mods.length === 1 && e.mods[0]!.kind === "control" && (e.duration === "game" || e.duration === "whileControlled")) ||
+  // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control. When you do, ...": done
+  // if both targets are still legal (rulings: either one illegal, it does nothing and can't be chosen).
+  (e.type === "continuous" && e.what.ref === "target" && !e.what.n && e.giveTo?.ref === "target" && !("n" in e.giveTo && e.giveTo.n) && e.mods.length === 1 && e.mods[0]!.kind === "control" && e.duration === "game") ||
   // "You may have that player gain control of equipped creature until end of turn. If you do, untap it." (Assault Suit).
   (e.type === "continuous" && e.what.ref === "attached" && e.giveTo?.ref === "eventPlayer" && e.duration === "endOfTurn") ||
   // Sphinx-Bone Wand: "you may put a charge counter on ~. If you do, ...": done if it's still on the battlefield to put
@@ -1498,6 +1501,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scythe of the Wretched: "return that card to the battlefield under your control. Attach ~ to that creature.": the
   // permanent it became (CR 400.7), the same as "... and attach ~ to it" (Nim Deathmantle); not onto a noncreature (rulings).
   text = text.replace(/^(return that card to the battlefield under your control)\. Attach ~ to that creature\.$/, "$1 and attach ~ to it.");
+  // Fortune, Loyal Steed: one delayed trigger doing both (sentences/basics.ts), kept whole past the ", then" split.
+  text = text.replace(/^at end of combat, exile it and up to one creature that saddled it this turn, then return those cards to the battlefield under their owner's control\.$/, "At end of combat, exile it and up to one creature that saddled it this turn and return those cards to the battlefield under their owner's control.");
   // Silent Gravestone: "Exile ~ and all cards from all graveyards": both at once; ~ goes to exile, not a graveyard.
   text = text.replace(/^Exile ~ and all cards from all graveyards\./, "Exile ~. Exile all cards from all graveyards.");
   // Sinkhole Surveyor: "you lose 1 life and ~ endures 1" (CR 701.63a), one after the other.
@@ -3846,6 +3851,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || !fx?.length || ctx.targets.length !== before) return null;
       effects.push({ type: "revealFromHand", filter, one: true, ...(revealOne[2] ? { orControl: true as const } : {}) }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
       si++;
+      continue;
+    }
+    // Thorin, Mountain-king: "attach any number of target Equipment you control to target creature you control. When one or
+    // more Equipment become attached to that creature this way, that creature deals damage equal to its power to up to one
+    // target creature": a reflexive trigger (CR 603.12) only if one of them moved onto it (CR 701.3c), about that creature.
+    const attachedWhen = /^When one or more Equipment become attached to that creature this way, (.+?)\.?$/.exec(s);
+    const lastAttach = effects.at(-1);
+    if (attachedWhen && lastAttach?.type === "attach" && lastAttach.what.ref === "target" && lastAttach.source?.ref === "target" && lastAttach.source.n && si + 1 === sentences.length) {
+      const reflexive = reflexiveBody(attachedWhen[1]!, ctx, false, true);
+      if (!reflexive) return null;
+      effects.push({ type: "reflexive", body: reflexive, about: { target: lastAttach.what.index, attachedThisWay: true } });
+      continue;
+    }
+    // Rambling Possum: "Then you may return any number of creatures that saddled it this turn to their owner's hand":
+    // chosen as it resolves, not targeted, none if you like (CR 107.1c); each one tapped for its saddle cost this turn
+    // (CR 702.171c), as the object it was then.
+    const saddledBack = /^(?:Then )?[Yy]ou may return any number of creatures that (saddled|crewed) (?:it|~) this turn to their owner's hand$/.exec(s);
+    if (saddledBack && !ctx.spell) {
+      const filter = pickFilter(`creature that ${saddledBack[1]} it this turn`);
+      if (!filter || filter.kind !== "object" || !(filter.saddledSource || filter.crewedSource)) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", anyNumber: true });
       continue;
     }
     // Sweep (Plow Through Reito): "Return any number of Plains you control to their owner's hand. Target creature gets

@@ -35,6 +35,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
   if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
+  // Luxurious Locomotive: "for each creature that crewed it this turn" (CR 702.122d), those gone since included (rulings).
+  if (each && ctx && !ctx.spell && /^creature that (crewed|saddled) (?:it|~) this turn$/.test(p)) return { count: { kind: "crewedSource", ...(/saddled/.test(p) ? { saddled: true as const } : {}) } };
   // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
   // Hundred-Battle Veteran counts them.
   if (!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) {

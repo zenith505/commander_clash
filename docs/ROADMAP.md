@@ -1539,6 +1539,31 @@ line blocks.
    Gambit, Count revealedSharedMv); "Whenever players finish voting, each opponent who voted for a choice you voted for
    ... the number of opponents who voted for a choice you didn't vote for" (Erestor of the Council: trigger
    playersFinishVoting, PlayerRef votedWithYou, Count opponentsVotedOtherwise). +11 (28,949 of 31,936 with B71-B74).
+   Round 239 (top of the list, now done): "If ~ is saddled, each opponent loses that much life instead" (Caustic
+   Bronco: revealTopToHand life.instead, saddled read through last known information, CR 702.171b); "When you discard
+   a card this way, target player mills cards equal to its mana value" (The Ancient One: a reflexive mill, CR 603.12);
+   "Choose land or nonland. Reveal cards ... until you reveal a card of the chosen kind" (Abundant Harvest: choice
+   landOrNonland, a Land / Nonland prompt with a browser test); "you may sacrifice a creature. If you do, look at the
+   top X cards ..., where X is that creature's mana value" (Industrial Advancement); "At the beginning of your first
+   main phase, you may discard two cards. If you do, return ~ from your graveyard" (Old One Eye: yourFirstMain from the
+   graveyard); "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (War's
+   Toll: an attack requirement checked at declaration, CR 508.1d, and the bot attacks with everything once it attacks);
+   "Spells your opponents cast that target you or a permanent you control cost {2} more" (Monastery Siege's Dragons,
+   CR 601.2f); "Equip costs {X} less ..., where X is the power of the creature it targets" (Belt of Giant Strength);
+   "cost {X} less to activate, where X is Agatha's power" (Agatha of the Vile Cauldron, CR 602.2b); "Spells you cast
+   this turn that are white and/or blue (black and/or red) cost {X} less, where X is the amount of life you gained
+   (lost) this turn" (Will and Rowan, Scion of ...: X fixed as the ability resolves, per the rulings); "you may cast
+   it without paying its mana cost if the spell's mana value is less than the number of Mountains you control"
+   (Solstice Revelations); "Whenever ~ deals combat damage to one or more players, exile up to that many target cards
+   from their graveyard" (Froghemoth: eventX); "creatures attacking your opponents and/or planeswalkers they control"
+   (Roar of Resistance: combat filter attackingOpponentOrTheirPlaneswalker); "You may spend mana as though it were mana
+   of any color to cast planeswalker spells" (Oath of Nissa, CR 609.4b). +15 (28,964 of 31,936 with B71-B74).
+   Out after round 239 (looked at, not done): Omnath, Locus of All ("If you would lose unspent mana, that mana becomes
+   black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (protection that doesn't
+   remove your own Auras and Equipment already attached, an exception to CR 702.16); Tamiyo, the Moon Sage (an emblem
+   that returns every card put into your graveyard from anywhere); Scion of the Ur-Dragon (becomes a copy of a card in
+   your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
+   mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
    Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
    Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent

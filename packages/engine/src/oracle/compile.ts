@@ -1387,6 +1387,10 @@ export function compile(d: CardDef): CompiledCard {
       if (again) (out.triggersAgain ??= []).push({ ...again, anchor: anchored[1]! });
       // Glacierwood Siege: "• Sultai — You may play lands from your graveyard." (the permission of Crucible of Worlds).
       else if (out.entersAnchor!.includes(anchored[1]!) && anchored[2] === "You may play lands from your graveyard." && !out.landsFromGraveyardIf) out.landsFromGraveyardIf = { kind: "anchor", word: anchored[1]! };
+      // Monastery Siege: "Dragons — Spells your opponents cast that target you or a permanent you control cost {2} more to
+      // cast": once per spell (rulings), only while that word was chosen.
+      else if (out.entersAnchor!.includes(anchored[1]!) && /^Spells your opponents cast that target you or a permanent you control cost \{\d+\} more to cast\.$/.test(anchored[2]!))
+        (out.opponentsTargetTax ??= []).push({ n: Number(/\{(\d+)\}/.exec(anchored[2]!)![1]), filter: { kind: "object", text: "permanent" }, you: true, if: { kind: "anchor", word: anchored[1]! } });
       else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
       continue;
     }
@@ -2685,6 +2689,11 @@ export function compile(d: CardDef): CompiledCard {
       out.firstDrawLook = true;
       continue;
     }
+    // War's Toll: a requirement (CR 508.1d) once an opponent declares any attacker (game.ts declareAttackers).
+    if (line === "If a creature an opponent controls attacks, all creatures that opponent controls attack if able.") {
+      out.opponentsAttackAll = true;
+      continue;
+    }
     if (line === "If you would draw a card while your library has no cards in it, you win the game instead.") {
       out.drawEmptyWins = true;
       continue;
@@ -2994,10 +3003,12 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Sam, Loyal Attendant: "Activated abilities of Foods you control cost {1} less to activate": any Food artifact (rulings).
-    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens|Foods)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    // Agatha of the Vile Cauldron: "... cost {X} less to activate, where X is ~'s power. This effect can't reduce ...":
+    // only abilities of creatures on the battlefield (rulings), generic mana only.
+    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens|Foods)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line) ?? /^Activated abilities of (creatures)( you control) cost \{(X)\} less to activate, where X is ~'s power\.( This effect can't reduce the mana in that cost to less than one mana\.)$/.exec(line);
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {
-      (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
+      (out.activationLess ??= []).push({ n: activationLess[3] === "X" ? 0 : Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}), ...(activationLess[3] === "X" ? { selfPower: true as const } : {}) });
       continue;
     }
     // Power Artifact: "Enchanted artifact's activated abilities cost {2} less to activate. This effect can't reduce the mana
@@ -3421,6 +3432,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Players may spend mana as though it were mana of any color.") {
       out.spendAnyColorAll = true;
+      continue;
+    }
+    // Oath of Nissa (CR 609.4b): colored symbols of its controller's planeswalker spells paid with mana of any color.
+    if (line === "You may spend mana as though it were mana of any color to cast planeswalker spells.") {
+      out.spendAnyColorPlaneswalkerSpells = true;
       continue;
     }
     if (line === "You can spend mana of any type to cast creature spells.") {
@@ -4343,7 +4359,9 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Equip {4}. This ability costs {1} less to activate for each color of the creature it targets." (Dragonfire Blade)
-    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line);
+    // Belt of Giant Strength: "Equip {10}. This ability costs {X} less to activate, where X is the power of the creature it
+    // targets": {1} less for each point of its power as the cost is worked out (CR 601.2f, 602.2b).
+    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line) ?? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(X)\} less to activate, where X is (the power of) the creature it targets\.$/.exec(line);
     // "Equip {4}. This ability costs {3} less to activate if you're the monarch." (Crown of Gondor): checked as it's
     // activated (CR 602.2b, 601.2f).
     const equipLessIf = !equipLessPer ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate if ([^.]+)\.$/.exec(line) : null;
@@ -4365,7 +4383,7 @@ export function compile(d: CardDef): CompiledCard {
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
         equip: true,
-        ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
+        ...(equipLessPer ? { costLessPerTarget: { n: equipLessPer[2] === "X" ? 1 : Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : equipLessPer[3] === "the power of" ? ("power" as const) : ("+1/+1" as const) } } : {}),
         ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
         ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
         ...(equipOnce ? { oncePerTurn: true } : {}),
@@ -5703,7 +5721,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

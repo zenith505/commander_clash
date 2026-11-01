@@ -773,6 +773,12 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   // don't, put that card into your hand." Any nonland card stops it; one with a greater mana value goes to the hand.
   const upTo = exile && !they ? new RegExp(`^You may cast it without paying its mana cost if that spell's mana value is (${NUM}) or less$`).exec(sentences[at + 1] ?? "") : null;
   if (upTo && sentences[at + 2] === "If you don't, put that card into your hand") return { effect: { type: "exileUntilNonland", then: "castFree", maxMv: num(upTo[1]!), orHand: true }, next: at + 3 };
+  // Solstice Revelations: "You may cast that card without paying its mana cost if the spell's mana value is less than the
+  // number of Mountains you control. If you don't cast that card this way, put it into your hand." Cast only as it
+  // resolves (rulings); the other exiled cards stay in exile.
+  const lessThan = exile && !they ? /^You may cast that card without paying its mana cost if the spell's mana value is less than (.+)$/.exec(sentences[at + 1] ?? "") : null;
+  const lessCount = lessThan && sentences[at + 2]?.replace(/\.$/, "") === "If you don't cast that card this way, put it into your hand" ? parseCount(lessThan[1]!, ctx) : null;
+  if (lessCount) return { effect: { type: "exileUntilNonland", then: "castFree", mvLessThan: lessCount, orHand: true }, next: at + 3 };
   let next = (shuffleFirst ? at + 1 : at) + 1;
   if (reveal) {
     if (sentences[next] !== "Exile that card and put the rest on the bottom of your library in a random order") return null;
@@ -4178,6 +4184,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];
+    // Industrial Advancement: "you may sacrifice a creature. If you do, look at the top X cards of your library, where X is
+    // that creature's mana value. You may put a creature card from among them onto the battlefield. Put the rest ...":
+    // the whole look only if one was sacrificed, X its mana value as it last existed (CR 608.2h).
+    const sacLook = sacDo && /^look at the top X cards of your library, where X is (?:that|the sacrificed) creature's mana value$/.exec(sacDo[1]!.replace(/\.$/, ""));
+    const sacPick = sacPrev?.type === "may" && !sacPrev.pay && sacPrev.effects.length === 1 ? sacPrev.effects[0] : sacPrev;
+    if (sacLook && sacPick?.type === "pick" && sacPick.action === "sacrifice" && sacPick.who.ref === "you" && sacPick.n === 1 && !sacPick.unless && sacPick.filter.types?.length === 1 && sacPick.filter.types[0] === "Creature") {
+      const rest = parseBody(`${["Look at the top X cards of your library", ...sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`, { ownX: true });
+      if (!rest || rest.targets.length || rest.effects.length !== 1 || rest.effects[0]!.type !== "dig") return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: replaceX(rest.effects, { count: { kind: "manaValue", of: { ref: "sacrificed" } } }) });
+      si = sentences.length;
+      continue;
+    }
     // "Sacrifice ~. If you do, create Marit Lage ..." (Dark Depths): only if it was sacrificed (it may have left already,
     // or be one that can't be sacrificed).
     if (sacDo && !/, where X is /.test(s) && ((sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) || (sacPrev?.type === "sacrifice" && sacPrev.what.ref === "self" && !sacPrev.byController))) {
@@ -6929,6 +6947,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (/^~ deals damage to (?:himself|herself|itself) equal to that card's mana value$/.test(next) && !ctx.spell) {
         effects.push({ type: "revealTopToHand", selfDamage: true });
         si++;
+        continue;
+      }
+      // Caustic Bronco: "You lose life equal to that card's mana value if ~ isn't saddled. Otherwise, each opponent loses
+      // that much life."
+      if (/^You lose life equal to that card's mana value if ~ isn't saddled$/.test(next) && /^Otherwise, each opponent loses that much life\.?$/.test(sentences[si + 2] ?? "") && !ctx.spell) {
+        effects.push({ type: "revealTopToHand", life: { who: { ref: "you" }, instead: { cond: { kind: "self", is: "saddled" }, who: { ref: "eachOpponent" } } } });
+        si += 2;
         continue;
       }
       effects.push({ type: "revealTopToHand", ...(drain ? { life: { who: { ref: "eachOpponent" }, drain: true } } : life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
@@ -10334,10 +10359,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Fiery Encore: "~ deals damage equal to that card's mana value to target creature or planeswalker": its X, the
       // mana value of the card discarded (ReflexiveEffect.xDiscardedMv).
       const mvOf = /^~ deals damage equal to that card's mana value to (?!.*\b(?:that card|its?)\b)/.exec(whenDiscarded[2]!);
+      // The Ancient One: "target player mills cards equal to its mana value": the card discarded (rulings).
+      const millMv = !mvOf && /^(target (?:player|opponent)) mills cards equal to its mana value$/.exec(whenDiscarded[2]!);
       if (mvOf) whenDiscarded[2] = `~ deals X damage to ${whenDiscarded[2]!.slice(mvOf[0].length)}`;
-      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx, false, false, !!mvOf);
+      else if (millMv) whenDiscarded[2] = `${millMv[1]} mills X cards`;
+      const millText = millMv ? `${millMv[0]}.` : undefined;
+      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx, false, false, !!mvOf || !!millMv);
       if (!reflexive) return null;
-      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: reflexive, ...(mvOf ? { xDiscardedMv: true as const } : {}) }] });
+      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: millText ? { ...reflexive, text: millText } : reflexive, ...(mvOf || millMv ? { xDiscardedMv: true as const } : {}) }] });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
@@ -12467,6 +12496,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const c = parseCardNameChoice(nameChoice[1]!);
       if (!c || allEffects(effects).some((x) => x.type === "choose" && x.choice === "cardName")) return null;
       effects.push({ type: "choose", choice: "cardName", ...c, purpose: namePurpose(sentences.slice(si + 1).join(" ")) });
+      continue;
+    }
+    // Abundant Harvest: "Reveal cards from the top of your library until you reveal a card of the chosen kind. Put that
+    // card into your hand and the rest on the bottom of your library in a random order." after "Choose land or nonland";
+    // with no such card, the whole library is revealed and goes to the bottom (CR 701.20a).
+    if (/^[Rr]eveal cards from the top of your library until you reveal a card of the chosen kind$/.test(s) && /^Put that card into your hand and the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "") && effects.at(-1)?.type === "choose" && (effects.at(-1) as { choice: string }).choice === "landOrNonland") {
+      effects.push({ type: "revealUntil", filter: { kind: "card", chosen: "landOrNonland", text: "card of the chosen kind" }, found: "hand", rest: "bottom" });
+      si++;
       continue;
     }
     // "Reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your

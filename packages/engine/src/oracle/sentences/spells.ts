@@ -57,6 +57,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` } }];
   }
+  // Will, Scion of Peace: "Spells you cast this turn that are white and/or blue cost {X} less to cast, where X is the amount
+  // of life you gained this turn": X counted once, as it resolves (rulings), generic mana only.
+  if ((m = /^Spells you cast this turn that are (white|blue|black|red|green) and\/or (white|blue|black|red|green) cost \{X\} less to cast(?:, where X is (.+))?$/.exec(s)) && (!!m[3] || !!ctx.whereX)) {
+    const change = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} and ${m[2]} spells you cast cost {1} less to cast`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard || change.costMod.times || change.costMod.nth) return null;
+    const times = m[3] ? parseCount(m[3], ctx) : X;
+    if (!times) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, times }];
+  }
   // "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker), "the next instant or sorcery spell
   // you cast this turn costs {X} less to cast, where X is ~'s power as this ability resolves" (Maelstrom Muse), "... for
   // each counter removed this way" (Mutated Cultist): a reduction to only the next such spell its controller casts this

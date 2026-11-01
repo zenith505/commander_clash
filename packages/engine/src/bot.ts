@@ -31,6 +31,7 @@ import {
   attackCostsPayable,
   attackTaxOf,
   attackYouLimit,
+  attackAllIfOne,
   combatLimit,
   playerBlockLimit,
   attackTaxPer,
@@ -3762,6 +3763,11 @@ const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolvi
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid);
+  // Abundant Harvest: a land while short of lands (fewer than five on the battlefield and in hand), else a spell.
+  if (what === "landOrNonland") {
+    const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length + player(s, pid).hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
+    return lands < 5 ? "land" : "nonland";
+  }
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
@@ -5741,6 +5747,13 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     attacks = attacks.filter((a) => a.attacker !== o.id);
     walkerBound.push({ attacker: o.id, defender: controllerOf(s, obj(s, ws[0]!)), planeswalker: ws[0]! });
   }
+  // War's Toll: attacking with any means attacking with all that can (CR 508.1d); the rest join, at whoever they can.
+  if (attacks.length && attackAllIfOne(s, pid) !== undefined)
+    for (const o of potentialAttackers(s, pid)) {
+      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id)) continue;
+      const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
+      if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
+    }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   // Scarred Puma stays home without a black or green creature beside it (CR 508.1c).

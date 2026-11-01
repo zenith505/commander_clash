@@ -1865,7 +1865,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const those = (event === "creaturesYouControlAttack" || dealtThose) && !(anyone && min) && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // Roar of Resistance: "planeswalkers they control" after "your opponents" is about those players, not the creatures.
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
@@ -2397,7 +2398,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -3021,7 +3022,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
   // Gate Colossus: "you may put ~ from your graveyard on top of your library", the same.
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard a card)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
+  // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards))\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {
@@ -3919,6 +3921,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Celeborn the Wise: "~ gets +1/+1 until end of turn for each card looked at while scrying this way": +X/+X, the same X.
   const scryEach = /^Whenever you scry, ~ gets \+1\/\+1 until end of turn for each card looked at while scrying this way\.$/.test(line);
   if (scryEach) return parseTrigger("Whenever you scry, ~ gets +X/+X until end of turn, where X is the number of cards looked at while scrying this way.");
+  // Froghemoth: "Whenever ~ deals combat damage to a player, exile up to that many target cards from their graveyard. ...":
+  // as many targets as the damage dealt, known as it triggers (CR 601.2c, 603.3d; TriggeredAbility.eventX).
+  const hitMany = /^Whenever ~ deals combat damage to a player, exile up to that many target cards from (?:their|that player's) graveyard\. (.+)$/.exec(line);
+  if (hitMany) {
+    const body = parseBody(`Exile up to X target cards from that player's graveyard. ${hitMany[1]}`, { ownX: true, eventPlayer: true });
+    return body ? { event: "selfDealsCombatDamageToPlayer", body: { ...body, text: line.replace(/^Whenever ~ deals combat damage to a player, /, "") }, eventX: true } : "fail";
+  }
   const scryX = /^Whenever you scry, (.+), where X is the number of cards looked at while scrying this way\.$/.exec(line);
   if (scryX) {
     const body = parseBody(`${scryX[1]}.`, { ownX: true });

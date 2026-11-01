@@ -158,6 +158,8 @@ export type Count =
   | { kind: "revealedSharedMv" }
   /** Augusta, Order Returned: "when one or more nonland cards are exiled this way, put that many ...": the cards the chooseFromGraveyard before moved (ResolvingState.yardChosen), only those like `filter`. */
   | { kind: "yardChosenThisWay"; filter?: TargetSpec }
+  /** "Equal to half that card's mana value" after "exile an instant or sorcery card from your graveyard" (Torrent Sculptor): the mana values of the cards this resolution chose from a graveyard and exiled, added up. */
+  | { kind: "yardChosenMv" }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }

@@ -128,11 +128,14 @@ const xenicPoltergeist = (): CardDef => ({"oracleId":"fb8f80cc-6214-4ab9-a9a9-18
 const victorManchaRunaway = (): CardDef => ({"oracleId":"606a83ae-c774-4abc-ba30-c113cbd1c05b","name":"Victor Mancha, Runaway","manaCost":"{5}","cmc":5,"typeLine":"Legendary Artifact Creature — Human Hero","supertypes":["Legendary"],"types":["Artifact","Creature"],"subtypes":["Human","Hero"],"oracleText":"When Victor Mancha enters, exile target card from your graveyard. You may play it for as long as you control Victor Mancha.","power":"4","toughness":"4","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/d/4d9bc6d6-fada-41f9-8a85-483e8806bb4b.jpg?1783903092","artUrl":"https://cards.scryfall.io/art_crop/front/4/d/4d9bc6d6-fada-41f9-8a85-483e8806bb4b.jpg?1783903092","layout":"normal"});
 const solRing = (): CardDef => ({"oracleId":"6ad8011d-3471-4369-9d68-b264cc027487","name":"Sol Ring","manaCost":"{1}","cmc":1,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{T}: Add {C}{C}.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/8/e/8ee443cc-e17a-493b-9c93-1f9e141a30e4.jpg?1789644446","artUrl":"https://cards.scryfall.io/art_crop/front/8/e/8ee443cc-e17a-493b-9c93-1f9e141a30e4.jpg?1789644446","layout":"normal"});
 const mindStone = (): CardDef => ({"oracleId":"c97361b5-af16-4a7b-af85-a429dbaf4ad2","name":"Mind Stone","manaCost":"{2}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/7/f/7fdef0b6-a3b9-4752-bce6-53c0140a1693.jpg?1783906237","artUrl":"https://cards.scryfall.io/art_crop/front/7/f/7fdef0b6-a3b9-4752-bce6-53c0140a1693.jpg?1783906237","layout":"normal"});
+const torrentSculptor = (): CardDef => ({"oracleId":"8a9fe2dd-50a7-4010-96ba-df4dec265e16","name":"Torrent Sculptor // Flamethrower Sonata","manaCost":"{2}{U}{U}","cmc":4,"typeLine":"Creature — Merfolk Wizard // Sorcery","supertypes":[],"types":["Creature"],"subtypes":["Merfolk","Wizard"],"oracleText":"Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nWhen this creature enters, exile an instant or sorcery card from your graveyard. Put a number of +1/+1 counters on this creature equal to half that card's mana value, rounded up.","power":"2","toughness":"2","colors":["U"],"colorIdentity":["R","U"],"keywords":["Ward"],"imageUrl":"https://cards.scryfall.io/normal/front/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334","artUrl":"https://cards.scryfall.io/art_crop/front/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334","layout":"modal_dfc","faces":[{"name":"Torrent Sculptor","manaCost":"{2}{U}{U}","typeLine":"Creature — Merfolk Wizard","supertypes":[],"types":["Creature"],"subtypes":["Merfolk","Wizard"],"oracleText":"Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nWhen this creature enters, exile an instant or sorcery card from your graveyard. Put a number of +1/+1 counters on this creature equal to half that card's mana value, rounded up.","power":"2","toughness":"2","colors":["U"],"imageUrl":"https://cards.scryfall.io/normal/front/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334","artUrl":"https://cards.scryfall.io/art_crop/front/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334"},{"name":"Flamethrower Sonata","manaCost":"{1}{R}","typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Discard a card, then draw a card. When you discard an instant or sorcery card this way, Flamethrower Sonata deals damage equal to that card's mana value to target creature or planeswalker you don't control.","colors":["R"],"imageUrl":"https://cards.scryfall.io/normal/back/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334","artUrl":"https://cards.scryfall.io/art_crop/back/8/7/87463b68-3642-41c7-a11c-67d524759b60.jpg?1783927334"}]});
+const divination = (): CardDef => ({"oracleId":"273b339c-964b-4a18-8eb5-ceb8abcdfd9e","name":"Divination","manaCost":"{2}{U}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Draw two cards.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/7/c7f9daf0-dbfd-45b2-be35-9c2de9d1a56e.jpg?1783935025","artUrl":"https://cards.scryfall.io/art_crop/front/c/7/c7f9daf0-dbfd-45b2-be35-9c2de9d1a56e.jpg?1783935025","layout":"normal"});
+const opt = (): CardDef => ({"oracleId":"713332c1-5bd8-400f-bfff-c1ca0697a043","name":"Opt","manaCost":"{U}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Scry 1. (Look at the top card of your library. You may put that card on the bottom.)\nDraw a card.","colors":["U"],"colorIdentity":["U"],"keywords":["Scry"],"imageUrl":"https://cards.scryfall.io/normal/front/f/1/f1de6f4a-ec3f-4bdb-902f-2e04f36ad7f4.jpg?1783906078","artUrl":"https://cards.scryfall.io/art_crop/front/f/1/f1de6f4a-ec3f-4bdb-902f-2e04f36ad7f4.jpg?1783906078","layout":"normal"});
 const bears = (): CardDef => ({"oracleId":"14c8f55d-d177-4c25-a931-ebeb9e6062a0","name":"Grizzly Bears","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Bear","supertypes":[],"types":["Creature"],"subtypes":["Bear"],"oracleText":"","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","artUrl":"https://cards.scryfall.io/art_crop/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","layout":"normal"});
 
 describe("Lane B round 78", () => {
   it("all of them are supported", () => {
-    supported(regentsAuthority(), earthRumbleWrestlers(), pharikasSpawn(), graspingGiant(), tolarianEntrancer(), hezrou(), hellcatUndyingVigilante(), otherworldlyEscort(), sereneRemembrance(), plagueBoiler(), armamentOfNyx(), charisma(), rootwaterThief(), xenicPoltergeist(), victorManchaRunaway());
+    supported(regentsAuthority(), earthRumbleWrestlers(), pharikasSpawn(), graspingGiant(), tolarianEntrancer(), hezrou(), hellcatUndyingVigilante(), otherworldlyEscort(), sereneRemembrance(), plagueBoiler(), armamentOfNyx(), charisma(), rootwaterThief(), xenicPoltergeist(), victorManchaRunaway(), torrentSculptor());
   });
 
   it("Regent's Authority: +2/+2, or a +1/+1 counter and +1/+1 on an enchantment creature or a legendary creature (only one counter if both)", () => {
@@ -438,5 +441,29 @@ describe("Lane B round 78", () => {
     expect(() => act(t, { type: "playLand", player: ap, objectId: land })).toThrow();
     s = act(s, { type: "playLand", player: ap, objectId: land });
     expect(zone(s, land)).toBe("battlefield");
+  });
+
+  it("Torrent Sculptor: exile an instant or sorcery card of your choice from your graveyard; +1/+1 counters for half its mana value, rounded up", () => {
+    const { s: s0, ap, ids } = setup([torrentSculptor()]);
+    const div = toZone(s0, ap, divination(), "graveyard");
+    const o = toZone(s0, ap, opt(), "graveyard");
+    toZone(s0, ap, bears(), "graveyard");
+    let s = settle(castNow(s0, ap, ids[0]!), { me: [ap] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    expect([...(s.pending as { cards: string[] }).cards].sort()).toEqual([div, o].sort());
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [div] }));
+    expect(zone(s, div)).toBe("exile");
+    expect(zone(s, o)).toBe("graveyard");
+    // Divination: mana value 3, half rounded up is 2.
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(2);
+    expect(pt(s, ids[0]!)).toBe("4/4");
+  });
+
+  it("Torrent Sculptor: with no instant or sorcery card in your graveyard, no counters", () => {
+    const { s: s0, ap, ids } = setup([torrentSculptor()]);
+    toZone(s0, ap, bears(), "graveyard");
+    const s = settle(castNow(s0, ap, ids[0]!));
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 });

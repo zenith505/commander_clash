@@ -11784,6 +11784,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       itsPrev.alsoMods = [{ kind: "setSubtypes", subtypes: itsTypes[1]!.split(" ") }];
       continue;
     }
+    // Torrent Sculptor: "When ~ enters, exile an instant or sorcery card from your graveyard. Put a number of +1/+1 counters on
+    // ~ equal to half that card's mana value, rounded up.": the card chosen and exiled as it resolves (rulings), none with no
+    // card to exile (CR 107.1a).
+    const halfMv = /^Put a number of \+1\/\+1 counters on ~ equal to half that card's mana value, rounded (up|down)$/.exec(s);
+    const yardPrev = effects[effects.length - 1];
+    if (halfMv && yardPrev?.type === "chooseFromGraveyard" && yardPrev.dest === "exile" && yardPrev.n === 1 && !yardPrev.upTo && !yardPrev.who && !yardPrev.anyGraveyard && !ctx.spell) {
+      effects.push({ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "yardChosenMv" }, half: halfMv[1] as "up" | "down" } });
+      continue;
+    }
     // Valkyrie's Call: "It has flying and is an Angel in addition to its other types": the same as "It's an Angel with
     // flying in addition to its other types".
     const hasAndIs = /^It has ([a-z]+) and is (an? [A-Z][a-z]+) in addition to its other types$/.exec(s);

@@ -91,6 +91,14 @@ const holy = (): CardDef => ({"oracleId":"9357de36-f8be-4f49-b2c8-9fe9eaf82b07",
 const pacifism = (): CardDef => ({"oracleId":"5f5e0b10-c8cf-450c-bfd3-bcb0528ec330","name":"Pacifism","manaCost":"{1}{W}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature can't attack or block.","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/4/3/433eed50-81af-4a59-b624-57b6f5f1bb0f.jpg?1783903091","artUrl":"https://cards.scryfall.io/art_crop/front/4/3/433eed50-81af-4a59-b624-57b6f5f1bb0f.jpg?1783903091","commanderLegal":"legal","set":"msc","releasedAt":"2026-06-26","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const unholy = (): CardDef => ({"oracleId":"090d88a9-7f2d-4bd1-a30a-7c48d05068be","name":"Unholy Strength","manaCost":"{B}","cmc":1,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature gets +2/+1.","colors":["B"],"colorIdentity":["B"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/8/a/8adc48d8-7ff9-46d4-921a-03e63ca41a66.jpg?1783943025","artUrl":"https://cards.scryfall.io/art_crop/front/8/a/8adc48d8-7ff9-46d4-921a-03e63ca41a66.jpg?1783943025","commanderLegal":"legal","set":"10e","releasedAt":"2007-07-13","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const bottle = (): CardDef => ({"oracleId":"8f167e2f-7b89-4ae2-8332-7c978f71522e","name":"Ventifact Bottle","manaCost":"{3}","cmc":3,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{X}{1}, {T}: Put X charge counters on this artifact. Activate only as a sorcery.\nAt the beginning of your first main phase, if this artifact has a charge counter on it, tap it and remove all charge counters from it. Add {C} for each charge counter removed this way.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/5/2/520f4a24-fb1a-4964-887c-2f08a752fae2.jpg?1783947035","artUrl":"https://cards.scryfall.io/art_crop/front/5/2/520f4a24-fb1a-4964-887c-2f08a752fae2.jpg?1783947035","commanderLegal":"legal","set":"mir","releasedAt":"1996-10-08","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const grapple = (): CardDef => ({"oracleId":"6b4f1569-2025-46a8-89ba-79859208b04e","name":"Flourishing Grapple","manaCost":"{G}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Target creature or planeswalker an opponent controls that's red or white loses all abilities until end of turn. Target creature you control deals damage equal to its power to that permanent.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/f/7/f71958e9-6d6d-4393-8b49-567103b50877.jpg?1789470852","artUrl":"https://cards.scryfall.io/art_crop/front/f/7/f71958e9-6d6d-4393-8b49-567103b50877.jpg?1789470852","commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const monument = (): CardDef => ({"oracleId":"df4bb104-d939-434f-8a1c-e89beda27c90","name":"Monument to Perfection","manaCost":"{2}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{3}, {T}: Search your library for a basic, Sphere, or Locus land card, reveal it, put it into your hand, then shuffle.\n{3}: This artifact becomes a 9/9 Phyrexian Construct artifact creature, loses all abilities, and gains indestructible and toxic 9. Activate only if there are nine or more lands with different names among the basic, Sphere, and Locus lands you control.","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/a/b/ab892e7b-6797-4ede-ab5d-d9d0fa488c80.jpg?1783917987","artUrl":"https://cards.scryfall.io/art_crop/front/a/b/ab892e7b-6797-4ede-ab5d-d9d0fa488c80.jpg?1783917987","commanderLegal":"legal","set":"one","releasedAt":"2023-02-10","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const mirrex = (): CardDef => ({"oracleId":"5502741a-e3b9-454e-8121-4360a6db6750","name":"Mirrex","manaCost":"","cmc":0,"typeLine":"Land — Sphere","supertypes":[],"types":["Land"],"subtypes":["Sphere"],"oracleText":"{T}: Add {C}.\n{T}: Add one mana of any color. Activate only if this land entered this turn.\n{3}, {T}: Create a 1/1 colorless Phyrexian Mite artifact creature token with toxic 1 and \"This token can't block.\" (Players dealt combat damage by it also get a poison counter.)","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["B","C","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/5/4/54a702cd-ca49-4570-b47e-8b090452a3c3.jpg?1783917980","artUrl":"https://cards.scryfall.io/art_crop/front/5/4/54a702cd-ca49-4570-b47e-8b090452a3c3.jpg?1783917980","commanderLegal":"legal","set":"one","releasedAt":"2023-02-10","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const cloudpost = (): CardDef => ({"oracleId":"f705c0eb-9c6c-4315-a860-208ed0c5d93e","name":"Cloudpost","manaCost":"","cmc":0,"typeLine":"Land — Locus","supertypes":[],"types":["Land"],"subtypes":["Locus"],"oracleText":"This land enters tapped.\n{T}: Add {C} for each Locus on the battlefield.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/2/f/2f28ecdc-a4f0-4327-a78c-340be41555ee.jpg?1783944494","artUrl":"https://cards.scryfall.io/art_crop/front/2/f/2f28ecdc-a4f0-4327-a78c-340be41555ee.jpg?1783944494","commanderLegal":"legal","set":"mrd","releasedAt":"2003-10-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const wastes = (): CardDef => ({"oracleId":"05d24b0c-904a-46b6-b42a-96a4d91a0dd4","name":"Wastes","manaCost":"","cmc":0,"typeLine":"Basic Land","supertypes":["Basic"],"types":["Land"],"subtypes":[],"oracleText":"{T}: Add {C}.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/6/0/60682c00-c661-4a9d-8326-f3f014a04e3e.jpg?1783937888","artUrl":"https://cards.scryfall.io/art_crop/front/6/0/60682c00-c661-4a9d-8326-f3f014a04e3e.jpg?1783937888","commanderLegal":"legal","set":"ogw","releasedAt":"2016-01-22","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const snowIsland = (): CardDef => ({"oracleId":"5b2460a5-6ae5-4cad-ba94-1a9e98e6e4c0","name":"Snow-Covered Island","manaCost":"","cmc":0,"typeLine":"Basic Snow Land — Island","supertypes":["Basic","Snow"],"types":["Land"],"subtypes":["Island"],"oracleText":"({T}: Add {U}.)","colors":[],"colorIdentity":["U"],"keywords":[],"producedMana":["U"],"imageUrl":"https://cards.scryfall.io/normal/front/0/d/0dcf8c0a-cf91-42a0-a54e-da5e7c697ee3.jpg?1783928166","artUrl":"https://cards.scryfall.io/art_crop/front/0/d/0dcf8c0a-cf91-42a0-a54e-da5e7c697ee3.jpg?1783928166","commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const tower = (): CardDef => ({"oracleId":"0895c9b7-ae7d-4bb3-af17-3b75deb50a25","name":"Command Tower","manaCost":"","cmc":0,"typeLine":"Land","supertypes":[],"types":["Land"],"subtypes":[],"oracleText":"{T}: Add one mana of any color in your commander's color identity.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/1/a/1ac6cb62-45da-4e9a-84c6-09e6eacf0664.jpg?1789644465","artUrl":"https://cards.scryfall.io/art_crop/front/1/a/1ac6cb62-45da-4e9a-84c6-09e6eacf0664.jpg?1789644465","commanderLegal":"legal","set":"frc","releasedAt":"2026-10-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const chandra = (): CardDef => ({"oracleId":"12cc800c-c7be-4811-8207-fd01a99cc892","name":"Chandra, Torch of Defiance","manaCost":"{2}{R}{R}","cmc":4,"typeLine":"Legendary Planeswalker — Chandra","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Chandra"],"oracleText":"+1: Exile the top card of your library. You may cast that card. If you don't, Chandra deals 2 damage to each opponent.\n+1: Add {R}{R}.\n−3: Chandra deals 4 damage to target creature.\n−7: You get an emblem with \"Whenever you cast a spell, this emblem deals 5 damage to any target.\"","loyalty":"4","colors":["R"],"colorIdentity":["R"],"keywords":[],"producedMana":["R"],"imageUrl":"https://cards.scryfall.io/normal/front/4/0/40cb22c8-cb03-45c9-bb0e-b8cabdcc43cd.jpg?1788329325","artUrl":"https://cards.scryfall.io/art_crop/front/4/0/40cb22c8-cb03-45c9-bb0e-b8cabdcc43cd.jpg?1788329325","commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 
 describe("Lane B round 71", () => {
   it("Dark Supplicant: graveyard and hand only, no shuffle; or the library too (CR 701.23, rulings)", () => {
@@ -310,5 +318,50 @@ describe("Lane B round 71", () => {
     expect(s.players[ap]!.manaPool.C).toBe(2);
     expect(s.objects[b]!.counters.charge ?? 0).toBe(0);
     expect(s.objects[b]!.tapped).toBe(true);
+  });
+
+  it("Flourishing Grapple: a red or white creature or planeswalker an opponent controls loses its abilities, then your creature deals damage equal to its power to it", () => {
+    const { s: s0, ap, opp, ids } = setup([grapple()]);
+    supported(grapple());
+    const mine = putOnBattlefield(s0, ap, grizzly());
+    const pw = putOnBattlefield(s0, opp, chandra());
+    s0.objects[pw]!.counters.loyalty = 4;
+    const green = putOnBattlefield(s0, opp, grizzly());
+    invalidateCharacteristics(s0);
+    expect(castProblem(s0, ap, ids[0]!, [tgt(green), tgt(mine)])).not.toBeNull();
+    expect(castProblem(s0, ap, ids[0]!, [tgt(mine), tgt(mine)])).not.toBeNull();
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(pw), tgt(mine)]));
+    expect(s.objects[pw]!.counters.loyalty).toBe(2);
+    expect(characteristics(s, s.objects[pw]!).hasPrintedAbilities).toBe(false);
+    expect(s.objects[mine]!.damage).toBe(0);
+  });
+
+  it("Monument to Perfection: finds a basic, Sphere or Locus land; becomes a 9/9 with nine differently named such lands, losing its abilities for good", () => {
+    const { s: s0, ap } = setup([]);
+    supported(monument());
+    const m = putOnBattlefield(s0, ap, monument());
+    const sphere = toZone(s0, ap, mirrex(), "library");
+    const tower0 = toZone(s0, ap, tower(), "library");
+    s0.players[ap]!.manaPool = { ...s0.players[ap]!.manaPool, C: 3 };
+    let s = settle(run(s0, planActivate(s0, ap, m, 0)), { me: ap });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary" });
+    const cards = (s.pending as { cards: string[] }).cards;
+    expect(cards).toContain(sphere);
+    expect(cards).not.toContain(tower0);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [sphere] }));
+    expect(zone(s, sphere)).toBe("hand");
+    // Plains, Island, Swamp, Mountain, Forest, Wastes, Snow-Covered Island, Cloudpost: eight names; Command Tower doesn't count.
+    for (const d of [wastes(), snowIsland(), cloudpost(), tower()]) putOnBattlefield(s, ap, d);
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, C: 3 };
+    expect(abilityProblem(s, ap, m, 1)).toMatch(/can.t be activated/);
+    putOnBattlefield(s, ap, mirrex());
+    expect(abilityProblem(s, ap, m, 1)).toBeNull();
+    s = settle(run(s, planActivate(s, ap, m, 1)));
+    const c = characteristics(s, s.objects[m]!);
+    expect(c.types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    expect(c.subtypes).toEqual(["Phyrexian", "Construct"]);
+    expect(`${power(s, s.objects[m]!)}/${toughness(s, s.objects[m]!)}`).toBe("9/9");
+    expect(c.keywords).toEqual(expect.arrayContaining(["Indestructible", "Toxic 9"]));
+    expect(c.hasPrintedAbilities).toBe(false);
   });
 });

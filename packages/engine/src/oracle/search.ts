@@ -141,6 +141,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const TYPE = "(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)";
   // Smuggler Captain: nothing was noted in a draft, so nothing is found (TargetSpec.drafted, oracle/draft.ts).
   if (DRAFTED_NAME.test(phrase)) return { kind: "card", drafted: true, text: phrase };
+  // Monument to Perfection: "a basic, Sphere, or Locus land card": a land card that's any of them.
+  const kinds = /^((?:basic|[A-Z][a-z]+), (?:(?:basic|[A-Z][a-z]+), )*or (?:basic|[A-Z][a-z]+)) land card$/.exec(phrase);
+  if (kinds) {
+    const anyOf = kinds[1]!.split(/, (?:or )?/).map((k) => parseSearchFilter(`${k} land card`, count));
+    if (anyOf.some((f) => !f || f.anyOf)) return null;
+    return { kind: "card", types: ["Land"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: phrase };
+  }
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
   // Fang-Druid Summoner: "a creature card with no abilities", by its printed text (TargetSpec.noAbilities).
   const noAb = /^(.+ card) with no abilities$/.exec(p);

@@ -1631,6 +1631,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
     return c?.kind === "control" && c.who === "you" && c.other && c.min === 1 && c.max === undefined ? { ...c, who: "attached" } : null;
   }
+  // Monument to Perfection: "there are nine or more lands with different names among the basic, Sphere, and Locus lands
+  // you control": lands you control that are any of those, each name counted once.
+  if ((m = new RegExp(`^there are ${NUM} or more lands with different names among the ((?:basic|[A-Z][a-z]+)(?:, (?:basic|[A-Z][a-z]+))*,? and (?:basic|[A-Z][a-z]+)) lands you control$`).exec(text))) {
+    const kinds = m[2]!.split(/,? and |, /);
+    const anyOf = kinds.map((k) => pickFilter(`${k} land`));
+    if (anyOf.some((f) => f?.kind !== "object" || f.controller || f.anyOf)) return null;
+    return { kind: "control", who: "you", filter: { kind: "object", types: ["Land"], anyOf: anyOf as TargetSpec[], text: `${m[2]} lands` }, min: num(m[1]!), differentNames: true };
+  }
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");

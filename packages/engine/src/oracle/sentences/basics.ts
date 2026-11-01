@@ -1617,6 +1617,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!c || c.times || c.plus || c.half) return null;
     return [{ type: "gainLife", who: { ref: "you" }, n: { ...c, times: Number(m[2]), plus: Number(m[1]) } }];
   }
+  // Devouring Greed: "Target player loses 2 life plus 2 life for each Spirit sacrificed this way": one life loss of the
+  // total (CR 119.3).
+  if ((m = /^(Target player|Target opponent|Each opponent) loses (\d+) life plus (\d+) life for each (.+)$/.exec(s))) {
+    const c = parseCount(m[4]!, ctx, true);
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    if (!c || c.times || c.plus || c.half || !who) return null;
+    return [{ type: "loseLife", who, n: { ...c, times: Number(m[3]), plus: Number(m[2]) } }];
+  }
   // Vitalizing Cascade: "You gain X plus 3 life".
   if ((m = /^You gain X plus (one|two|three|four|five|\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: { ...X, plus: num(m[1]!) } }];
   return undefined;

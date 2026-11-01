@@ -493,6 +493,8 @@ export function compile(d: CardDef): CompiledCard {
   let ascendSpell = false;
   /** Banefire: "If X is 5 or more, ... the damage can't be prevented": applied to the spell's damage once it's compiled. */
   let unpreventableX: number | undefined;
+  /** Demonfire: "If you have no cards in hand, ... the damage can't be prevented", applied the same way. */
+  let unpreventableIf: { cond: StaticCondition; raw: string } | undefined;
   let awaken: { n: number; raw: string } | undefined;
   // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
@@ -2737,6 +2739,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${lifeAlt[1]} spell` }))(spec), once: true, yourTurn: true, life: true };
       continue;
     }
+    // Kentaro, the Smiling Cat: "You may pay {X} rather than pay the mana cost for Samurai spells you cast, where X is that
+    // spell's mana value": an alternative cost (CR 118.9) of generic mana only (rulings), the spell's mana value from its
+    // own mana cost (CR 202.3), X at 0 in it as for any alternative cost without X (CR 107.3, 601.2b).
+    const genericAlt = /^You may pay \{X\} rather than pay the mana cost for ([A-Z][a-z]+) spells you cast, where X is that spell's mana value\.$/.exec(line);
+    if (genericAlt) {
+      const spec = parseTargetPhrase(`${genericAlt[1]} card from a graveyard`);
+      if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${genericAlt[1]} spell` }))(spec), genericMv: true };
+      continue;
+    }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
     // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
     const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);
@@ -3223,6 +3235,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
       continue;
     }
+    // Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~" (CR 402.2), counted whenever it's
+    // checked; set like "is seven", the latest such effect winning (rulings, CR 613.7).
+    const handEqual = /^Your maximum hand size is equal to (the number of [a-z]+ counters on ~)\.$/.exec(line);
+    const handEqualN = handEqual ? parseCount(handEqual[1]!, null) : null;
+    if (handEqual) {
+      if (!handEqualN) out.unsupported.push(raw);
+      else (out.handSize ??= []).push({ who: "you", set: 0, equal: handEqualN });
+      continue;
+    }
     // Winter, Misanthropic Guide: "Delirium — As long as there are four or more card types among cards in your graveyard,
     // each opponent's maximum hand size is equal to seven minus the number of those card types" (CR 402.2, 205.2a).
     if (/^(?:Delirium — )?As long as there are four or more card types among cards in your graveyard, each opponent's maximum hand size is equal to seven minus the number of those card types\.$/.test(line)) {
@@ -3553,6 +3574,20 @@ export function compile(d: CardDef): CompiledCard {
       out.preventToYou = { ...(toYou[1] ? { combat: toYou[1] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(toYou[2] ? { others: true as const } : {}) };
       continue;
     }
+    // Purity: "If noncombat damage would be dealt to you, prevent that damage. You gain life equal to the damage prevented
+    // this way." The life is part of the prevention (CR 615.5). See staticRules in damage.ts.
+    const purity = /^If (combat |noncombat )?damage would be dealt to you, prevent that damage\. You gain life equal to the damage prevented this way\.$/.exec(line);
+    if (purity) {
+      out.preventToYou = { ...(purity[1] ? { combat: purity[1] === "combat " ? ("only" as const) : ("non" as const) } : {}), gain: true };
+      continue;
+    }
+    // Stormwild Capridor: "If noncombat damage would be dealt to ~, prevent that damage. Put a +1/+1 counter on ~ for each 1
+    // damage prevented this way." (CR 615.5) See staticRules in damage.ts.
+    const capridor = /^If (combat |noncombat )?damage would be dealt to ~, prevent that damage\. Put an? ([+-]\d+\/[+-]\d+) counter on ~ for each 1 damage prevented this way\.$/.exec(line);
+    if (capridor) {
+      out.preventToSelfCounters = { ...(capridor[1] ? { combat: capridor[1] === "combat " ? ("only" as const) : ("non" as const) } : {}), counter: capridor[2]! };
+      continue;
+    }
     // Pariah, Palisade Giant, Martyrs of Korlis (CR 614.9): see staticRules in damage.ts.
     const redirect = /^(?:As long as ~ is untapped, a|A)ll damage that would be dealt to you( and other permanents you control)?( by artifacts)? is dealt to (~|enchanted creature|equipped creature) instead\.$/.exec(line);
     if (redirect) {
@@ -3598,6 +3633,16 @@ export function compile(d: CardDef): CompiledCard {
     if (xUncounterable && isSpell && unpreventableX === undefined) {
       out.cantBeCounteredX = Number(xUncounterable[1]);
       unpreventableX = Number(xUncounterable[1]);
+      continue;
+    }
+    // Demonfire: "Hellbent — If you have no cards in hand, this spell can't be countered and the damage can't be prevented."
+    // Static abilities of the spell (CR 113.6, 101.2), the condition checked whenever something would counter it and as
+    // the damage is dealt (CR 615.12).
+    const ifUncounterable = /^If ([^,]+), ~ can't be countered and the damage can't be prevented\.$/.exec(line);
+    const ifUncounterableCond = ifUncounterable && !/\bX\b/.test(ifUncounterable[1]!) ? parseStaticCondition(ifUncounterable[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (ifUncounterable && isSpell) {
+      if (!ifUncounterableCond || out.cantBeCounteredIf || unpreventableIf) out.unsupported.push(raw);
+      else [out.cantBeCounteredIf, unpreventableIf] = [ifUncounterableCond, { cond: ifUncounterableCond, raw }];
       continue;
     }
     if (/^~ can't be countered\.$/.test(line)) {
@@ -4831,6 +4876,14 @@ export function compile(d: CardDef): CompiledCard {
     else {
       out.unsupported.push(`If X is ${unpreventableX} or more, ~ can't be countered and the damage can't be prevented.`);
       delete out.cantBeCounteredX;
+    }
+  }
+  if (unpreventableIf) {
+    const dmg = out.spell?.effects.filter((e) => e.type === "damage") ?? [];
+    if (out.spell && !out.spell.modal && dmg.length === 1 && dmg[0]!.type === "damage" && !dmg[0]!.by) dmg[0]!.unpreventableIf = unpreventableIf.cond;
+    else {
+      out.unsupported.push(unpreventableIf.raw);
+      delete out.cantBeCounteredIf;
     }
   }
   if (repeat) {

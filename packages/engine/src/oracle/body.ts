@@ -112,6 +112,8 @@ export interface Ctx {
   lastCreatedEquipment?: boolean;
   /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
   lastDugLands?: boolean;
+  /** Arthur, Marigold Knight: "You may put a creature card from among them onto the battlefield ..." made one creature "that creature". */
+  lastDugCreature?: boolean;
   /** After "look at the top N cards ... You may put any number of them into your hand": "each card you put into your hand this way" (Count "dugToHand"). */
   dugToHand?: boolean;
   /** The same, exactly one card: "that card's mana value" (Reviving Vapors; Count "dugToHandMv"). */
@@ -1363,6 +1365,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
   // Silvan Rally: "Mill four cards, then put up to two land cards from among them into your hand": up to two, none too.
   text = text.replace(/^Mill (two|three|four|five) cards, then put up to (two|three) ([a-z]+) cards from among them into your hand\./, "Mill $1 cards. You may put up to $2 $3 cards from among them into your hand.");
+  // Rickety Gazebo: "mill four cards, then return up to two permanent cards from among them to your hand": the same.
+  text = text.replace(/^([Mm])ill (two|three|four|five) cards, then return up to (two|three) ([a-z]+) cards from among them to your hand\./, "$1ill $2 cards. You may put up to $3 $4 cards from among them into your hand.");
   // Ana Battlemage: "tap target untapped creature and that creature deals damage equal to its power to its controller":
   // two instructions about the target, in order.
   text = text.replace(/^([Tt]ap target untapped creature) and (that creature deals damage equal to its power to its controller)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -2598,7 +2602,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Choose (any number of|up to two) target ([^.]+?)\. For each (?:of them|of those creatures), create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of $1 target $2$3.");
   // "Target creature you control other than ~" (Rosie Cotton) is "another target creature you control"; "each creature you
   // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
-  text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);
+  // Satya, Aetherflux Genius: "create a ... token ... You get {E}{E}. At the beginning of the next end step, sacrifice that
+  // token unless you pay ...": the delayed trigger is about the token either way; getting the energy first or last in the
+  // same resolution is the same, so the sentence about the token comes right after the one that made it.
+  text = text.replace(/(create [^.]*?token[^.]*)\. (You get (?:\{E\})+)\. (At the beginning of the next end step, sacrifice that token unless you pay an amount of \{E\} equal to its mana value)\./, "$1. $3. $2.");
+  // Shaun, Father of Synths: "target attacking legendary creature you control other than ~" the same way.
+  text = text.replace(/\b([Tt])arget ((?:attacking |legendary |nontoken )*)(creature|permanent) you control other than ~/g, (_, t: string, adj: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${adj}${w} you control`);
   text = text.replace(/\beach (creature|permanent) you control other than ~/g, "each other $1 you control");
   // "Exile target nonland permanent other than ~" (Admonition Angel), "target creature other than ~ gets -1/-1" (Weed-Pruner
   // Poplar): "another target ...", other than the source, when no target comes before it in the sentence.
@@ -4118,6 +4127,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
     // before added, unless it can only be spent some ways.
     // After "Spend this mana only to cast spells" (Klauth): the mana the sentence before that one added, restricted and kept.
+    // Fire Lord Ozai: "add an amount of {R} equal to the sacrificed creature's power. Until end of combat, you don't lose
+    // this mana as steps end" (as firebending's, CR 702.189a, 500.4).
+    if (/^Until end of combat, you don't lose this mana as steps end$/.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      if (!added.length || added.some((e) => e.only || e.keep)) return null;
+      for (const e of added) e.keep = "combat";
+      continue;
+    }
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
       const spendBefore = si > 0 && /^(?:[Ss]pend this mana only |This mana can't be spent to cast (?:non|spells$))/.test(sentences[si - 1]!);
       const added = spendBefore ? spendAdded : allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
@@ -4627,6 +4644,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachPlayer" }, oneOf: true, life: true });
       si += 2;
+      continue;
+    }
+    // Fire Lord Ozai: "Exile the top card of each opponent's library. Until end of turn, you may play one of those cards
+    // without paying its mana cost." One card in all, as Nashi's; a land is played with the usual timing and land drop.
+    if (/^[Ee]xile the top card of each opponent's library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Until end of turn, you may play one of those cards without paying its mana cost") {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachOpponent" }, oneOf: true, free: true });
+      si++;
       continue;
     }
     // Tyrant of Discord: "target opponent chooses a permanent they control at random and sacrifices it. If a nonland
@@ -8349,6 +8373,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "resolvedNth", n: [...nthSeen], not: true }, effects: sub.effects });
       nthSeen.push(0);
       si++;
+      continue;
+    }
+    // Zimone, Mystery Unraveler: "Otherwise, you may turn a permanent you control face up": the choice, made then.
+    const nthMay = nthOtherwise ? /^you may (.+)$/.exec(nthOtherwise[1]!) : null;
+    if (nthMay) {
+      const before = ctx.targets.length;
+      ctx.mayNow = true;
+      const inner = parseOne(capital(nthMay[1]!), ctx);
+      ctx.mayNow = false;
+      if (!inner?.length || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: [...nthSeen], not: true }, effects: [{ type: "may", effects: inner, text: nthMay[1]! }] });
+      nthSeen.push(0);
       continue;
     }
     if (nthOtherwise) {
@@ -13033,6 +13069,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     ctx.dugToHand = last?.type === "dig" && last.into === "hand" && !last.each && !last.who;
     ctx.dugOneToHand = last?.type === "dig" && ctx.dugToHand && last.count === 1 && !last.upTo && !last.countX && last.kickedCount === undefined && !last.countIfYard && !last.oneOfEach;
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
+    ctx.lastDugCreature = last?.type === "dig" && last.into === "battlefield" && last.count === 1 && !last.each && !last.who && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Creature";
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.
     ctx.opponentsDiscarded = last?.type === "discard" && (last.who.ref === "eachOpponent" || last.who.ref === "eachPlayer") && last.n === 1 && !last.random && !last.filter;

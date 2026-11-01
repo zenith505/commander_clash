@@ -8,7 +8,7 @@ import { parseUnlessPays, addTarget, parseBody, replaceX } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
-import { PREDEFINED_TOKENS } from "../tokens";
+import { PREDEFINED_TOKENS, parseCopyExcept } from "../tokens";
 import { parseSearchFilter } from "../search";
 import { parseCostChange } from "../statics";
 import { parsePunisherOptions } from "./basics";
@@ -590,7 +590,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Resonance Technician: "Copy target instant or sorcery spell you control with mana value X", the X of the ability's
   // "Tap X untapped artifacts you control" (CR 107.3a, TargetSpec.xRange).
   // Myojin of Cryptic Dreams: "Copy target permanent spell you control three times" (each copy becomes a token, CR 608.3f).
-  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less))?)(, except it isn't legendary if the spell is legendary)?( twice| three times)?$/i.exec(s))) {
+  // Errant, Street Artist: "Copy target spell you control that wasn't cast" (a copy, CR 707.10).
+  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary)?( twice| three times)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
     const spec = parseTargetPhrase(m[1]!, { x: true });
     const n = m[3] === " twice" ? 2 : m[3] ? 3 : 1;
@@ -634,6 +635,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Storm King's Thunder: "copy that spell X times", the X of the spell that made the delayed trigger; Photon Blast
   // Barrage: "When you cast ~, copy it X times", its own X (rulings: X copies, none if X is 0).
   // Bygone Marvels: "When you cast this spell, ... copy this spell twice" ("this spell" is ~ by now).
+  // Tawnos, the Toymaker: "copy it, except the copy is an artifact in addition to its other types" (CR 707.9b): the token
+  // the copy becomes is one too (CR 608.3f).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell), except the copy is (an artifact) in addition to its other types$/.exec(s))) {
+    const except = parseCopyExcept(`it's ${m[1]} in addition to its other types`);
+    return except?.addTypes?.length === 1 && !except.addSubtypes?.length ? [{ type: "copySpell", spell: "cause", n: 1, newTargets: false, except }] : null;
+  }
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice| X times)?(, except the copy isn't legendary)?$/.exec(s) ?? (ctx.selfCastSpell ? /^[Cc]opy ~( twice)?()$/.exec(s) : null))) return [{ type: "copySpell", spell: "cause", n: m[1] === " X times" ? X : m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
   // Bonus Round: "that player copies it and may choose new targets for the copy": the caster copies it and controls the
   // copy (rulings, CR 707.10).

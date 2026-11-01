@@ -311,6 +311,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const when = m[2] === "end of combat" ? "endOfCombat" : /on your next turn/.test(m[2]!) ? "yourNextTurnEndStep" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next upkeep/.test(m[2]!) ? "yourNextUpkeep" : /upkeep/.test(m[2]!) ? "nextTurnUpkeep" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
     return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
+  // Satya, Aetherflux Genius: "At the beginning of the next end step, sacrifice that token unless you pay an amount of {E}
+  // equal to its mana value": the token's mana value then (a copy's, CR 707.2; X is 0), chosen as the delayed trigger
+  // resolves (as Volatile Stormdrake's).
+  if (ctx.lastCreatedAny && /^At the beginning of the next end step, sacrifice (?:that token|it) unless you pay an amount of \{E\} equal to its mana value$/.test(s))
+    return [{ type: "delayed", when: "nextEndStep", each: "created", effects: [{ type: "may", effects: [], payEnergy: { count: { kind: "manaValue", of: { ref: "subject" } } }, otherwise: [{ type: "sacrifice", what: { ref: "subject" } }], keep: true, text: "Pay {E} equal to that token's mana value to keep it" }], text: "sacrifice ~ unless you pay {E} equal to its mana value" }];
   // "Incubate 2 five times" (The Argent Etchings): one incubate after another (CR 701.53a).
   // Glistening Dawn: "Incubate X twice, where X is the number of lands you control": X each time.
   if ((m = /^Incubate (\d+|X) (twice|three times|four times|five times)$/.exec(s))) {

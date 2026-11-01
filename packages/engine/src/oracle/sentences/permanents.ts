@@ -48,8 +48,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const put = what?.ref === "subject" ? parseSentence(fu[2]!.replace(/^p/, "P"), ctx) : null;
     return put ? [{ type: "either", options: [[{ type: "turnFaceUp", what: what! }], put], labels: ["Turn it face up", "Put a +1/+1 counter on it"] }] : null;
   }
-  if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control) face up$/.exec(s))) {
-    const filter = parseTargetPhrase(fu[1]!);
+  // Zimone, Mystery Unraveler: "you may turn a permanent you control face up": only a face-down one can be (CR 708.8;
+  // a face-up one has no face-up side to turn to), so it's the same choice.
+  if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control|permanent you control) face up$/.exec(s))) {
+    const filter = parseTargetPhrase(fu[1]!.replace(/^permanent/, "face-down permanent"));
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;
   }
   // Nahiri, Heir of the Ancients: "You may attach an Equipment you control to it", the token just created; Goldwardens'

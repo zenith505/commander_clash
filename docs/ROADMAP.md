@@ -1,7 +1,7 @@
 # Roadmap
 
-28,631 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,184 of
+28,647 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,198 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1301,6 +1301,34 @@ line blocks.
    the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
    Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
    the next instant or sorcery); Garland, Knight of Cornelia (return transformed from the graveyard).
+   Round 226 (fresh cards from the top): "once during each of your turns, you may play a land or cast a permanent spell
+   from among cards in your graveyard that were put there from your library this turn" (Kagha, Shadow Archdruid) and
+   "... from anywhere other than the battlefield this turn" (Banon, the Returners' Leader); "a second target artifact"
+   (Shuri, Wakandan Inventor); "Otherwise, you may turn a permanent you control face up" (Zimone, Mystery Unraveler);
+   "target attacking legendary creature you control other than ~" (Shaun, Father of Synths); "becomes crewed for the
+   first time each turn, if it was crewed by exactly two creatures" (Mighty Servant of Leuk-o; Mindlink Mech too, whose
+   "except it's 4/3" now sets nothing on a copy of a permanent that isn't normally a creature or Vehicle, rulings);
+   "copy target spell you control that wasn't cast" (Errant, Street Artist); "copy it, except the copy is an artifact in
+   addition to its other types" (Tawnos, the Toymaker); "Until end of combat, you don't lose this mana as steps end" and
+   "play one of those cards without paying its mana cost" from each opponent's library (Fire Lord Ozai); "sacrifice that
+   token unless you pay an amount of {E} equal to its mana value" at the next end step (Satya, Aetherflux Genius); "mill
+   four cards, then return up to two permanent cards from among them" (Greenhouse // Rickety Gazebo); "whenever you play
+   a card with two or more card types" (Rendmaw, Creaking Nest); "you may copy that spell. The copy targets ~" (Ivy,
+   Gleeful Spellthief); "Return that creature to its owner's hand at end of combat" after a creature put onto the
+   battlefield from the top six (Arthur, Marigold Knight); "that doesn't have the same name as a token you control" (The
+   Apprentice's Folly). +16 (28,647 of 31,936 with B64).
+   Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (each poisoned opponent's face-down exiled card,
+   playable with mana of any color); Firkraag, Cunning Instigator ("if that creature had to attack this combat");
+   Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (every draw
+   replaced, alongside dredge and the other draw replacements, CR 616.1); Hofri Ghostforge and Timothar, Baron of Bats
+   (a token's granted ability linked to the card the trigger exiled, rulings); Anrakyr the Traveller (cast an artifact
+   spell from hand or graveyard for life during a trigger's resolution); Crabomination (a card at random from the
+   graveyard and from the hand, then cast one of the three); Winnowing (each player's sacrifice by the creature types of
+   a creature you chose for them); Grolnok, the Omnivore (a card trigger for each permanent card milled, croak counters,
+   playing them from exile); Coram, the Undertaker (lands and spells from every graveyard, cards you don't own);
+   Territorial Hellkite (an opponent at random it didn't attack last combat); Boreas Charger (an opponent who controls
+   more lands, a search for the difference); Eivor, Wolf-Kissed ("a Saga card and/or a land card" from among the milled
+   ones).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

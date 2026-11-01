@@ -1647,6 +1647,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
+  // Historian's Wisdom: "if enchanted permanent is a creature with the greatest power among creatures on the battlefield":
+  // tied counts too (as High Score), checked as it triggers and as it resolves (rulings, CR 603.4).
+  if (text === "enchanted permanent is a creature with the greatest power among creatures on the battlefield") {
+    const greatest = parseCount("the greatest power among creatures on the battlefield", null);
+    if (greatest?.count.kind !== "greatestPower") return null;
+    return { kind: "allOf", conds: [{ kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } }, { kind: "amount", amount: { count: { kind: "power", of: { ref: "attached" } }, plus: 1 }, moreThan: greatest }] };
+  }
   if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
   // Synchronized Eviction: "if you control at least two creatures that share a creature type": two or more of yours with
   // one creature type in common. Littjara Kinseekers: "if you control three or more creatures that share a creature type".

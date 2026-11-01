@@ -1557,6 +1557,21 @@ export function compile(d: CardDef): CompiledCard {
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
       continue;
     }
+    // Devouring Hellion: "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters
+    // with twice that many +1/+1 counters on it.": devour 2's choice (CR 702.82a, 614.12), of either kind. Rescuer Sphinx:
+    // "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1
+    // counter on it.": the same choice of at most one, returned. Both only among permanents already on the battlefield
+    // (rulings).
+    if (line === "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters with twice that many +1/+1 counters on it." && !isSpell) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: 2, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" } };
+      continue;
+    }
+    if (line === "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1 counter on it." && !isSpell) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: 1, filter: { kind: "object", notTypes: ["Land"], text: "nonland permanent" }, bounce: true, max: 1 };
+      continue;
+    }
     // Urborg Lhurgoyf: "As ~ enters, mill three cards for each time it was kicked." Part of how it enters, not a trigger
     // (rulings, CR 614.1c), its kicker costs counted (CR 702.33d).
     // Monstrous War-Leech: "As ~ enters, if it was kicked, mill four cards": the same, with a kicker paid at most once (CR

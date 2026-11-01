@@ -1516,8 +1516,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // step": both groups as it resolves (CR 611.2c), as two instructions.
   text = text.replace(/\bEach attacking creature and each blocking creature doesn't untap during its controller's next untap step\./, "Each attacking creature doesn't untap during its controller's next untap step. Each blocking creature doesn't untap during its controller's next untap step.");
   // Sigil of Myrkul: "put a +1/+1 counter on target creature you control and it gains deathtouch until end of turn": the
-  // same, about the target.
-  text = text.replace(/^([Pp]ut a \+1\/\+1 counter on target creature you control) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
+  // same, about the target. Skyrider Patrol: "put a +1/+1 counter on another target creature you control, and that
+  // creature gains flying until end of turn".
+  text = text.replace(/^([Pp]ut a \+1\/\+1 counter on (?:another )?target creature you control),? and (?:it|that creature) gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
   text = text.replace(/^[Mm]ill (two|three|four|five) cards, then you may put (an? [a-z]+(?: or [a-z]+)? card) from among the milled cards on top of your library\./, "Mill $1 cards. You may put $2 from among the milled cards on top of your library.");
   // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
   // turn": the same as two sentences, "those creatures" the same group.
@@ -1658,6 +1659,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Stinging Vitriol: "That player reveals their hand. You choose a nonland card from it. They discard that card.": the
   // same as "... That player discards that card.", "they" being that player.
   text = text.replace(/(\. That player reveals their hand\. You choose an? (?:[a-z]+ )?card from it\.) They discard that card\.$/, "$1 That player discards that card.");
+  // Celestial Regulator: "choose target creature you don't control and tap it. If you control a creature with a counter on
+  // it, the chosen creature doesn't untap during its controller's next untap step.": the target, both times.
+  text = text.replace(/^choose (target creature you don't control) and tap it\. (If you control [^.,]+), the chosen creature doesn't untap during its controller's next untap step\.$/, "tap $1. $2, that creature doesn't untap during its controller's next untap step.");
+  // Grim Captain's Call: "Return a Pirate card from your graveyard to your hand, then do the same for Vampire, Dinosaur, and
+  // Merfolk.": one instruction for each type in turn, each card chosen as it's reached (rulings).
+  text = text.replace(/^Return an? ([A-Z][a-z]+) card from your graveyard to your hand, then do the same for ([A-Z][a-z]+), ([A-Z][a-z]+), and ([A-Z][a-z]+)\.$/, (_, a: string, b: string, c: string, d: string) => [a, b, c, d].map((t) => `Return ${/^[AEIOU]/.test(t) ? "an" : "a"} ${t} card from your graveyard to your hand.`).join(" "));
+  // Ballroom Brawlers: "~ and up to one other target creature you control both gain your choice of first strike or lifelink
+  // until end of turn": one choice, for both (as "gain").
+  text = text.replace(/^(~ and up to one other target creature you control) both gain your choice of /, "$1 gain your choice of ");
+  // Transcendent Archaic: "the number of colors of mana spent to cast this spell" in a permanent's enters trigger is the
+  // permanent's spell, as it was cast (CR 702.69a).
+  if (opts.selfEntered && !opts.spell) text = text.replace(/\bthe number of colors of mana spent to cast this spell\b/, "the number of colors of mana spent to cast ~");
+  // Disciple of Phenax: "target player reveals a number of cards from their hand equal to ... You choose one of them.
+  // That player discards that card." Cabal Interrogator: "... reveals X cards from their hand and you choose one of them.
+  // That player discards that card.": one instruction (spells.ts).
+  text = text.replace(/\b(reveals (?:X cards|a number of cards) from their hand(?: equal to [^.]+?)?)(?:\. You choose one of (?:them|those cards)| and you choose one of them)\. That player discards that card\./, "$1 and discards the one of them you choose.");
   // Ral's Staticaster: "~ gets +1/+0 for each card in your hand until end of turn": the usual order, counted as it
   // resolves (rulings).
   text = text.replace(/(^|\. )(~ gets [+-]\d+\/[+-]\d+) for each ([^.]+?) until end of turn\./, "$1$2 until end of turn for each $3.");
@@ -5546,6 +5563,37 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
       continue;
     }
+    // Blood Oath, Fertile Imagination: "Choose a card type. Target opponent reveals their hand. ~ deals 3 damage to that
+    // player for each card of the chosen type revealed this way.": the type chosen as it resolves (CR 608.2d), the cards of
+    // it in the hand just revealed (as Thought Hemorrhage). Kindred isn't offered (no kindred card is supported).
+    if (/^Choose a card type$/.test(s) && /^Target (?:player|opponent) reveals their hand\.?$/.test(sentences[si + 1] ?? "") && / for each card of the chosen type revealed this way\.?$/.test(sentences[si + 2] ?? "") && !effects.some((e) => e.type === "choose")) {
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) });
+      continue;
+    }
+    const perTypeRevealed = /^(.+) for each card of the chosen type revealed this way$/.exec(s);
+    if (perTypeRevealed) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal || prev.who.ref !== "target" || !effects.some((e) => e.type === "choose" && e.choice === "cardType")) return null;
+      const before = ctx.targets.length;
+      const fx = parseOne(`${perTypeRevealed[1]!} for each creature card in their hand`, ctx);
+      if (!fx?.length || ctx.targets.length !== before) return null;
+      // The placeholder's count, made the chosen type's: only a count of that player's hand.
+      let swapped = 0;
+      const swap = (v: unknown): unknown => {
+        if (Array.isArray(v)) return v.map(swap);
+        if (!v || typeof v !== "object") return v;
+        const o = v as Record<string, unknown>;
+        if (o.kind === "cardsInHand" && (o.filter as TargetSpec | undefined)?.text === "creature card" && JSON.stringify(o.who) === JSON.stringify(prev.who)) {
+          swapped++;
+          return { ...o, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" } };
+        }
+        return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, swap(x)]));
+      };
+      const out = swap(fx) as Effect[];
+      if (swapped !== 1) return null;
+      effects.push(...out);
+      continue;
+    }
     // Isperia the Inscrutable: "choose a card name. That player reveals their hand. If a card with the chosen name is revealed
     // this way, search ...": whether the hand just revealed holds one (nothing happens in between, rulings).
     const nameRevealed = /^If a card with the chosen name is revealed this way, (.+)$/.exec(s);
@@ -7650,6 +7698,31 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "opponent", text: "an opponent controls" };
       effects.push(...fx, { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: then });
       si++;
+      continue;
+    }
+    // Transcendent Archaic: "you may draw X cards, where X is .... If you draw one or more cards this way, discard two
+    // cards.": only if you drew (none drawn with X 0 or an empty library), part of the "you may".
+    const drewDiscard = /^If you draw one or more cards this way, discard (a card|two cards|three cards)$/.exec(s);
+    const mayDraw = effects[effects.length - 1];
+    if (drewDiscard && mayDraw?.type === "may" && !mayDraw.pay && mayDraw.effects.length === 1 && mayDraw.effects[0]!.type === "draw" && (mayDraw.effects[0] as { who: PlayerRef }).who.ref === "you") {
+      const n = drewDiscard[1] === "a card" ? 1 : num(drewDiscard[1]!.split(" ")[0]!);
+      mayDraw.effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "drawnThisWay" } }, min: 1 }, effects: [{ type: "discard", who: { ref: "you" }, n, random: false }] });
+      continue;
+    }
+    // Grisly Sigil: "Choose target creature or planeswalker. If it was dealt noncombat damage this turn, ~ deals 3 damage to
+    // it and you gain 3 life. Otherwise, ~ deals 1 damage to it and you gain 1 life.": checked as it resolves.
+    const hurtIf = /^Choose target [^.]+$/.test(s) ? /^If it was dealt noncombat damage this turn, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    const hurtElse = hurtIf && /^Otherwise, (.+?)\.?$/.exec(sentences[si + 2] ?? "");
+    if (hurtIf && hurtElse) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length || ctx.targets.length !== before + 1) return null;
+      const then = parseOne(capital(hurtIf[1]!), ctx);
+      const otherwise = parseOne(capital(hurtElse[1]!), ctx);
+      if (!then?.length || !otherwise?.length || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], dealtNoncombatDamageThisTurn: true, text: "dealt noncombat damage this turn" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: then, otherwise });
+      si += 2;
       continue;
     }
     // Sold Out: "Exile target creature. If it was dealt damage this turn, create a Clue token.": whether it was, checked
@@ -12857,6 +12930,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const sac = parseOne("Sacrifice ~", ctx);
       if (!sac) return null;
       effects.push({ type: "if", cond: { kind: "amountsCompare", a: { count: { kind: "counters", counter: "+1/+1", of: { ref: "subject" } } }, atLeast: num(ordeal[1]!) }, effects: sac });
+      continue;
+    }
+    // Stadium Vendors: "choose a player. That player adds two mana of any one color they choose.": any player, you too,
+    // chosen as it resolves (CR 608.2d); they add the mana and choose its color (CR 106.4, 608.2d).
+    if (/^[Cc]hoose a player$/.test(s) && /^That player adds two mana of any one color they choose\.?$/.test(sentences[si + 1] ?? "") && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined) {
+      const inner = parseOne("Add two mana of any one color", ctx);
+      const who: PlayerRef = { ref: "chosenPlayer", nth: 0 };
+      if (!inner?.length || !inner.every((e) => (e.type === "addMana" && !e.anyColors && !e.who) || (e.type === "choose" && e.choice === "color" && !e.who))) return null;
+      effects.push({ type: "choosePlayer", prompt: "to add two mana of any one color" }, ...inner.map((e) => ({ ...e, who }) as Effect));
+      si++;
       continue;
     }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.

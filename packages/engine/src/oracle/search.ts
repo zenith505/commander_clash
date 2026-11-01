@@ -149,6 +149,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { kind: "card", types: ["Land"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: phrase };
   }
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
+  // Tallowisp: "an Aura card with enchant creature" (TargetSpec.enchantCreature, as Rootwater Shaman's).
+  if (p === "Aura card with enchant creature") return { kind: "card", types: ["Enchantment"], notTypes: [], notColors: [], subtypes: ["Aura"], enchantCreature: true, text: p };
   // Call to the Kindred: "a creature card that shares a creature type with enchanted creature", bound as the look resolves.
   const kindred = /^(creature card) that shares a creature type with enchanted creature$/.exec(p);
   if (kindred) {

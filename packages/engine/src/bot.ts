@@ -401,6 +401,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     }
+    // Revealing cards from our hand for an opponent to choose one we discard (Disciple of Phenax): the cheapest ones.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.revealFor !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     // Revealing from the hand for a search for its name (Assembly Hall, Infernal Tutor): a card with another copy left in
     // our library first. Otherwise the costliest.
     // Vault 21: House Gambit: cards whose mana value others share, the biggest groups first.
@@ -3245,6 +3247,8 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
       const tokens = ok.filter((o) => o.isToken && worth(s, pid, o) <= 4).map((o) => o.id);
       return tokens.length ? tokens.slice(0, pend.count) : [...ok].sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 1).map((o) => o.id);
     }
+    // Rescuer Sphinx: a cheap nontoken permanent to cast again (a token would cease to exist, CR 111.8), or nothing.
+    if (devour?.bounce) return [...ok].filter((o) => !o.isToken && mv(s, o.id) <= 2).sort((a, b) => mv(s, a.id) - mv(s, b.id)).slice(0, 1).map((o) => o.id);
     const n = devour?.n;
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);

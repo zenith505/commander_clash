@@ -4635,7 +4635,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Scholar of Combustion: "You may cast that card until the end of your next turn": the same.
     const untilNext = /^Until the end of your next turn, you may (cast|play) that card( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(s.replace(/^You may (cast|play) that card until the end of your next turn$/, "Until the end of your next turn, you may $1 that card"));
-    const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn|for as long as you control ~)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
     const youCast = youCast0 && (youCast0[2] !== "this turn" || effects[effects.length - 1]?.type === "exile") && (youCast0[1] === "cast" || (youCast0[2] !== "this turn" && !youCast0[3] && effects[effects.length - 1]?.type === "exile")) ? youCast0 : null;
     // Mazzy, Truesword Paladin: "exile it. Until the end of your next turn, you may cast that card.": the card the Aura that
@@ -4651,9 +4651,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const thisTurn = youCast[2] === "this turn";
       const nextTurn = youCast[2] === "until the end of your next turn";
       const play = youCast[1] === "play";
+      // Victor Mancha, Runaway: "You may play it for as long as you control ~": a card from a graveyard, an ability's.
+      const whileYou = youCast[2] === "for as long as you control ~";
+      if (whileYou && (ctx.spell || youCast[3] || ctx.targets[prev.what.index]?.kind !== "card")) return null;
       const exileAfter = !play && sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into a graveyard, exile it instead";
       if ((thisTurn || nextTurn || play) && ctx.targets[prev.what.index]?.kind !== "card" && !(untilNext?.[2] && !play && ctx.targets[prev.what.index]?.kind === "object")) return null;
-      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(nextTurn ? { nextTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
+      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(whileYou ? { whileControlled: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(nextTurn ? { nextTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
       if (exileAfter) si++;
       continue;
     }

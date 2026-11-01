@@ -93,6 +93,7 @@ const block = (s: GameState, opp: PlayerId, blocks: { blocker: string; attacker:
   return s;
 };
 
+// (helpers above)
 const attach = (s: GameState, pid: PlayerId, def: CardDef, to: string) => {
   const id = putOnBattlefield(s, pid, def);
   s.objects[id]!.attachedTo = to;
@@ -123,11 +124,15 @@ const murder = (): CardDef => ({"oracleId":"938b4e2c-88d9-4637-bc00-e228920c9a78
 const spiritOfTheLabyrinth = (): CardDef => ({"oracleId":"1463795b-ec0c-44d6-ae1a-55f78d9843ec","name":"Spirit of the Labyrinth","manaCost":"{1}{W}","cmc":2,"typeLine":"Enchantment Creature — Spirit","supertypes":[],"types":["Enchantment","Creature"],"subtypes":["Spirit"],"oracleText":"Each player can't draw more than one card each turn.","power":"3","toughness":"1","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/f/4/f44e5128-e146-4e46-b313-a40d82719d1d.jpg?1783939575","artUrl":"https://cards.scryfall.io/art_crop/front/f/4/f44e5128-e146-4e46-b313-a40d82719d1d.jpg?1783939575","layout":"normal"});
 const forest = (): CardDef => ({"oracleId":"b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6","name":"Forest","manaCost":"","cmc":0,"typeLine":"Basic Land — Forest","supertypes":["Basic"],"types":["Land"],"subtypes":["Forest"],"oracleText":"({T}: Add {G}.)","colors":[],"colorIdentity":["G"],"keywords":[],"producedMana":["G"],"imageUrl":"https://cards.scryfall.io/normal/front/4/f/4fae200d-5757-4924-8cf4-ab2a5ef2ccc0.jpg?1785981689","artUrl":"https://cards.scryfall.io/art_crop/front/4/f/4fae200d-5757-4924-8cf4-ab2a5ef2ccc0.jpg?1785981689","layout":"normal"});
 
+const xenicPoltergeist = (): CardDef => ({"oracleId":"fb8f80cc-6214-4ab9-a9a9-1873ab9feb0c","name":"Xenic Poltergeist","manaCost":"{1}{B}{B}","cmc":3,"typeLine":"Creature — Spirit","supertypes":[],"types":["Creature"],"subtypes":["Spirit"],"oracleText":"{T}: Until your next upkeep, target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value.","power":"1","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/1/5149ffff-d38f-458e-bcfa-a4b6b332a0b4.jpg?1783948370","artUrl":"https://cards.scryfall.io/art_crop/front/5/1/5149ffff-d38f-458e-bcfa-a4b6b332a0b4.jpg?1783948370","layout":"normal"});
+const victorManchaRunaway = (): CardDef => ({"oracleId":"606a83ae-c774-4abc-ba30-c113cbd1c05b","name":"Victor Mancha, Runaway","manaCost":"{5}","cmc":5,"typeLine":"Legendary Artifact Creature — Human Hero","supertypes":["Legendary"],"types":["Artifact","Creature"],"subtypes":["Human","Hero"],"oracleText":"When Victor Mancha enters, exile target card from your graveyard. You may play it for as long as you control Victor Mancha.","power":"4","toughness":"4","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/d/4d9bc6d6-fada-41f9-8a85-483e8806bb4b.jpg?1783903092","artUrl":"https://cards.scryfall.io/art_crop/front/4/d/4d9bc6d6-fada-41f9-8a85-483e8806bb4b.jpg?1783903092","layout":"normal"});
+const solRing = (): CardDef => ({"oracleId":"6ad8011d-3471-4369-9d68-b264cc027487","name":"Sol Ring","manaCost":"{1}","cmc":1,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{T}: Add {C}{C}.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/8/e/8ee443cc-e17a-493b-9c93-1f9e141a30e4.jpg?1789644446","artUrl":"https://cards.scryfall.io/art_crop/front/8/e/8ee443cc-e17a-493b-9c93-1f9e141a30e4.jpg?1789644446","layout":"normal"});
+const mindStone = (): CardDef => ({"oracleId":"c97361b5-af16-4a7b-af85-a429dbaf4ad2","name":"Mind Stone","manaCost":"{2}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/7/f/7fdef0b6-a3b9-4752-bce6-53c0140a1693.jpg?1783906237","artUrl":"https://cards.scryfall.io/art_crop/front/7/f/7fdef0b6-a3b9-4752-bce6-53c0140a1693.jpg?1783906237","layout":"normal"});
 const bears = (): CardDef => ({"oracleId":"14c8f55d-d177-4c25-a931-ebeb9e6062a0","name":"Grizzly Bears","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Bear","supertypes":[],"types":["Creature"],"subtypes":["Bear"],"oracleText":"","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","artUrl":"https://cards.scryfall.io/art_crop/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","layout":"normal"});
 
 describe("Lane B round 78", () => {
   it("all of them are supported", () => {
-    supported(regentsAuthority(), earthRumbleWrestlers(), pharikasSpawn(), graspingGiant(), tolarianEntrancer(), hezrou(), hellcatUndyingVigilante(), otherworldlyEscort(), sereneRemembrance(), plagueBoiler(), armamentOfNyx(), charisma(), rootwaterThief());
+    supported(regentsAuthority(), earthRumbleWrestlers(), pharikasSpawn(), graspingGiant(), tolarianEntrancer(), hezrou(), hellcatUndyingVigilante(), otherworldlyEscort(), sereneRemembrance(), plagueBoiler(), armamentOfNyx(), charisma(), rootwaterThief(), xenicPoltergeist(), victorManchaRunaway());
   });
 
   it("Regent's Authority: +2/+2, or a +1/+1 counter and +1/+1 on an enchantment creature or a legendary creature (only one counter if both)", () => {
@@ -395,5 +400,43 @@ describe("Lane B round 78", () => {
     expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
     s = settle(act(s, { type: "searchLibrary", player: ap, found: [wanted] }));
     expect(zone(s, wanted)).toBe("exile");
+  });
+
+  it("Xenic Poltergeist: a noncreature artifact is an artifact creature with P/T equal to its mana value until your next upkeep", () => {
+    const { s: s0, ap } = setup([]);
+    const pg = putOnBattlefield(s0, ap, xenicPoltergeist());
+    const stone = putOnBattlefield(s0, ap, mindStone());
+    const i = abilitiesOf(s0, s0.objects[pg]!).activated.findIndex((a) => /Until your next upkeep/.test(a.body.text));
+    // A creature artifact isn't a legal target.
+    expect(planActivate(s0, ap, pg, i, [tgt(pg)])).toBeNull();
+    let s = settle(run(s0, planActivate(s0, ap, pg, i, [tgt(stone)])));
+    expect(characteristics(s, s.objects[stone]!).types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    expect(pt(s, stone)).toBe("2/2");
+    // Through the other players' turns, until your next upkeep begins (rulings).
+    s = goUntil(s, (x) => x.activePlayer !== ap && x.step === "main1");
+    expect(characteristics(s, s.objects[stone]!).types).toContain("Creature");
+    s = goUntil(s, (x) => x.activePlayer === ap && x.step === "upkeep");
+    expect(characteristics(s, s.objects[stone]!).types).not.toContain("Creature");
+  });
+
+  it("Victor Mancha, Runaway: exile a card from your graveyard; you may play it for as long as you control Victor Mancha", () => {
+    const { s: s0, ap, ids } = setup([victorManchaRunaway()]);
+    const ring = toZone(s0, ap, solRing(), "graveyard");
+    let s = settle(castNow(s0, ap, ids[0]!), { targets: [[tgt(ring)]] });
+    expect(zone(s, ring)).toBe("exile");
+    s = settle(castNow(s, ap, ring));
+    expect(zone(s, ring)).toBe("battlefield");
+  });
+
+  it("Victor Mancha, Runaway: a land exiled this way can be played, but not once you no longer control it", () => {
+    const { s: s0, ap, ids } = setup([victorManchaRunaway()]);
+    const land = toZone(s0, ap, forest(), "graveyard");
+    let s = settle(castNow(s0, ap, ids[0]!), { targets: [[tgt(land)]] });
+    expect(zone(s, land)).toBe("exile");
+    const t = structuredClone(s);
+    destroyPermanent(t, t.objects[ids[0]!]!, "test");
+    expect(() => act(t, { type: "playLand", player: ap, objectId: land })).toThrow();
+    s = act(s, { type: "playLand", player: ap, objectId: land });
+    expect(zone(s, land)).toBe("battlefield");
   });
 });

@@ -1467,10 +1467,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
   // Creator): the same as with the duration after it.
   // Hydro-Man, Fluid Felon: "Until your next turn, ~ becomes a land and gains "{T}: Add {U}."": itself.
-  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+  // Xenic Poltergeist: "Until your next upkeep, target noncreature artifact becomes ...": over as your next upkeep begins
+  // (rulings).
+  if ((m = /^Until (end of turn|your next turn|your next upkeep), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     const mods = what && parseChanges(m[3]!);
-    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : m[1] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
   // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.

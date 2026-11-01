@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
-import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
+import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
@@ -488,6 +488,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.selfCounter) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "counters", what: { ref: "self" }, counter: e.selfCounter, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Put ${sc.n} ${e.selfCounter} counter${sc.n === 1 ? "" : "s"} on ~ to keep it (cumulative upkeep)`, keep: true }, ctx);
       if (e.drawCost) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "draw", who: { ref: "you" }, n: sc.n } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Draw ${sc.n === 1 ? "a card" : `${sc.n} cards`} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
       if (e.addMana) return runEffect(s, { type: "may", effects: [...(sc.n ? [{ type: "addMana", mana: e.addMana.repeat(sc.n) } as Effect] : []), paid], otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Add ${e.addMana.repeat(sc.n)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      // Phyrexian Soulgorger: that many different creatures, chosen and sacrificed as it resolves, or ~ is sacrificed; none
+      // to sacrifice for no age counters (rulings).
+      if (e.sacrificeCost) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        return runEffect(s, { type: "punisher", who: { ref: "you" }, options: [{ sacrifice: e.sacrificeCost, n: sc.n }], mode: "ifNone", effects: [{ type: "sacrifice", what: { ref: "self" } }], otherwise: [paid], thenText: "sacrifice ~ (cumulative upkeep)" }, ctx);
+      }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
@@ -613,6 +619,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
               if (c.controlledByEventPlayer) return ctx.event?.player !== undefined && controllerOf(s, o) === ctx.event.player;
               return c.controlledByTarget !== undefined ? t?.kind === "player" && controllerOf(s, o) === t.id : !c.yours || controllerOf(s, o) === ctx.controller;
             })
+          : e.cond.kind === "lifeAtLeastNoted"
+          ? ((o) => o?.notedLife !== undefined && player(s, ctx.controller).life >= o.notedLife)(ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined)
           : e.cond.kind === "libraryHas"
           ? player(s, ctx.controller).library.length >= e.cond.n
           : e.cond.kind === "resolvedNth"
@@ -1028,7 +1036,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
     // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).
     if (e.type === "gainLife" && e.who.ref === "you" && (!canGainLife(s, ctx.controller) || amountNow(s, e.n, ctx) <= 0)) return false;
-    if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
+    // Sigarda, Host of Herons: an opponent's spell or ability can't give its controller the option (rulings).
+    if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => (e.byController || controllerOf(s, o) === ctx.controller) && canBeSacrificed(s, o))) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
@@ -1125,7 +1134,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
             const penalty = e.mode ? "Don't" : describePenalty(s, e, ctx);
             const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
             const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
-            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
+            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.who.ref === "you" ? (e.mode === "ifAny" ? "If you do" : "If you don't") : e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
             s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt };
             return "paused";
           }

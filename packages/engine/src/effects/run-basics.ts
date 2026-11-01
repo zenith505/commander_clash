@@ -702,6 +702,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
       return;
     }
+    case "noteLife": {
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      o.notedLife = player(s, ctx.controller).life;
+      log(s, `${src} notes ${player(s, ctx.controller).name}'s life total: ${o.notedLife}.`);
+      return;
+    }
     case "gainLife":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, { ...ctx, eachOne: pid });

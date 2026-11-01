@@ -721,6 +721,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
       fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
     }
+    // Fire Lord Zuko: "whenever a permanent you control enters from exile"; The Lost and the Damned: "whenever a land you
+    // control enters from anywhere other than your hand" (not from its controller's own hand, CR 603.6a). The same ability
+    // as its cast trigger, one trigger for this event.
+    const fromExile = !!entering.enteredFromExile;
+    const notFromHand = objIsType(s, entering, "Land") && !(entering.enteredFromHand && entering.owner === you);
+    if (fromExile || notFromHand)
+      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "castSpell" && ((!!t.cast?.orPermanentEntersFromExile && fromExile) || (!!t.cast?.orLandEntersNotFromHand && notFromHand)));
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
     const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, ctrl)), undefined, undefined, entering);
@@ -1243,9 +1250,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
       // The final chapter ability: the greatest chapter number among the Saga's chapter abilities (rulings on Narci).
       const last = Math.max(0, ...abilitiesOf(s, o).triggers.map((t) => (t.event === "chapter" ? (t.chapter ?? 0) : 0)));
+      let finalTriggered = false;
       for (const t of s.triggerQueue.slice(from)) {
         t.chapter = true;
-        if (triggerOf(s, t)?.chapter === last) t.finalChapter = defMv(defOf(s, o));
+        if (triggerOf(s, t)?.chapter === last) {
+          t.finalChapter = defMv(defOf(s, o));
+          finalTriggered = true;
+        }
+      }
+      // Historian's Boon: "whenever the final chapter ability of a Saga you control triggers".
+      if (finalTriggered) {
+        const you = controllerOf(s, o);
+        for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "youFinalChapterTriggers");
       }
     }
     for (const id of s.battlefield) {

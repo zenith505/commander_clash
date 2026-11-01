@@ -585,7 +585,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // nothing else named before it, "it" is the permanent whose ability this is.
     .replace(/^It (?=(?:gets|gains) [^.]*until end of turn\.$)/, returnsSelf || inYard || fromHand ? "It " : "~ ")
     // Blademane Baku: "For each counter removed, ~ gets +2/+0 until end of turn" after "Remove X ki counters from ~".
-    .replace(/^For each counter removed, (~ gets [+-]\d+\/[+-]\d+ until end of turn)\.$/, removeCounters?.x ? "$1 for each counter removed this way." : "$&").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ ").replace(/^(Untap ~\. Put an? [^.]+ counter on) it\.$/, "$1 ~."), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
+    .replace(/^For each counter removed, (~ gets [+-]\d+\/[+-]\d+ until end of turn)\.$/, removeCounters?.x ? "$1 for each counter removed this way." : "$&").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ ").replace(/^(Untap ~\. Put an? [^.]+ counter on) it\.$/, "$1 ~."), { activated: true, ...(removeCounters?.x ? { ownX: true } : {}), ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   if (uncopyable) body.uncopyable = true;
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana

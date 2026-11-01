@@ -518,7 +518,23 @@ function artifactAbilityKind(s: GameState, action: Action): { artifact: boolean;
  */
 export function cloneState(state: GameState): GameState {
   const { cards, log: entries, ...rest } = state;
-  return { ...structuredClone(rest), cards, log: [...entries] };
+  return { ...(copyJson(rest) as typeof rest), cards, log: [...entries] };
+}
+
+/**
+ * A deep copy of plain JSON data (the state is plain JSON: no Maps, Sets, Dates or shared references to keep). It's
+ * about twice as fast as structuredClone, and every action copies the whole state.
+ */
+function copyJson(v: unknown): unknown {
+  if (typeof v !== "object" || v === null) return v;
+  if (Array.isArray(v)) {
+    const out = new Array(v.length);
+    for (let i = 0; i < v.length; i++) out[i] = copyJson(v[i]);
+    return out;
+  }
+  const out: Record<string, unknown> = {};
+  for (const k in v as Record<string, unknown>) out[k] = copyJson((v as Record<string, unknown>)[k]);
+  return out;
 }
 
 // ---------------------------------------------------------------------------

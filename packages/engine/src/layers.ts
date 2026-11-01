@@ -1983,33 +1983,71 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
 // Cache. Computing every permanent at once is needed (effects look at each other), so the
 // result is cached per state and thrown away whenever something that matters changes.
 
-const cache = new WeakMap<GameState, { map: CharMap; sig?: string; grants: OffFieldGrant[] }>();
+type CountSig = (string | number | boolean | undefined)[];
+const cache = new WeakMap<GameState, { map: CharMap; sig?: CountSig; grants: OffFieldGrant[] }>();
 let cacheEnabled = true;
 
 /**
  * Static abilities that count things ("+1/+1 for each card in your hand", Death's Shadow's life
  * total) can change without anything that invalidates the cache happening: a draw, a life change,
  * tapping. When the cached result used such a count, it's only good while these stay the same.
+ * `countSignature` records them; `sameCounts` compares them with a recorded signature in the same order, stopping at
+ * the first difference and building nothing: it runs on every characteristics() read while such a static is around,
+ * hundreds of thousands of times a game. The two must read the same things in the same order.
  */
-function countSignature(s: GameState): string {
-  const parts: string[] = [];
+function countSignature(s: GameState): CountSig {
+  const sig: CountSig = [];
   for (const pid of s.turnOrder) {
     const p = s.players[pid]!;
     // The mana pool too, for "for each unspent green mana you have" (Omnath, Locus of Mana).
     // The top card of the library too, for "as long as the top card of your library is black" (Vampire Nocturnus).
     // The exile too, for "instant and sorcery cards you own in exile" (Crackling Drake).
-    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.library[0] ?? ""},${p.graveyard.length},${p.exile.length},${Object.values(p.manaPool).join(".")}`);
+    sig.push(p.life, p.hand.length, p.library.length, p.library[0], p.graveyard.length, p.exile.length);
+    const pool = p.manaPool as Record<string, number | undefined>;
+    let keys = 0;
+    for (const k in pool) {
+      keys++;
+      sig.push(pool[k]);
+    }
+    sig.push(keys);
   }
+  sig.push(s.battlefield.length);
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
-    // Enchanted, equipped and modified creatures (TargetSpec.status): what's attached to what, and counters.
-    if (o.attachedTo) parts.push(`${id}@${o.attachedTo}`);
-    const n = Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0);
-    if (n) parts.push(`${id}#${n}`);
+    // Tapped, attacking and blocking; enchanted, equipped and modified creatures (TargetSpec.status): what's attached
+    // to what, and counters.
+    let n = 0;
+    for (const k in o.counters) n += o.counters[k] ?? 0;
+    sig.push(id, !!o.tapped, o.attacking !== undefined, !!o.blocking, o.attachedTo, n);
   }
-  parts.push(`${s.activePlayer}`, `${s.turn}`); // and "this turn" conditions start over each turn
-  return parts.join("|");
+  sig.push(s.activePlayer, s.turn); // and "this turn" conditions start over each turn
+  return sig;
+}
+
+function sameCounts(s: GameState, sig: CountSig): boolean {
+  let i = 0;
+  for (const pid of s.turnOrder) {
+    const p = s.players[pid]!;
+    if (sig[i] !== p.life || sig[i + 1] !== p.hand.length || sig[i + 2] !== p.library.length || sig[i + 3] !== p.library[0] || sig[i + 4] !== p.graveyard.length || sig[i + 5] !== p.exile.length) return false;
+    i += 6;
+    const pool = p.manaPool as Record<string, number | undefined>;
+    let keys = 0;
+    for (const k in pool) {
+      keys++;
+      if (sig[i++] !== pool[k]) return false;
+    }
+    if (sig[i++] !== keys) return false;
+  }
+  if (sig[i++] !== s.battlefield.length) return false;
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (sig[i] !== id || sig[i + 1] !== !!o.tapped || sig[i + 2] !== (o.attacking !== undefined) || sig[i + 3] !== !!o.blocking || sig[i + 4] !== o.attachedTo) return false;
+    let n = 0;
+    for (const k in o.counters) n += o.counters[k] ?? 0;
+    if (sig[i + 5] !== n) return false;
+    i += 6;
+  }
+  return sig[i] === s.activePlayer && sig[i + 1] === s.turn && i + 2 === sig.length;
 }
 
 const isCounted = (a: Amount) => typeof a !== "number";
@@ -2048,7 +2086,7 @@ export function invalidateCharacteristics(s: GameState) {
 export function characteristics(s: GameState, o: GameObject): Characteristics {
   if (o.zone !== "battlefield") return withCounters(o, printed(s, o));
   let hit = cacheEnabled ? cache.get(s) : undefined;
-  if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
+  if (hit?.sig !== undefined && !sameCounts(s, hit.sig)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
     const counted = { yes: false };
     const grants: OffFieldGrant[] = [];

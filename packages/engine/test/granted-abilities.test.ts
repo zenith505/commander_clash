@@ -46,8 +46,9 @@ const kill = card("Kill Test", "Instant", "{B}", { oracleText: "Destroy target c
 describe("granted abilities", () => {
   it("compiles keywords and quoted abilities after has, have and gains", () => {
     supported(study, rite, rebirth, end, kitesail, slinger);
-    // The granting card's own name in the quote is that card (CR 201.5a), not the creature: not modeled.
-    unsupported(card("Dagger Test", "Artifact — Equipment", "{1}", { oracleText: 'Equipped creature has "Whenever this creature attacks, you may sacrifice Dagger Test."\nEquip {1}' }));
+    // The granting card's own name in the quote is that card (CR 201.5a), not the creature: bound to it as the ability
+    // is granted (Lane B round B74, laneb-round74.test.ts).
+    supported(card("Dagger Test", "Artifact — Equipment", "{1}", { oracleText: 'Equipped creature has "Whenever this creature attacks, you may sacrifice Dagger Test."\nEquip {1}' }));
     // A static ability given away that takes abilities away would have to come out of the same layer calculation that
     // grants it (layer 6); ones that give keywords join layer 6 once granted (round148.test.ts), and ones whose effects
     // come in later layers work (background-grants.test.ts).

@@ -201,6 +201,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // An ability an Equipment gives that names it: "Blazing Torch deals 2 damage to any target" (Blazing Torch, Ninja's
+  // Kunai): the Equipment is the source, as it last existed if the cost sacrificed it (CR 608.2h; the creature isn't).
+  const sourceDeals = /^\u27easource\u27eb (deals \d+ damage to (?:any target|target [a-z ]+))$/.exec(s);
+  if (sourceDeals) {
+    const fx = parseSentence(`~ ${sourceDeals[1]}`, ctx);
+    return fx?.length === 1 && fx[0]!.type === "damage" && !fx[0]!.by && !fx[0]!.also ? [{ ...fx[0]!, by: { ref: "grantSource" } }] : null;
+  }
   // Form of the Dinosaur: "~ deals 15 damage to target creature an opponent controls and that creature deals damage equal to
   // its power to you": two damage events in order, the second from that creature, its power as it resolves; none from it
   // if it's an illegal target by then (rulings).
@@ -210,6 +217,15 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const a = ctx.lastObjectTarget;
     if (first?.length !== 1 || first[0]!.type !== "damage" || a === undefined || ctx.targets.length !== a + 1) return null;
     return [...first, { type: "damage", amount: { count: { kind: "power", of: { ref: "target", index: a } } }, to: { ref: "you" }, by: { target: a } }];
+  }
+  // Dwarven Catapult: "~ deals X damage divided evenly, rounded down, among all creatures target opponent controls": the
+  // same damage to each of them, X divided by how many there are as it resolves (rulings: none if there are more than X).
+  const evenly = /^~ deals X damage divided evenly, rounded down, among all creatures (target opponent) controls$/.exec(s);
+  if (evenly) {
+    const each = parseSentence(`~ deals X damage to each creature ${evenly[1]} controls`, ctx);
+    const e = each?.length === 1 ? each[0]! : undefined;
+    if (e?.type !== "damage" || e.to.ref !== "each" || e.to.of?.ref !== "target" || typeof e.amount !== "object" || e.amount.count.kind !== "x") return null;
+    return [{ ...e, amount: { ...e.amount, divBy: { kind: "permanents", filter: e.to.filter, whose: e.to.of } } }];
   }
   // Deep Spawn: "~ gains shroud until end of turn and doesn't untap during your next untap step": both, in order.
   const andNoUntap = /^(~ gains [a-z ]+ until end of turn) and (doesn't untap during your next untap step)$/.exec(s);

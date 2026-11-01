@@ -1,7 +1,7 @@
 # Roadmap
 
-28,882 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
+28,949 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -165,7 +165,7 @@ line blocks.
    cards a surveil kept on top), Mistbreath Elder (returning another creature with "if you do / otherwise"), Cult
    Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Verdeloth the
    Ancient ("other" applies to the Treefolk only), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
-   doesn't remove Auras"), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
+   doesn't remove Auras", done in round B71), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
    each of its colors), Welcome the Dead (cards put into your graveyard from your hand or library this turn), Konda's
    Banner (creatures that share a color or a creature type with the equipped creature), Fork and Evereth ("except that
    the copy is red"), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
@@ -324,7 +324,7 @@ line blocks.
    Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (returning as another type), Spellweaver
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
-   turn"), Foggy Swamp Visions, Gate to the Afterlife, Galloping
+   turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
    Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
@@ -1206,7 +1206,7 @@ line blocks.
    Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
    Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
-   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles); Ib Halfheart, Goblin Tactician
+   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
    (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
    Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
@@ -1519,7 +1519,7 @@ line blocks.
    own in exile" and "the rest on the bottom of your library in any order" after a chosen card type (Alrund, God of the
    Cosmos); "that opponent may pay {X}, where X is the number of cards in their hand. If they don't, they can't attack
    you this combat" (Champions of Minas Tirith: that combat phase only, not their planeswalkers, per the rulings). +13
-   (28,871 of 31,936).
+   (28,938 of 31,936 with B71-B74).
    Round 238 (top of the list, now done): "the Ring tempts you, then you put a +1/+1 counter on your Ring-bearer" after
    a will of the council vote (Galadriel, Elven-Queen: ObjRef ringBearer); "If you attacked this turn, you may have ~
    enter as a copy" (Protean Raider, entersAsCopy ifAttacked); "~ has dealt 3 or more damage this turn" and the −7's
@@ -1538,7 +1538,7 @@ line blocks.
    those cards that has the same mana value as another card revealed this way, create a Treasure" (Vault 21: House
    Gambit, Count revealedSharedMv); "Whenever players finish voting, each opponent who voted for a choice you voted for
    ... the number of opponents who voted for a choice you didn't vote for" (Erestor of the Council: trigger
-   playersFinishVoting, PlayerRef votedWithYou, Count opponentsVotedOtherwise). +11 (28,882 of 31,936).
+   playersFinishVoting, PlayerRef votedWithYou, Count opponentsVotedOtherwise). +11 (28,949 of 31,936 with B71-B74).
    Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
    Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
@@ -2279,7 +2279,7 @@ line blocks.
      asked "library too, or only the graveyard?" only when the graveyard has a card that fits, so searching nothing just
      to skip the shuffle isn't offered. "A card named A or B" works (Bogbrew Witch, Dragonstorm Forecaster): it splits
      only between names of two or more words, since a name may hold "or" (Fight or Flight). "A card named A and/or a card
-     named B" works for a library search (Alpine Houndmaster); Agency Outfitter ("graveyard, hand and/or library") is out.
+     named B" works for a library search (Alpine Houndmaster); Agency Outfitter ("graveyard, hand and/or library") is done in round B71.
    - "If X is N or more" works in a spell; still out: "instead" (Finale of Revelation), "destroy all other creatures"
      after making tokens (Martial Coup), Banefire, Finale of Eternity and Finale of Promise.
    - "You may cast target ... card from your graveyard without paying its mana cost" works (Torrential Gearhulk,
@@ -4098,7 +4098,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way"), Murktide Regent (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
-  Spinner, Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
+  Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
 - Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
   turn, create a 2/2 green Bear creature token (you gain 5 life) instead" (Words of Wilding, Words of Worship: one draw
@@ -4158,6 +4158,113 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   get +1/+0" (Triarch Stalker, Beckoning Will-o'-Wisp), "Each opponent exiles the top card of their library. Until end
   of turn, you may cast spells from among those cards by paying life equal to the spells' mana values" (Xander's
   Pact), "Exile the top card of target player's library". +12 (28,799 of 31,936 with rounds 230 to 232).
+- Round B71 (from EDHREC rank about 19,700 up, and a few more played cards the same templates cover): "Search your
+  graveyard, hand, and/or library for a card named Scion of Darkness and put it onto the battlefield. If you search your
+  library this way, shuffle." (Dark Supplicant, Gate to the Afterlife; Agency Outfitter's "a card named A and/or a card
+  named B ... put them": the library only if you choose, then a shuffle, rulings; "Graveyard and hand only" in the UI,
+  browser test), "Search your graveyard and/or library for a card named Arachnus Web and put it onto the battlefield
+  attached to target creature" (Arachnus Spinner: the Aura only onto that creature, if it can enchant it, CR 303.4f-g;
+  bots aim it at an opponent's creature), "Search your library and graveyard for a basic land card and a card named
+  Jiang Yanggu" (Journey for the Elixir, Nissa's Encouragement: up to one of each; a card named Forest only, rulings),
+  "Whenever an opponent shuffles their library" (Cosi's Trickster, Psychic Surgery: each time a library is shuffled, an
+  empty one too, twice for Green Sun's Zenith, but not cards put on the bottom in a random order, rulings, CR 701.24;
+  Psychic Surgery's look, exile one and the rest back in your order; browser test), "This effect doesn't remove this
+  Aura" after a pump (Tattoo Ward) and "doesn't remove Auras" (Spectra Ward: no Aura falls off for it, but one with
+  protection from its color from elsewhere does, White Ward staying, rulings, CR 702.16c), "if this artifact has a
+  charge counter on it, tap it and remove all charge counters from it. Add {C} for each charge counter removed this way"
+  (Ventifact Bottle), "creature or planeswalker an opponent controls that's red or white" and "deals damage equal to its
+  power to that permanent" (Flourishing Grapple: that permanent is the first target; it was read as the creature
+  dealing the damage), "a basic, Sphere, or Locus land card" and "Activate only if there are nine or more lands with
+  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,871 of 31,936
+  with rounds 230 to 236).
+- Round B72 (from EDHREC rank about 24,300 up to 13,300; every card left unread in that range that a "cards exiled
+  with ~" or "while it has a counter" template could cover): cards exiled with ~ (CR 607.2a): "Put a creature card
+  exiled with ~ onto the battlefield under your control. It gains haste until end of turn" (Yggdrasil, Rebirth Engine:
+  the cards both its exile abilities exiled), "Choose a card at random that was exiled with ~. Put that card into its
+  owner's hand" (Skyship Weatherlight), "Return up to X cards from among cards exiled with ~ to their owners' hands,
+  where X is the result" (Bag of Devouring: the die roll, picked as it resolves), "Cast any number of cards exiled with ~
+  without paying their mana costs" (Izzet Chemister), imprint "look at the top four cards of your library, exile one
+  face down, then put the rest on the bottom of your library in any order" (Clone Shell; browser test) and "turn the
+  exiled card face up. If it's a creature card, put it onto the battlefield" (Clone Shell, Summoner's Egg: otherwise it
+  stays exiled face up, rulings), "You may cast spells from among cards exiled with ~" (Rona, Disciple of Gix: spells
+  only, so not a land; not once Rona has left, rulings), "return all cards you own exiled with ~ to your hand" (Bottled
+  Cloister, as errata'd), "Put a card exiled with this Saga into its owner's hand" (Roads Go Ever, Ever On); counters:
+  "If you do, that creature has base power and toughness 3/1 and has flying for as long as it has a feather counter on
+  it" (Aven Mimeomancer, CR 611.2b), "For as long as that land has a blaze counter on it, it has ..." (Obsidian
+  Fireheart), "When that creature dies, if it has an egg counter on it, draw a card and create ..." (Xira, the Golden
+  Sting: a delayed trigger that outlives Xira, checked with the counters it died with, CR 603.4, 603.10a), rejection
+  counters and "for each opponent, choose up to one target creature they control with a rejection counter on it. That
+  creature's owner puts it on their choice of the top or bottom of their library" (Tolarian Contempt); "choose a
+  suspended card you own and remove that many time counters from it" (Amy Pond: picked as it resolves, the last counter
+  casts it, CR 702.62; browser test). Engine fix: a "top or bottom of their library" effect with several targets
+  looped forever (it moved the cards already put there again). +14 (28,885 of 31,936 with rounds 230 to 236).
+- Round B73 (from EDHREC rank about 27,700 up to 22,500; cards whose one blocking line a small template covers): "~ is every
+  creature type (even if this card isn't on the battlefield)" (Mistform Ultimus: a characteristic-defining ability like
+  changeling, in every zone, kept when it loses its abilities, CR 604.3, 613.3), "It gets -6/-0 instead as long as its
+  controller has seven or more cards in their graveyard" (So Tiny: the enchanted creature's controller), "that player
+  sacrifices that creature unless they pay {2}" at the upkeep of the enchanted creature's controller (Slow Motion: not
+  once someone else controls it, CR 701.21a), "Whenever enchanted land becomes tapped, ~ deals 2 damage to that land's
+  controller" (Psychic Venom), "if that player controls more lands than each other player, the player creates" (Greener
+  Pastures, checked again as it resolves, CR 603.4), "unless one of their opponents was dealt damage this turn"
+  (Antagonism: the end step's player, the whole turn looked back on), "if ~ is the only creature card in your graveyard,
+  you may return ~ to the battlefield" (Nether Spirit: two of them stop each other, rulings), "Choose three target
+  nonenchantment permanents. Destroy one of them at random." (Wild Swing: among the targets still legal as it resolves),
+  "X damage divided evenly, rounded down, among all creatures target opponent controls" (Dwarven Catapult: none if there
+  are more creatures than X), "target opponent gains control of all other permanents you control" (Sky Swallower),
+  "Enchanted land is the chosen type" (Convincing Mirage, Phantasmal Terrain: the basic land type chosen as the Aura
+  entered, in place of its land types and their abilities, CR 305.7; browser test), "Prevent all damage that would be
+  dealt to enchanted creature by sources of the chosen color" (Prismatic Ward; browser test), "Players (Your opponents)
+  can't cast spells with the same name as the exiled card" (Exclusion Ritual, Ixalan's Binding: the card the enters
+  ability exiled, while it stays exiled, CR 607.2a), "The owner of target spell or nonland permanent puts it on their
+  choice of the top or bottom of their library" (Sudden Setback: a spell leaves the stack without being countered),
+  "If it's (~ is) an Aura, enchanted creature gets ... instead" (Everflame Eidolon, Erebos's Emissary: bestowed, CR
+  702.103), "target permanent you own or control" (Telim'Tor's Edict). +19 (28,904 of 31,936 with rounds 230 to 236).
+- Round B74 (abilities an Equipment or Aura grants that name it, from the bottom of the list): quoted granted text
+  naming the Equipment or Aura now points at that object (bound as the ability is granted, so it follows the object even
+  if the creature changes, CR 113.7, 607.2): "Sacrifice Blazing Torch: Blazing Torch deals 2 damage to any target"
+  (Blazing Torch: the damage source is the Torch as it last existed, CR 608.2h; only its controller can sacrifice it,
+  CR 701.21a; browser test), Sunfire Torch, Ninja's Kunai, Deconstruction Hammer, Citizen's Crowbar, Spare Dagger,
+  Surestrike Trident and Rakdos Riteknife ("Sacrifice ~", "counters on ~"), "{T}, Unattach Leonin Bola: Tap target
+  creature" (Leonin Bola, Heartseeker, Trusty Boomerang, Razor Boomerang: unattaching only from that creature, CR
+  701.3d; Razor Boomerang's damage comes from the Boomerang; browser test), "Return Blinding Powder to its owner's
+  hand" (Blinding Powder), Trickster's Talisman, Archery Training; "can't attack (block) unless a creature with greater
+  power also attacks (blocks)" (Okk, CR 508.1c, 509.1b: a blocker declared earlier in the combat counts), "each player
+  who didn't discard a creature card this way loses 4 life" (Strongarm Tactics), "If it isn't a creature or Vehicle, it
+  becomes a 0/0 Construct" (Lifecraft Awakening), "Whenever a card is put into your graveyard from your library"
+  (Pedantic Learning), "Whenever a permanent is returned to your hand" (Azorius Aethermage, tokens included), "Whenever
+  a permanent is returned to a player's hand, that player ..." (Warped Devotion: its owner). +21 (28,925 of
+  31,936 with rounds 230 to 236 and B71 to B73). Also faster: the characteristics cache's count check (it
+  was rebuilt as a string on every read) and the state copy, which took the slow Cocoon test from about 5 s to 1 s.
+- Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
+  removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
+  as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
+  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend and
+  The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
+  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (Lane A's round 236, now
+  merged, changed the same keyword-binding code: next).
+- Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
+  payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land
+  types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight
+  counters).
+- Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 added escape until
+  end of turn, now in main, to build on), Kheru Mind-Eater (whoever controls it may look at and play the face-down card),
+  Lodestone Bauble (up to four basic land cards from one player's graveyard, the player chosen even with no target),
+  Gather Specimens (creatures entering under an opponent's control this turn, against other replacement effects),
+  Varchild's War-Riders (cumulative upkeep tokens each for a different opponent), Shaun & Rebecca, Agents (a reflexive
+  trigger inside a mana ability), Timecrafting (a permanent with time counters or a suspended card as one target),
+  Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (destroy the
+  creature when ~ leaves the battlefield or becomes untapped), Fortune's Favor (an opponent splits the cards into two
+  piles, face down), Templar Knight (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
+  linked yet; "choose a card exiled with ~, you may play it this turn"), Purgatory (pay {4} and 2 life at upkeep to
+  return a card exiled with it, the exile from a "put into your graveyard" trigger not linked yet).
+- Out after round B71 (looked at, not done): Say Its Name ("Exile this card and two other cards named ~ from your
+  graveyard" as a cost), Valleymaker ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
+  cost, which would use the stack here, see the mana abilities gap below), Sewers of Estark ("If it's blocking, prevent
+  all combat damage that would be dealt this combat by it and each creature it's blocking"), Benevolent Blessing (only
+  the Auras and Equipment you control already attached), Tunnel Vision (reveal until a named card, then the rest into the
+  graveyard and that card on top).
+- Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
+  Psychic Surgery or Cosi's Trickster watching.
 - Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
   stack), Munda, Ambush Leader (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
@@ -4179,20 +4286,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
-- Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 100
-  there are still unsupported and unlisted; `npm run popular -- --least`, minus the names
-  already in ROADMAP and HISTORY), then the lists below.
+- Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,
+  minus the names already in ROADMAP and HISTORY). After round B74 about 265 of those are ranked below 25,000 and about
+  440 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
+  replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
-  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
-  Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
-  Succession, The Rack, Infernal Tutor, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
-  Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
+  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
+  Succession, Drain Power, Volcano Hellion, Drain Life, Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
-  Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
-  Curse of Inertia, Dreamshaper Shaman, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's Sanction, Kathril,
-  Jump Scare, Feral Encounter, Gimli; then on up from 13,200.
+  Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia, Dreamshaper Shaman, Fishing Pole, Regna's Sanction,
+  Kathril, Feral Encounter; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 
@@ -4205,7 +4309,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
   Equip reductions "that target enchanted creature" (Strong Back).
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
-- Protection from a player; protection that doesn't remove other Auras (Spectra Ward, Benevolent Blessing).
+- Protection from a player; protection that doesn't remove other Auras (Benevolent Blessing; Spectra Ward done in round B71).
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).

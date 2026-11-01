@@ -24,8 +24,8 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CREATURE_TYPES, IDENTITY_PROTECTION, stripReminder, subtypeSet } from "./keywords";
-import { compileCard, compileGranted } from "./oracle";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
 export type Layer = "2" | "3" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
@@ -84,6 +84,9 @@ export interface PTPart {
   untilEndOfTurn: boolean;
 }
 
+/** Characteristics.sparedBy: protection from "This effect doesn't remove Auras" (Spectra Ward), sparing every Aura. */
+export const SPARES_AURAS = "*auras" as const;
+
 export interface Characteristics {
   name: string;
   supertypes: string[];
@@ -99,7 +102,7 @@ export interface Characteristics {
    * Keywords (lowercase) it has only from one effect that "doesn't remove" that effect's source (Cho-Manno's Blessing):
    * that protection doesn't make the source fall off (CR 702.16c), protection from anywhere else does.
    */
-  sparedBy?: Record<string, ObjectId>;
+  sparedBy?: Record<string, ObjectId | typeof SPARES_AURAS>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
   /** "Lose ... ward" (Shay Cormac): its ward abilities, printed or gained before, don't trigger; one gained later does (CR 613.7). */
@@ -163,7 +166,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -209,6 +212,10 @@ export interface Characteristics {
   attackWithOthers?: number;
   /** "... can't block unless at least two other creatures block": that many other blockers this combat. */
   blockWithOthers?: number;
+  /** Okk: "can't attack unless a creature with greater power also attacks": another attacker with greater power. */
+  attackWithGreater?: boolean;
+  /** Okk: "can't block unless a creature with greater power also blocks": another blocker this combat with greater power. */
+  blockWithGreater?: boolean;
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -670,13 +677,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "selfDamagedCreature":
       return !!s.turnLog?.damagedCreature?.includes(`${src.id}@${src.zoneChanges ?? 0}`);
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
-      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
+      // Nether Spirit: no other creature card there (rulings: two of them stop each other), as the cards are there.
+      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src)) && (!cond.onlyCreature || (defOf(s, src).types.includes("Creature") && !(s.players[you]?.graveyard ?? []).some((id) => id !== src.id && !!s.objects[id] && defOf(s, s.objects[id]!).types.includes("Creature"))));
     case "topCardIs": {
       const top = s.objects[s.players[you]?.library[0] ?? ""];
       return !!top && printedMatches(cond.filter, defOf(s, top));
     }
-    case "graveyardAtLeast": // threshold
-      return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
+    case "graveyardAtLeast": {
+      // threshold; So Tiny's "its controller", the controller of the creature it's attached to, as the layers so far have it
+      const who = cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? chars.get(src.attachedTo)!.controller : undefined) : you;
+      return who !== undefined && (s.players[who]?.graveyard.length ?? 0) >= cond.n;
+    }
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
       return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
     case "graveyardPermanents": // descend
@@ -956,6 +967,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you) && (!cond.yours || d.player === you));
     case "opponentLostLife":
       if (cond.damaged && cond.noncombat) return Object.entries(s.turnLog?.noncombatDamage ?? {}).some(([p, v]) => Number(p) !== you && v > 0);
+      if (cond.damaged && cond.of === "eventPlayer") return eventPlayer !== undefined && (s.damagedThisTurn ?? []).some((p) => p !== eventPlayer);
       if (cond.damaged) return (s.damagedThisTurn ?? []).some((p) => p !== you);
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
@@ -1252,6 +1264,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "renowned") return !!src.renowned; // CR 702.112b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
+      if (cond.is === "aura") return src.zone === "battlefield" && !!chars.get(src.id)?.subtypes.includes("Aura");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "attackedOrBlockedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0);
       if (cond.is === "attackedOrBlockedThisTurn") return src.declaredInCombat?.turn === s.turn;
@@ -1445,7 +1458,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // this early, layer 6 grants come later). Its basic land types give it their mana abilities (manaAbilitiesOn).
       // Card types and supertypes stay: a nonbasic land stays nonbasic, a land creature stays a creature.
       if (!c.types.includes("Land")) return;
-      c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes];
+      // Convincing Mirage's "the chosen type": the basic land type chosen as the source entered; none chosen, no change.
+      if (m.subtypes.includes(CHOSEN_LAND_TYPE)) {
+        const chosen = e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined;
+        if (!chosen) return;
+        c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes.map((st) => (st === CHOSEN_LAND_TYPE ? chosen : st))];
+      } else c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes];
       c.hasPrintedAbilities = false;
       c.keywords = [];
       c.sparedBy = undefined;
@@ -1487,8 +1505,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
-          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = e.sourceId;
-        } else if (c.sparedBy?.[key] !== undefined && !(m.spares && c.sparedBy[key] === e.sourceId)) delete c.sparedBy[key]; // it has it from elsewhere too
+          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = m.spares === "auras" ? SPARES_AURAS : e.sourceId;
+        } else if (c.sparedBy?.[key] !== undefined) {
+          // It has it from elsewhere too: an Aura is spared only if every effect giving it spares that Aura (White Ward
+          // and Spectra Ward: White Ward stays, Spectra Ward goes, rulings).
+          const was = c.sparedBy[key]!;
+          const now = m.spares && e.sourceId ? (m.spares === "auras" ? SPARES_AURAS : e.sourceId) : undefined;
+          const both = now === undefined ? undefined : was === now || now === SPARES_AURAS ? was : was === SPARES_AURAS ? now : undefined;
+          if (both === undefined) delete c.sparedBy[key];
+          else c.sparedBy[key] = both;
+        }
       }
       return;
     case "removeKeywords":
@@ -1525,7 +1551,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addAbility":
       if (/^ward\b/i.test(m.text)) delete c.wardLost;
-      c.grantedAbilities.push(m.text);
+      // An ability that names the permanent giving it ("Sacrifice Blazing Torch"): bound to that object (grants.ts).
+      c.grantedAbilities.push(m.text.includes(QUOTED_SOURCE_NAME) && e.sourceId && s.objects[e.sourceId] ? bindGrantSource(m.text, e.sourceId, s.objects[e.sourceId]!.zoneChanges ?? 0, e.sourceName) : m.text);
       (c.grantedAt ??= []).push(e.timestamp);
       return;
     case "definePT":
@@ -1666,7 +1693,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.untargetable = [...(c.untargetable ?? []), { ...m.by, of: e.controller ?? (e.sourceId ? chars.get(e.sourceId)?.controller : undefined) ?? c.controller }];
       return;
     case "preventDamage": {
-      const { kind: _, ...p } = m;
+      const { kind: _, fromChosenColor, ...p0 } = m;
+      // Prismatic Ward: the color its source's controller chose as it entered (CR 614.12).
+      const chosenCol = fromChosenColor && e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined;
+      const p = fromChosenColor ? { ...p0, fromColors: chosenCol ? [chosenCol] : [] } : p0;
       c.preventDamage = [...(c.preventDamage ?? []), p.plusOnes || p.reflect ? { ...p, you: controllerOfInst(e, chars), from: e.sourceId ?? "" } : p];
       return;
     }
@@ -1722,6 +1752,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBlockUnlessOthers":
       c.blockWithOthers = Math.max(c.blockWithOthers ?? 0, m.n);
+      return;
+    case "cantAttackUnlessGreater":
+      c.attackWithGreater = true;
+      return;
+    case "cantBlockUnlessGreater":
+      c.blockWithGreater = true;
       return;
     case "cantAttackUnlessMore":
       if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];
@@ -1958,33 +1994,71 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
 // Cache. Computing every permanent at once is needed (effects look at each other), so the
 // result is cached per state and thrown away whenever something that matters changes.
 
-const cache = new WeakMap<GameState, { map: CharMap; sig?: string; grants: OffFieldGrant[] }>();
+type CountSig = (string | number | boolean | undefined)[];
+const cache = new WeakMap<GameState, { map: CharMap; sig?: CountSig; grants: OffFieldGrant[] }>();
 let cacheEnabled = true;
 
 /**
  * Static abilities that count things ("+1/+1 for each card in your hand", Death's Shadow's life
  * total) can change without anything that invalidates the cache happening: a draw, a life change,
  * tapping. When the cached result used such a count, it's only good while these stay the same.
+ * `countSignature` records them; `sameCounts` compares them with a recorded signature in the same order, stopping at
+ * the first difference and building nothing: it runs on every characteristics() read while such a static is around,
+ * hundreds of thousands of times a game. The two must read the same things in the same order.
  */
-function countSignature(s: GameState): string {
-  const parts: string[] = [];
+function countSignature(s: GameState): CountSig {
+  const sig: CountSig = [];
   for (const pid of s.turnOrder) {
     const p = s.players[pid]!;
     // The mana pool too, for "for each unspent green mana you have" (Omnath, Locus of Mana).
     // The top card of the library too, for "as long as the top card of your library is black" (Vampire Nocturnus).
     // The exile too, for "instant and sorcery cards you own in exile" (Crackling Drake).
-    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.library[0] ?? ""},${p.graveyard.length},${p.exile.length},${Object.values(p.manaPool).join(".")}`);
+    sig.push(p.life, p.hand.length, p.library.length, p.library[0], p.graveyard.length, p.exile.length);
+    const pool = p.manaPool as Record<string, number | undefined>;
+    let keys = 0;
+    for (const k in pool) {
+      keys++;
+      sig.push(pool[k]);
+    }
+    sig.push(keys);
   }
+  sig.push(s.battlefield.length);
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
-    // Enchanted, equipped and modified creatures (TargetSpec.status): what's attached to what, and counters.
-    if (o.attachedTo) parts.push(`${id}@${o.attachedTo}`);
-    const n = Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0);
-    if (n) parts.push(`${id}#${n}`);
+    // Tapped, attacking and blocking; enchanted, equipped and modified creatures (TargetSpec.status): what's attached
+    // to what, and counters.
+    let n = 0;
+    for (const k in o.counters) n += o.counters[k] ?? 0;
+    sig.push(id, !!o.tapped, o.attacking !== undefined, !!o.blocking, o.attachedTo, n);
   }
-  parts.push(`${s.activePlayer}`, `${s.turn}`); // and "this turn" conditions start over each turn
-  return parts.join("|");
+  sig.push(s.activePlayer, s.turn); // and "this turn" conditions start over each turn
+  return sig;
+}
+
+function sameCounts(s: GameState, sig: CountSig): boolean {
+  let i = 0;
+  for (const pid of s.turnOrder) {
+    const p = s.players[pid]!;
+    if (sig[i] !== p.life || sig[i + 1] !== p.hand.length || sig[i + 2] !== p.library.length || sig[i + 3] !== p.library[0] || sig[i + 4] !== p.graveyard.length || sig[i + 5] !== p.exile.length) return false;
+    i += 6;
+    const pool = p.manaPool as Record<string, number | undefined>;
+    let keys = 0;
+    for (const k in pool) {
+      keys++;
+      if (sig[i++] !== pool[k]) return false;
+    }
+    if (sig[i++] !== keys) return false;
+  }
+  if (sig[i++] !== s.battlefield.length) return false;
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (sig[i] !== id || sig[i + 1] !== !!o.tapped || sig[i + 2] !== (o.attacking !== undefined) || sig[i + 3] !== !!o.blocking || sig[i + 4] !== o.attachedTo) return false;
+    let n = 0;
+    for (const k in o.counters) n += o.counters[k] ?? 0;
+    if (sig[i + 5] !== n) return false;
+    i += 6;
+  }
+  return sig[i] === s.activePlayer && sig[i + 1] === s.turn && i + 2 === sig.length;
 }
 
 const isCounted = (a: Amount) => typeof a !== "number";
@@ -2023,7 +2097,7 @@ export function invalidateCharacteristics(s: GameState) {
 export function characteristics(s: GameState, o: GameObject): Characteristics {
   if (o.zone !== "battlefield") return withCounters(o, printed(s, o));
   let hit = cacheEnabled ? cache.get(s) : undefined;
-  if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
+  if (hit?.sig !== undefined && !sameCounts(s, hit.sig)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
     const counted = { yes: false };
     const grants: OffFieldGrant[] = [];
@@ -2101,8 +2175,9 @@ function offFieldGrants(s: GameState): OffFieldGrant[] {
   return grants;
 }
 
-/** Changeling (CR 702.73a), unless an effect outside the battlefield set the card's creature types. */
-export const everyCreatureType = (d: CardDef): boolean => d.everyCreatureType ?? d.keywords.includes("Changeling");
+/** Changeling (CR 702.73a), or Mistform Ultimus's "~ is every creature type" (a characteristic-defining ability that works
+ * in every zone, CR 604.3, rulings), unless an effect outside the battlefield set the card's creature types. */
+export const everyCreatureType = (d: CardDef): boolean => d.everyCreatureType ?? (d.keywords.includes("Changeling") || isEveryCreatureTypeText(d));
 
 const typedDefs = new Map<string, CardDef>();
 

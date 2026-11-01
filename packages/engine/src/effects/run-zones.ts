@@ -1695,7 +1695,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (actor === undefined) return;
       const p = player(s, actor);
       const sc = (s.resolving!.scratch ??= {});
+      // Clone Shell: the card is exiled; the rest go on the bottom in the order the actor chooses.
+      if (sc.faceDownBottom) return toBottom(s, p.id, sc.faceDownBottom.filter((id) => obj(s, id).zone === "library"), src, false);
       let ids: ObjectId[];
+      let restBottom: ObjectId[] = [];
       if (e.from === "handCard") {
         if (!sc.faceDownPick) {
           if (!p.hand.length) return;
@@ -1729,11 +1732,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const looked = (sc.faceDownLooked ?? ids).filter((id) => obj(s, id).zone === "library");
           sc.faceDownLooked = undefined;
           const chosen = (sc.found ?? []).filter((id) => looked.includes(id));
-          for (const id of looked.filter((id) => !chosen.includes(id))) {
+          if (e.bottomAnyOrder) restBottom = looked.filter((id) => !chosen.includes(id));
+          else for (const id of looked.filter((id) => !chosen.includes(id))) {
             const owner = player(s, obj(s, id).owner);
             owner.library = [...owner.library.filter((x) => x !== id), id];
           }
-          if (looked.length > chosen.length) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
+          if (looked.length > chosen.length && !e.bottomAnyOrder) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
           ids = chosen;
         }
       }
@@ -1774,7 +1778,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const owners = [...new Set(done.map((id) => obj(s, id).owner))];
       const whose = owners.length === 1 && owners[0] === p.id ? "their" : owners.map((pid) => `${player(s, pid).name}'s`).join(" and ");
       log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? `from the top of ${whose} library` : "from their hand"} face down with ${src}${e.play ? `, and may ${e.play.castOnly ? "cast" : "play"} ${n === 1 ? "it" : "them"}` : ""}${e.foretold !== undefined ? `. ${n === 1 ? "It becomes" : "They become"} foretold` : ""}.`);
-      if ((e.look || e.play) && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
+      if ((e.look || e.play || e.pickOne) && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
+      if (restBottom.length) {
+        sc.faceDownBottom = restBottom;
+        return toBottom(s, p.id, restBottom, src, false);
+      }
       return;
     }
     case "moveLinked": {
@@ -1787,12 +1795,37 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
       let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
+      if (e.turnFaceUp)
+        for (const c of cards.filter((c) => c.hiddenExile)) {
+          // Clone Shell: turned face up for everyone to see (CR 406.3); a noncreature card stays exiled face up (rulings).
+          delete c.hiddenExile;
+          log(s, `${p.name} turns ${defOf(s, c).name} face up (${src}).`);
+        }
       if (e.filter) {
         // "With mana value X" (Ashiok, Nightmare Weaver): the X of its loyalty cost.
         const filter = bindBound(s, e.filter, amountCtx(s, ctx));
         cards = cards.filter((c) => printedMatches(filter, defOf(s, c)));
       }
-      if (e.one) {
+      if (e.one && e.random) {
+        // Skyship Weatherlight: one at random as it resolves.
+        if (!cards.length) return;
+        const pick = cards[Math.floor(nextRandom(s) * cards.length)]!;
+        log(s, `${src} chooses ${defOf(s, pick).name} at random.`);
+        cards = [pick];
+      } else if (e.upTo !== undefined) {
+        // Bag of Devouring: up to that many of them, chosen as it resolves.
+        if (!sc.linkedPick) {
+          const max = Math.min(cards.length, Math.max(0, amountNow(s, e.upTo, ctx)));
+          if (!max) return;
+          sc.linkedPick = true;
+          delete sc.found;
+          const ids = cards.map((c) => c.id);
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `up to ${max} card${max === 1 ? "" : "s"} exiled with ${src}`, cards: ids, min: 0, max, dig: { looked: ids, to: e.dest === "hand" ? "into their owners' hands" : e.dest === "battlefield" ? "onto the battlefield" : "into their owners' graveyards", rest: "stay exiled" } };
+          return "paused";
+        }
+        sc.linkedPick = undefined;
+        cards = cards.filter((c) => sc.found?.includes(c.id));
+      } else if (e.one) {
         if (!sc.linkedPick) {
           if (!cards.length) return;
           sc.linkedPick = true;
@@ -2347,6 +2380,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "destroyRandomTarget": {
+      // Wild Swing: chosen at random among the legal targets left, then destroyed at once (CR 701.8).
+      const left = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
+      if (!left.length) return;
+      const o = left[Math.floor(nextRandom(s) * left.length)]!;
+      const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
+      if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}, chosen at random.`, false, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
+      return;
+    }
     case "randomFromGraveyard": {
       const from = e.from ? players(s, e.from, ctx)[0] : ctx.controller;
       if (from === undefined) return;
@@ -2741,7 +2783,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Owners choosing for several objects (Aetherspouts): the active player makes all of their choices first, then each
       // other player in turn order (rulings, CR 101.4).
       const order = e.position === "ownersChoice" ? apnap(s, s.turnOrder) : [];
-      const todo = [...objects(s, e.what, ctx)];
+      // Back after an owner's choice: those already put there are done (Tolarian Contempt's several targets).
+      const todo = objects(s, e.what, ctx).filter((o) => o.zone !== "library");
       if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
       const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
       for (const o of todo) {

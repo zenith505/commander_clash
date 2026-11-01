@@ -282,6 +282,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
+  // Plague Boiler: "Put a plague counter on ~ or remove a plague counter from it": one or the other, chosen as it resolves,
+  // removing only with one there to remove (rulings, CR 608.2d).
+  if ((m = /^Put an? ([a-z]+) counter on ~ or remove an? ([a-z]+) counter from (?:it|~)$/.exec(s)) && m[1] === m[2] && !ctx.spell) {
+    const k = m[1]!;
+    return [{ type: "either", options: [[{ type: "counters", what: { ref: "self" }, counter: k, n: 1 }], [{ type: "removeCounters", what: { ref: "self" }, counter: k, n: 1 }]], labels: [`Put a ${k} counter on ~`, `Remove a ${k} counter from ~`], onlyDoable: true }];
+  }
   // Telekinetic Bonds: "If you do, you may tap or untap target permanent": tap, untap or neither, as one question.
   if ((m = /^You may tap or untap (target permanent)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

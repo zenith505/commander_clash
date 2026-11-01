@@ -4723,6 +4723,19 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Armament of Nyx: "Enchanted creature has double strike as long as it's an enchantment. Otherwise, prevent all damage
+    // that would be dealt by enchanted creature.": one or the other by whether it's an enchantment now, checked
+    // continuously (rulings, CR 611.3a).
+    const nyx = /^Enchanted creature has ([a-z ]+) as long as it's an enchantment\. Otherwise, prevent all damage that would be dealt by enchanted creature\.$/.exec(line);
+    if (nyx) {
+      const [a, b] = [parseStatic(`Enchanted creature has ${nyx[1]}.`), parseStatic("Prevent all damage that would be dealt by enchanted creature.")];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition && a.mods.every((m) => m.kind === "addKeywords")) {
+        const yes: TargetSpec = { kind: "object", types: ["Creature"], allTypes: ["Enchantment"], text: "enchantment creature" };
+        const no: TargetSpec = { kind: "object", types: ["Creature"], notTypes: ["Enchantment"], text: "nonenchantment creature" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
+        continue;
+      }
+    }
     // Mishra's Domination: "As long as you control enchanted creature, it gets +2/+2. Otherwise, it can't block.": who
     // controls it now, checked continuously (CR 611.3a); in a free-for-all game every other player is an opponent.
     const domination = /^As long as you control enchanted creature, it (gets [+-]\d+\/[+-]\d+)\. Otherwise, it (can't block|can't attack|can't attack or block)\.$/.exec(line);

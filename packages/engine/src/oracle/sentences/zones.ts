@@ -419,6 +419,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
   // libraries." (body.ts reads it as this): each card into its owner's library, each library shuffled once (rulings, CR
   // 701.24c).
+  // Serene Remembrance: "Shuffle ~ and up to three target cards from a single graveyard into their owners' libraries": the
+  // cards, then the spell itself (with no targets chosen, only the spell; with all of them illegal, it doesn't resolve,
+  // rulings, CR 608.2b).
+  if ((m = /^Shuffle ~ and (up to (?:two|three|four|five) target cards from a single graveyard) into their owners' libraries$/.exec(s)) && ctx.spell) {
+    const what = parseCardTarget(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }, { type: "shuffleSpell" }] : null;
+  }
   if ((m = /^Shuffle (up to (?:one|two|three|four|five)|any number of) target cards from graveyards into their owners' libraries$/.exec(s))) {
     const what = parseCardTarget(`${m[1]} target cards from graveyards`, ctx);
     return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }] : null;

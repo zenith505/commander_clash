@@ -1348,6 +1348,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Midnight Oil: "At the beginning of your draw step, draw an additional card and remove two hour counters from ~": two
   // instructions, in that order (CR 608.2c); counters are removed only as many as there are (rulings).
   text = text.replace(/^(draw an additional card) and (remove (?:a|an|one|two|three) [a-z]+ counters? from ~\.?)$/, (_, a: string, b: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}`);
+  // Rootwater Thief: "search that player's library for a card and exile it, then the player shuffles": the search shuffles
+  // the library it searched (CR 701.23a).
+  text = text.replace(/\b(search that player's library for an? (?:[a-z]+ )?card and exile it), then the player shuffles\./g, "$1.");
   // Sadistic Sacrament: "Search target player's library for up to three cards, exile them, then that player shuffles. If
   // ~ was kicked, instead search that player's library for up to fifteen cards, exile them, then that player shuffles.":
   // Denying Wind's search, for more cards when kicked (CR 702.33e).

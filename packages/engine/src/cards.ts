@@ -152,7 +152,9 @@ export const ownDefOf = (s: GameState, o: GameObject): CardDef => {
   if (!found) throw new Error(`missing card def ${key}`);
   // A card with faces has its resting characteristics unless a face is up (CR 709.4, 712.8a, 715.4).
   const d = restingDef(found);
-  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : o.cleaved ? cleavedDef(d) : o.mutating ? mutatingDef(d, o.owner) : d;
+  // A prototyped permanent that's a copy of something has the copied values (CR 707.2), prototyped ones only if the
+  // permanent it copies was prototyped (718.2a, 718.3d: then they're already in what it copies).
+  return o.bestowed ? bestowedDef(d) : o.prototyped && roomlessId(o) === ownId(o) ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : o.cleaved ? cleavedDef(d) : o.mutating ? mutatingDef(d, o.owner) : d;
 };
 
 const mutatingDefs = new Map<string, CardDef>();

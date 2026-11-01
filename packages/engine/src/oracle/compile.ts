@@ -2948,6 +2948,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${genericAlt[1]} spell` }))(spec), genericMv: true };
       continue;
     }
+    // Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast": an
+    // alternative cost (CR 118.9) of energy counters (CR 107.14), X at 0 in it (CR 107.3, 601.2b).
+    const energyAlt = new RegExp(`^You may pay ${NUM} \\{E\\} rather than pay the mana cost for permanent spells you cast\\.$`).exec(line);
+    if (energyAlt) {
+      const n = num(energyAlt[1]!);
+      const spec = parseTargetPhrase("permanent card from a graveyard");
+      if (!n || spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: "permanent spell" }))(spec), energy: n };
+      continue;
+    }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
     // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
     const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);

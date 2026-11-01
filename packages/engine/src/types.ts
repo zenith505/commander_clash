@@ -1688,7 +1688,7 @@ export interface GameState {
    */
   animated?: Record<string, { id: ObjectId; zc: number }>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
-  flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number } }[];
+  flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**

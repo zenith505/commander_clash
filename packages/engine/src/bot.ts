@@ -2297,7 +2297,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -3044,6 +3044,8 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const pick = spareCounterHost(s, pid, c, targeted);
       if (!pick) return null;
       out.counterOn = [pick];
+    } else if (c.kind === "payEnergy") {
+      if ((player(s, pid).energy ?? 0) < c.n) return null;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;

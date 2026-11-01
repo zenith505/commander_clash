@@ -1577,8 +1577,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         : e.what
           ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard")
           : [];
-      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(e.escape ? { escape: e.escape } : {}) });
-      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${e.escape.mana}, exile ${e.escape.exile} other cards from your graveyard)` : "flashback"} until end of turn.`);
+      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(e.escape ? { escape: e.escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${e.escape.mana}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
       return;
     }
     case "cipher":

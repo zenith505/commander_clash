@@ -446,6 +446,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter?.kind !== "card" || !parseManaCost(m[2]!).supported) return null;
     return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]} card in your graveyard` }, escape: { mana: m[2]!, exile: num(m[3]!) } }];
   }
+  // Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end
+  // of turn": the cards there now (CR 611.2c), each with a permission to cast it from there (game.ts grantedWays).
+  if ((m = /^([A-Z][a-z]+) cards in your graveyard gain "You may cast (?:~|this card) from your graveyard\.?" until end of turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]!.toLowerCase()} card from your graveyard`);
+    if (filter?.kind !== "card") return null;
+    return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]!.toLowerCase()} card in your graveyard` }, cast: true }];
+  }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
   if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {

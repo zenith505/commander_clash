@@ -3617,8 +3617,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
     // your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
-    // (Gwenom, Remorseless): Bolas's Citadel's permission for the rest of the turn (Effect topTurn).
-    const topTurn = /^[Uu]ntil end of turn, you may look at the top card of your library any time and (you may .+)$/.exec(s);
+    // (Gwenom, Remorseless): Bolas's Citadel's permission for the rest of the turn (Effect topTurn). The Belligerent: "...
+    // any time, and you may play lands and cast spells from the top of your library" (the same, with a comma).
+    const topTurn = /^[Uu]ntil end of turn, you may look at the top card of your library any time,? and (you may .+)$/.exec(s);
     if (topTurn) {
       const top = parseFromTop(topTurn[1]!);
       const life = sentences[si + 1] === "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost";

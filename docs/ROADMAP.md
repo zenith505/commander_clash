@@ -166,7 +166,7 @@ line blocks.
    cards a surveil kept on top), Mistbreath Elder (returning another creature with "if you do / otherwise"), Cult
    Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Verdeloth the
    Ancient ("other" applies to the Treefolk only), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
-   doesn't remove Auras"), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
+   doesn't remove Auras", done in round B71), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
    each of its colors), Welcome the Dead (cards put into your graveyard from your hand or library this turn), Konda's
    Banner (creatures that share a color or a creature type with the equipped creature), Fork and Evereth ("except that
    the copy is red"), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
@@ -325,7 +325,7 @@ line blocks.
    Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (returning as another type), Spellweaver
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
-   turn"), Foggy Swamp Visions, Gate to the Afterlife, Galloping
+   turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
    Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
@@ -1207,7 +1207,7 @@ line blocks.
    Stumpsquall Hydra (distribute counters among it and commanders); Cursecloth
    Wrappings (granted embalm with the card's own mana cost); Rift Elemental (remove a time counter from a permanent or
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
-   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles); Ib Halfheart, Goblin Tactician
+   Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
    (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
    Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
@@ -2118,7 +2118,7 @@ line blocks.
      asked "library too, or only the graveyard?" only when the graveyard has a card that fits, so searching nothing just
      to skip the shuffle isn't offered. "A card named A or B" works (Bogbrew Witch, Dragonstorm Forecaster): it splits
      only between names of two or more words, since a name may hold "or" (Fight or Flight). "A card named A and/or a card
-     named B" works for a library search (Alpine Houndmaster); Agency Outfitter ("graveyard, hand and/or library") is out.
+     named B" works for a library search (Alpine Houndmaster); Agency Outfitter ("graveyard, hand and/or library") is done in round B71.
    - "If X is N or more" works in a spell; still out: "instead" (Finale of Revelation), "destroy all other creatures"
      after making tokens (Martial Coup), Banefire, Finale of Eternity and Finale of Promise.
    - "You may cast target ... card from your graveyard without paying its mana cost" works (Torrential Gearhulk,
@@ -3937,7 +3937,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way"), Murktide Regent (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
-  Spinner, Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
+  Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
   granted abilities with their own costs).
 - Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
   turn, create a 2/2 green Bear creature token (you gain 5 life) instead" (Words of Wilding, Words of Worship: one draw
@@ -3997,6 +3997,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   get +1/+0" (Triarch Stalker, Beckoning Will-o'-Wisp), "Each opponent exiles the top card of their library. Until end
   of turn, you may cast spells from among those cards by paying life equal to the spells' mana values" (Xander's
   Pact), "Exile the top card of target player's library". +12 (28,786 of 31,936 with rounds 230 and 231).
+- Round B71 (from EDHREC rank about 19,700 up, and a few more played cards the same templates cover): "Search your
+  graveyard, hand, and/or library for a card named Scion of Darkness and put it onto the battlefield. If you search your
+  library this way, shuffle." (Dark Supplicant, Gate to the Afterlife; Agency Outfitter's "a card named A and/or a card
+  named B ... put them": the library only if you choose, then a shuffle, rulings; "Graveyard and hand only" in the UI,
+  browser test), "Search your graveyard and/or library for a card named Arachnus Web and put it onto the battlefield
+  attached to target creature" (Arachnus Spinner: the Aura only onto that creature, if it can enchant it, CR 303.4f-g;
+  bots aim it at an opponent's creature), "Search your library and graveyard for a basic land card and a card named
+  Jiang Yanggu" (Journey for the Elixir, Nissa's Encouragement: up to one of each; a card named Forest only, rulings),
+  "Whenever an opponent shuffles their library" (Cosi's Trickster, Psychic Surgery: each time a library is shuffled, an
+  empty one too, twice for Green Sun's Zenith, but not cards put on the bottom in a random order, rulings, CR 701.24;
+  Psychic Surgery's look, exile one and the rest back in your order; browser test), "This effect doesn't remove this
+  Aura" after a pump (Tattoo Ward) and "doesn't remove Auras" (Spectra Ward: no Aura falls off for it, but one with
+  protection from its color from elsewhere does, White Ward staying, rulings, CR 702.16c), "if this artifact has a
+  charge counter on it, tap it and remove all charge counters from it. Add {C} for each charge counter removed this way"
+  (Ventifact Bottle), "creature or planeswalker an opponent controls that's red or white" and "deals damage equal to its
+  power to that permanent" (Flourishing Grapple: that permanent is the first target; it was read as the creature
+  dealing the damage), "a basic, Sphere, or Locus land card" and "Activate only if there are nine or more lands with
+  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,799 of 31,936
+  with rounds 230 and 231).
+- Out after round B71 (looked at, not done): Say Its Name ("Exile this card and two other cards named ~ from your
+  graveyard" as a cost), Valleymaker ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
+  cost, which would use the stack here, see the mana abilities gap below), Sewers of Estark ("If it's blocking, prevent
+  all combat damage that would be dealt this combat by it and each creature it's blocking"), Benevolent Blessing (only
+  the Auras and Equipment you control already attached), Tunnel Vision (reveal until a named card, then the rest into the
+  graveyard and that card on top).
+- Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
+  Psychic Surgery or Cosi's Trickster watching.
 - Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (exiling a spell from the
   stack), Munda, Ambush Leader (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
@@ -4045,7 +4072,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
   Equip reductions "that target enchanted creature" (Strong Back).
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
-- Protection from a player; protection that doesn't remove other Auras (Spectra Ward, Benevolent Blessing).
+- Protection from a player; protection that doesn't remove other Auras (Benevolent Blessing; Spectra Ward done in round B71).
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).

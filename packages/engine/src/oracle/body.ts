@@ -8400,6 +8400,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = sentences.length;
       continue;
     }
+    // Ezio Auditore da Firenze: "you may pay {W}{U}{B}{R}{G} if that player has 10 or less life. When you do, that player
+    // loses the game": the trigger's player's life is checked as it resolves, and only then may you pay; the reflexive
+    // ability that paying triggers doesn't check it again (rulings).
+    const payIfLife = ctx.eventPlayer ? new RegExp(`^[Yy]ou may pay ((?:\\{[^}]+\\})+) if that player has ${NUM} or less life$`).exec(s) : null;
+    if (payIfLife) {
+      const pay = parsePayCost(payIfLife[1]!);
+      const when = /^When you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const reflexive = pay && when && reflexiveBody([when[1]!, ...sentences.slice(si + 2)].join(". "), ctx, false, false, false);
+      if (!reflexive) return null;
+      const life = parseCount("that player's life total", ctx);
+      if (!life) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: life, max: num(payIfLife[2]!) }, effects: [{ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay, text: `pay ${payIfLife[1]}. When you do, ${[when[1]!, ...sentences.slice(si + 2)].join(". ")}` }] });
+      si = sentences.length;
+      continue;
+    }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
     if (mayPay) {
       const pay = parsePayCost(mayPay[1]!);

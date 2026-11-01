@@ -5606,7 +5606,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
 /** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | /** Freerunning a permanent gives a spell (Ezio Auditore da Firenze: "Assassin spells you cast have freerunning {B}{B}"): a cost of its own beside the spell's own freerunning (CR 702.173a). */ "grantedFreerunning" | /** Web-slinging a permanent gives a spell (Amazing Spider-Man: "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}"), CR 702.188a, beside any of the spell's own. */ "grantedWebSlinging" | /** Blitz a permanent gives a spell (Henzie "Toolbox" Torre: "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost"), CR 702.152a, beside any blitz of the spell's own. */ "grantedBlitz" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -6442,6 +6442,14 @@ export interface CompiledCard {
   devotionBonus?: number;
   /** "Dinosaur spells you cast have prowl {2}{R}" (Hunting Velociraptor), CR 702.76a: that alternative cost, for those spells. */
   spellsHaveProwl?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Assassin spells you cast have freerunning {B}{B}" (Ezio Auditore da Firenze), CR 702.173a: that alternative cost, for those spells (AltCostKind "grantedFreerunning"). */
+  spellsHaveFreerunning?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}" (Amazing Spider-Man), CR 702.188a: that alternative cost, for those spells (AltCostKind "grantedWebSlinging"). */
+  spellsHaveWebSlinging?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost." (Henzie "Toolbox" Torre), CR 702.152a: blitz for those spells, its cost their mana cost (AltCostKind "grantedBlitz"). */
+  spellsHaveBlitz?: { filter: TargetSpec; text: string }[];
+  /** Henzie "Toolbox" Torre: "Blitz costs you pay cost {1} less for each time you've cast your commander from the command zone this game" (CR 601.2f): this much generic mana per such cast, off each blitz cost its controller pays. */
+  blitzLessPerCommanderCast?: number;
   /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
   handWarp?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian): miracle for those cards in its controller's hand (CR 702.94a), so drawing one as the first card drawn this turn triggers it. */

@@ -378,7 +378,11 @@ export function normalizeSelf(d: CardDef): string {
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
-  const short = ofThe ?? first ?? regnal ?? comma;
+  // "Ezio" for "Ezio Auditore da Firenze": a legendary card's longer name without a comma, by its first word, when its
+  // text uses that word alone (CR 201.5c).
+  const firstOfLong = comma === full && !ofThe && !first && !regnal && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+ [a-z]+ [A-Z][a-z]+$/.exec(full)?.[1] : undefined;
+  const firstUsed = firstOfLong && !CREATURE_TYPES.has(firstOfLong) && new RegExp(`(?<![\\p{L}])${esc(firstOfLong)} (?!${esc(full.slice(firstOfLong.length + 1))})`, "u").test(t) ? firstOfLong : undefined;
+  const short = ofThe ?? first ?? regnal ?? firstUsed ?? comma;
   // Galactus, Devourer of Worlds: "a creature named Silver Surfer, Galactus's Herald" is another card's name with the short
   // name in it.
   if (short && short !== full) t = t.replace(new RegExp(`(\\bnamed )([A-Z][\\w'-]*(?: [A-Z][\\w'-]*)*, ${esc(short)}'s [A-Z][\\w'-]*)`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
@@ -389,7 +393,7 @@ export function normalizeSelf(d: CardDef): string {
     const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an) )" : "";
     // Lizard, Connors's Curse: "becomes a green Lizard creature" is the creature type its short name also is (CR 205.3m).
     const shortTyped = CREATURE_TYPES.has(short) ? "(?! creatures?\\b)" : "";
-    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
+    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first || firstUsed ? "(?!'s [A-Z])" : ""}`, "gu");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -2025,6 +2029,32 @@ export function compile(d: CardDef): CompiledCard {
       (out.graveyardGrants ??= []).push({ filter: { ...f, text: permYard[2] ? `${permYard[2]} cards` : "cards" }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
+    // Noctis, Prince of Lucis: "You may cast artifact spells from your graveyard by paying 3 life in addition to paying
+    // their other costs. If you cast a spell this way, that artifact enters with a finality counter on it." Any number,
+    // paying all costs and following the timing rules (rulings), the artifact entering with the counter (CR 614.1c).
+    const lifeYard = /^You may cast ([a-z]+) spells from your graveyard by paying (\d+) life in addition to paying their other costs\. If you cast a spell this way, that \1 enters with an? ([a-z]+) counter on it\.$/.exec(line);
+    if (lifeYard) {
+      const f = parseTargetPhrase(`${lifeYard[1]} card from a graveyard`);
+      if (f?.kind !== "card" || !f.types?.length) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...rest } = f;
+        (out.graveyardGrants ??= []).push({ filter: { ...rest, text: `${lifeYard[1]} cards` }, way: { kind: "permission", costs: [{ kind: "payLife", n: Number(lifeYard[2]) }], exile: false, entersWith: { counter: lifeYard[3]!, n: 1 } } });
+      }
+      continue;
+    }
+    // Hades, Sorcerer of Eld: "During your turn, you may play cards from your graveyard." Lands (each with a land play,
+    // CR 305.2) and spells of any card type, paying all costs and following the timing rules (rulings), during its
+    // controller's turn only.
+    if (line === "During your turn, you may play cards from your graveyard." && !out.landsFromGraveyardIf) {
+      const f = parseTargetPhrase("card from a graveyard");
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...rest } = f;
+        out.landsFromGraveyardIf = { kind: "yourTurn" };
+        (out.graveyardGrants ??= []).push({ filter: { ...rest, text: "cards" }, way: { kind: "permission", costs: [], exile: false }, yourTurn: true });
+      }
+      continue;
+    }
     // Jaya Ballard's emblem: "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be
     // put into your graveyard, exile it instead." Any number, paying their costs and following the usual timing rules; a
     // spell cast this way that's countered goes to exile too (CR 614.1a), one that leaves the stack another way doesn't.
@@ -2691,6 +2721,12 @@ export function compile(d: CardDef): CompiledCard {
     // Demon of Fate's Design: "Once during each of your turns, you may cast an enchantment spell by paying life equal to its
     // mana value rather than paying its mana cost": an alternative cost (CR 118.9), X is 0 (rulings), from wherever the
     // spell may be cast; once for each such permanent, as for One with the Multiverse.
+    // Access Maze: "Once during each of your turns, you may cast a spell from your hand by paying life equal to its mana
+    // value rather than paying its mana cost": the same, for any spell cast from your hand.
+    if (line === "Once during each of your turns, you may cast a spell from your hand by paying life equal to its mana value rather than paying its mana cost.") {
+      out.payZero = { once: true, yourTurn: true, life: true, fromHand: true };
+      continue;
+    }
     const lifeAlt = /^Once during each of your turns, you may cast an? ([a-z]+) spell by paying life equal to its mana value rather than paying its mana cost\.$/.exec(line);
     if (lifeAlt) {
       const spec = parseTargetPhrase(`${lifeAlt[1]} card from a graveyard`);
@@ -2937,6 +2973,38 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${giveProwl[1]!.toLowerCase()} spell`);
       if (f?.kind !== "spell" || /\{X\}/.test(giveProwl[2]!)) out.unsupported.push(raw);
       else (out.spellsHaveProwl ??= []).push({ filter: f, mana: giveProwl[2]!, text: line });
+      continue;
+    }
+    // "Assassin spells you cast have freerunning {B}{B}" (Ezio Auditore da Firenze), CR 702.173a: an alternative cost for
+    // those spells, beside any freerunning cost of their own.
+    const giveFreerun = /^([A-Z][a-z]+) spells you cast have freerunning ((?:\{[^}]+\})+)\.$/.exec(line);
+    if (giveFreerun) {
+      const f = parseTargetPhrase(`${giveFreerun[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell" || /\{X\}/.test(giveFreerun[2]!)) out.unsupported.push(raw);
+      else (out.spellsHaveFreerunning ??= []).push({ filter: f, mana: giveFreerun[2]!, text: line });
+      continue;
+    }
+    // "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}" (Amazing Spider-Man), CR
+    // 702.188a: an alternative cost for those spells, beside any web-slinging of their own.
+    const giveSling = /^Each ([a-z]+) spell you cast( that's one or more colors)? has web-slinging ((?:\{[^}]+\})+)\.$/.exec(line);
+    if (giveSling) {
+      const f = parseTargetPhrase(`${giveSling[1]!}${giveSling[2] ? " colored" : ""} spell`);
+      if (f?.kind !== "spell" || /\{X\}/.test(giveSling[3]!)) out.unsupported.push(raw);
+      else (out.spellsHaveWebSlinging ??= []).push({ filter: f, mana: giveSling[3]!, text: line });
+      continue;
+    }
+    // Henzie "Toolbox" Torre: "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal
+    // to its mana cost." (CR 702.152a): an alternative cost for those spells, beside any blitz of their own.
+    const giveBlitz = /^Each (creature spell(?: with mana value \d+ or greater)?) you cast has blitz\. The blitz cost is equal to its mana cost\.$/.exec(line.replace(/^Each creature spell you cast (with mana value \d+ or greater) has/, "Each creature spell $1 you cast has"));
+    if (giveBlitz) {
+      const f = parseTargetPhrase(giveBlitz[1]!);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveBlitz ??= []).push({ filter: f, text: line });
+      continue;
+    }
+    const blitzLess = /^Blitz costs you pay cost \{(\d+)\} less for each time you've cast your commander from the command zone this game\.$/.exec(line);
+    if (blitzLess) {
+      out.blitzLessPerCommanderCast = (out.blitzLessPerCommanderCast ?? 0) + Number(blitzLess[1]);
       continue;
     }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you

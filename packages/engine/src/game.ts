@@ -3708,7 +3708,7 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
     invalidateCharacteristics(s);
   }
   if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
-  if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
+  if (o.zone === "battlefield" && (o.castAlt === "blitz" || o.castAlt === "grantedBlitz")) blitzed(s, o, item.controller);
   if (o.zone === "battlefield" && (o.castAlt === "warp" || o.castAlt === "grantedWarp")) warped(s, o, item.controller);
 }
 
@@ -4571,7 +4571,7 @@ export function castProblem(
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
-    if (choices.alt === "freerunning" && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
+    if ((choices.alt === "freerunning" || choices.alt === "grantedFreerunning") && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Sneak (CR 702.190a): only during your declare blockers step, once blockers are declared (an unblocked attacker).
     if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a). A permission to cast it from the graveyard that
@@ -4940,6 +4940,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
       else if (opponents(s, by).includes(pid)) flashbackMore += a.flashbackTax ?? 0;
     }
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
+  // Henzie "Toolbox" Torre: "Blitz costs you pay cost {1} less for each time you've cast your commander from the command
+  // zone this game": a blitz cost, the card's own or one a permanent gave it (CR 702.152a, 601.2f).
+  if (how.alt === "blitz" || how.alt === "grantedBlitz") {
+    const casts = Object.values(player(s, pid).commanderCasts).reduce((n, c) => n + c, 0);
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid) less += (abilitiesOf(s, obj(s, id)).blitzLessPerCommanderCast ?? 0) * casts;
+  }
   // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
   const emerged = how.alt === "emerge" && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
@@ -5262,6 +5268,9 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   // Prowl (CR 702.76a): the card's own, else one a permanent of `pid`'s gives it ("Dinosaur spells you cast have prowl").
   if (alt === "prowl") return compileCard(d).altCosts?.find((a) => a.kind === alt) ?? (s && pid !== undefined ? grantedProwl(s, pid, d) : undefined);
   if (alt === "grantedWarp") return s && pid !== undefined ? grantedWarp(s, pid, d) : undefined;
+  if (alt === "grantedFreerunning") return s && pid !== undefined ? grantedFreerunning(s, pid, d) : undefined;
+  if (alt === "grantedWebSlinging") return s && pid !== undefined ? grantedWebSlinging(s, pid, d) : undefined;
+  if (alt === "grantedBlitz") return s && pid !== undefined ? grantedBlitz(s, pid, d) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
@@ -5285,6 +5294,50 @@ function grantedWarp(s: GameState, pid: PlayerId, d: CardDef): NonNullable<Compi
   });
   const mana = costs.sort((a, b) => manaValue(parseManaCost(a)) - manaValue(parseManaCost(b)))[0];
   return mana ? { kind: "grantedWarp", mana } : undefined;
+}
+
+/**
+ * The freerunning cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (Ezio
+ * Auditore da Firenze; CR 702.173a). Several: the cheapest by mana value.
+ */
+function grantedFreerunning(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (isType(d, "Land")) return undefined;
+  const costs = s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).spellsHaveFreerunning ?? []).filter((x) => printedMatches(x.filter, d)).map((x) => x.mana) : [];
+  });
+  const mana = costs.sort((a, b) => manaValue(parseManaCost(a)) - manaValue(parseManaCost(b)))[0];
+  return mana ? { kind: "grantedFreerunning", mana } : undefined;
+}
+
+/**
+ * The web-slinging cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (Amazing
+ * Spider-Man; CR 702.188a): that mana and returning a tapped creature you control to its owner's hand. Several: the
+ * cheapest by mana value.
+ */
+function grantedWebSlinging(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (isType(d, "Land")) return undefined;
+  const costs = s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).spellsHaveWebSlinging ?? []).filter((x) => printedMatches(x.filter, d)).map((x) => x.mana) : [];
+  });
+  const mana = costs.sort((a, b) => manaValue(parseManaCost(a)) - manaValue(parseManaCost(b)))[0];
+  return mana
+    ? { kind: "grantedWebSlinging", mana, costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", tapped: true, text: "tapped creature you control" }, n: 1 }], text: "web-slinging: return a tapped creature you control to its owner's hand", webSlinging: true }
+    : undefined;
+}
+
+/**
+ * Blitz a permanent `pid` controls gives this creature spell, checked by its characteristics as a spell (Henzie "Toolbox"
+ * Torre; CR 702.152a): its cost is the spell's mana cost, so a spell without one has none.
+ */
+function grantedBlitz(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (!isType(d, "Creature") || !d.manaCost) return undefined;
+  const given = s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveBlitz ?? []).some((x) => printedMatches(x.filter, d));
+  });
+  return given ? { kind: "grantedBlitz", mana: d.manaCost } : undefined;
 }
 
 /** The prowl cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (CR 702.76a). */
@@ -5364,7 +5417,10 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   if (isType(defOf(s, o), "Land")) return own;
   const prowl = own.some((a) => a.kind === "prowl") ? undefined : grantedProwl(s, pid, defOf(s, o));
   const warp = o.zone === "hand" && o.owner === pid ? grantedWarp(s, pid, defOf(s, o)) : undefined;
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  const freerun = grantedFreerunning(s, pid, defOf(s, o));
+  const sling = grantedWebSlinging(s, pid, defOf(s, o));
+  const blitz = grantedBlitz(s, pid, defOf(s, o));
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -5711,7 +5767,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const returned: LastKnown = {};
   const discarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled);
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
@@ -5719,7 +5775,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
   // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
-  if (choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) o.webSlung = returned;
+  // A web-slinging cost a permanent gave it (Amazing Spider-Man) is casting it using web-slinging too.
+  if ((choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) || choices.alt === "grantedWebSlinging") o.webSlung = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
@@ -5930,6 +5987,12 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
 }
 
 /**
+ * How much a permission to cast from a graveyard asks beyond the card's mana cost, for picking among several: costs on
+ * top or a counter as it enters (Noctis, Prince of Lucis), then exile afterwards (Jaya Ballard's emblem). 0: nothing.
+ */
+const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0);
+
+/**
  * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
  * Lier, Six), one of each kind; the cost is the card's mana cost, so a card without one can't be cast this way (rulings).
  */
@@ -5964,9 +6027,10 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
         else out.push({ ...g.way, mana: d.manaCost, permits });
         continue;
       }
-      // Its caster would choose a permission that doesn't exile the spell afterwards over one that does (Jaya Ballard's emblem).
+      // Its caster would choose a permission that doesn't exile the spell afterwards over one that does (Jaya Ballard's
+      // emblem), and one with no cost on top or counter as it enters over one with them (Noctis, Prince of Lucis).
       const had = out.findIndex((w) => w.kind === g.way.kind);
-      if (had >= 0 && g.way.kind === "permission" && out[had]!.exileIfToGraveyard && !g.way.exileIfToGraveyard) out.splice(had, 1);
+      if (had >= 0 && g.way.kind === "permission" && permissionBurden(g.way) < permissionBurden(out[had]!)) out.splice(had, 1);
       else if (had >= 0 || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
@@ -5974,7 +6038,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
   // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !w.exileIfToGraveyard)) {
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
     const i = out.findIndex((w) => w.kind === "permission");
     if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
@@ -6310,7 +6374,20 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+/**
+ * The costs of the way a card is cast from a graveyard: a permission a permanent gives may have costs of its own ("by
+ * paying 3 life in addition to paying their other costs", Noctis, Prince of Lucis), so it's the way the card has there.
+ */
+function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?: ObjectId; viaWay?: CastFromGraveyard } | undefined, s?: GameState, pid?: PlayerId): AdditionalCost[] | undefined {
+  if (choices?.via === "permission") {
+    if (choices.viaWay) return choices.viaWay.costs;
+    const o = s && choices.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+    if (s && o?.zone === "graveyard") return graveyardWay(s, o, "permission", pid)?.costs;
+  }
+  return graveyardCast(d, choices?.via)?.costs;
+}
+
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -6331,7 +6408,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // resolves (CR 702.35a).
   const madnessPend = s?.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.player === pid ? s.pending : undefined;
   const madnessLife = madnessPend && s!.objects[madnessPend.objectId] && defOf(s!, s!.objects[madnessPend.objectId]!).name === d.name ? (compileCard(d).madnessLife ?? 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>

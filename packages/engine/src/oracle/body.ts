@@ -12637,6 +12637,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Empty the Laboratory: "Sacrifice X Zombies, then reveal cards from the top of your library until you reveal a number of
+    // Zombie creature cards equal to the number of Zombies sacrificed this way. Put those cards onto the battlefield and the
+    // rest on the bottom of your library in a random order.": as many as were sacrificed (fewer if you had fewer), all
+    // entering together (rulings).
+    const untilSacked = /^[Rr]eveal cards from the top of your library until you reveal a number of ([A-Z][a-z]+) creature cards equal to the number of ([A-Z][a-z]+)s sacrificed this way$/.exec(s);
+    if (untilSacked && untilSacked[1] === untilSacked[2] && CREATURE_TYPES.has(untilSacked[1]!) && /^Put those cards onto the battlefield and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const prev = effects[effects.length - 1];
+      const sub = untilSacked[1]!;
+      if (prev?.type !== "pick" || prev.action !== "sacrifice" || prev.who.ref !== "you" || prev.filter.subtypes?.length !== 1 || prev.filter.subtypes[0] !== sub || prev.filter.types?.length) return null;
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], subtypes: [sub], text: `${sub} creature card` }, found: "battlefield", rest: "bottom", n: { count: { kind: "sacrificedThisWayCount" } } });
+      si++;
+      continue;
+    }
     // Selvala's Stampede: "Reveal cards from the top of your library until you reveal a creature card for each wild vote.
     // Put those creature cards onto the battlefield, then shuffle the rest into your library." As many creature cards as
     // there were votes for that word (CR 701.38), entering together (rulings); with no such vote, none is revealed.

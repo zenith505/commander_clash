@@ -8,7 +8,8 @@
 // toughness, the prototype's if prototyped); Immortal Obligation (an opponent's creature card returned under their control,
 // goaded and kept off you while it has a duty counter); Choco, Seeker of Paradise ("look at that many cards ... You may
 // put one of them into your hand. Then put any number of land cards from among them onto the battlefield tapped and the
-// rest into your graveyard").
+// rest into your graveyard"); Empty the Laboratory ("until you reveal a number of Zombie creature cards equal to the
+// number of Zombies sacrificed this way").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -53,6 +54,7 @@ const moritte = (): CardDef => ({"oracleId":"78699161-fc14-4a44-8a15-0f7c08be034
 const metamorph = (): CardDef => ({"oracleId":"b2b09dc3-8239-4f3b-91d2-e7cbbdc062f7","name":"Hulking Metamorph","manaCost":"{9}","cmc":9,"typeLine":"Artifact Creature — Shapeshifter","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Shapeshifter"],"oracleText":"Prototype {2}{U}{U} — 3/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nYou may have this creature enter as a copy of an artifact or creature you control, except it's an artifact creature in addition to its other types, and its power and toughness are equal to this creature's power and toughness.","power":"7","toughness":"7","colors":[],"colorIdentity":["U"],"keywords":["Prototype"],"commanderLegal":"legal","set":"bro","releasedAt":"2022-11-18","rarity":"uncommon","layout":"prototype","gameChanger":false}) as CardDef;
 const obligation = (): CardDef => ({"oracleId":"b34080fe-69d1-4cc9-9feb-c37762f26a23","name":"Immortal Obligation","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Return target creature card from an opponent's graveyard to the battlefield under their control with a duty counter on it. For as long as that creature has a duty counter on it, it is goaded, can't attack you or a permanent you control, and can't block creatures you control.","colors":["W"],"colorIdentity":["W"],"keywords":["Goad"],"commanderLegal":"legal","set":"mkc","releasedAt":"2024-02-09","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const choco = (): CardDef => ({"oracleId":"7979bf83-5091-4e62-8885-ca1833a97306","name":"Choco, Seeker of Paradise","manaCost":"{1}{G}{W}{U}","cmc":4,"typeLine":"Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Bird"],"oracleText":"Whenever one or more Birds you control attack, look at that many cards from the top of your library. You may put one of them into your hand. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard.\nLandfall — Whenever a land you control enters, Choco gets +1/+0 until end of turn.","power":"3","toughness":"5","colors":["G","U","W"],"colorIdentity":["G","U","W"],"keywords":["Landfall"],"commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const laboratory = (): CardDef => ({"oracleId":"84f3736f-5b2a-40f9-8c3b-c18f8c637c22","name":"Empty the Laboratory","manaCost":"{X}{U}{U}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Sacrifice X Zombies, then reveal cards from the top of your library until you reveal a number of Zombie creature cards equal to the number of Zombies sacrificed this way. Put those cards onto the battlefield and the rest on the bottom of your library in a random order.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"mic","releasedAt":"2021-09-24","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const ogre = card("Hill Ogre", "Creature — Ogre", "{3}{R}", { power: "3", toughness: "3" });
 const rock = card("Test Rock", "Artifact", "{2}", { oracleText: "{T}: Add {C}." });
@@ -61,7 +63,7 @@ const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 
 const automaton = card("Blitz Automaton", "Artifact Creature — Construct", "{7}", { power: "6", toughness: "4", keywords: ["Haste", "Prototype"], oracleText: "Prototype {2}{R} — 3/2 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nHaste" });
 
 describe("round 240 cards", () => {
-  it("are fully supported", () => supported(belligerent(), limb(), nissa(), feast(), moritte(), metamorph(), obligation(), choco()));
+  it("are fully supported", () => supported(belligerent(), limb(), nissa(), feast(), moritte(), metamorph(), obligation(), choco(), laboratory()));
 });
 
 describe("The Belligerent", () => {
@@ -305,5 +307,35 @@ describe("Choco, Seeker of Paradise", () => {
     s = settle(act(s, { type: "searchLibrary", player: ap, found: [l1] }));
     expect(s.objects[l1]!.zone).toBe("battlefield");
     expect(s.objects[spell]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Empty the Laboratory", () => {
+  const zombie = card("Test Zombie", "Creature — Zombie", "{1}{B}", { power: "2", toughness: "2" });
+  it("X = 2: two Zombies sacrificed, then revealing until two Zombie creature cards, which enter together; the rest to the bottom", () => {
+    const { s: s0, ap, ids } = setup([laboratory()]);
+    const zs = [putOnBattlefield(s0, ap, zombie), putOnBattlefield(s0, ap, zombie), putOnBattlefield(s0, ap, zombie)];
+    const z2 = into(s0, ap, zombie, "library");
+    const other = into(s0, ap, ogre, "library");
+    const z1 = into(s0, ap, zombie, "library");
+    const first = into(s0, ap, ogre, "library");
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 2));
+    s = settle(s);
+    if (s.pending?.kind === "pickPermanents") s = settle(act(s, { type: "pickPermanents", player: ap, ids: zs.slice(0, 2) }));
+    expect(zs.filter((id) => s.objects[id]!.zone === "graveyard").length).toBe(2);
+    expect(s.objects[z1]!.zone).toBe("battlefield");
+    expect(s.objects[z2]!.zone).toBe("battlefield");
+    const lib = s.players[ap]!.library;
+    expect(lib.slice(-2).sort()).toEqual([first, other].sort());
+  });
+  it("with only one Zombie to sacrifice, X = 2 finds one", () => {
+    const { s: s0, ap, ids } = setup([laboratory()]);
+    putOnBattlefield(s0, ap, zombie);
+    const z2 = into(s0, ap, zombie, "library");
+    const z1 = into(s0, ap, zombie, "library");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 2)));
+    if (s.pending?.kind === "pickPermanents") s = settle(act(s, { type: "pickPermanents", player: ap, ids: s.pending.options ?? [] }));
+    expect(s.objects[z1]!.zone).toBe("battlefield");
+    expect(s.objects[z2]!.zone).toBe("library");
   });
 });

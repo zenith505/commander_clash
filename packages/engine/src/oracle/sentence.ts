@@ -334,7 +334,10 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // Tide Shaper: "target land becomes an Island for as long as ~ remains on the battlefield": the same as until end of turn,
   // ending when ~ leaves instead (CR 611.2b, 305.7).
   // Graceful Antelope: "... become a Plains until ~ leaves the battlefield": the same (CR 611.2b).
-  const remainsLand = !ctx.spell && /^([Tt]arget land becomes an? (?:Plains|Island|Swamp|Mountain|Forest)) (?:for as long as ~ remains on the battlefield|until ~ leaves the battlefield)$/.exec(s);
+  // Skilled Animator: "target artifact you control becomes an artifact creature with base power and toughness 5/5 for as
+  // long as ~ remains on the battlefield"; Awakener Druid: "target Forest becomes a 4/5 green Treefolk creature ..." (its
+  // "It's still a land" follows): the same, ending when ~ leaves (CR 611.2b).
+  const remainsLand = !ctx.spell && (/^([Tt]arget land becomes an? (?:Plains|Island|Swamp|Mountain|Forest)) (?:for as long as ~ remains on the battlefield|until ~ leaves the battlefield)$/.exec(s) ?? /^((?:[Uu]p to one )?[Tt]arget (?:artifact(?: you control)?|Forest) becomes an? (?:artifact creature with base power and toughness \d+\/\d+|\d+\/\d+ [a-z]+ [A-Z][a-z]+ creature)) for as long as ~ remains on the battlefield$/.exec(s));
   if (remainsLand) {
     const fx = parseSentence(`${remainsLand[1]} until end of turn`, ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "endOfTurn" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
@@ -597,6 +600,10 @@ export function parseBecomes(text: string): Modification[] | null {
   const out: Modification[] = [];
   let m: RegExpExecArray | null;
   if ((m = /^(?:the color of your choice)$/i.exec(rest))) return null;
+  // Phantasmal Form: "up to two target creatures each ... become blue Illusions in addition to their other colors and
+  // types": each one the same as "becomes a blue Illusion in addition to its other colors and types".
+  const pluralKind = /^(white|blue|black|red|green) ([A-Z][a-z]+)s in addition to their other colors and types$/.exec(rest);
+  if (pluralKind && CREATURE_TYPES.has(pluralKind[2]!)) return parseBecomes(`a ${pluralKind[1]} ${pluralKind[2]} in addition to its other colors and types`);
   // The color or basic land type chosen as it resolves (see parseBody). A land's basic land type replaces its land
   // types and the abilities from its rules text (CR 305.7): "becomes an Island" too.
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
@@ -604,6 +611,9 @@ export function parseBecomes(text: string): Modification[] | null {
   if (/^all colors$/i.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   if (/^the chosen colors$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: "colors" }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
+  // Navigator's Compass: "becomes the basic land type of your choice in addition to its other types": it keeps its land
+  // types and abilities and gains the chosen type's mana ability (CR 305.6, 305.7).
+  if (/^the chosen basic land type in addition to its other types$/i.test(rest)) return [{ kind: "addTypes", types: [], subtypes: [CHOSEN_LAND_TYPE] }];
   // "Becomes snow" (Arcum's Weathervane, Thermal Flux): it gains the supertype and keeps its others (CR 205.4a, rulings).
   if (/^snow$/i.test(rest)) return [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Snow"] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];

@@ -1,4 +1,4 @@
-import { ANY_COUNTER } from "../abilities";
+import { ANY_COUNTER, isRealKicker } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
@@ -129,6 +129,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
+  if (spec.kickerAbility && !isRealKicker(compileCard(defOf(s, o)).kicker)) return false;
   if (spec.noXInCost && parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
@@ -436,6 +437,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.xInCost && !parseManaCost(d.manaCost).hasX) return false;
+  if (spec.kickerAbility && !isRealKicker(compileCard(d).kicker)) return false;
   if (spec.noXInCost && parseManaCost(d.manaCost).hasX) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;

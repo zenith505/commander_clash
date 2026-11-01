@@ -514,6 +514,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const a = { ref: "target" as const, index: ctx.lastObjectTarget };
     return [{ type: "damage", amount: { count: { kind: "manaValue", of: a } }, to: { ref: "self" }, by: { target: a.index, lastKnown: true } }];
   }
+  // Dizzying Gaze: "{R}: Enchanted creature deals 1 damage to target creature with flying": damage from the creature the
+  // Aura enchants as the ability resolves (as it last existed if the Aura has left, CR 608.2h), not from the Aura.
+  if ((m = /^Enchanted creature deals (\d+) damage to (target creature(?: with [a-z]+)?)$/.exec(s)) && !ctx.spell && ctx.activated) {
+    const to = parseDamageRecipient(m[2]!, ctx);
+    return to && "ref" in to && to.ref === "target" ? [{ type: "damage", amount: Number(m[1]), to, by: "attached" }] : null;
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

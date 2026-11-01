@@ -690,6 +690,9 @@ export function compile(d: CardDef): CompiledCard {
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
     // An instant's or sorcery's ability word ("Spell mastery — If ...", CR 207.2c): no rules meaning either.
     if (isSpell) line = line.replace(SPELL_ABILITY_WORD, "");
+    // Zimone, All-Questioning: "if ... you control a prime number of lands, create Primo, ..., then put that many +1/+1
+    // counters on it": that many is the number of lands, counted as it resolves.
+    line = line.replace(/^(At the beginning of your end step, if [^,]+ and you control a prime number of lands, create [^.]+ token, then put) that many (\+1\/\+1 counters on it)\.$/, "$1 X $2, where X is the number of lands you control.");
     // Ascendant Acolyte: "~ enters with a +1/+1 counter on it for each +1/+1 counter among other creatures you control":
     // counted as it enters, when it isn't on the battlefield yet (CR 614.1c), so the same as "among creatures you control".
     line = line.replace(/^(~ enters with a \+1\/\+1 counter on it for each \+1\/\+1 counter among) other (creatures you control\.)$/, "$1 $2");
@@ -2487,6 +2490,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If a creature you control would explore, instead it explores, then it explores again.") {
       out.exploresTwice = true;
+      continue;
+    }
+    if (line === "If a creature you control would explore, instead you scry 1, then that creature explores.") {
+      out.scryBeforeExplore = true;
       continue;
     }
     if (line === "As ~ enters, note your life total.") {

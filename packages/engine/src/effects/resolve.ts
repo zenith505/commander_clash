@@ -327,6 +327,15 @@ function attachedHost(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number
   return { ...was, here: o?.zone === "battlefield" && (o.zoneChanges ?? 0) === was.zc };
 }
 
+/** The creature types of what the source enchants, or last enchanted as it last existed (CR 608.2h); none without one. */
+export function attachedHostTypes(s: GameState, ctx: ResolveCtx): Set<string> | "all" | undefined {
+  const host = attachedHost(s, ctx);
+  if (!host) return undefined;
+  if (host.here) return creatureTypesOf(s, s.objects[host.id]!);
+  const lk = s.lastKnown?.[host.id];
+  return lk?.zc === host.zc && lk.creatureTypes ? (lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)) : undefined;
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -1170,6 +1179,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterOfKindOnIt":
     case "removeCounters":
     case "noteManaSpent":
+    case "noteAmount":
     case "removeAnyCounters":
     case "gatherCounters":
     case "battleDefense":
@@ -1192,6 +1202,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exchangeControl":
     case "playerGains":
     case "attackBanNextTurn":
+    case "attackBanThisTurn":
     case "cantAttackNextTurn":
     case "attackWalkerNextTurn":
     case "attach":

@@ -356,6 +356,10 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // "Each opponent who does can't attack you or permanents you control during their next turn" (The Second Doctor): the
   // opponents who chose to.
   if (ctx.eachChose && /^[Ee]ach opponent who does can't attack you or permanents you control during their next turn$/.test(s)) return [{ type: "attackBanNextTurn", who: { ref: "choseThisWay", opponents: true } }];
+  // Web of Inertia: "creatures they control can't attack you this turn"; Jace, Multiverse Architect: "... can't attack
+  // Jaces you control this turn": the player the trigger is about.
+  if (ctx.eventPlayer && !ctx.spell && (m = /^[Cc]reatures (?:they|that player) controls? can't attack (you|Jaces you control) this turn$/.exec(s)))
+    return [{ type: "attackBanThisTurn", who: { ref: "eventPlayer" }, ...(m[1] === "you" ? {} : { subtype: "Jace" }) }];
   // "Then each player who drew a card this way gains 1 life" (Kwain): those who chose to.
   if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach player who drew a card this way gains (\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "choseThisWay" }, n: Number(m[1]) }];
   // Flare of Fortitude: "Until end of turn, your life total can't change, and permanents you control gain hexproof and

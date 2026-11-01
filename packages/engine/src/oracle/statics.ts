@@ -1363,6 +1363,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
       return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
+  // Zimone, All-Questioning: "if a land entered the battlefield under your control this turn and you control a prime number
+  // of lands": both, the second counted as it triggers and again as it resolves (rulings: it won't resolve otherwise).
+  if ((m = /^(an? land entered the battlefield under your control this turn) and (you control a prime number of lands)$/.exec(text))) {
+    const a = parseStaticCondition(m[1]!, st);
+    return a ? { kind: "allOf", conds: [a, { kind: "control", who: "you", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" }, prime: true }] } : null;
+  }
   // Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn" (once, however
   // many entered; a noncreature permanent that became a creature later doesn't count, rulings).
   if (/^you had another creature enter the battlefield under your control last turn$/.test(text)) return { kind: "youEntered", types: ["Creature"], n: 1, other: true, lastTurn: true };

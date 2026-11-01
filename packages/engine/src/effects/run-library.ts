@@ -3,11 +3,11 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { attackingPermanentOf, castProblem, freeCastable, draw, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw, shareCreatureType, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
-import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
+import { ResolveCtx, apnap, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
@@ -1545,7 +1545,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const chosenFilter = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
         const filter = chosenFilter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(chosenFilter) : chosenFilter && bindBound(s, chosenFilter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
-        const options = sc.looked.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
+        // Call to the Kindred: sharing a creature type with the enchanted creature, as it is now or last was.
+        const kin = filter?.sharesTypeWithAttached ? (attachedHostTypes(s, ctx) ?? new Set<string>()) : undefined;
+        const printed = kin && filter ? (({ sharesTypeWithAttached: _, ...r }) => r)(filter) : filter;
+        const options = sc.looked.filter((id) => (!printed || printedMatches(printed, defOf(s, obj(s, id)))) && (!kin || shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const yardHas = (f: TargetSpec) => player(s, ctx.controller).graveyard.some((id) => printedMatches(f, defOf(s, obj(s, id))));
         const count = e.countAll ? sc.looked.length : e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.count;

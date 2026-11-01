@@ -28,6 +28,17 @@ function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source
  * Only set for the length of one synchronous call, never kept in the game state.
  */
 let putterNow: PlayerId | undefined;
+/** While set, the counters being put come from a modular triggered ability (Zabaz, the Glimmerwasp). */
+let modularNow = false;
+export function withModular<T>(fn: () => T): T {
+  const was = modularNow;
+  modularNow = true;
+  try {
+    return fn();
+  } finally {
+    modularNow = was;
+  }
+}
 export function withPutter<T>(pid: PlayerId | undefined, fn: () => T): T {
   const was = putterNow;
   putterNow = pid;
@@ -77,6 +88,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
       if (mod.what !== "counters" || "onPlayer" in mod) return false;
+      if ("modular" in mod && mod.modular && !modularNow) return false;
       // Mowu, Loyal Companion: only on itself, as it enters too (it affects only that permanent, CR 614.12; rulings).
       if ("self" in mod && mod.self) return source === o.id && (mod.counter === undefined || mod.counter === kind);
       if ((("other" in mod && mod.other) || entering) && source === o.id) return false;

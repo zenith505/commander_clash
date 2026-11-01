@@ -766,6 +766,8 @@ export interface Player {
    * permanents `player` controls.
    */
   attackBansNextTurn?: { player: PlayerId; turn?: number }[];
+  /** Effect attackBanThisTurn: this player's creatures can't attack `player` (or, with `subtype`, their planeswalkers of that type) during `turn`. */
+  attackBansThisTurn?: { player: PlayerId; turn: number; subtype?: string }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -2133,6 +2135,8 @@ export interface TriggerEventInfo {
 export interface Resolving {
   item: StackItem;
   body: AbilityBody;
+  /** Effect noteAmount's count (Count notedAmount). */
+  notedAmount?: number;
   legal: boolean[]; // which targets were legal as it began resolving (CR 608.2b)
   /**
    * The answers so far to the questions about the shields of the damage the current instruction deals (CR 616.1): it
@@ -2437,6 +2441,7 @@ export interface Resolving {
     retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     exploresLeft?: number; // explores still to do for one instruction (Topography Tracker doubles them)
+    exploreScries?: number; // scries still to do before an explore (Twists and Turns, one each)
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast

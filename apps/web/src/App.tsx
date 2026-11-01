@@ -182,6 +182,7 @@ import {
   abilityCostsHaveX,
   spellManaValue,
   blockWithoutCompany,
+  showGrantSource,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -2908,7 +2909,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             </span>
           ))}
           {m.grantedAbilities.length > 0 && (
-            <span className="kw" title={m.grantedAbilities.map((t) => `Has "${t.replace(/~/g, c.name)}"`).join("\n")}>
+            <span className="kw" title={m.grantedAbilities.map((t) => `Has "${showGrantSource(t).replace(/~/g, c.name)}"`).join("\n")}>
               +{m.grantedAbilities.length} {m.grantedAbilities.length === 1 ? "ability" : "abilities"}
             </span>
           )}

@@ -518,7 +518,23 @@ function artifactAbilityKind(s: GameState, action: Action): { artifact: boolean;
  */
 export function cloneState(state: GameState): GameState {
   const { cards, log: entries, ...rest } = state;
-  return { ...structuredClone(rest), cards, log: [...entries] };
+  return { ...(copyJson(rest) as typeof rest), cards, log: [...entries] };
+}
+
+/**
+ * A deep copy of plain JSON data (the state is plain JSON: no Maps, Sets, Dates or shared references to keep). It's
+ * about twice as fast as structuredClone, and every action copies the whole state.
+ */
+function copyJson(v: unknown): unknown {
+  if (typeof v !== "object" || v === null) return v;
+  if (Array.isArray(v)) {
+    const out = new Array(v.length);
+    for (let i = 0; i < v.length; i++) out[i] = copyJson(v[i]);
+    return out;
+  }
+  const out: Record<string, unknown> = {};
+  for (const k in v as Record<string, unknown>) out[k] = copyJson((v as Record<string, unknown>)[k]);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -7458,6 +7474,14 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.keyword === "Power-up" && s.extraTurn?.noPowerUp) return "power-up abilities can't be activated this turn"; // Kang the Conqueror
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
+  // "Sacrifice Blazing Torch", "Unattach Leonin Bola" in an ability that Equipment gives: that permanent, still the same
+  // object, one the activating player controls (CR 701.21a) or attached to this one (CR 701.3d, 602.2b).
+  if (ab.grantSourceCost) {
+    const g = ab.grantSourceCost.id ? s.objects[ab.grantSourceCost.id] : undefined;
+    if (!g || g.zone !== "battlefield" || (g.zoneChanges ?? 0) !== ab.grantSourceCost.zc) return "the permanent that gave that ability is gone";
+    if (ab.grantSourceCost.action === "sacrifice" && (controllerOf(s, g) !== pid || !canSacrificeForCost(s, g))) return `you can't sacrifice ${nameOf(s, g.id)}`;
+    if (ab.grantSourceCost.action === "unattach" && g.attachedTo !== o.id) return `${nameOf(s, g.id)} isn't attached to ${d.name}`;
+  }
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
   if (ab.tapAttached) {
@@ -7917,6 +7941,14 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.attachedTo = undefined;
     invalidateCharacteristics(s);
   }
+  // "Unattach Leonin Bola" (CR 701.3d); "Sacrifice Blazing Torch" comes with the other sacrifices below.
+  const granter = ab.grantSourceCost?.id ? s.objects[ab.grantSourceCost.id] : undefined;
+  if (ab.grantSourceCost?.action === "unattach" && granter?.attachedTo === o.id) {
+    log(s, `${p.name} unattaches ${nameOf(s, granter.id)} from ${d.name}.`);
+    fireEvent(s, { type: "unattached", id: granter.id, host: o.id });
+    granter.attachedTo = undefined;
+    invalidateCharacteristics(s);
+  }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
@@ -7930,6 +7962,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+  if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
@@ -9603,6 +9636,8 @@ export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: 
   if (others && new Set(attacks.filter((a) => a.attacker !== id).map((a) => a.attacker)).size < others) return `${nameOf(s, id)} can't attack unless at least ${others} other creatures attack`;
   for (const f of characteristics(s, o).attackOnlyWith ?? [])
     if (!attacks.some((a) => a.attacker !== id && objectMatches(s, f, obj(s, a.attacker), controllerOf(s, o), false))) return `${nameOf(s, id)} can't attack unless ${f.text} also attacks`;
+  // Okk: another attacker in this declaration with greater power, as it is now (CR 508.1c).
+  if (characteristics(s, o).attackWithGreater && !attacks.some((a) => a.attacker !== id && power(s, obj(s, a.attacker)) > power(s, o))) return `${nameOf(s, id)} can't attack unless a creature with greater power also attacks`;
   return null;
 }
 
@@ -9611,12 +9646,27 @@ export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: 
  * blocks and those other defending players declared before (`earlier`), not counting it (CR 509.1b).
  */
 export function blockWithoutCompany(s: GameState, blocks: { blocker: ObjectId }[], earlier: number): string | null {
+  const id = lonelyBlocker(s, blocks, earlier);
+  if (id === undefined) return null;
+  const others = characteristics(s, obj(s, id)).blockWithOthers;
+  return others && earlier + new Set(blocks.map((b) => b.blocker)).size - 1 < others
+    ? `${nameOf(s, id)} can't block unless at least ${others} other creatures block`
+    : `${nameOf(s, id)} can't block unless a creature with greater power also blocks`;
+}
+/**
+ * The first of these blockers without the company it needs: Orcish Conscripts' number of other blockers, Okk's other
+ * blocker with greater power (these blocks or another defending player's earlier ones this combat, as they are now, CR
+ * 509.1b).
+ */
+export function lonelyBlocker(s: GameState, blocks: { blocker: ObjectId }[], earlier: number): ObjectId | undefined {
   const ids = [...new Set(blocks.map((b) => b.blocker))];
-  for (const id of ids) {
-    const others = characteristics(s, obj(s, id)).blockWithOthers;
-    if (others && earlier + ids.length - 1 < others) return `${nameOf(s, id)} can't block unless at least ${others} other creatures block`;
-  }
-  return null;
+  return ids.find((id) => {
+    const c = characteristics(s, obj(s, id));
+    if (c.blockWithOthers && earlier + ids.length - 1 < c.blockWithOthers) return true;
+    if (!c.blockWithGreater) return false;
+    const all = [...ids, ...s.battlefield.filter((x) => (obj(s, x).blocking?.length ?? 0) > 0 && !ids.includes(x))];
+    return !all.some((x) => x !== id && power(s, obj(s, x)) > c.power);
+  });
 }
 
 /** A player's last turn: their latest one that has begun, or the one before it while it's theirs (the turn number it began). */

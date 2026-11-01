@@ -909,9 +909,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject("its", ctx);
     return of?.ref === "subject" ? count({ kind: "counters", counter: ANY_COUNTER, of }) : null;
   }
-  // "Charge counter on ~", "+1/+1 counters on it".
-  if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {
-    const of = whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
+  // "Charge counter on ~", "+1/+1 counters on it". Archery Training: "arrow counters on Archery Training" in an ability it
+  // gives, that Aura.
+  if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature|\u27easource\u27eb)$`).exec(p))) {
+    const of = m[2] === "\u27easource\u27eb" ? ({ ref: "grantSource" } as const) : whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
   }
   // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"

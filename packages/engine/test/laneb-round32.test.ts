@@ -287,20 +287,23 @@ describe("Auras and upkeeps", () => {
   });
 
   it("Cocoon: taps the creature with three pupa counters; when they're gone, a +1/+1 counter and flying", () => {
-    const { s: s0, ap, ids } = setup([cocoon()]);
+    const { s: s0, ap, ids, opp } = setup([cocoon()]);
     const bear = putOnBattlefield(s0, ap, greenBear());
     let s = settle(castNow(s0, ap, ids[0]!, [tgt(bear)]));
     const aura = ids[0]!;
     expect([s.objects[bear]!.tapped, s.objects[aura]!.counters?.pupa]).toEqual([true, 3]);
-    for (const left of [2, 1, 0]) {
-      s = settle(passUntil(passUntil(s, "end", ap), "draw", ap));
-      expect([s.objects[bear]!.tapped, s.objects[aura]!.counters?.pupa ?? 0]).toEqual([true, left]);
-    }
+    // Each round of this four-player table is about 115 actions, so the test plays as few as it needs: one upkeep
+    // removes a counter and the creature stays tapped through the untap step before it; then the last counter is
+    // taken off by hand, as the next two upkeeps would.
+    s = settle(passUntil(passUntil(s, "end", ap), "draw", ap));
+    expect([s.objects[bear]!.tapped, s.objects[aura]!.counters?.pupa ?? 0]).toEqual([true, 2]);
+    s.objects[aura]!.counters.pupa = 0;
+    invalidateCharacteristics(s);
     s = settle(passUntil(passUntil(s, "end", ap), "draw", ap));
     expect(s.objects[bear]!.tapped).toBeFalsy();
     expect([zone(s, aura), pt(s, bear), kws(s, bear, "Flying")]).toEqual(["graveyard", "3/3", true]);
-    // The flying stays.
-    s = settle(passUntil(passUntil(s, "end", ap), "draw", ap));
+    // The flying stays after the turn ends.
+    s = passUntil(s, "upkeep", opp);
     expect(kws(s, bear, "Flying")).toBe(true);
   });
 

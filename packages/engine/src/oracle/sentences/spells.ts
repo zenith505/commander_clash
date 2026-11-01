@@ -19,6 +19,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   // Sacrificing (CR 701.21): "sacrifice ~", "sacrifice it" (the permanent itself)
+  // "You may sacrifice Sunfire Torch" in an ability it gives: that Equipment, only if you control it (CR 701.21a).
+  if (s === "Sacrifice \u27easource\u27eb") return [{ type: "sacrifice", what: { ref: "grantSource" } }];
   if ((m = /^Sacrifice (~|it)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).

@@ -201,6 +201,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // An ability an Equipment gives that names it: "Blazing Torch deals 2 damage to any target" (Blazing Torch, Ninja's
+  // Kunai): the Equipment is the source, as it last existed if the cost sacrificed it (CR 608.2h; the creature isn't).
+  const sourceDeals = /^\u27easource\u27eb (deals \d+ damage to (?:any target|target [a-z ]+))$/.exec(s);
+  if (sourceDeals) {
+    const fx = parseSentence(`~ ${sourceDeals[1]}`, ctx);
+    return fx?.length === 1 && fx[0]!.type === "damage" && !fx[0]!.by && !fx[0]!.also ? [{ ...fx[0]!, by: { ref: "grantSource" } }] : null;
+  }
   // Form of the Dinosaur: "~ deals 15 damage to target creature an opponent controls and that creature deals damage equal to
   // its power to you": two damage events in order, the second from that creature, its power as it resolves; none from it
   // if it's an illegal target by then (rulings).

@@ -2091,6 +2091,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cd3d1e5d-db12-4878-92a2-23eb8d23eaf3",
+  "name": "Blazing Torch",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature can't be blocked by Vampires or Zombies.\nEquipped creature has \"{T}, Sacrifice Blazing Torch: Blazing Torch deals 2 damage to any target.\"\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "240d650b-97ea-40ad-8c1b-fe1ea52d861f",
   "name": "Blessing of Frost",
   "manaCost": "{3}{G}",
@@ -11303,6 +11329,32 @@
   "commanderLegal": "legal",
   "set": "tmt",
   "releasedAt": "2026-03-06",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d5f72164-441e-4e04-8b2b-0d6ab618d22e",
+  "name": "Leonin Bola",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{T}, Unattach Leonin Bola: Tap target creature.\"\nEquip {1} ({1}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "dst",
+  "releasedAt": "2004-02-06",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

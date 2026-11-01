@@ -1,7 +1,7 @@
 # Roadmap
 
-28,722 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,241 of
+28,751 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,245 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1410,6 +1410,33 @@ line blocks.
    Wretched, Paleontologist's Pick-Axe and Sunbird Standard ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
    direction); Ramses, Assassin Lord (attacked this turn by an Assassin you controlled).
+   Round 232 (unexamined cards from ranks 6,400 to 13,000, now done): a search's exile linked to a dies ability (Hoarding
+   Dragon: each Dragon its own hoard, CR 607.2a); "Choose a card name. Whenever a creature with the chosen name deals
+   combat damage to a player this turn" (The Clone Saga: the name bound into the delayed trigger, anyone's creature); "for
+   each land destroyed/sacrificed this way, its controller may search ... for a basic land card" (From the Ashes, Wave of
+   Vitriol: one search per player, up to one card for each of their lands, as they last existed, CR 608.2h); "for each
+   player, destroy up to one nonbasic land that player controls" (Krenko's Buzzcrusher: you choose for each player in
+   APNAP order, not targeted; picker and browser test); "If that card is legendary, create a Treasure token. Then
+   shuffle." between a search and its shuffle (Instrument of the Bards); "if a creature died under an opponent's control
+   this turn" (Sidequest: Hunt the Mark); "you may pay {4}{U}{U}{B}{B} and exile eight cards from your graveyard. If you
+   do" (Ultimecia, Time Sorceress); "the spell's mana value" in a cast trigger, Birds even when the spell can't be
+   countered (Dovescape); "Whenever a Werewolf you control enters, you may transform it" (Geier Reach Bandit's back face);
+   "exile all creatures you control, then reveal ... until you reveal that many creature cards" (Mass Polymorph, tokens
+   counted); a Saga's chapter III returning what its chapter I exiled (The Princess Takes Flight, the same Saga object
+   only); "If he's attacking, untap ~ and there is an additional combat phase after this phase" (The Incredible Hulk). +13
+   (28,751 of 31,936).
+   Out after round 232 (looked at, not done): Island Sanctuary (skip the draw-step draw for "can't be attacked except by
+   creatures with flying and/or islandwalk" until your next turn; Lane B's draw replacements are moving in B68/B69);
+   Cairn Wanderer (landwalk and protection as the creature cards in graveyards have them, by kind); Synthetic Destiny
+   ("that many" carried into the delayed trigger at the next end step); Lorcan, Warlock Collector (pay life equal to the
+   card's mana value from any zone into a graveyard, then a Warlock exile-instead replacement); Wild Pair (a search for the
+   same total power and toughness, "if you cast it from your hand"); Vislor Turlough (an opponent gains control and it's
+   goaded for as long as they control it); Nephalia Academy (a discard an opponent causes put on top instead); Heirloom
+   Epic (tap creatures for an activation cost's mana, like convoke); Kaldring, the Rimestaff (play a snow permanent card
+   from your graveyard this turn, entering tapped); Hostile Hostel (soul counters, transform, then untap; Creeping Inn's
+   "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
+   Cryptic Gateway, Mogg Assassin, Karplusan Minotaur, The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
+   ("transform it" is the enchantment, not the attacker).
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the

@@ -307,6 +307,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
+  if (kind === "attackingPlayer") return { ...rest, attackingWhom: chosen?.player ?? "eventPlayer" };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
 }
 

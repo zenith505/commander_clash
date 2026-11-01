@@ -75,6 +75,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           (s.extraTurns ??= []).push({
             player: pid,
             ...(e.skipUntap ? { skipUntap: true as const } : {}),
+            ...(e.noPowerUp ? { noPowerUp: true as const } : {}),
             ...(e.loseAtEnd && card ? { loseAtEnd: { controller: ctx.controller, sourceCardId: cardIdOf(card), subject: { id: card.id, zc: card.zoneChanges ?? 0 } } } : {}),
           });
         }

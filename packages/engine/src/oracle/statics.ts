@@ -1706,6 +1706,9 @@ export function parseAffected(subject: string): Affects | null {
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
   // "Creatures attacking your opponents", the same (rulings).
+  // Triarch Stalker, Beckoning Will-o'-Wisp: "Creatures attacking the last chosen player": attacking that player (not
+  // their planeswalkers or battles), the one its trigger chose last (kept on the permanent, compile.ts).
+  if (x === "Creatures attacking the last chosen player") return { kind: "filter", types: ["Creature"], spec: { kind: "object", chosen: "attackingPlayer", text: "creature attacking the last chosen player" } };
   if (/^(?:Each creature that's|Creatures) attacking (?:one of )?your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
   // Lovisa Coldeyes: "Each creature that's a Barbarian, a Warrior, or a Berserker": any player's creature with any of those
   // creature types, counted once.

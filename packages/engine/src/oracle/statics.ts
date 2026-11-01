@@ -1365,6 +1365,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
       return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
+  // Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn" (once, however
+  // many entered; a noncreature permanent that became a creature later doesn't count, rulings).
+  if (/^you had another creature enter the battlefield under your control last turn$/.test(text)) return { kind: "youEntered", types: ["Creature"], n: 1, other: true, lastTurn: true };
   if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };

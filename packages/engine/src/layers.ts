@@ -995,6 +995,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "youEntered": {
       const selfZc = sourceZc ?? s.objects[sourceId]?.zoneChanges ?? 0;
+      // "Last turn": the creatures that entered then, under your control then (Ephara rulings: whatever happened to them since).
+      if (cond.lastTurn) return (s.lastTurn?.creaturesEntered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc)).length >= cond.n;
       return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype))).length >= cond.n;
     }
     case "destroyedByOpponent":
@@ -1487,7 +1489,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

@@ -1880,6 +1880,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return pickPermanents(s, e, ctx, src);
     case "sacrificeEach":
       return sacrificeEach(s, e, ctx, src);
+    case "randomCounterKind": {
+      const o = objects(s, e.what, ctx)[0];
+      if (!o || o.zone !== "battlefield") return;
+      // Only the counters on it count: a keyword it has from elsewhere still leaves that kind eligible (rulings).
+      const kinds = e.kinds.filter((k) => !((o.counters[k] ?? 0) > 0));
+      if (!kinds.length) {
+        log(s, `${defOf(s, o).name} already has every kind of counter it could get.`);
+        return;
+      }
+      const k = kinds[Math.floor(nextRandom(s) * kinds.length)]!;
+      log(s, `${src} chooses a ${k} counter at random.`);
+      withPutter(ctx.controller, () => putCounters(s, o, k, 1));
+      invalidateCharacteristics(s);
+      return;
+    }
     case "sacrificeRandom":
       for (const pid of apnap(s, players(s, e.who, ctx)))
         for (;;) {

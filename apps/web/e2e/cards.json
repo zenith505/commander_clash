@@ -14831,6 +14831,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b6e36e77-0cea-4b7a-b968-774b1e74a992",
+  "name": "Phyrexian Soulgorger",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Snow Artifact Creature — Phyrexian Construct",
+  "supertypes": [
+   "Snow"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Construct"
+  ],
+  "oracleText": "Cumulative upkeep—Sacrifice a creature. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+  "power": "8",
+  "toughness": "8",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ea96fe35-88ed-432b-a495-08e787d23d0b",
   "name": "Piercing Exhale",
   "manaCost": "{1}{G}",

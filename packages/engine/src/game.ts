@@ -707,6 +707,8 @@ export function moveObject(
     x?: number;
     /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
     sacrificed?: boolean;
+    /** Sacrificed to pay a cost of its controller's own spell or ability (mana abilities included): an opponent's resolving spell or ability doesn't cause it (Sigarda, Host of Herons). */
+    cost?: true;
     /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
     destroyedBy?: PlayerId;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
@@ -728,7 +730,7 @@ export function moveObject(
   const o = obj(s, id);
   const fromZone = o.zone;
   // "Can't be sacrificed": an instruction to sacrifice it does nothing (rulings on Alexios, CR 701.21).
-  if (opts.sacrificed && fromZone === "battlefield" && !canBeSacrificed(s, o)) {
+  if (opts.sacrificed && fromZone === "battlefield" && (opts.cost ? characteristics(s, o).cantBeSacrificed : !canBeSacrificed(s, o))) {
     log(s, `${defOf(s, o).name} can't be sacrificed.`);
     return;
   }
@@ -1104,6 +1106,8 @@ export function moveObject(
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
   o.enteredFromExile = to === "battlefield" && fromZone === "exile" ? true : undefined;
+  // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
+  if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
@@ -3240,10 +3244,16 @@ export function deciderOf(s: GameState, pid: PlayerId): PlayerId {
 /** The combat phase's steps (CR 506.1). */
 export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
+/** The creatures that entered this turn, as they entered (turnLog.entered), for GameState.lastTurn. */
+function creaturesEnteredOf(s: GameState): { creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] } {
+  const list = (s.turnLog?.entered ?? []).filter((e) => e.types.includes("Creature")).map((e) => ({ controller: e.controller, ...(e.id !== undefined ? { id: e.id, zc: e.zc } : {}) }));
+  return list.length ? { creaturesEntered: list } : {};
+}
+
 function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
-  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}) };
+  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...creaturesEnteredOf(s) };
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
   const controlled = s.controlledTurn;
@@ -4595,7 +4605,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
-    moveObject(s, id, "graveyard", { sacrificed: true });
+    moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   }
   if (ab.returnSelf) {
     log(s, `${p.name} returns ${name} to its owner's hand for mana.`);
@@ -4619,7 +4629,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
   if (ab.sacrificeIfNo && o.zone === "battlefield" && !(o.counters[ab.sacrificeIfNo] ?? 0)) {
     log(s, `${p.name} sacrifices ${name}.`);
-    moveObject(s, id, "graveyard", { sacrificed: true });
+    moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
@@ -6064,7 +6074,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
-    moveObject(s, choices.casualty, "graveyard", { sacrificed: true });
+    moveObject(s, choices.casualty, "graveyard", { sacrificed: true, cost: true });
     item.casualty = true;
     closeZoneBatch(s);
   }
@@ -6074,14 +6084,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Bargain: "you may sacrifice an artifact, enchantment, or token" (CR 702.166a).
   if (choices.bargain) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
-    moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
+    moveObject(s, choices.bargain, "graveyard", { sacrificed: true, cost: true });
     o.bargained = true;
     closeZoneBatch(s);
   }
   // Offering: the permanent is sacrificed as the total cost is paid (CR 702.48b).
   if (choices.offering) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.offering)} (offering).`);
-    moveObject(s, choices.offering, "graveyard", { sacrificed: true });
+    moveObject(s, choices.offering, "graveyard", { sacrificed: true, cost: true });
     closeZoneBatch(s);
   }
   // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c).
@@ -7194,7 +7204,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       if (choices.sacrifice?.length) {
         for (const id of choices.sacrifice) {
           log(s, `${p.name} forages, sacrificing ${nameOf(s, id)}.`);
-          moveObject(s, id, "graveyard", { sacrificed: true });
+          moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
         }
       } else {
         const ids = choices.exileCards ?? [];
@@ -7268,7 +7278,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         const ch = characteristics(s, o);
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
-        moveObject(s, id, "graveyard", { sacrificed: true });
+        moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
       }
     } else if (c.kind === "discard" && c.random) {
       // Chosen by the game as the cost is paid (CR 701.9b); a spell being cast is on the stack already (CR 601.2a).
@@ -7933,8 +7943,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
-  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
-  if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true });
+  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+  if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
@@ -9990,7 +10000,7 @@ function attackCostPaid(s: GameState, p: Player, ids: ObjectId[]) {
   for (const id of ids) {
     if (cost!.action === "sacrifice") {
       log(s, `${p.name} sacrifices ${nameOf(s, id)} to attack with ${nameOf(s, cost!.id)}.`);
-      moveObject(s, id, "graveyard", { sacrificed: true });
+      moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
     } else {
       log(s, `${p.name} returns ${nameOf(s, id)} to ${obj(s, id).owner === p.id ? "their" : "its owner's"} hand to attack with ${nameOf(s, cost!.id)}.`);
       moveObject(s, id, "hand");

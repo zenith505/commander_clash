@@ -12,7 +12,7 @@ import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, g
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
-import { lockedDoors } from "./run-permanents";
+import { canTransform, lockedDoors } from "./run-permanents";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
@@ -989,6 +989,12 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may discard a card or sacrifice a land" (Highway Robbery): only with one of them possible (rulings).
     if (e.type === "either" && e.onlyDoable && !e.options.some((o) => canDoNow(s, o, ctx))) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
+    // Ratchet, Field Medic: "you may convert ~. When you do, ...": only if it turns over now, the same object that hasn't
+    // transformed since the ability was put on the stack (CR 701.27f, rulings: a second trigger does nothing).
+    if (e.type === "transform" && e.what.ref === "self") {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || (me.transforms ?? 0) !== (ctx.sourceTransforms ?? 0) || (me.isToken ? !defOf(s, me).tokenBack || me.tokenBackUp : !canTransform(s, me))) return false;
+    }
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
     // (CR 609.3).

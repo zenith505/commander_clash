@@ -2139,6 +2139,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Way of the Paradox: "Whenever you activate a loyalty ability, ..."; Keral Keep Disciples: "... of a Chandra
   // planeswalker"; Way of the Mind Sculptor: "..., if you removed two or more loyalty counters to activate it, ..." (CR
   // 606.3-4). The event player is you.
+  // Elspeth's Talent, Rowan's Talent: "... of enchanted planeswalker": the permanent this Aura is attached to as the
+  // ability is activated (the same check as Illusionist's Bracers' "equipped creature").
+  const loyalEnchanted = /^Whenever you activate a loyalty ability of enchanted planeswalker, (.+)$/.exec(line);
+  if (loyalEnchanted) {
+    const body = parseBody(loyalEnchanted[1]!, { activatedAbility: true });
+    return body ? { event: "abilityActivated", activates: { by: "you", loyalty: true, equipped: true }, body } : "fail";
+  }
   const loyal = /^Whenever you activate a loyalty ability(?: of an? ([A-Z][a-z]+) planeswalker)?, (?:if you removed (two|three|four|five) or more loyalty counters to activate it, )?(.+)$/.exec(line);
   if (loyal) {
     const of = loyal[1] ? parseTargetPhrase(`${loyal[1]} planeswalker`) : undefined;
@@ -3466,6 +3473,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damages) return damages;
   // Vraska the Unseen: "whenever a creature deals combat damage to ~, destroy that creature": once for each creature
   // dealing it combat damage, which "that creature" means.
+  // Liliana's Talent: "Whenever a creature deals damage to enchanted planeswalker, destroy that creature": any damage,
+  // not just combat damage (rulings), once for each creature dealing it.
+  const damagesHost = /^Whenever a creature deals damage to enchanted planeswalker, (.+)$/.exec(line);
+  if (damagesHost) {
+    const body = parseBody(damagesHost[1]!, { subjectIt: true });
+    return body ? { event: "creatureDealsDamageToAttached", host: "attached", body } : "fail";
+  }
   const damagedBy = /^Whenever a creature deals combat damage to ~, (.+)$/.exec(line);
   if (damagedBy) {
     const body = parseBody(damagedBy[1]!, { subjectIt: true });

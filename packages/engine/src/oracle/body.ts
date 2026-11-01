@@ -409,6 +409,8 @@ const checkableMay = (e: Effect): boolean =>
   (e.type === "continuous" && e.what.ref === "target" && !e.what.n && e.duration === "game" && e.mods.some((m) => m.kind === "addTypes")) ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
+  // "You may convert ~. When you do, ..." (Ratchet, Field Medic): only if it turns over (run-choices canDoNow).
+  (e.type === "transform" && e.what.ref === "self") ||
   // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
   // there and tapped.
   (e.type === "untap" && e.what.ref === "target" && !("n" in e.what && e.what.n)) ||
@@ -2036,6 +2038,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
+  // Bring to Light: "Search your library for a creature, instant, or sorcery card with mana value less than or equal to
+  // ..., exile that card, then shuffle. You may cast that card without paying its mana cost.": cast as this resolves or
+  // not at all, and it stays exiled if it isn't cast (rulings, CR 608.2g).
+  const searchCastExiled = /^((?:[A-Z][a-z]+ — )?Search your library for an? [^.]+?, exile that card, then shuffle\.) You may cast that card without paying its mana cost\.$/.exec(text.trim());
+  if (searchCastExiled) {
+    const first = parseBody(searchCastExiled[1]!, opts);
+    const fx = first?.effects[0];
+    if (!first || first.effects.length !== 1 || fx?.type !== "search" || fx.dest.zone !== "exile" || fx.n !== 1 || fx.dest.faceDown || fx.dest.play || fx.dest.linked || fx.others || fx.who || fx.library) return null;
+    const { away: _away, ...search } = fx;
+    return { ...first, effects: [{ ...search, dest: { ...fx.dest, castFree: true } }, { type: "castSearched" }], text };
+  }
   // Ugin, Eye of the Storms: "Search your library for any number of colorless nonland cards, exile them, then shuffle.
   // Until end of turn, you may cast those cards without paying their mana costs." With the normal timing (rulings).
   const ugin = /^Search your library for any number of (.+? cards), exile them, then shuffle\. Until end of turn, you may cast those cards without paying their mana costs\.$/.exec(text.trim());

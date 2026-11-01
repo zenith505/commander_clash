@@ -10,7 +10,8 @@ import { layerOf } from "../layers";
  * '... token with flying and '{R}: This token gets +1/+0 until end of turn.'', Nesting Dragon): double quotes once it's
  * an ability of its own.
  */
-export const innerQuotes = (text: string) => text.replace(/ (with|and) '([^']+?\.)'/g, ' $1 "$2"');
+// Teferi's Talent: "an emblem with 'You may activate ... on any player's turn ...'": an apostrophe inside is no quote mark.
+export const innerQuotes = (text: string) => text.replace(/ (with|and) '(.+?\.)'(?![A-Za-z])/g, ' $1 "$2"');
 
 /** Can we run an ability given in quotes (a token's or one granted to something)? */
 export function compileQuoted(text: string): boolean {

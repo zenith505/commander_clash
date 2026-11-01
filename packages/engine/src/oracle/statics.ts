@@ -1699,7 +1699,7 @@ export function parseAffected(subject: string): Affects | null {
     const { controller: _, ...spec } = a.spec;
     return { ...a, spec, controller: "enchanted" };
   }
-  if (/^(Enchanted|Equipped) (creature|permanent|artifact|land)$/.test(x)) return { kind: "attached" };
+  if (/^(Enchanted|Equipped) (creature|permanent|artifact|land|planeswalker)$/.test(x)) return { kind: "attached" };
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
   // "Creatures attacking your opponents", the same (rulings).

@@ -741,6 +741,14 @@ export function compile(d: CardDef): CompiledCard {
       out.borrows = { filter: { kind: "object", subtypes: [topBorrow[1]!], text: `${topBorrow[1]} card` }, top: true };
       continue;
     }
+    // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
+    // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
+    const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
+    if (borrowLinked && !out.borrows) {
+      const kind = borrowLinked[1] ? capital(borrowLinked[1]) : undefined;
+      out.borrows = { filter: { kind: "card", ...(kind ? { types: [kind], notTypes: [], notColors: [] } : {}), text: `${borrowLinked[1] ? `${borrowLinked[1]} ` : ""}cards exiled with ~` }, linked: true };
+      continue;
+    }
     if (borrow && !out.borrows) {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
@@ -1400,11 +1408,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
-    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type(?: other than (?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?: or (?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))?)?)\.$/.exec(line);
     if (asCardType) {
+      // Stenn, Paranoid Partisan: "a card type other than creature or land": any of the others.
+      const other = /^a card type other than (\w+)(?: or (\w+))?$/.exec(asCardType[1]!);
+      const not = other ? [capital(other[1]!), ...(other[2] ? [capital(other[2])] : [])] : [];
       if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
       // "Choose a card type" (Serra's Emissary): any that a card here can have (rulings).
-      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1] === "a card type" ? Object.keys(CARD_TYPE_PLURAL) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.startsWith("a card type") ? Object.keys(CARD_TYPE_PLURAL).filter((t) => !not.includes(t)) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
@@ -5199,6 +5210,14 @@ function linkExile(out: CompiledCard) {
     const oneAbility = exiles.length > 1 && new Set(out.triggers.map((t) => JSON.stringify(t.body)).filter((b, i) => allEffects(out.triggers[i]!.body.effects).some((e) => exiles.includes(e)))).size === 1 && exiles.every((e) => out.triggers.some((t) => allEffects(t.body.effects).includes(e)));
     if ((exiles.length !== 1 && !oneAbility) || exiles.some((e) => e.type !== "exile" || e.until)) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
     else for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
+  }
+  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a).
+  if (out.borrows?.linked) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1 || exiles[0]!.until) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
   }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).

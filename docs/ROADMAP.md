@@ -1,7 +1,7 @@
 # Roadmap
 
-28,710 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,235 of
+28,722 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,241 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1391,6 +1391,25 @@ line blocks.
    is supported); Mariposa Military Base (an opt-in "enter tapped with rad counters" choice when the land is played;
    "rad counters you have" now counts); Font of Agonies (no "whenever you pay life" event yet); Tromokratis ("can't be
    blocked unless all creatures defending player controls block it": a block legality rule and bot blocking).
+   Round 230 (skipped cards from the top, now done): "~ has all activated abilities of all cards exiled with it", mana
+   abilities too, linked to its one exile ability (Myr Welder; "creature cards" for Dark Impostor and Patchwork Crawler;
+   CR 607.2a); "choose a card type other than creature or land" (Stenn, Paranoid Partisan); converge, then "exile that
+   card, then shuffle. You may cast that card without paying its mana cost", the card staying exiled if it isn't cast
+   (Bring to Light); the planeswalker Talents: "Enchanted planeswalker has "[+1]: ..."" (a loyalty ability, once a turn
+   with the planeswalker's own, CR 606.3), "Whenever you activate a loyalty ability of enchanted planeswalker" (Elspeth's
+   Talent; Rowan's Talent copies it), "put a loyalty counter on enchanted planeswalker" (Vivien's and Teferi's Talents;
+   Teferi's emblem, an apostrophe inside its single-quoted text now read right), "Whenever a creature deals damage to
+   enchanted planeswalker, destroy that creature", combat or not (Liliana's Talent); "you may convert ~. When you do,
+   ..." (Ratchet, Field Medic) and "you may transform it. If you do, ..." (Soul Seizer): only if it can turn over and
+   hasn't transformed since the ability went on the stack (CR 701.27f, rulings). Browser tests for Stenn's choice and a
+   Talent's granted loyalty ability. +12 (28,722 of 31,936).
+   Out after round 230 (looked at, not done): Abstruse Appropriation ("spend colorless mana as though it were mana of
+   any color": a payment rule for colored symbols); War's Toll ("If a creature an opponent controls attacks, all
+   creatures that opponent controls attack if able": a requirement that depends on the declaration); Kaito, Dancing
+   Shadow ("activate loyalty abilities of ~ twice this turn", a one-turn grant); Saheeli's Lattice, Altar of the
+   Wretched, Paleontologist's Pick-Axe and Sunbird Standard ("Craft with one or more ...", and what their back faces
+   read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
+   direction); Ramses, Assassin Lord (attacked this turn by an Assassin you controlled).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

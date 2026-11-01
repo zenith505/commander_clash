@@ -113,6 +113,7 @@ import {
   landUntappedOffer,
   creatureTypesOf,
   mustAttackPlayers,
+  hasConspire,
   walkersFreeToAttack,
   attackTargetScore,
 } from "./game";
@@ -197,6 +198,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Out of the Tombs: the creature card that costs the most comes back.
     if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
+    if (pend.kind === "drawInstead") {
+      // Its own Words before an opponent's Urabrask; the life when it's low, otherwise the token.
+      const words = pend.options.filter((k) => k.startsWith("words:"));
+      const w = (k: string) => player(s, pid).nextDrawInstead?.[Number(k.slice("words:".length))];
+      const low = player(s, pid).life <= 10;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? pend.options[0]!;
+      return [{ type: "drawInstead", player: pid, choice: pick }];
+    }
     if (pend.kind === "dredge") {
       // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
       const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
@@ -2766,7 +2775,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     if (tw) extra.teamwork = tw;
     if (must("teamwork") && !tw) return null;
     // Conspire (CR 702.78a): two such creatures for a copy of the spell.
-    if (c.conspire) {
+    if (hasConspire(s, pid, obj(s, id))) {
       const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
       if (two.length === 2) extra.conspire = two;
     }
@@ -4168,6 +4177,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
+      if (ab.body.effects.some((e) => e.type === "nextDrawInstead") && !(only && s.step === "upkeep" && s.activePlayer === pid)) continue; // only for the draw step's draw (chooseTimed)
       // Metzali's "Choose a creature at random that attacked this turn. Destroy that creature.": only when none of them are
       // ours and there is one.
       const randomKill = ab.body.effects.find((e) => e.type === "destroyRandom");
@@ -4689,6 +4699,11 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
+  // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
+  if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
+    const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));
+    if (words) return words;
+  }
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
 }
 

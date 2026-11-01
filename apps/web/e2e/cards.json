@@ -10903,6 +10903,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7df50107-25d8-47dc-9a13-27b257cfbf6f",
+  "name": "Lens of Clarity",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may look at the top card of your library and at face-down creatures you don't control any time.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ktk",
+  "releasedAt": "2014-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6496eea7-38f5-4428-a379-b08b0eeb5239",
   "name": "Leonardo, Big Brother",
   "manaCost": "{2}{W}",
@@ -20072,6 +20094,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "51d517c9-2812-44ce-ab4d-e5422b5ecf6c",
+  "name": "Tomorrow, Azami's Familiar",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "If you would draw a card, look at the top three cards of your library instead. Put one of those cards into your hand and the rest on the bottom of your library in any order.",
+  "power": "1",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a6395447-677d-4c39-8eda-2d57e527c94e",
   "name": "Torrential Gearhulk",
   "manaCost": "{4}{U}{U}",
@@ -21969,6 +22023,58 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "888582df-4fe2-4d05-9b62-10c90aaa76f2",
+  "name": "Words of Wilding",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time you would draw a card this turn, create a 2/2 green Bear creature token instead.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f1fad5ab-d087-4912-b1b9-42733fa34707",
+  "name": "Words of Worship",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time you would draw a card this turn, you gain 5 life instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

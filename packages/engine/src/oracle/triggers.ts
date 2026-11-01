@@ -2404,6 +2404,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
     // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
+    // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.
+    .replace(/^(At the beginning of each player's upkeep, if that player controls more lands than each other player), the player creates /, "$1, that player creates ")
+    // Psychic Venom: "Whenever enchanted land becomes tapped, ~ deals 2 damage to that land's controller": the tapped land's
+    // controller, as Pooling Venom's "its controller" (rulings: tapped for any reason).
+    .replace(/^(Whenever enchanted land becomes tapped, ~ deals \w+ damage to) that land's controller\.$/, "$1 its controller.")
+    // Slow Motion: "that player sacrifices that creature unless they pay {2}": their choice to pay as it resolves, then the
+    // sacrifice if they didn't (rulings; a player can only sacrifice a creature they control, CR 701.21a).
+    .replace(/^(At the beginning of the upkeep of enchanted creature's controller), that player sacrifices that creature unless they pay ((?:\{[^}]+\})+)\.$/, "$1, that player may pay $2. If they don't, that player sacrifices enchanted creature.")
     // Paralyze: "that player may pay {4}. If the player does, untap the creature.": the enchanted creature.
     .replace(/^(At the beginning of the upkeep of enchanted creature's controller, that player may pay (?:\{[^}]+\})+\. If the player does, untap) the creature\.$/, "$1 enchanted creature.")
     // Awaken the Sky Tyrant: "When a source an opponent controls deals damage to you, sacrifice ~. ...": each time, the
@@ -2938,6 +2946,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${inYard[1]}, ${inYard[3]}return ~ from your graveyard to your hand.`);
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard", ...(inYard[2] ? { creatureAbove: true as const } : {}) } };
+  }
+  // Nether Spirit: "At the beginning of your upkeep, if ~ is the only creature card in your graveyard, you may return ~ to
+  // the battlefield": an ability of the card in the graveyard (CR 113.6b) with an intervening if (CR 603.4): it doesn't
+  // trigger, or does nothing, while another creature card is there (rulings).
+  if (/^At the beginning of your upkeep, if ~ is the only creature card in your graveyard, you may return ~ to the battlefield\.$/.test(line)) {
+    const t = parseTrigger("At the beginning of your upkeep, you may return ~ from your graveyard to the battlefield.");
+    if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
+    return { ...t, ifCond: { kind: "selfInGraveyard", onlyCreature: true } };
   }
   // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {2}{G}. If you do, return target creature
   // card from your graveyard to your hand." (Genesis): the same, about other cards; its target may be the card itself.

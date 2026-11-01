@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CREATURE_TYPES, IDENTITY_PROTECTION, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -166,7 +166,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -673,13 +673,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "selfDamagedCreature":
       return !!s.turnLog?.damagedCreature?.includes(`${src.id}@${src.zoneChanges ?? 0}`);
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
-      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
+      // Nether Spirit: no other creature card there (rulings: two of them stop each other), as the cards are there.
+      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src)) && (!cond.onlyCreature || (defOf(s, src).types.includes("Creature") && !(s.players[you]?.graveyard ?? []).some((id) => id !== src.id && !!s.objects[id] && defOf(s, s.objects[id]!).types.includes("Creature"))));
     case "topCardIs": {
       const top = s.objects[s.players[you]?.library[0] ?? ""];
       return !!top && printedMatches(cond.filter, defOf(s, top));
     }
-    case "graveyardAtLeast": // threshold
-      return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
+    case "graveyardAtLeast": {
+      // threshold; So Tiny's "its controller", the controller of the creature it's attached to, as the layers so far have it
+      const who = cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? chars.get(src.attachedTo)!.controller : undefined) : you;
+      return who !== undefined && (s.players[who]?.graveyard.length ?? 0) >= cond.n;
+    }
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
       return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
     case "graveyardPermanents": // descend
@@ -955,6 +959,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you) && (!cond.yours || d.player === you));
     case "opponentLostLife":
       if (cond.damaged && cond.noncombat) return Object.entries(s.turnLog?.noncombatDamage ?? {}).some(([p, v]) => Number(p) !== you && v > 0);
+      if (cond.damaged && cond.of === "eventPlayer") return eventPlayer !== undefined && (s.damagedThisTurn ?? []).some((p) => p !== eventPlayer);
       if (cond.damaged) return (s.damagedThisTurn ?? []).some((p) => p !== you);
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
@@ -1251,6 +1256,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "renowned") return !!src.renowned; // CR 702.112b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
+      if (cond.is === "aura") return src.zone === "battlefield" && !!chars.get(src.id)?.subtypes.includes("Aura");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "attackedOrBlockedThisCombat") return src.declaredInCombat?.turn === s.turn && src.declaredInCombat.combat === (s.combatsThisTurn ?? 0);
       if (cond.is === "attackedOrBlockedThisTurn") return src.declaredInCombat?.turn === s.turn;
@@ -1437,7 +1443,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // this early, layer 6 grants come later). Its basic land types give it their mana abilities (manaAbilitiesOn).
       // Card types and supertypes stay: a nonbasic land stays nonbasic, a land creature stays a creature.
       if (!c.types.includes("Land")) return;
-      c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes];
+      // Convincing Mirage's "the chosen type": the basic land type chosen as the source entered; none chosen, no change.
+      if (m.subtypes.includes(CHOSEN_LAND_TYPE)) {
+        const chosen = e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined;
+        if (!chosen) return;
+        c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes.map((st) => (st === CHOSEN_LAND_TYPE ? chosen : st))];
+      } else c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes];
       c.hasPrintedAbilities = false;
       c.keywords = [];
       c.sparedBy = undefined;
@@ -1666,7 +1677,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.untargetable = [...(c.untargetable ?? []), { ...m.by, of: e.controller ?? (e.sourceId ? chars.get(e.sourceId)?.controller : undefined) ?? c.controller }];
       return;
     case "preventDamage": {
-      const { kind: _, ...p } = m;
+      const { kind: _, fromChosenColor, ...p0 } = m;
+      // Prismatic Ward: the color its source's controller chose as it entered (CR 614.12).
+      const chosenCol = fromChosenColor && e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined;
+      const p = fromChosenColor ? { ...p0, fromColors: chosenCol ? [chosenCol] : [] } : p0;
       c.preventDamage = [...(c.preventDamage ?? []), p.plusOnes || p.reflect ? { ...p, you: controllerOfInst(e, chars), from: e.sourceId ?? "" } : p];
       return;
     }
@@ -2101,8 +2115,9 @@ function offFieldGrants(s: GameState): OffFieldGrant[] {
   return grants;
 }
 
-/** Changeling (CR 702.73a), unless an effect outside the battlefield set the card's creature types. */
-export const everyCreatureType = (d: CardDef): boolean => d.everyCreatureType ?? d.keywords.includes("Changeling");
+/** Changeling (CR 702.73a), or Mistform Ultimus's "~ is every creature type" (a characteristic-defining ability that works
+ * in every zone, CR 604.3, rulings), unless an effect outside the battlefield set the card's creature types. */
+export const everyCreatureType = (d: CardDef): boolean => d.everyCreatureType ?? (d.keywords.includes("Changeling") || isEveryCreatureTypeText(d));
 
 const typedDefs = new Map<string, CardDef>();
 

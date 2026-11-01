@@ -463,6 +463,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (what?.ref !== "target" || what.n !== 3) return null;
     return [{ type: "randomTargetsToBottom", what, keep: 2 }, { type: "putOntoBattlefield", what }];
   }
+  // Wild Swing: one of the three targets still legal as it resolves, chosen at random then (rulings: one of the other two if
+  // one has become illegal, the last one if two have; no time to respond between the choice and the destruction).
+  if (/^Destroy one of three target nonenchantment permanents at random$/.test(s)) {
+    const what = parseObject("three target nonenchantment permanents", ctx);
+    if (what?.ref !== "target" || what.n !== 3) return null;
+    return [{ type: "destroyRandomTarget", what }];
+  }
   if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on (?:it|~))?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
@@ -1182,6 +1189,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.
   if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it (on their choice of the top or bottom of their library|into their library second from the top or on the bottom)$/i.exec(s))) {
     // Subtlety: "up to one target creature or planeswalker spell": one spell, or none (CR 115.6, 601.2c).
+    // Sudden Setback: "The owner of target spell or nonland permanent puts it ...": one target, a spell (it leaves the
+    // stack, not countered, so even one that can't be countered) or a nonland permanent, its owner choosing as it
+    // resolves (rulings); like Airbend's spell or permanent.
+    if (m[2] === "target spell or nonland permanent" && !/second from the top/.test(m[3]!)) {
+      const perm = parseTargetPhrase("nonland permanent");
+      if (perm?.kind !== "object") return null;
+      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or nonland permanent" });
+      return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
+    }
     const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
     const spellSpec = spellUpTo ? parseTargetPhrase(spellUpTo[1]!) : undefined;
     // Temporal Cleansing: "puts it into their library second from the top or on the bottom", a permanent only.

@@ -2373,6 +2373,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "destroyRandomTarget": {
+      // Wild Swing: chosen at random among the legal targets left, then destroyed at once (CR 701.8).
+      const left = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
+      if (!left.length) return;
+      const o = left[Math.floor(nextRandom(s) * left.length)]!;
+      const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
+      if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}, chosen at random.`, false, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
+      return;
+    }
     case "randomFromGraveyard": {
       const from = e.from ? players(s, e.from, ctx)[0] : ctx.controller;
       if (from === undefined) return;

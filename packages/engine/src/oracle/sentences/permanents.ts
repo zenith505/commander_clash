@@ -1151,6 +1151,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
+  // Sky Swallower: "target opponent gains control of all other permanents you control": each of them at once, the ones you
+  // control as it resolves (CR 611.2c), for the rest of the game (rulings: Auras stay where they are; they don't come
+  // back when ~ leaves).
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) gains control of all other permanents you control$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const what = who && parseObject("all other permanents you control", ctx);
+    return who?.ref === "target" && what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
   // Starke of Rath: "Destroy target artifact or creature. That permanent's controller gains control of ~": whoever
   // controlled it as it last existed (CR 608.2h), destroyed or not; nobody if it's an illegal target (CR 608.2b). For the
   // rest of the game, layer 2.

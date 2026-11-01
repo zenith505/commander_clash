@@ -299,7 +299,19 @@ export const objIsType = (s: GameState, o: GameObject, t: string) => characteris
 /** Does this permanent have keyword `k` right now (printed, granted, or not lost)? */
 /** Whether it can be sacrificed: not if it "can't be sacrificed" (CR 701.21; rulings on Alexios), for a cost or by an effect. */
 export function canBeSacrificed(s: GameState, o: GameObject): boolean {
-  return !characteristics(s, o).cantBeSacrificed;
+  return !characteristics(s, o).cantBeSacrificed && !opponentForbidsSacrifice(s, o);
+}
+
+/**
+ * Sigarda, Host of Herons: a spell or ability an opponent of this permanent's controller controls is resolving, and that
+ * player controls a permanent with "Spells and abilities your opponents control can't cause you to sacrifice permanents"
+ * (rulings: the sacrifice, or the option to sacrifice, just isn't there). Every other player is an opponent (CR 102.3).
+ */
+export function opponentForbidsSacrifice(s: GameState, o: GameObject): boolean {
+  const by = s.resolving?.item.controller;
+  if (by === undefined || o.zone !== "battlefield") return false;
+  const you = controllerOf(s, o);
+  return by !== you && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === you && !!abilitiesOf(s, s.objects[id]!).opponentsCantMakeYouSacrifice);
 }
 
 /**
@@ -307,7 +319,8 @@ export function canBeSacrificed(s: GameState, o: GameObject): boolean {
  * Angel of Jubilation ("creatures") or Yasharn ("nonland permanents") says players can't (rulings).
  */
 export function canSacrificeForCost(s: GameState, o: GameObject): boolean {
-  if (!canBeSacrificed(s, o)) return false;
+  // A cost of the player's own spell or ability isn't caused by an opponent's (Sigarda, Host of Herons), so only "can't be sacrificed".
+  if (characteristics(s, o).cantBeSacrificed) return false;
   return !s.battlefield.some((id) => {
     const r = abilitiesOf(s, s.objects[id]!).noSacrificeCosts;
     return r === "creatures" ? objIsType(s, o, "Creature") : r === "nonland" ? !objIsType(s, o, "Land") : false;

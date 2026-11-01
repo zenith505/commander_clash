@@ -141,6 +141,7 @@ export function canonicalKeyword(text: string): string | undefined {
   const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored|activated and triggered abilities|artifacts|creatures|enchantments|instants|planeswalkers|sorceries)$/.exec(p);
   if (hx) return `Hexproof from ${hx[1]}`;
   if (p === "hexproof from the chosen color") return CHOSEN_HEXPROOF;
+  if (p === "hexproof from each of its colors") return OWN_COLORS_HEXPROOF;
   // "Gains toxic 1" (Skrelv): a keyword with a number (CR 702.164a).
   const tox = /^toxic (\d+)$/.exec(p);
   if (tox) return `Toxic ${tox[1]}`;
@@ -201,6 +202,11 @@ export const CHOSEN_PROTECTION = "Protection from the chosen color";
 export const CHOSEN_HEXPROOF = "Hexproof from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
 /**
+ * "Has hexproof from each of its colors" (Tam, Mindful First-Year): filled in, in layer 6, with the colors the permanent
+ * has after layer 5 (CR 613.1e-f), one "hexproof from [color]" each (CR 702.11d); none if it's colorless (rulings).
+ */
+export const OWN_COLORS_HEXPROOF = "Hexproof from each of its colors";
+/**
  * "Protection from each color that's not in your commander's color identity" (Commander's Plate): filled in with the
  * colors outside the combined color identity of the commanders of the effect's controller; none if they have no
  * commander (rulings).
@@ -224,9 +230,11 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[]) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[]) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_KEYWORDS
+    k === OWN_COLORS_HEXPROOF
+      ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `Hexproof from ${COLOR_WORD[c]}`)
+      : k === CHOSEN_KEYWORDS
       ? [...(chosenKeywords ?? [])]
       : k === CHOSEN_CREATURE_TYPE_PROTECTION
       ? creatureType ? [`Protection from creatures of type ${creatureType}`] : []

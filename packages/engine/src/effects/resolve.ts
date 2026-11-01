@@ -1005,6 +1005,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "increaseSpeed":
     case "ascend":
     case "gainLife":
+    case "noteLife":
     case "exchangeLife":
     case "exchangeLifeWithSelf":
     case "loseLife":
@@ -1054,6 +1055,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "meld":
     case "sacrificeEach":
     case "sacrificeRandom":
+    case "randomCounterKind":
     case "destroyRandom":
     case "keepRest":
     case "keepDestroyRest":

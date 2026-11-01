@@ -306,7 +306,9 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
   // "Whenever a creature or enchantment you control enters this turn, draw a card" (Rite of Harmony): the same as "This
   // turn, whenever a creature or enchantment you control enters, ..." (CR 603.7b).
-  const enters = /^Whenever (an?(?: [a-z]+)? (?:creature|enchantment|artifact|land|permanent)(?: or (?:creature|enchantment|artifact|land))?(?: you control)?) enters this turn, (.+)$/.exec(s);
+  // Theoretical Duplication: "Whenever a nontoken creature an opponent controls enters this turn, create a token that's a
+  // copy of that creature."
+  const enters = /^Whenever (an?(?: [a-z]+)? (?:creature|enchantment|artifact|land|permanent)(?: or (?:creature|enchantment|artifact|land))?(?: you control| an opponent controls)?) enters this turn, (.+)$/.exec(s);
   if (enters) return floatingTrigger(`This turn, whenever ${enters[1]!} enters, ${enters[2]!}`, after, ctx);
   // "Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
@@ -3131,6 +3133,34 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseSentence(capital(sacTurnX[2]!), ctx);
       if (!then || !JSON.stringify(effects).includes('"sacrificedThisTurn"')) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "sacrificedThisTurn" } }, min: num(sacTurnX[1]!) }, effects: then });
+      continue;
+    }
+    // Sigarda's Splendor: "draw a card if your life total is greater than or equal to the last noted life total for ~. Then
+    // note your life total.": noted as it resolves, drawn or not (rulings).
+    if (/^[Dd]raw a card if your life total is greater than or equal to the last noted life total for ~$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Then note your life total") {
+      effects.push({ type: "if", cond: { kind: "lifeAtLeastNoted" }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] }, { type: "noteLife" });
+      si++;
+      continue;
+    }
+    // Crystalline Giant: "choose a kind of counter at random that ~ doesn't have on it from among flying, first strike, ...,
+    // and +1/+1. Put a counter of that kind on ~." Keyword counters (CR 122.1b) and +1/+1.
+    const randomKind = /^[Cc]hoose a kind of counter at random that ~ doesn't have on it from among (.+), and (\+1\/\+1)$/.exec(s);
+    if (randomKind && sentences[si + 1]?.replace(/\.$/, "") === "Put a counter of that kind on ~") {
+      const kinds = [...randomKind[1]!.split(", "), randomKind[2]!];
+      const ok = new Set(["flying", "first strike", "double strike", "deathtouch", "haste", "hexproof", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance", "+1/+1"]);
+      if (!kinds.every((k) => ok.has(k))) return null;
+      effects.push({ type: "randomCounterKind", what: { ref: "self" }, kinds });
+      si++;
+      continue;
+    }
+    // Grindstone: "Target player mills two cards. If two cards that share a color were milled this way, repeat this
+    // process.": again and again in this resolution while the two milled share a color (rulings: both colorless don't).
+    if (sentences[si + 1]?.replace(/\.$/, "") === "If two cards that share a color were milled this way, repeat this process") {
+      const mill = parseSentence(capital(s), ctx);
+      const m0 = mill?.length === 1 ? mill[0] : undefined;
+      if (m0?.type !== "mill" || typeof m0.n !== "number" || m0.n !== 2) return null;
+      effects.push({ ...m0, repeatSharedColor: true });
+      si++;
       continue;
     }
     // Akroma, Vision of Ixidor: one instruction, before the conditions below read its "if it has" (sentences/permanents.ts).

@@ -2671,6 +2671,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
     return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
   }
+  // Fire Lord Zuko: "Whenever you cast a spell from exile and whenever a permanent you control enters from exile": two
+  // trigger events for one ability (CR 603.2), the second a permanent put onto the battlefield or played from exile under
+  // your control (CR 603.6a). The Lost and the Damned: "Whenever a land you control enters from anywhere other than your
+  // hand or you cast a spell from anywhere other than your hand": the same with the land first.
+  const permFromExile = /^Whenever you cast a spell from exile and whenever a permanent you control enters from exile, (.+)$/.exec(line);
+  const landNotHand = /^Whenever a land you control enters from anywhere other than your hand or you cast a spell from anywhere other than your hand, (.+)$/.exec(line);
+  if (permFromExile || landNotHand) {
+    const rest = (permFromExile ?? landNotHand)![1]!;
+    if (/\b(it|its|that card|that spell|that land|that permanent)\b/.test(rest)) return "fail";
+    const t = parseTrigger(`Whenever you cast a spell from ${permFromExile ? "exile" : "anywhere other than your hand"}, ${rest}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== (permFromExile ? "exile" : "notHand")) return "fail";
+    return { ...t, cast: { ...t.cast, ...(permFromExile ? { orPermanentEntersFromExile: true as const } : { orLandEntersNotFromHand: true as const }) } };
+  }
   // Rendmaw, Creaking Nest: "whenever you play a card with two or more card types": a spell cast or a land played (CR
   // 305.1, 601.2) whose card has that many card types (CR 205.2a), as it was played.
   const playTypes = /^Whenever you play a card with (two|three) or more card types, (.+)$/.exec(line);
@@ -2767,6 +2780,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Narci, Fable Singer; Tom Bombadil: "whenever the final chapter ability of a Saga you control resolves": the chapter
   // ability with the greatest chapter number its Saga has (rulings), once it has finished resolving and left the stack
   // (rulings); "that Saga's mana value" is the event's amount.
+  // Historian's Boon: "Whenever the final chapter ability of a Saga you control triggers": as it triggers (CR 603.2), the
+  // chapter ability with the greatest chapter number its Saga has (rulings), whether or not it resolves.
+  const finalTriggers = /^Whenever the final chapter ability of a Saga you control triggers, (.+)$/.exec(line);
+  if (finalTriggers) {
+    if (/\b(that Saga|it|its|that ability)\b|\bX\b/.test(finalTriggers[1]!)) return "fail";
+    const body = parseBody(capital(finalTriggers[1]!));
+    return body ? { event: "youFinalChapterTriggers", body } : "fail";
+  }
   const finalChapter = /^Whenever the final chapter ability of a Saga you control resolves, (.+?)(, where X is that Saga's mana value)?\.$/.exec(line);
   if (finalChapter) {
     if (/\bthat Saga\b/.test(finalChapter[1]!) || /\bX\b/.test(finalChapter[1]!) !== !!finalChapter[2]) return "fail";

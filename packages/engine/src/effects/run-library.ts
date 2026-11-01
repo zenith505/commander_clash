@@ -139,13 +139,24 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.milledExiled = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
-        for (const id of p.library.slice(0, n)) {
-          moveObject(s, id, "graveyard", { milled: true });
-          if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
-          else if (obj(s, id).zone === "exile") s.resolving!.milledExiled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+        // Grindstone: repeated while two cards that share a color are milled, each time anew; it ends with a library that
+        // runs out (fewer than two milled), so no shortcut is needed (CR 732).
+        for (let again = true; again; ) {
+          again = false;
+          const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
+          const ids = p.library.slice(0, n);
+          for (const id of ids) {
+            moveObject(s, id, "graveyard", { milled: true });
+            if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+            else if (obj(s, id).zone === "exile") s.resolving!.milledExiled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+          }
+          log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
+          if (e.repeatSharedColor && ids.length === 2) {
+            // The cards as milled: their colors in the zone they went to (a card's colors outside the battlefield, CR 105.2).
+            const [a, b] = ids.map((id) => characteristics(s, obj(s, id)).colors);
+            again = a!.some((c) => b!.includes(c));
+          }
         }
-        log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }
       return;
     case "exileTop":

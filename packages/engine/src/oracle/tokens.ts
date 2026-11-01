@@ -180,6 +180,8 @@ export function parseCountMod(line: string): CountMod | undefined {
   m = /^If one or more counters would be put on (an artifact or creature|a permanent) you control, that many plus one of each of those kinds of counters are put on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: m[1] === "a permanent" ? "permanent" : "artifactOrCreature", who: "you", op: "plusOne" };
   if (line === "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead.") return { what: "counters", onPlayer: true, op: "plusOne" };
+  if (line === "If you would get one or more {E}, you get that many plus one {E} instead.") return { what: "counters", onPlayer: true, op: "plusOne", counter: "energy" };
+  if (line === "If you would get one or more {E}, you get twice that many {E} instead.") return { what: "counters", onPlayer: true, op: "double", counter: "energy" };
   // Vizier of Remedies.
   if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")
     return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };

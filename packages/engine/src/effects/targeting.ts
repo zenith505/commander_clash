@@ -1161,7 +1161,8 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
   // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
-  if (e.anyController && (e.action === "counters" || e.action === "bounce")) return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
+  // The Horus Heresy: "each player chooses a creature", anyone's.
+  if (e.anyController && (e.action === "counters" || e.action === "bounce" || (e.action === "choose" && !e.least && !e.greatest))) return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
   // Drop of Honey, Purging Scythe: "the creature with the least power" on the battlefield, anyone's, or tied for it; to be
   // destroyed, one that can be if any of those can (rulings, CR 702.12b).
   if (e.anyController && e.action === "choose" && e.least) {

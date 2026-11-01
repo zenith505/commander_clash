@@ -653,10 +653,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
         // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
-        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src, ...(e.maxMv !== undefined ? { mv: { max: e.maxMv } } : {}) };
-        if (freeCastable(s, caster, hit)) return "paused";
+        // Solstice Revelations: "less than the number of Mountains you control", counted now.
+        const maxMv = e.mvLessThan !== undefined ? amountNow(s, e.mvLessThan, ctx) - 1 : e.maxMv;
+        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src, ...(maxMv !== undefined ? { mv: { max: maxMv } } : {}) };
+        if (maxMv === undefined || maxMv >= 0) if (freeCastable(s, caster, hit)) return "paused";
         s.pending = null;
-        log(s, `${defOf(s, obj(s, hit)).name} can't be cast${e.maxMv !== undefined ? ` (mana value ${e.maxMv} or less)` : ""}.`);
+        log(s, `${defOf(s, obj(s, hit)).name} can't be cast${maxMv !== undefined ? ` (mana value ${maxMv < 0 ? "less than 0" : `${maxMv} or less`})` : ""}.`);
       }
       // "If you don't, put that card into your hand": its owner's, from exile (Breaching Dragonstorm).
       const left = sc.untilNonland.hit;

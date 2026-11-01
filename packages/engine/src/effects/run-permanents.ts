@@ -3,7 +3,7 @@ import { abilitiesOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, 
 import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withPutter } from "../counters";
+import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -815,7 +815,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const m = e.maxTotal !== undefined ? Math.min(n, e.maxTotal - (o.counters[kind] ?? 0)) : n;
         if (m <= 0) continue;
         invalidateCharacteristics(s);
-        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, kind, m)) : putCounters(s, o, kind, m);
+        // Modular's own counters (the only effect counting a permanent's last known counters): Zabaz adds one more.
+        const putNow = () => (e.perLastKnownCounter ? withModular(() => putCounters(s, o, kind, m)) : putCounters(s, o, kind, m));
+        const put = by !== undefined ? withPutter(by, putNow) : putNow();
         log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
         // "Each creature that had a +1/+1 counter put on it this way" (Fangs of Kalonia): not one a replacement kept them off.
         if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind });
@@ -1003,6 +1005,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${src} puts ${put === 1 ? "a" : put} ${counter} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
       return;
     }
+    case "noteAmount":
+      s.resolving!.notedAmount = amountNow(s, e.n, ctx);
+      return;
     case "noteManaSpent": {
       // Its source, if it's still the same object (CR 400.7); one type of mana spent (the cost {1} paid with one mana).
       const o = objects(s, { ref: "self" }, ctx)[0];
@@ -1489,6 +1494,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attackBanThisTurn": {
+      const you = player(s, ctx.controller).name;
+      for (const pid of players(s, e.who, ctx)) {
+        if (pid === ctx.controller) continue;
+        (player(s, pid).attackBansThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, ...(e.subtype ? { subtype: e.subtype } : {}), ...(e.combat ? { combat: s.combatsThisTurn ?? 0 } : {}) });
+        log(s, `Creatures ${player(s, pid).name} controls can't attack ${e.subtype ? `${e.subtype}s ${you} controls` : you} this ${e.combat ? "combat" : "turn"}.`);
+      }
+      return;
+    }
     case "attackBanNextTurn": {
       for (const pid of players(s, e.who, ctx)) {
         (player(s, pid).attackBansNextTurn ??= []).push({ player: ctx.controller });
@@ -1913,8 +1927,17 @@ export function unlockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]) {
  */
 function exploreReplaced(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
   const sc = (s.resolving!.scratch ??= {});
+  const you = self && self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller;
   if (sc.exploresLeft === undefined) {
-    const you = self && self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller;
+    // Twists and Turns: "instead you scry 1, then that creature explores", once for each of them (rulings: two copies
+    // scry 1 twice). With Topography Tracker too, the scries come first: they replace the instruction to explore, and
+    // the explore they leave is the one Tracker doubles (CR 616.1; it can't apply to the same event twice, 614.5).
+    sc.exploreScries ??= s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).scryBeforeExplore).length;
+    while (sc.exploreScries > 0) {
+      if (runEffect(s, { type: "scry", n: 1 }, { ...ctx, controller: you }) === "paused") return "paused";
+      sc.arranged = undefined;
+      sc.exploreScries--;
+    }
     const trackers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).exploresTwice).length;
     sc.exploresLeft = 2 ** Math.min(trackers, 6);
     if (trackers) log(s, `${self ? characteristics(s, self).name : src} explores ${sc.exploresLeft} times instead (Topography Tracker).`);
@@ -1923,7 +1946,7 @@ function exploreReplaced(s: GameState, self: GameObject | undefined, ctx: Resolv
     if (explore(s, self, ctx, src) === "paused") return "paused";
     sc.exploresLeft--;
   }
-  sc.exploresLeft = undefined;
+  sc.exploresLeft = sc.exploreScries = undefined;
 }
 
 function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {

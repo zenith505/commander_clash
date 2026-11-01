@@ -52,6 +52,14 @@ export function sharingAColor(s: GameState, t: GameObject, group: NonNullable<Ex
 }
 
 /** Is `o` attacking `pid` or a planeswalker `pid` controls now (CR 506.3)? Not a battle. */
+/** Roar of Resistance: attacking an opponent of `pid`, or a planeswalker one of them controls (not a battle, CR 506.3). */
+function attacksOpponentOrTheirPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.attacking === undefined) return false;
+  if (!o.attackingPermanent) return opponents(s, pid).includes(o.attacking);
+  const pw = s.objects[o.attackingPermanent.id];
+  return !!pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === o.attackingPermanent.zc && characteristics(s, pw).types.includes("Planeswalker") && opponents(s, pid).includes(controllerOf(s, pw));
+}
+
 function attacksYouOrYourPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.attacking === undefined) return false;
   if (!o.attackingPermanent) return o.attacking === pid;
@@ -95,7 +103,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland") return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
@@ -128,6 +136,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackingAlone" && (o.attacking === undefined || s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined))) return false;
   // Soul Snare: "attacking you or a planeswalker you control": a planeswalker that's still there and still yours (rulings).
   if (spec.combat === "attackingYouOrYourPlaneswalker" && !attacksYouOrYourPlaneswalker(s, o, controller)) return false;
+  if (spec.combat === "attackingOpponentOrTheirPlaneswalker" && !attacksOpponentOrTheirPlaneswalker(s, o, controller)) return false;
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
   if (spec.attackingWhom !== undefined && (spec.attackingWhom === "eventPlayer" || o.attacking !== spec.attackingWhom || o.attackingPermanent)) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
@@ -304,6 +313,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
   if (kind === "parity" && chosen?.parity && rest.parity) return { ...rest, parity: { ...rest.parity, is: chosen.parity } };
+  if (kind === "landOrNonland" && chosen?.landOrNonland) return chosen.landOrNonland === "land" ? { ...rest, types: [...(rest.types ?? []), "Land"] } : { ...rest, notTypes: [...(rest.notTypes ?? []), "Land"] };
   if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
@@ -322,6 +332,7 @@ function isParity(n: number | undefined, p: { is?: "odd" | "even"; not?: true })
 
 export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
   if (what === "parity") return ["odd", "even"];
+  if (what === "landOrNonland") return ["land", "nonland"];
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
   const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
@@ -337,6 +348,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "cardName") return { ...chosen, name: choice };
   if (what === "number") return { ...chosen, number: Number(choice) };
   if (what === "parity") return { ...chosen, parity: choice === "odd" ? "odd" : "even" };
+  if (what === "landOrNonland") return { ...chosen, landOrNonland: choice === "land" ? "land" : "nonland" };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   // "The color or colors of your choice": the colors named, "White,Blue", in WUBRG order.
   if (what === "colors") return { ...chosen, colors: (Object.keys(COLOR_NAMES) as Color[]).filter((c) => choice.split(",").includes(COLOR_NAMES[c])) };
@@ -409,7 +421,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.counter) return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.counter) return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (d.types.includes("Creature") && /^-?\d+$/.test(d.power ?? "") ? Number(d.power) : undefined) : defMv(d), spec.parity)) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
@@ -430,6 +442,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
   if (spec.notNamedAsYours) return false; // not worked out yet
+  if (spec.sharesTypeWithAttached) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.noManaAbility && (compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
@@ -520,7 +533,7 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
 
 /** An anyOf that's only "power N or less" / "toughness N or less" (Stern Scolding's "power or toughness 2 or less"). */
 const isPtAnyOf = (anyOf: TargetSpec[] | undefined): anyOf is TargetSpec[] => !!anyOf?.length && anyOf.every((a) => Object.keys(a).every((k) => ["kind", "types", "notTypes", "notColors", "power", "toughness", "text"].includes(k)) && !a.types?.length && !!(a.power || a.toughness));
-const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
+export const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
 /** What a player gained until end of turn or until their next turn. */
 const gainedBy = (s: GameState, pid: PlayerId): string[] => [...(s.players[pid]?.gained ?? []), ...(s.players[pid]?.gainedUntilNextTurn ?? [])];

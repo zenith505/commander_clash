@@ -221,6 +221,12 @@ export function parseCostKeyword(
     const each = m[2] === "each other player";
     return { alt: { kind: "alternative", mana: "", costs: [{ kind: "giveLife", n: Number(m[3]), ...(each ? { each: true as const } : {}) }], if: cond, text: `have ${m[2]} gain ${m[3]} life` } };
   }
+  // Asmoranomardicadaistinaculdacar: "As long as you've discarded a card this turn, you may pay {B/R} to cast ~" (it has no
+  // mana cost, so only this way, CR 118.6): an alternative cost, only while that's true as it's cast (CR 601.2b).
+  if ((m = /^As long as ([^,]+), you may pay ((?:\{[^}]+\})+) to cast ~\.$/.exec(line))) {
+    const cond = altCondition(m[1]!);
+    return cond && plainMana(m[2]!) ? { alt: { kind: "alternative", mana: m[2]!, if: cond } } : "fail";
+  }
   // "You may pay {R}{G} rather than pay ~'s mana cost. Spend only mana produced by Treasures to cast it this way."
   // (Security Rhox): only mana a Treasure made can pay it (CR 106.3).
   if ((m = /^You may pay ((?:\{[^}]+\})+) rather than pay ~'s mana cost\. Spend only mana produced by Treasures to cast it this way\.$/.exec(line)))

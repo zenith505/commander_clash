@@ -152,6 +152,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Gremlin Infestation: "enchanted artifact's controller", in a permanent's own ability.
   if (/^enchanted (?:artifact|creature|enchantment|land|permanent)'s controller$/.test(x) && !ctx.spell) return { ref: "hostController" };
   if (x === "each opponent") return { ref: "eachOpponent" };
+  // Erestor of the Council: "each opponent who voted for a choice you voted for", in the vote that triggered it.
+  if (x === "each opponent who voted for a choice you voted for" && ctx.votesEvent) return { ref: "votedWithYou" };
   if (x === "each player") return { ref: "eachPlayer" };
   // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
   // the player it targets, or the planeswalker's controller.
@@ -452,6 +454,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   // "Return Trusty Boomerang to its owner's hand" in an ability it gives: that Equipment (grants.ts binds it).
   if (x === "\u27easource\u27eb") return { ref: "grantSource" };
+  // Galadriel, Elven-Queen: "put a +1/+1 counter on your Ring-bearer": the controller's, none without one (CR 701.54a).
+  if (/^your Ring-bearer$/.test(x) && !ctx.spell) return { ref: "ringBearer" };
   if (ctx.subjectIt && /^that (land|artifact|enchantment|planeswalker|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
   // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
   if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
@@ -1082,6 +1086,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^(?:nonartifact creatures|creature tokens)$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
   // Harvester of Misery: "other creatures get -2/-2 until end of turn": every creature but the source.
   const othersAll = other && /^creatures$/i.test(p);
+  // Roar of Resistance: "creatures attacking your opponents and/or planeswalkers they control get +2/+0 until end of
+  // turn": whichever are attacking them as it resolves (CR 611.2c), not ones attacking a battle.
+  if (!all && !other && /^creatures attacking your opponents and\/or planeswalkers they control$/i.test(p))
+    return { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingOpponentOrTheirPlaneswalker", text: phrase.trim().toLowerCase() }, other };
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that fought this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -1827,6 +1835,11 @@ export function parseTargetPhrase(
   // planeswalker or battle (CR 506.3), as for Oviya's static.
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking one of your opponents$/.test(p)) {
     extra.combat = "attackingOpponent";
+    p = "creature";
+  }
+  // Roar of Resistance: "creatures attacking your opponents and/or planeswalkers they control".
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking your opponents and\/or planeswalkers they control$/.test(p)) {
+    extra.combat = "attackingOpponentOrTheirPlaneswalker";
     p = "creature";
   }
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you or a planeswalker you control$/.test(p)) {

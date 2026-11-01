@@ -53,8 +53,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "You get an emblem with "..."", "Each opponent gets an emblem with ...", "Target opponent gets ..." (CR 114.2), one
   // or more quoted abilities ('with "..." and "..."'). "This emblem" in them is the emblem; a quoted ability inside one
   // is in single quotes ("Mountains you control have '{T}: This land deals 1 damage to any target.'").
-  if ((m = /^(You|Each opponent|Target opponent|Target player) gets? an emblem with ("[^"]+"(?: and "[^"]+")*)\.?$/.exec(s))) {
-    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+  // Chandra, Roaring Flame: "Each player dealt damage this way gets an emblem with ...": only players actually dealt
+  // damage by it (rulings).
+  if ((m = /^(You|Each opponent|Target opponent|Target player|Each player dealt damage this way) gets? an emblem with ("[^"]+"(?: and "[^"]+")*)\.?$/.exec(s))) {
+    const who: PlayerRef | null = m[1] === "Each player dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(m[1]!.toLowerCase(), ctx);
     const abilities = [...m[2]!.matchAll(/"([^"]+)"/g)].map((q) =>
       q[1]!
         .replace(/\b(ha(?:s|ve)(?: [^']*? and)? )'([^']+?)'/g, '$1"$2"')
@@ -1229,6 +1231,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
   // "Choose odd or even." (Extinction Event): as it resolves; "of the chosen quality" after it (zero is even).
   if (/^Choose odd or even$/i.test(s)) return [{ type: "choose", choice: "parity" }];
+  // Abundant Harvest: "Choose land or nonland." as it resolves; "a card of the chosen kind" after it.
+  if (/^Choose land or nonland$/i.test(s)) return [{ type: "choose", choice: "landOrNonland" }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 

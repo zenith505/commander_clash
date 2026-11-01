@@ -1115,9 +1115,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
     // "Target Cave card" (Glimpse the Core): a land subtype (CR 205.3i).
+    // Rise to Glory: "Return target Aura card from your graveyard to the battlefield": an enchantment, so a permanent card;
+    // its controller chooses what it enchants as it enters, or it stays in the graveyard (CR 303.4f-g).
     // "Target Vampire card" (Queen's Bay Paladin): a creature type; a Kindred card that isn't a permanent card stays where it
     // is (CR 110.4b, putOntoBattlefield checks it as it resolves).
-    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura") || (!attach && CREATURE_TYPES.has(st)));
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || st === "Aura" || (!attach && CREATURE_TYPES.has(st)));
     // "Target artifact creature card" (Scarecrone): every one of its types (allTypes) is a permanent type.
     const types = spec?.types?.length ? spec.types : spec?.allTypes ?? [];
     // "Target card named Rekindling Phoenix" (its token's ability): the card that made the token, a permanent card.
@@ -1276,7 +1278,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
   // trigger's subject.
-  if ((m = /^Put (target .+?|~|that creature) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && (m[1] !== "that creature" || (ctx.subject && ctx.lastObjectTarget === undefined))) {
+  // Dovin's Dismissal: "Put up to one target tapped creature on top of its owner's library": the same, or nothing with no
+  // target chosen (CR 115.1, 601.2c).
+  if ((m = /^Put ((?:up to one )?target .+?|~|that creature) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && (m[1] !== "that creature" || (ctx.subject && ctx.lastObjectTarget === undefined))) {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || (what.ref === "subject" && m[1] === "that creature")) ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
@@ -1544,6 +1548,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
     const of = parsePlayer("defending player", ctx);
     return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
+  }
+  // Concussive Bolt: "creatures controlled by that player or by that planeswalker's controller can't block this turn": a
+  // rule for the turn, so creatures that come under that player's control later can't block either (rulings).
+  if (/^[Cc]reatures controlled by that player or by that planeswalker's controller can't block this turn$/.test(s)) {
+    const of = parsePlayer("that player or that planeswalker's controller", ctx);
+    return of ? [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures" }, ofPlayer: of }] : null;
   }
   // Rumbling Ruin (body.ts makes it one sentence): "creatures your opponents control with power less than or equal to the
   // number of +1/+1 counters on creatures you control can't block this turn": the number counted once as it resolves

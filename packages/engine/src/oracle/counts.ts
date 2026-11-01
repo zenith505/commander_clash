@@ -491,6 +491,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).
   if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
+  // Astral Confrontation: "for each opponent you're attacking": opponents your creatures are attacking, counted as it's cast.
+  if (each && /^opponents? you're attacking$/i.test(p)) return count({ kind: "playersAttacked", byYou: true });
   // Custodi Soulcaller: "where X is the number of players you attacked this combat": as melee counts them (CR 702.121a;
   // rulings: players, not planeswalkers, attacked with at least one creature, whether or not they're still in the game).
   if (/^(?:the number of )?(?:players|opponents) you attacked this combat$/i.test(p)) return { count: { kind: "opponentsAttacked" } };
@@ -673,6 +675,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Enemy of Enlightenment: "for each card in your opponents' hands": all of them together.
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });
+  // Adamaro, First to Desire: "the number of cards in the hand of the opponent with the most cards in hand": that one hand.
+  if (/^cards in the hand of the opponent with the most cards in hand$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" }, most: true });
   // Realm Seekers: "the total number of cards in all players' hands", every player's added up.
   if (/^cards? in all players' hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachPlayer" } });
   // Flunk: "the number of cards in that creature's controller's hand": the targeted creature's controller as this resolves.

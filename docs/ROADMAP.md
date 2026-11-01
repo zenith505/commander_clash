@@ -1,6 +1,6 @@
 # Roadmap
 
-29,032 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,048 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,308 of
 9,979 (93%).
 
@@ -4315,6 +4315,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature you don't control and tap it" (Celestial Regulator); "discards cards equal to the damage" (Jagged Poppet);
   "put a +1/+1 counter on another target creature you control, and that creature gains flying" (Skyrider Patrol). +23
   (29,032 of 31,936 with rounds 237 to 239).
+- Round B78 (one-line templates from the bottom of the list): "If it's an enchantment creature or legendary creature,
+  instead put a +1/+1 counter on it and it gets +1/+1" (Regent's Authority); "you control a land creature or a land
+  entered the battlefield under your control this turn" (Earth Rumble Wrestlers); "~ escapes with N +1/+1 counters on
+  it. When it enters this way, ..." (Pharika's Spawn, an enters trigger "if it escaped"); "Exile that creature until ~
+  leaves the battlefield" (Grasping Giant); "At end of combat, gain control of that creature" (Tolarian Entrancer, and
+  Charisma); "Whenever one or more creatures you control become blocked" (Hezrou); "~ loses all abilities and gains
+  haste" as it returns (Hellcat, Undying Vigilante); a dies trigger "if it's not a Spirit" that returns it, "It's a
+  Spirit Detective" (Otherworldly Escort); "Shuffle ~ and up to three target cards from a single graveyard into their owners'
+  libraries" (Serene Remembrance); "Put a plague counter on ~ or remove a plague counter from it" (Plague Boiler, the
+  either prompt); "has double strike as long as it's an enchantment. Otherwise, prevent all damage that would be dealt
+  by enchanted creature" (Armament of Nyx); a search of that player's library that shuffles it once (Rootwater Thief);
+  "until your next upkeep" (Xenic Poltergeist); "You may play that card for as long as you control ~" (Victor Mancha,
+  Runaway); "counters equal to half that card's mana value, rounded up" of a card exiled from your graveyard (Torrent
+  Sculptor). No new prompt. +16 (29,048 of 31,936).
+- Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
+  batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (the
+  creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion ("Sacrifice enchanted creature" as
+  a cost), Rasputin, the Oneiromancer (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
+  face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (a state trigger bound
+  to the chosen color), Grim Contest (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an

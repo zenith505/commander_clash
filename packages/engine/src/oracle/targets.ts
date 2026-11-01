@@ -751,9 +751,9 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     // Custodi Soulcaller: "the number of players you attacked this combat", fixed once attackers are declared.
     case "opponentsAttacked":
       return true;
-    // Rot Hulk: "the number of opponents you have".
+    // Rot Hulk: "the number of opponents you have"; Glissa's Retriever: "... who have three or more poison counters".
     case "players":
-      return Object.keys(c).every((k) => k === "kind" || k === "opponents");
+      return Object.keys(c).every((k) => k === "kind" || k === "opponents" || k === "poisonAtLeast");
     case "power":
     case "toughness":
     case "counters":

@@ -156,7 +156,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const n = nFor[pid] ?? 0;
     // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
-    const options0 = group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
+    // "On either of them" (Call of the Death-Dweller): the permanents the targets became, still on the battlefield.
+    const ofTargets = e.fromTargets ? objects(s, { ref: "target", index: e.fromTargets.index, n: e.fromTargets.n }, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) : undefined;
+    const options0 = ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
     const options = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
@@ -1022,7 +1024,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (sc.may !== undefined) return;
       sc.may = false;
       o.miracleRevealed = undefined; // no longer revealed once the ability resolves (CR 702.94b)
-      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "miracle" };
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "miracle", ...(e.cost ? { miracleCost: e.cost } : {}) };
       const problem = castProblem(s, ctx.controller, o.id);
       if (problem === null || /^not enough mana/.test(problem)) return "paused";
       s.pending = null;

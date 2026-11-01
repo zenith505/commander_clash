@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -1366,6 +1366,16 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Greymond, Avacyn's Stalwart: "As ~ enters, choose two abilities from among first strike, vigilance, and lifelink."
+    // (CR 614.12): two different keywords, one after the other, kept as Chosen.keywords.
+    const asAbilities = /^As ~ enters, choose (two|three) abilities from among ((?:[a-z ]+, )+and [a-z ]+)\.$/.exec(line);
+    if (asAbilities) {
+      const kws = asAbilities[2]!.split(/, (?:and )?/).map((k) => canonicalKeyword(k));
+      const n = asAbilities[1] === "two" ? 2 : 3;
+      if (kws.some((k) => !k || k.startsWith("(")) || kws.length <= n || out.entersChoose?.some((c) => c.what === "keyword")) out.unsupported.push(raw);
+      else for (let i = 0; i < n; i++) (out.entersChoose ??= []).push({ what: "keyword", options: kws as string[], many: true });
+      continue;
+    }
     // "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk." (Eclipsed Realms,
     // CR 614.12): one of these creature types.
     const asTypeList = /^As (?:~|it) enters, choose ((?:[A-Z][a-z]+, )+or [A-Z][a-z]+)\.$/.exec(line);
@@ -1985,6 +1995,13 @@ export function compile(d: CardDef): CompiledCard {
       out.flipTwo = true;
       continue;
     }
+    // Edgar, King of Figaro: "The first time you flip one or more coins each turn, those coins come up heads and you win
+    // those flips." (a replacement of the results, CR 705.3; rulings: whatever the coins would have shown, and a won flip
+    // even for one that would have no winner).
+    if (line === "The first time you flip one or more coins each turn, those coins come up heads and you win those flips.") {
+      out.firstFlipsHeads = true;
+      continue;
+    }
     // Titania, Nature's Force: "You may play Forests from your graveyard." Land cards with that basic land type (CR 305.6).
     const typedYard = /^You may play (Plains|Islands|Swamps|Mountains|Forests) from your graveyard\.$/.exec(line);
     if (typedYard) {
@@ -2533,6 +2550,16 @@ export function compile(d: CardDef): CompiledCard {
       (out.equipLess ??= []).push({ n: Number(turnEquip[2]), if: turnCond });
       continue;
     }
+    // Kaito, Bane of Nightmares: "During your turn, as long as ~ has one or more loyalty counters on him, he's a 3/4 Ninja
+    // creature and has hexproof.": a creature instead of a planeswalker then (CR 205.1a; rulings: damage then removes no
+    // loyalty counters, and his loyalty abilities can still be activated), in layers 4, 6 and 7b.
+    const pwCreature = /^During your turn, as long as ~ has one or more loyalty counters on (?:him|her|it|~), (?:he|she|it)'s (an? \d+\/\d+ [A-Z][a-z]+ creature) and has ([a-z]+)\.$/.exec(line);
+    const pwMods = pwCreature && d.types.includes("Planeswalker") ? parseBecomes(`${pwCreature[1]!} with ${pwCreature[2]!}`) : null;
+    if (pwCreature) {
+      if (!pwMods || pwMods[0]?.kind !== "setTypes") out.unsupported.push(raw);
+      else out.statics.push({ affects: { kind: "self" }, mods: pwMods, condition: { kind: "allOf", conds: [{ kind: "yourTurn" }, { kind: "selfCounters", counter: "loyalty", min: 1 }] }, text: line });
+      continue;
+    }
     // Gruul Spellbreaker: "During your turn, you and ~ have hexproof.": you have it in your turn, and so does ~.
     const youAndSelf = /^During your turn, you and ~ have hexproof\.$/.test(line) && !out.youHave ? parseConditionalStatic("During your turn, ~ has hexproof.") : null;
     if (youAndSelf) {
@@ -2783,6 +2810,15 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${warpGrant[1]!.toLowerCase().replace(/ cards and /, " card or ").replace(/ cards$/, " card")} from a graveyard`);
       if (f?.kind !== "card") out.unsupported.push(raw);
       else (out.handWarp ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${warpGrant[1]!.toLowerCase()} in your hand` }, mana: warpGrant[2]!, text: line });
+      continue;
+    }
+    // Lorehold, the Historian: "Each instant and sorcery card in your hand has miracle {2}": miracle for those cards while
+    // they're in its controller's hand (CR 702.94a), so one drawn as the first card drawn in a turn triggers.
+    const miracleGrant = /^Each ([a-z]+(?: and [a-z]+)?) card in your hand has miracle ((?:\{[^}]+\})+)\.$/.exec(line.replace(/ \(You may cast a card for its miracle cost when you draw it if it's the first card you drew this turn\.\)$/, ""));
+    if (miracleGrant) {
+      const f = parseTargetPhrase(`${miracleGrant[1]!.replace(" and ", " or ")} card from a graveyard`);
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else (out.handMiracle ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${miracleGrant[1]} cards in your hand` }, mana: miracleGrant[2]!, text: line });
       continue;
     }
     // Dream Devourer: "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana
@@ -5266,6 +5302,8 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
+    // "Each of the chosen abilities" (Greymond): only with "as ~ enters, choose two abilities from among ...".
+    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_KEYWORDS) && !out.entersChoose?.some((c) => c.what === "keyword" && c.many)) bad = true;
     if (o.ref === "selfChosenPlayer" && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     // Lobotomy: a card chosen from a revealed hand gives the name (Effect takeFromHand "name").

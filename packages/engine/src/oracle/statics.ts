@@ -1,6 +1,6 @@
 import type { Amount, AmountExpr, Affects, Modification, MostStat, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
-import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
+import { CHOSEN_KEYWORDS, CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
@@ -1876,6 +1876,9 @@ export function parseExtraBlocks(text: string): Modification | null {
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
 export function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
+  // Greymond, Avacyn's Stalwart: "Humans you control have each of the chosen abilities": the keywords chosen as the source
+  // entered (Chosen.keywords; compile checks it chooses them), in layer 6 (CR 613.1f).
+  if (/^(?:has|have) each of the chosen abilities$/.test(rest)) return [{ kind: "addKeywords", keywords: [CHOSEN_KEYWORDS] }];
   // The job select Equipment: "gets +1/+0 and is a Monk in addition to its other types", "gets +2/+2, has reach, and
   // is a Bard ...", "is a Wizard in addition to its other types and has "..."", "gets +0/+2, is a Wizard in addition to
   // its other types, and has "..."" (a creature type added in layer 4, CR 205.1b).
@@ -2579,12 +2582,24 @@ function parseStaticLine(line: string): StaticAbility | null {
     const more = parseStaticMods(artifactType[3]!);
     if (subtypeSet(sub) === "Artifact" && artifactsOnly && more) return { affects: artifactTypeAffects, mods: [{ kind: "addTypes", types: [], subtypes: [sub] }, ...more], text: line };
   }
-  const areAlso = /^(.+?) are ([A-Z][a-z]+) in addition to their other (?:creature )?types$/.exec(text);
+  // Dune Chanter: "Lands you control and land cards you own that aren't on the battlefield are Deserts in addition to
+  // their other types": a land type (CR 205.3i) for its controller's lands, and their land cards elsewhere too
+  // (StaticAbility.offFieldLands; CR 613.1d).
+  const landsAlso = /^Lands you control and land cards you own that aren't on the battlefield are ([A-Z][a-z]+)s in addition to their other types$/.exec(text);
+  if (landsAlso) {
+    if (subtypeSet(landsAlso[1]!) !== "Land") return null;
+    return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [landsAlso[1]!] }], text: line, offFieldLands: true };
+  }
+  // Roshan, Hidden Magister: "Other creatures you control are Assassins in addition to their other types. The same is true
+  // for creature spells you control and creature cards you own that aren't on the battlefield": outside the battlefield
+  // too (StaticAbility.offField; CR 613.1d), as for Maskwood Nexus.
+  const areAlso = /^(.+?) are ([A-Z][a-z]+) in addition to their other (?:creature )?types(\. The same is true for creature spells you control and creature cards you own that aren't on the battlefield)?$/.exec(text);
   const areAlsoAffects = areAlso && / have | and /.test(areAlso[1]!) ? null : areAlso && parseAffected(areAlso[1]!);
   if (areAlso && areAlsoAffects?.kind === "filter" && areAlsoAffects.types.includes("Creature") && !/ cards? /.test(areAlso[1]!)) {
     const type = singular(areAlso[2]!);
     if (!CREATURE_TYPES.has(type)) return null;
-    return { affects: areAlsoAffects, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
+    if (areAlso[3] && (areAlsoAffects.controller !== "you" || !/^(?:Other )?creatures you control$/i.test(areAlso[1]!))) return null;
+    return { affects: areAlsoAffects, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line, ...(areAlso[3] ? { offField: true as const } : {}) };
   }
   // Mephidross Vampire: "Each creature you control is a Vampire in addition to its other creature types and has
   // "Whenever this creature deals damage to a creature, put a +1/+1 counter on this creature."": layers 4 and 6, for

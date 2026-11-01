@@ -230,6 +230,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
     let m: RegExpExecArray | null;
     // "Except it's not legendary" (Delina, Wild Mage) says the same.
     if (/^(?:isn't|aren't|is not|are not|it's not|they're not) legendary$/.test(p)) out.notLegendary = true;
+    // Jace, Mirror Mage: "except it's not legendary and its starting loyalty is 1" (a copiable value, CR 707.9b, 306.5b).
+    else if ((m = /^its starting loyalty is (\d+)$/.exec(p))) out.loyalty = Number(m[1]);
     // "Enters with an additional +1/+1 counter on it if it's a creature" (Spark Double), "... loyalty counter on it if it's
     // a planeswalker", "enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
     // Machine God's Effigy: "except it's an artifact": its only card type, keeping its supertypes and artifact subtypes,

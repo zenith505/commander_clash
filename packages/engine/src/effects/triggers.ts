@@ -567,6 +567,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
   };
+  // Siona, Captain of the Pyleas: "Whenever an Aura you control becomes attached to a creature you control": the
+  // permanents of the player who controls both, about the Aura.
+  const auraToYours = (aura: GameObject, host: GameObject) => {
+    const you = controllerOf(s, aura);
+    if (controllerOf(s, host) !== you || !characteristics(s, host).types.includes("Creature")) return;
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "auraAttachedToYours", undefined, undefined, aura);
+  };
   /**
    * The cards in graveyards with abilities that work there, each with its owner, who controls those abilities
    * (CR 113.6m, 113.8); `f` adds the ones that trigger.
@@ -722,7 +729,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, src, entering, ctrl), triggers, undefined, entering));
     // Brood Keeper: an Aura entering attached to it becomes attached to it (rulings).
     const host = entering.attachedTo ? s.objects[entering.attachedTo] : undefined;
-    if (host?.zone === "battlefield" && characteristics(s, entering).subtypes.includes("Aura")) add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, entering);
+    if (host?.zone === "battlefield" && characteristics(s, entering).subtypes.includes("Aura")) {
+      add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, entering);
+      auraToYours(entering, host);
+    }
     locked = null;
     causedBy = null;
   } else if (ev.type === "controlChanged") {
@@ -732,7 +742,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever an Aura becomes attached to ~" (Brood Keeper): the host's controller's trigger, about the Aura.
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
-    if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && characteristics(s, o).subtypes.includes("Aura")) add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, o);
+    if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && characteristics(s, o).subtypes.includes("Aura")) {
+      add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, o);
+      auraToYours(o, host);
+    }
   } else if (ev.type === "unattached") {
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
@@ -1158,8 +1171,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever ~ becomes tapped", "whenever enchanted land becomes tapped", "whenever a Dwarf you control becomes
     // tapped" (the tapped permanent is the subject: "put a wind counter on it").
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfBecomesTapped");
-    addHosted(o, (e) => e === "selfBecomesTapped");
+    // "For the first time during each of your turns" (Tale of Katara and Toph): its first tap this turn.
+    const firstTap = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === (o.zoneChanges ?? 0) && o.tapsThisTurn.n === 1;
+    add(o, controllerOf(s, o), (e, t) => e === "selfBecomesTapped" && (!t.firstEachTurn || firstTap));
+    addHosted(o, (e, t) => e === "selfBecomesTapped" && !t.firstEachTurn);
     const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(tapWatch);

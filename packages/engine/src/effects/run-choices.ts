@@ -623,7 +623,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "targetSpellTargets"
             ? ((t, f) => t?.kind === "stack" && targetsMatch(s, (s.stack.find((x) => x.id === t.id)?.targets ?? []).filter((x) => x.kind === "object" && s.objects[x.id]?.zone === "battlefield"), f, ctx.controller))(ctx.targets[e.cond.index], e.cond.filter)
             : e.cond.kind === "exiledThisWay"
-            ? !!s.resolving!.exiled?.length
+            ? !!((e.cond as { cards?: true }).cards ? s.resolving!.exiledCards : s.resolving!.exiled)?.length
             : e.cond.kind === "digTook"
             ? !!s.resolving!.digTook
             : e.cond.kind === "searchFound"

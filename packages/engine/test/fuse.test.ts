@@ -33,6 +33,14 @@ const giveTake = scry(
   ],
   { keywords: ["Fuse"] },
 );
+const fleshBlood = scry(
+  "split",
+  [
+    { name: "Flesh", mana_cost: "{3}{B}{G}", type_line: "Sorcery", oracle_text: `Exile target creature card from a graveyard. Put X +1/+1 counters on target creature, where X is the power of the card you exiled.\n${FUSE}` },
+    { name: "Blood", mana_cost: "{R}{G}", type_line: "Sorcery", oracle_text: `Target creature you control deals damage equal to its power to any target.\n${FUSE}` },
+  ],
+  { keywords: ["Fuse"] },
+);
 const relic = card("Darksteel Relic", "Artifact", "{0}", { oracleText: "" });
 const pacifism = card("Spirit Chain", "Enchantment", "{1}{W}", { oracleText: "" });
 
@@ -83,8 +91,10 @@ describe("fuse (CR 702.102)", () => {
   });
 
   it("a fuse card whose halves can't be read as one spell stays unsupported", () => {
-    // Take's "Draw that many cards" isn't supported on its own, so the card isn't either.
-    expect(isFullySupported(giveTake)).toBe(false);
+    // Flesh's "where X is the power of the card you exiled" isn't supported, so the card isn't either.
+    expect(isFullySupported(fleshBlood)).toBe(false);
+    // Take's "Draw that many cards" is since Lane B round B67 (laneb-round67.test.ts).
+    expect(isFullySupported(giveTake)).toBe(true);
   });
 });
 

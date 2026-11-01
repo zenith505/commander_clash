@@ -14,7 +14,7 @@ import { evalAmount } from "./amounts";
 import { batchPlayerCounters, putPlayerCounters, putCounters, tokenBatch, withPutter } from "./counters";
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
-import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
+import { bindChosen, inRange, objectMatches, playerProtectedFrom } from "./effects/targeting";
 import { canPreventDamage, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -488,7 +488,9 @@ function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
 function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, controller: PlayerId): boolean {
   const o = src.ref ? s.objects[src.ref.object] : undefined;
   if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === src.ref!.zc) return objectMatches(s, spec, o, controller, false);
-  if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.manaValue || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
+  // A spell's mana value counts its X (CR 202.3e); a gone permanent's is its card's.
+  if (spec.manaValue && (src.manaValue === undefined || !inRange(src.manaValue, spec.manaValue))) return false;
+  if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
   if (spec.named !== undefined && !hasName(src.name, spec.named)) return false;
   const kw = (k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;

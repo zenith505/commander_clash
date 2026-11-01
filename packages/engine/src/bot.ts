@@ -31,6 +31,7 @@ import {
   attackCostsPayable,
   attackTaxOf,
   attackYouLimit,
+  attackAllIfOne,
   combatLimit,
   playerBlockLimit,
   attackTaxPer,
@@ -117,6 +118,7 @@ import {
   conspireInstances,
   walkersFreeToAttack,
   attackTargetScore,
+  discardKeywordKinds,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -403,6 +405,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromHand && pend.revealFor !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     // Revealing from the hand for a search for its name (Assembly Hall, Infernal Tutor): a card with another copy left in
     // our library first. Otherwise the costliest.
+    // Vault 21: House Gambit: cards whose mana value others share, the biggest groups first.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.reveal && JSON.stringify(s.resolving?.body.effects ?? []).includes('"revealedSharedMv"')) {
+      const same = (id: ObjectId) => pend.cards.filter((x) => mv(s, x) === mv(s, id)).length;
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => same(b) - same(a) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
       const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
@@ -490,6 +497,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
+    // Indominus Rex: a card only for a keyword counter no card chosen so far gives (each counter draws a card back), the
+    // cheapest first.
+    if (pend.kind === "pickPermanents" && pend.action === "discard" && pend.objectId) {
+      const rex = s.objects[pend.objectId]!;
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => mv(s, a) - mv(s, b)))
+        if (discardKeywordKinds(s, rex, [...ids, id]).length > discardKeywordKinds(s, rex, ids).length) ids.push(id);
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
     // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.
@@ -3751,6 +3767,11 @@ const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolvi
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid);
+  // Abundant Harvest: a land while short of lands (fewer than five on the battlefield and in hand), else a spell.
+  if (what === "landOrNonland") {
+    const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length + player(s, pid).hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
+    return lands < 5 ? "land" : "nonland";
+  }
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
@@ -5730,6 +5751,13 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     attacks = attacks.filter((a) => a.attacker !== o.id);
     walkerBound.push({ attacker: o.id, defender: controllerOf(s, obj(s, ws[0]!)), planeswalker: ws[0]! });
   }
+  // War's Toll: attacking with any means attacking with all that can (CR 508.1d); the rest join, at whoever they can.
+  if (attacks.length && attackAllIfOne(s, pid) !== undefined)
+    for (const o of potentialAttackers(s, pid)) {
+      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id)) continue;
+      const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
+      if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
+    }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   // Scarred Puma stays home without a black or green creature beside it (CR 508.1c).

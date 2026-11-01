@@ -1,7 +1,7 @@
 # Roadmap
 
-28,993 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
+29,032 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,308 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -109,8 +109,7 @@ line blocks.
    (named tokens plus entering under an opponent's control), Astelli Reclaimer ("mana value X or less" in a target
    with X the mana spent to cast it), Wurmquake (corrupted, then "another one of those tokens"). Out after round 166:
    The Everflowing Well (a permanent becomes a copy of a spell), Summon: Esper Valigarmanda (cast a card exiled with ~
-   with mana of any type), Champions of Minas Tirith ("that opponent may pay {X}", and "can't attack you" only, not
-   your planeswalkers, per the rulings), Zurzoth, Chaos Rider ("one or more Devils attack one or more players", "those
+   with mana of any type), Zurzoth, Chaos Rider ("one or more Devils attack one or more players", "those
    players"), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
    anywhere other than your hand"), The Master, Transcendent ("milled this turn"), Everlasting Torment (all damage as
@@ -330,7 +329,7 @@ line blocks.
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
    stun counter on one of them), Territorial Aetherkite, Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
-   the top card of your library any time"), Wernog, Jinxed Choker, Fall of the Impostor (the greatest power among a
+   the top card of your library any time"), Jinxed Choker, Fall of the Impostor (the greatest power among a
    target opponent's creatures), Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
    counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
    Vengeance, Shaile ("entered under your control this turn"), Tales of the Ancestors. Round 180
@@ -1505,6 +1504,79 @@ line blocks.
    Duplication); "instead it explores, then it explores again" (Topography Tracker; two of them: four times,
    cumulative as Alhammarret's Archive's rulings say); "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger:
    a different creature for each age counter, itself allowed; browser test). +16 (28,858 of 31,936 with B69 and B70).
+   Round 237 (top of the list, now done): "If a creature you control would explore, instead you scry 1, then that
+   creature explores" (Twists and Turns, CompiledCard.scryBeforeExplore, one scry for each); "If a modular triggered
+   ability would put one or more +1/+1 counters" (Zabaz, the Glimmerwasp: counters.ts withModular); "a source you
+   control with an odd mana value" (Obosh, the Preypiercer); "you control a prime number of lands" and "that many"
+   counters (Zimone, All-Questioning); "As long as you've discarded a card this turn, you may pay {B/R} to cast this
+   spell" and "Target creature deals 6 damage to itself" (Asmoranomardicadaistinaculdacar); "up to two Forest cards
+   ... Put one of them onto the battlefield tapped and the other into your hand" (Flourishing Bloom-Kin); "a creature
+   card that shares a creature type with enchanted creature" (Call to the Kindred); "the number of different color
+   pairs among permanents you control that are exactly two colors", X counted once (Niv-Mizzet, Guildpact, Count
+   colorPairs, Effect noteAmount); "each opponent may investigate ... one plus the number of opponents who investigated
+   this way" (Wernog, Rider's Chaplain); "creatures they control can't attack you / Jaces you control this turn" (Web of
+   Inertia, Jace, Multiverse Architect: Effect attackBanThisTurn, Player.attackBansThisTurn); "each foretold card you
+   own in exile" and "the rest on the bottom of your library in any order" after a chosen card type (Alrund, God of the
+   Cosmos); "that opponent may pay {X}, where X is the number of cards in their hand. If they don't, they can't attack
+   you this combat" (Champions of Minas Tirith: that combat phase only, not their planeswalkers, per the rulings). +13
+   (28,938 of 31,936 with B71-B74).
+   Round 238 (top of the list, now done): "the Ring tempts you, then you put a +1/+1 counter on your Ring-bearer" after
+   a will of the council vote (Galadriel, Elven-Queen: ObjRef ringBearer); "If you attacked this turn, you may have ~
+   enter as a copy" (Protean Raider, entersAsCopy ifAttacked); "~ has dealt 3 or more damage this turn" and the −7's
+   "Each player dealt damage this way gets an emblem" (Chandra, Fire of Kaladesh: StaticCondition
+   selfDealtDamageThisTurn from TurnLog.sourceDamage); "you and defending player each draw a card, then discard a card
+   ... if you discarded the card with the greatest mana value among those cards or tied for greatest" (Cait, Cage
+   Brawler); "each player exiles a card from their graveyard. When one or more nonland cards are exiled this way, put
+   that many +1/+1 counters" (Augusta, Order Returned: Count yardChosenThisWay, reflexive CR 603.12); "sacrifice any
+   number of artifacts. When you sacrifice one or more artifacts this way, tap up to that many target creatures and
+   draw that many cards" (Nyssa of Traken); "At the beginning of combat on each player's turn ... target creature that
+   player controls" (Kitt Kanto, Mayhem Diva: trigger eachBeginCombat with the event player); "choose a creature you
+   control, then draw cards equal to its total toxic value" (Goliath Hatchery: Count toxicValue, CR 702.164b); "As ~
+   enters, discard any number of creature cards. It enters with a flying counter on it if a card discarded this way has
+   flying. The same is true for ..." (Indominus Rex, Alpha: enters choice discardKeywords, a pickPermanents "discard"
+   prompt with a browser test, CR 614.12 and 122.1b); "Reveal up to five nonland cards from your hand. For each of
+   those cards that has the same mana value as another card revealed this way, create a Treasure" (Vault 21: House
+   Gambit, Count revealedSharedMv); "Whenever players finish voting, each opponent who voted for a choice you voted for
+   ... the number of opponents who voted for a choice you didn't vote for" (Erestor of the Council: trigger
+   playersFinishVoting, PlayerRef votedWithYou, Count opponentsVotedOtherwise). +11 (28,949 of 31,936 with B71-B74).
+   Round 239 (top of the list, now done): "If ~ is saddled, each opponent loses that much life instead" (Caustic
+   Bronco: revealTopToHand life.instead, saddled read through last known information, CR 702.171b); "When you discard
+   a card this way, target player mills cards equal to its mana value" (The Ancient One: a reflexive mill, CR 603.12);
+   "Choose land or nonland. Reveal cards ... until you reveal a card of the chosen kind" (Abundant Harvest: choice
+   landOrNonland, a Land / Nonland prompt with a browser test); "you may sacrifice a creature. If you do, look at the
+   top X cards ..., where X is that creature's mana value" (Industrial Advancement); "At the beginning of your first
+   main phase, you may discard two cards. If you do, return ~ from your graveyard" (Old One Eye: yourFirstMain from the
+   graveyard); "If a creature an opponent controls attacks, all creatures that opponent controls attack if able" (War's
+   Toll: an attack requirement checked at declaration, CR 508.1d, and the bot attacks with everything once it attacks);
+   "Spells your opponents cast that target you or a permanent you control cost {2} more" (Monastery Siege's Dragons,
+   CR 601.2f); "Equip costs {X} less ..., where X is the power of the creature it targets" (Belt of Giant Strength);
+   "cost {X} less to activate, where X is Agatha's power" (Agatha of the Vile Cauldron, CR 602.2b); "Spells you cast
+   this turn that are white and/or blue (black and/or red) cost {X} less, where X is the amount of life you gained
+   (lost) this turn" (Will and Rowan, Scion of ...: X fixed as the ability resolves, per the rulings); "you may cast
+   it without paying its mana cost if the spell's mana value is less than the number of Mountains you control"
+   (Solstice Revelations); "Whenever ~ deals combat damage to one or more players, exile up to that many target cards
+   from their graveyard" (Froghemoth: eventX); "creatures attacking your opponents and/or planeswalkers they control"
+   (Roar of Resistance: combat filter attackingOpponentOrTheirPlaneswalker); "You may spend mana as though it were mana
+   of any color to cast planeswalker spells" (Oath of Nissa, CR 609.4b). +15 (28,964 of 31,936 with B71-B74).
+   Out after round 239 (looked at, not done): Omnath, Locus of All ("If you would lose unspent mana, that mana becomes
+   black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (protection that doesn't
+   remove your own Auras and Equipment already attached, an exception to CR 702.16); Tamiyo, the Moon Sage (an emblem
+   that returns every card put into your graveyard from anywhere); Scion of the Ur-Dragon (becomes a copy of a card in
+   your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
+   mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
+   Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
+   Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
+   Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
+   searches, one land under your control); Quest for Ula's Temple (a may-reveal of a looked-at card); Arlinn, the
+   Pack's Hope (+1 "until your next turn" flash plus an extra counter on each creature entering); Rootcoil Creeper
+   (mana only for spells from your graveyard, a flashback card returned from exile); Whiskervale Forerunner (put it
+   onto the battlefield only on your turn); Deification (choose a planeswalker type, loyalty-damage replacement);
+   Anafenza, the Foremost (exile instead of an opponent's graveyard, including cards not on the battlefield); Herald
+   of Leshrac and Burning-Rune Demon (as before).
+   Out after round 237 (looked at, not done): Burning-Rune Demon ("search for exactly two cards ... with different
+   names": no ruling on finding just one); Herald of Leshrac, Vault 21, Whiskervale Forerunner, Rootweaver Druid,
+   Galadriel, Elven-Queen, Erestor, King of the Oathbreakers, Deification, Indominus Rex, Protean Raider, Anafenza the
+   Foremost, Goliath Hatchery (other lines, not started).
    Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
    the dead creature's +1/+1 counters).
    Out after round 235 (looked at, not done): Squandered Resources (mana of a type the sacrificed land could produce);
@@ -1536,7 +1608,7 @@ line blocks.
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
-   7, Obosh, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
+   7, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
@@ -1752,7 +1824,7 @@ line blocks.
    Smaller gaps from round 116: bots never use "target creature it's
    blocking" abilities (Tinder Wall, Wall of Corpses, Goblin Snowman; bots activate abilities in their own main phase
    only); bots stop paying Lim-Dûl's Vault life after four looks; round 115's Assault
-   Suit, Brass Herald, Alrund, Vigean Intuition, Sages of the Anima and Serra's Emissary (kindred) are
+   Suit, Brass Herald, Vigean Intuition, Sages of the Anima and Serra's Emissary (kindred) are
    still out.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
@@ -1931,7 +2003,7 @@ line blocks.
      with triggers that care about batches). Their choices stay open and in turn order (CR 101.4b, Tempt rulings), not
      hidden like Show and Tell's. Bots always accept: accepting never leaves a bot behind the other opponents, and the
      offerer gets only what the bot also gets. Still out: Tempt with Discovery ("who searches a library this way"),
-     Tempt with Mayhem (copies), Braids, Fandaniel, Wernog, The Second Doctor ("who doesn't"), Step Between Worlds and
+     Tempt with Mayhem (copies), Braids, Fandaniel, The Second Doctor ("who doesn't"), Step Between Worlds and
      Turtles in Time ("each player who does draws seven").
    - Granted persist and undying (Haunted One) are abilities, not keywords: "creatures with undying" doesn't see them.
    - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
@@ -2245,8 +2317,8 @@ line blocks.
      Wish, Contaminated Drink (rad
      counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
-     "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv and
-     Obosh (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (next-time doubling on a chosen or
+     "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv
+     (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (next-time doubling on a chosen or
      unblocked source), Quest for Pure Flame, Taii Wakeen, Goblin Goliath and Jeska (other lines), Rankle and Torbran
      (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
      (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
@@ -4204,8 +4276,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Blade), "Whenever enchanted creature blocks a creature, that creature doesn't untap" (Shield
   of the Righteous), costs {1} less for each opponent you're attacking (Astral Confrontation), cards in the hand of the opponent
   with the most (Adamaro, First to Desire), "if you had an X or a Y enter the battlefield under your control this turn"
-  (Cleaving Reaper). Fix: "Then if ..., sacrifice ~ and it deals" put the damage outside the condition. +21 (28,946 of
-  31,936).
+  (Cleaving Reaper). Fix: "Then if ..., sacrifice ~ and it deals" put the damage outside the condition. +21 (28,985 of
+  31,936 with rounds 237 to 239).
 - Round B76 (one-line templates from the bottom of the list): look-at-the-top filters "a blue or artifact card"
   (Tezzeret's Gatebreaker), "a card with a kicker ability" (Coralhelm Chronicler: multikicker too, not replicate,
   rulings), "a land card or a card with {X} in its mana cost" (Paradox Surveyor), "if an opponent cast a blue and/or
@@ -4223,7 +4295,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   colors and types" (Phantasmal Form); "Return target Aura card from your graveyard to the battlefield" (Rise to Glory,
   Brotherhood Outcast: what it enchants is chosen as it enters, CR 303.4f); "discard a number of cards equal to"
   (Cabal Conditioning); "Enchanted creature deals 1 damage to target creature with flying" (Dizzying Gaze: the creature
-  is the source). +24 (28,970 of 31,936).
+  is the source). +24 (29,009 of 31,936 with rounds 237 to 239).
 - Round B77 (one-line templates from the bottom of the list): "target player reveals a number of cards from their hand
   equal to ... You choose one of them. That player discards that card" (Disciple of Phenax, Klaw, Sonic Subjugator,
   Acquisitions Expert, Bala Ged Thief, Mire's Toll; "reveals X cards" Cabal Interrogator and Hollow Specter): that
@@ -4242,7 +4314,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Return a Pirate card ..., then do the same for Vampire, Dinosaur, and Merfolk" (Grim Captain's Call); "choose target
   creature you don't control and tap it" (Celestial Regulator); "discards cards equal to the damage" (Jagged Poppet);
   "put a +1/+1 counter on another target creature you control, and that creature gains flying" (Skyrider Patrol). +23
-  (28,993 of 31,936).
+  (29,032 of 31,936 with rounds 237 to 239).
 - Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an

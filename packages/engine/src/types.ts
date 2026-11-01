@@ -768,6 +768,8 @@ export interface Player {
    * permanents `player` controls.
    */
   attackBansNextTurn?: { player: PlayerId; turn?: number }[];
+  /** Effect attackBanThisTurn: this player's creatures can't attack `player` (or, with `subtype`, their planeswalkers of that type) during `turn`. */
+  attackBansThisTurn?: { player: PlayerId; turn: number; subtype?: string; /** "This combat" (Champions of Minas Tirith): only in that combat phase (GameState.combatsThisTurn). */ combat?: number }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -1945,7 +1947,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; power: number; toughness: number; /** Its base power as it last existed (see basePowerNow): Jason Bright's "if its power was different from its base power". */ basePower?: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
+  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; /** Saddled as it left the battlefield (Caustic Bronco, CR 702.171b). */ saddled?: true; power: number; toughness: number; /** Its base power as it last existed (see basePowerNow): Jason Bright's "if its power was different from its base power". */ basePower?: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /**
    * Mystic Reflection: the next time one or more creatures or planeswalkers enter this turn, they enter as copies of this
@@ -2057,6 +2059,8 @@ export interface Chosen {
   players?: PlayerId[];
   /** "Choose odd or even" (Extinction Event). */
   parity?: "odd" | "even";
+  /** "Choose land or nonland" (Abundant Harvest). */
+  landOrNonland?: "land" | "nonland";
 }
 
 export interface TurnRule {
@@ -2094,6 +2098,8 @@ export interface AttackCostDue {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Whenever players finish voting" (Erestor of the Council): the votes cast (CR 701.38). */
+  votes?: { voter: PlayerId; choice: string }[];
   /** "Whenever you roll one or more dice": the highest of the dice's results ("if any of those results was 10 or higher", Farideh). */
   rollMax?: number;
   /** A "whenever you clash" trigger: whether that player won that clash ("If you won, ...", CR 701.30d). */
@@ -2137,6 +2143,8 @@ export interface TriggerEventInfo {
 export interface Resolving {
   item: StackItem;
   body: AbilityBody;
+  /** Effect noteAmount's count (Count notedAmount). */
+  notedAmount?: number;
   legal: boolean[]; // which targets were legal as it began resolving (CR 608.2b)
   /**
    * The answers so far to the questions about the shields of the damage the current instruction deals (CR 616.1): it
@@ -2443,6 +2451,7 @@ export interface Resolving {
     retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     exploresLeft?: number; // explores still to do for one instruction (Topography Tracker doubles them)
+    exploreScries?: number; // scries still to do before an explore (Twists and Turns, one each)
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast

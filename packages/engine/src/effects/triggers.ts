@@ -270,6 +270,8 @@ export type TriggerSourceEvent =
   | { type: "excessDamage"; hits: { id: ObjectId; amount: number; controller: PlayerId }[]; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
+  /** Erestor of the Council: players finished a vote (CR 701.38), with the votes cast. */
+  | { type: "votesDone"; votes: { voter: PlayerId; choice: string }[] }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
@@ -1185,6 +1187,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (you === ev.player) add(o, you, (e) => e === "youDamagePrevented", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "votesDone") {
+    // "Whenever players finish voting" (Erestor of the Council): once all have voted, put on the stack after the vote's
+    // spell or ability finishes resolving (rulings), knowing the votes.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      add(o, controllerOf(s, o), (e) => e === "playersFinishVoting", undefined, undefined, undefined, undefined, undefined, undefined, { votes: ev.votes });
     }
   } else if (ev.type === "ringTempted") {
     // "Whenever the Ring tempts you" (CR 701.54d), "if you chose a creature other than ~ as your Ring-bearer" (CR 603.4);

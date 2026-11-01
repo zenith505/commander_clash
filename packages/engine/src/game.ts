@@ -950,7 +950,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1200,7 +1200,7 @@ export function moveObject(
     const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
-    if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
@@ -1416,7 +1416,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -3382,6 +3382,8 @@ function startNextTurn(s: GameState, skipping = false) {
   }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
+  // Web of Inertia's bans are over with the turn they were for.
+  for (const p of s.players) if (p.attackBansThisTurn) p.attackBansThisTurn = p.attackBansThisTurn.some((b) => b.turn === s.turn) ? p.attackBansThisTurn.filter((b) => b.turn === s.turn) : undefined;
   // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
   if (ap.attackBansNextTurn) {
     ap.attackBansNextTurn = ap.attackBansNextTurn.flatMap((b) => (b.turn === undefined ? [{ ...b, turn: s.turn }] : []));
@@ -5151,14 +5153,16 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // opponents cast that target one or more commanders you control cost {3} more". Each such permanent once, with the
   // targets chosen before the cost is worked out (CR 601.2c, 601.2f).
   const targeted = [...new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))].map((id) => s.objects[id]).filter((t) => t?.zone === "battlefield") as GameObject[];
-  if (targeted.length && !how.faceDown)
+  if ((targeted.length || playersTargeted.size) && !how.faceDown)
     for (const id of s.battlefield) {
       const src = obj(s, id);
       const ab = abilitiesOf(s, src);
       if (!ab.castTargetLess && !ab.commanderTargetTax && !ab.opponentsTargetTax) continue;
       const by = controllerOf(s, src);
       // Kopala, Warden of Waves: a permanent its controller controls (CR 601.2f).
-      if (by !== pid && opponents(s, by).includes(pid)) for (const c of ab.opponentsTargetTax ?? []) if (!c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) mods.more += c.n;
+      // Monastery Siege: "that target you or a permanent you control", {2} per spell however many of them it targets
+      // (rulings), only while "Dragons" was chosen.
+      if (by !== pid && opponents(s, by).includes(pid)) for (const c of ab.opponentsTargetTax ?? []) if (!c.abilities && (!c.if || staticConditionNow(s, c.if, id, by)) && ((c.you && playersTargeted.has(by)) || targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false)))) mods.more += c.n;
       if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
       if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
     }
@@ -7653,7 +7657,7 @@ export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost
     const src = obj(s, id);
     for (const m of abilitiesOf(s, src).activationLess ?? []) {
       if (!objectMatches(s, m.filter, o, controllerOf(s, src), false) || (m.enchanted && src.attachedTo !== o.id)) continue;
-      less += m.n;
+      less += m.n + (m.selfPower ? Math.max(0, power(s, src)) : 0);
       if (m.atLeastOne) atLeastOne = true;
     }
   }
@@ -7714,7 +7718,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
   const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
-  if (per && aim) less += per.n * (per.each === "color" ? characteristics(s, aim).colors.length : (aim.counters["+1/+1"] ?? 0));
+  if (per && aim) less += per.n * (per.each === "color" ? characteristics(s, aim).colors.length : per.each === "power" ? Math.max(0, power(s, aim)) : (aim.counters["+1/+1"] ?? 0));
   // "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath)
   for (const id of powerUp ? s.battlefield : []) {
     const src = obj(s, id);
@@ -8267,7 +8271,8 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
       sacrificedInstead(s, obj(s, pend.objectId), ids, entry.enters);
       return;
     }
-    if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    if (pend.action === "discard") discardKeywordsChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    else if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     return;
   }
@@ -8425,7 +8430,7 @@ export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
 function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
-  if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
+  if (pend.what === "devour" || pend.what === "amplify" || pend.what === "discardKeywords") throw new RulesError(`${pend.what} is chosen by picking cards`);
   const inRange = pend.numberRange && /^\d+$/.test(choice) && Number(choice) >= pend.numberRange.min && Number(choice) <= pend.numberRange.max;
   // "The color or colors of your choice" (CR 105.3): one or more different colors, named together ("White,Blue").
   if (pend.what === "colors") {
@@ -8971,6 +8976,32 @@ export function amplifyOptions(s: GameState, o: GameObject): ObjectId[] {
   return player(s, controllerOf(s, o)).hand.filter((id) => shareCreatureType(mine, creatureTypesOf(s, obj(s, id))));
 }
 
+/** Indominus Rex, Alpha: the creature cards in its controller's hand it could discard as it enters. */
+export function discardKeywordOptions(s: GameState, o: GameObject): ObjectId[] {
+  return player(s, controllerOf(s, o)).hand.filter((id) => id !== o.id && objIsType(s, obj(s, id), "Creature"));
+}
+
+/** The keyword counters the cards `ids` would give Indominus Rex, Alpha (CR 122.1b): one of each kind any of them has. */
+export function discardKeywordKinds(s: GameState, o: GameObject, ids: ObjectId[]): string[] {
+  const kinds = compileCard(defOf(s, o)).entersDiscardKeywords ?? [];
+  return kinds.filter((k) => ids.some((id) => objHasKeyword(s, obj(s, id), k.replace(/^./, (c) => c.toUpperCase()))));
+}
+
+/**
+ * Indominus Rex, Alpha: the cards are discarded as it enters (CR 614.12), then it enters with a counter of each keyword
+ * kind a discarded card has, one of each (rulings). Then it has entered.
+ */
+function discardKeywordsChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const you = controllerOf(s, o);
+  const cards = ids.filter((id) => player(s, you).hand.includes(id) && objIsType(s, obj(s, id), "Creature"));
+  const kinds = discardKeywordKinds(s, o, cards);
+  if (cards.length) discardCards(s, you, cards, "", false, false, you);
+  for (const k of kinds) putCounters(s, o, k, 1, true);
+  if (kinds.length) log(s, `${defOf(s, o).name} enters with ${kinds.map((k) => `a ${k} counter`).join(", ")}.`);
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
 /** Dragon's Disciple: does its controller control a Dragon (other than it) as it would enter? */
 function amplifyOneControls(s: GameState, o: GameObject): boolean {
   const one = compileCard(defOf(s, o)).amplifyOne;
@@ -9051,6 +9082,17 @@ function askEntersChoice(s: GameState): boolean {
         return true;
       }
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : devour!.n === 2 && devour!.filter.types?.includes("Planeswalker") ? { prompt: `sacrifice any number of creatures and/or planeswalkers as it enters (two +1/+1 counters for each): click them, then sacrifice.` } : {}) };
+      return true;
+    }
+    if (c.what === "discardKeywords") {
+      // Indominus Rex: any number of creature cards from its controller's hand (not itself, it isn't there).
+      const options = discardKeywordOptions(s, o);
+      if (!options.length) {
+        q.shift();
+        discardKeywordsChosen(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "discard", what: "creature card", options, count: options.length, min: 0, objectId: o.id, prompt: "discard any number of creature cards as it enters (a counter for each of flying, first strike, double strike, deathtouch, hexproof, haste, indestructible, lifelink, menace, reach, trample and vigilance among them): click them, then discard." };
       return true;
     }
     if (c.what === "amplify") {
@@ -9603,6 +9645,12 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
   // The Second Doctor: during the attacker's next turn, not the player or a permanent they control.
   const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+  // Web of Inertia: that player only (not their planeswalkers or battles); Jace, Multiverse Architect: their Jaces only.
+  for (const b of player(s, c.controller).attackBansThisTurn ?? []) {
+    if (b.turn !== s.turn || b.player !== hit || (b.combat !== undefined && b.combat !== (s.combatsThisTurn ?? 0))) continue;
+    if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this ${b.combat !== undefined ? "combat" : "turn"}`;
+    if (b.subtype && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker") && characteristics(s, obj(s, attacked)).subtypes.includes(b.subtype)) return `${c.name} can't attack ${b.subtype}s ${player(s, hit).name} controls this turn`;
+  }
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   // Chronomantic Escape: that player, not their planeswalkers or battles.
   if (player(s, defender).unattackableUntil && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name} until their next turn`;
@@ -9777,6 +9825,11 @@ export function playerBlockLimit(s: GameState, pid: PlayerId): number {
 }
 
 /** Crawlspace: the most creatures that can attack this player (not their planeswalkers) each combat; Infinity with no such rule. */
+/** War's Toll: a permanent an opponent of `pid` controls that makes all of `pid`'s creatures attack if able once one does. */
+export function attackAllIfOne(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsAttackAll);
+}
+
 export function attackYouLimit(s: GameState, defender: PlayerId): number {
   let n = Infinity;
   for (const id of s.battlefield) {
@@ -9842,6 +9895,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length >= limit) {
     if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(shirks(shirking!));
   } else if (shirking && opps.length) throw new RulesError(shirks(shirking));
+  // War's Toll: once one of its controller's opponent's creatures attacks, all of that player's creatures attack if able
+  // (CR 508.1d), up to a limit on attackers (CR 508.1c); none attacking obeys it too. A creature that would need a cost
+  // paid to attack needn't (CR 508.1d).
+  const toll = attacks.length && attacks.length < limit ? attackAllIfOne(s, p.id) : undefined;
+  if (toll) {
+    const idle = potentialAttackers(s, p.id).find((o) => !seen.has(o.id) && opps.some((d) => free(o, d)) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]));
+    if (idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once one does (${nameOf(s, toll)})`);
+  }
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   // One that has to attack a planeswalker (Gideon) as well obeys as many of all its requirements as it can (CR 508.1d):

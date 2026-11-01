@@ -3381,6 +3381,8 @@ function startNextTurn(s: GameState, skipping = false) {
   }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
+  // Web of Inertia's bans are over with the turn they were for.
+  for (const p of s.players) if (p.attackBansThisTurn) p.attackBansThisTurn = p.attackBansThisTurn.some((b) => b.turn === s.turn) ? p.attackBansThisTurn.filter((b) => b.turn === s.turn) : undefined;
   // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
   if (ap.attackBansNextTurn) {
     ap.attackBansNextTurn = ap.attackBansNextTurn.flatMap((b) => (b.turn === undefined ? [{ ...b, turn: s.turn }] : []));
@@ -9590,6 +9592,12 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
   // The Second Doctor: during the attacker's next turn, not the player or a permanent they control.
   const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+  // Web of Inertia: that player only (not their planeswalkers or battles); Jace, Multiverse Architect: their Jaces only.
+  for (const b of player(s, c.controller).attackBansThisTurn ?? []) {
+    if (b.turn !== s.turn || b.player !== hit || (b.combat !== undefined && b.combat !== (s.combatsThisTurn ?? 0))) continue;
+    if (!b.subtype && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, hit).name} this ${b.combat !== undefined ? "combat" : "turn"}`;
+    if (b.subtype && attacked !== undefined && s.objects[attacked] && objIsType(s, obj(s, attacked), "Planeswalker") && characteristics(s, obj(s, attacked)).subtypes.includes(b.subtype)) return `${c.name} can't attack ${b.subtype}s ${player(s, hit).name} controls this turn`;
+  }
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   // Chronomantic Escape: that player, not their planeswalkers or battles.
   if (player(s, defender).unattackableUntil && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name} until their next turn`;

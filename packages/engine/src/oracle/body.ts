@@ -1913,7 +1913,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Jarad's Orders: "Search your library for up to two creature cards and reveal them. Put one into your hand and the
   // other into your graveyard. Then shuffle." Viewpoint Synchronization: "... up to three basic land cards and reveal
   // them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle." One search each.
-  text = text.replace(/^(Search your library for up to (?:two|three) [^.]+? cards) and reveal them\. Put (one|two of them) ([^.]+? and the other [^.]+?)(?:\. Then shuffle|, then shuffle)\./, (_, a: string, b: string, c: string) => `${a}, reveal them, put ${b.toLowerCase()} ${c}, then shuffle.`);
+  // Flourishing Bloom-Kin: "search ... up to two Forest cards and reveal them. Put one of them onto the battlefield tapped
+  // and the other into your hand, then shuffle" in a trigger: the same.
+  text = text.replace(/^([Ss]earch your library for up to (?:two|three) [^.]+? cards) and reveal them\. Put (one(?= onto| into)|one of them(?= onto| into)|two of them) ([^.]+? and the other [^.]+?)(?:\. Then shuffle|, then shuffle)\./, (_, a: string, b: string, c: string) => `${a}, reveal them, put ${b === "one of them" ? "one" : b.toLowerCase()} ${c}, then shuffle.`);
   // Out of the Tombs: "put two eon counters on ~, then mill cards equal to the number of eon counters on it": ~ is the
   // only object named, so "it" is ~.
   text = text.replace(/^([Pp]ut [^.~]+ counters? on ~, then [^.~]+ counters on )it\./, "$1~.");
@@ -2621,6 +2623,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many 1/1 colorless
   // Myr artifact creature tokens. Then shuffle.": one token for each card exiled (the shuffle after changes nothing).
   text = text.replace(/\b(Search your library for any number of [a-z]+ cards, exile them), then create that many (\d+\/\d+ [^.]+?) tokens\. Then shuffle\./, "$1, then shuffle. Create a $2 token for each card exiled this way.");
+  // Wernog, Rider's Chaplain: "You investigate X times" after the opponents' choice: the same as "Investigate X times".
+  text = text.replace(/(^|\. )You investigate (X|\w+) times(?=, where X is |\.)/g, "$1Investigate $2 times");
   // Together as One: "Target player draws X cards, ~ deals X damage to any target, and you gain X life, where X is the
   // number of colors of mana spent to cast ~.": three instructions in order, the same X for each.
   text = text.replace(/^Target player draws X cards, ~ deals X damage to any target, and you gain X life, (where X is [^.]+)\.$/, "Target player draws X cards, $1. ~ deals X damage to any target, $1. You gain X life, $1.");
@@ -4774,10 +4778,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Web of Inertia: "that player may exile a card from their graveyard. If the player doesn't, ...": their choice (none
+    // to make with an empty graveyard, CR 101.3), then what not doing it means.
+    const webMay = ctx.eventPlayer && !ctx.spell && /^[Tt]hat player may exile a card from their graveyard$/.test(s) ? /^If (?:the player|that player|they) (?:doesn't|don't), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (webMay) {
+      const then = parseOne(capital(webMay[1]!), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile" }], text: "exile a card from your graveyard", each: true, need: { zone: "graveyard", filter: { kind: "card", text: "card" } } }, { type: "if", cond: { kind: "theyChose", not: true }, effects: then });
+      si++;
+      continue;
+    }
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     // Mtenda Lion, Shrouded Serpent: "Whenever ~ attacks, defending player may pay {U}": the player it's attacking (CR 506.2).
-    const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Dd]efending player) may pay (.+)$/.exec(s);
+    const thatMay = /^([Tt]hat player|[Tt]hat opponent|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Dd]efending player) may pay (.+)$/.exec(s);
+    // Champions of Minas Tirith: "that opponent may pay {X}, where X is the number of cards in their hand. If they don't,
+    // they can't attack you this combat": a punisher whose penalty is that restriction (CR 508.1c), in this combat only.
+    const cantAttack = thatMay && /^If (?:the player|that player|they) (?:doesn't|don't), they can't attack you this combat\.?$/.test(sentences[si + 1] ?? "");
+    if (thatMay && cantAttack) {
+      // "On each opponent's turn, ... that opponent": the player whose turn it is.
+      const who = /^that opponent$/i.test(thatMay[1]!) ? (ctx.eventPlayer ? { ref: "eventPlayer" as const } : null) : parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
+      if (!who || who.ref === "you" || options?.length !== 1 || !("pay" in options[0]!)) return null;
+      effects.push({ type: "punisher", who, options, effects: [{ type: "attackBanThisTurn", who: { ref: "punished" }, combat: true }], penalty: "your creatures can't attack {you} this combat" });
+      si++;
+      continue;
+    }
     // "If they don't, return that card to the battlefield under your control ..." (Meathook Massacre II): what you do.
     const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+|return that card to the battlefield under your control.*)$/.exec(sentences[si + 1] ?? "");
     if (thatMay && thatThen) {
@@ -4822,7 +4848,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses ..." (Fandaniel):
     // each chooses in turn order, then the chosen ones are sacrificed (rulings); only one who has such a creature can.
     const sacAlone = offer && !does && /^sacrifice an? [a-z ]+?(?: of their choice)?$/.test(offer[2]!) && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) /.test(sentences[si + 1] ?? "");
-    const alone = offer && !does && (sacAlone || /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
+    const alone = offer && !does && (sacAlone || /^(?:scry \d+|surveil \d+|draw a card|investigate)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
     // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
     // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
     const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -5458,10 +5484,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
     // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
     // 608.2d): Mulch's dig with that type.
-    const typeThenReveal = /^Choose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
-    if (typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard$/.test(sentences[si + 2] ?? "")) {
+    // Alrund, God of the Cosmos: "... and the rest on the bottom of your library in any order" (its owner orders them, CR
+    // 401.4).
+    const typeThenReveal = /^[Cc]hoose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
+    const typeRevealRest = typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order)\.?$/.exec(sentences[si + 2] ?? "");
+    if (typeThenReveal && typeRevealRest) {
       const n = num(typeThenReveal[1]!);
-      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: typeRevealRest[1] === "into your graveyard" ? "graveyard" : "bottom", reveal: true, required: true });
       si += 2;
       continue;
     }
@@ -8456,12 +8485,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cream of the Crop: "You may look at the top X cards of your library, where X is that creature's power. If you do, put
     // one of those cards on top ...": the whole look is optional.
-    const mayLook = !dig && /^If you do, put /.test(sentences[si + 1] ?? "") ? /^[Yy]ou may (look at the top .+)$/.exec(s) : null;
+    // Niv-Mizzet, Guildpact: "it deals X damage to any target, target player draws X cards, and you gain X life, where X is
+    // ...": three instructions in order, X counted only once as it resolves (rulings).
+    const oneX = !ctx.spell ? /^(?:it|~) deals X damage to any target, target player draws X cards, and you gain X life, where X is (.+)$/.exec(s) : null;
+    if (oneX) {
+      const n = parseCount(oneX[1]!, ctx);
+      if (!n) return null;
+      const any = addTarget(ctx, { kind: "any", text: "any target" });
+      const who = addTarget(ctx, { kind: "player", text: "target player" });
+      const noted: Amount = { count: { kind: "notedAmount" } };
+      effects.push({ type: "noteAmount", n }, { type: "damage", amount: noted, to: { ref: "anyTarget", index: any } }, { type: "draw", who: { ref: "target", index: who }, n: noted }, { type: "gainLife", who: { ref: "you" }, n: noted });
+      continue;
+    }
+    // Call to the Kindred: "If you do, you may put a creature card ... from among them onto the battlefield, then you put the
+    // rest of those cards on the bottom of your library in any order": the same, the rest said in a sentence of its own.
+    const mayLook = !dig && /^If you do, (?:you may )?put /.test(sentences[si + 1] ?? "") ? /^[Yy]ou may (look at the top .+)$/.exec(s) : null;
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(mayLook ? mayLook[1]! : s);
     if (look && !dig && (!look[3] || look[2] === "X")) {
       if (mayLook) {
         digPaid = { text: [s, ...sentences.slice(si + 1, si + 3)].join(". ") };
-        sentences[si + 1] = capital(sentences[si + 1]!.replace(/^If you do, /, ""));
+        const then = /^If you do, (you may put .+? from among them onto the battlefield), then you put the rest of those cards (on the bottom of your library in any order)\.?$/.exec(sentences[si + 1]!);
+        if (then) sentences.splice(si + 1, 1, capital(then[1]!), `Put the rest ${then[2]}`);
+        else sentences[si + 1] = capital(sentences[si + 1]!.replace(/^If you do, /, ""));
       }
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
       if (look[3] && !def) return null;
@@ -13996,6 +14041,11 @@ export function usesX(v: unknown): boolean {
 export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   let m: RegExpExecArray | null;
   if (text === "{X}") return { cost: "", generic: X };
+  // Champions of Minas Tirith: "{X}, where X is the number of cards in their hand", counted as it resolves.
+  if ((m = /^\{X\}, where X is (.+)$/.exec(text))) {
+    const n = parseCount(m[1]!, ctx);
+    return n && typeof n === "object" ? { cost: "", generic: n } : null;
+  }
   // Thassa's Intervention: "twice {X}", generic mana.
   if (text === "twice {X}") return { cost: "", generic: { count: { kind: "x" }, times: 2 } };
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };

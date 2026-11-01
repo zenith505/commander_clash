@@ -353,6 +353,10 @@ export type Count =
   | { kind: "keywordsAmong"; keywords: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes"; /** Allied Strategies: "among lands they control", that player's. */ whose?: PlayerRef }
+  /** "The number of different color pairs among permanents you control that are exactly two colors" (Niv-Mizzet, Guildpact). */
+  | { kind: "colorPairs" }
+  /** The amount an effect "noteAmount" counted earlier in this resolution (X "checked only once", rulings on Niv-Mizzet, Guildpact). */
+  | { kind: "notedAmount" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
   /** Loot, the Key to Everything: "the number of card types among other nonland permanents you control" (CR 205.2a). */
   | { kind: "cardTypesAmongPermanents"; other?: true; nonland?: true }
@@ -388,7 +392,7 @@ export type Count =
   /** "The greatest mana value among cards in exile" (Ulamog, the Defiler): every player's exiled cards, a face-down one 0 (CR 708.2). */
   | { kind: "greatestMvInExile" }
   /** "There are seven or more cards in exile" (Ketramose): every player's exiled cards, face-down ones too (rulings). */
-  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind }
+  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind; /** "Foretold card you own in exile" (Alrund): only foretold ones (CR 702.143a, GameObject.foretold). */ foretold?: true }
   | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true; /** "The lowest mana value" among them (Culling Scales), 0 with none. */ least?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
@@ -518,7 +522,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "For each opponent who didn't discard two nonland cards this way" (Garruk, Veiled Butcher): those in the game who discarded fewer than this many nonland cards in this resolution. */ discardedFewerNonland?: number; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "Opponents who investigated this way" after "each opponent may investigate" (Wernog): those who chose to (PlayerRef choseThisWay). */ choseThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "For each opponent who didn't discard two nonland cards this way" (Garruk, Veiled Butcher): those in the game who discarded fewer than this many nonland cards in this resolution. */ discardedFewerNonland?: number; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Opponents who have three or more poison counters" (Glissa's Retriever), counted now. */ poisonAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true; /** "For each graveyard with seven or more cards in it" (The Master of Lake-town): players whose graveyard has this many, counted now. */ yardAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -834,6 +838,8 @@ export interface TargetSpec {
    * and sharing a permanent type with it as it is, or last was, on the battlefield (CR 608.2h), checked as it resolves.
    */
   sharesPermanentTypeWithSubject?: true;
+  /** "A creature card that shares a creature type with enchanted creature" (Call to the Kindred): with what the source enchants, or last enchanted (CR 608.2h), as a look resolves. */
+  sharesTypeWithAttached?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
@@ -2153,7 +2159,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending" | /** "Its controller controls no other creatures" (Predator's Gambit): the controller of the permanent the source is attached to; `other` means other than that permanent. */ "attached"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true }
+  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending" | /** "Its controller controls no other creatures" (Predator's Gambit): the controller of the permanent the source is attached to; `other` means other than that permanent. */ "attached"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true; /** "You control a prime number of lands" (Zimone, All-Questioning): the count is a prime. */ prime?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -3189,6 +3195,8 @@ export type Effect =
   | { type: "randomCounterKind"; what: ObjRef; kinds: CounterKind[] }
   /** Sigarda's Splendor: "Then note your life total": noted for the source (GameObject.notedLife), its controller's life now. */
   | { type: "noteLife" }
+  /** Count `n` now and keep it for the rest of this resolution (Count notedAmount): one X for several instructions. */
+  | { type: "noteAmount"; n: Amount }
   | { type: "mill"; who: PlayerRef; n: Amount; /** Grindstone: "If two cards that share a color were milled this way, repeat this process" (each player's own repeats). */ repeatSharedColor?: true }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   /**
@@ -3920,6 +3928,12 @@ export type Effect =
    * see Player.attackBansNextTurn.
    */
   | { type: "attackBanNextTurn"; who: PlayerRef }
+  /**
+   * "Creatures they control can't attack you this turn" (Web of Inertia), "... can't attack Jaces you control this turn"
+   * (Jace, Multiverse Architect): `who`'s creatures, this turn; `subtype`: only planeswalkers of that type you control
+   * instead of you.
+   */
+  | { type: "attackBanThisTurn"; who: PlayerRef; subtype?: string; /** "Can't attack you this combat" (Champions of Minas Tirith): this combat phase only. */ combat?: true }
   /** Wall of Dust: "that creature can't attack during its controller's next turn": that player's next turn, while it's the same object (CR 400.7). */
   | { type: "cantAttackNextTurn"; what: ObjRef }
   /**
@@ -5754,7 +5768,7 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true; /** "If a modular triggered ability would put" (Zabaz): only counters a modular trigger puts. */ modular?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   /** Izzet Generatorium, Aether Refinery: "If you would get one or more {E}, you get that many plus one {E} instead" / "twice that many": energy only (`counter`); you order them, plus one first (rulings, CR 616.1). */
   | { what: "counters"; onPlayer: true; op: "plusOne" | "double"; counter?: "energy" }
@@ -5913,6 +5927,8 @@ export interface CompiledCard {
   notesLifeOnEnter?: true;
   /** Topography Tracker: "If a creature you control would explore, instead it explores, then it explores again" (CR 614.1a; two of them: four times, cumulative, as Alhammarret's Archive's rulings say of draws). */
   exploresTwice?: true;
+  /** "If a creature you control would explore, instead you scry 1, then that creature explores." (Twists and Turns) */
+  scryBeforeExplore?: true;
   entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;

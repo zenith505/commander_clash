@@ -383,7 +383,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // The Second Doctor: what doing it means for an opponent.
           const you = player(s, ctx.controller).name;
           const ban = after?.type === "attackBanNextTurn" && pid !== ctx.controller ? `If you do, you can't attack ${you} or permanents ${you} controls during your next turn.` : undefined;
-          const otherwise = loss !== undefined ? `If you don't, you lose ${loss} life.` : ban;
+          // Web of Inertia, Jace, Multiverse Architect: what not doing it means for that player's attack this turn.
+          const next = s.resolving!.body.effects[s.resolving!.next + 1];
+          const webBan = next?.type === "if" && next.cond.kind === "theyChose" && next.cond.not && next.effects[0]?.type === "attackBanThisTurn" ? next.effects[0] : undefined;
+          const webText = webBan ? `If you don't, creatures you control can't attack ${webBan.subtype ? `${webBan.subtype}s ${you} controls` : you} this turn.` : undefined;
+          const otherwise = loss !== undefined ? `If you don't, you lose ${loss} life.` : (ban ?? webText);
           s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: typeof e.wheel === "number" ? e.wheel : amountNow(s, e.wheel, { ...ctx, eachOne: pid }) } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(otherwise ? { otherwise } : {}) };
           return "paused";
         }

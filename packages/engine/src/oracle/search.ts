@@ -149,6 +149,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { kind: "card", types: ["Land"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: phrase };
   }
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
+  // Call to the Kindred: "a creature card that shares a creature type with enchanted creature", bound as the look resolves.
+  const kindred = /^(creature card) that shares a creature type with enchanted creature$/.exec(p);
+  if (kindred) {
+    const base = parseSearchFilter(kindred[1]!, count);
+    return base ? { ...base, sharesTypeWithAttached: true, text: p } : null;
+  }
   // Fang-Druid Summoner: "a creature card with no abilities", by its printed text (TargetSpec.noAbilities).
   const noAb = /^(.+ card) with no abilities$/.exec(p);
   if (noAb) {

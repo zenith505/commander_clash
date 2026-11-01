@@ -476,6 +476,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = parseDamageRecipient(m[2]!, ctx);
     return to?.ref === "anyTarget" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, also: [{ ref: "target", index: a.index }], by: { target: a.index } }] : null;
   }
+  // Asmoranomardicadaistinaculdacar: "Target creature deals 6 damage to itself": that creature is the source (its
+  // deathtouch, lifelink and infect apply); none if it's an illegal target as this resolves (CR 608.2b).
+  if ((m = /^(Target creature) deals (\d+) damage to itself$/.exec(s))) {
+    const a = parseObject(m[1]!.toLowerCase(), ctx);
+    return a?.ref === "target" && !a.n ? [{ type: "damage", amount: Number(m[2]), to: a, by: { target: a.index } }] : null;
+  }
   // "Target creature you control deals damage equal to its power to target player" (Gravitic Punch): from that creature,
   // its power as this resolves; none if either target is illegal (rulings).
   // Origin of Thor: "... to each opponent", each of them at once, from that creature.

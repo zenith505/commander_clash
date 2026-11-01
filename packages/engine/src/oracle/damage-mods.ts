@@ -14,6 +14,12 @@ const COLOR = "(?:white|blue|black|red|green)";
 
 /** One kind of source: "a red source you control", "a creature you control", "a red instant or sorcery spell you control". */
 function sourceKind(t: string): { spec: TargetSpec; spell?: true } | null {
+  // Obosh, the Preypiercer: "a source you control with an odd mana value" (a spell's with its X, rulings, CR 202.3e).
+  const parity = /^(source you control) with an? (odd|even) mana value$/.exec(t);
+  if (parity) {
+    const k = sourceKind(parity[1]!);
+    return k && { spec: { ...k.spec, manaValue: { parity: parity[2] as "odd" | "even" }, text: t } };
+  }
   const you = / you control$/.test(t);
   let rest = t.replace(/ you control$/, "");
   // Leading colors ("red", "red or artifact" is handled by the caller): the target phrases don't take them before

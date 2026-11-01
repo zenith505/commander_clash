@@ -47,6 +47,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Seize the Storm: "the number of cards with flashback you own in exile": face-up cards with a printed flashback.
   if (!each && /^the number of cards with flashback you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Flashback"], text: "card with flashback" } } };
+  // Alrund, God of the Cosmos: "for each foretold card you own in exile" (CR 702.143a): foretold cards are face down, so
+  // only the foretold mark counts.
+  if (each ? /^foretold card you own in exile$/i.test(p) : /^the number of foretold cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, foretold: true } };
   // Cosmogoyf: "the number of cards you own in exile": face down or not, wherever ~ is (its rulings: it counts itself in
   // exile, CR 604.3).
   if (!each && /^the number of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" } } };
@@ -536,6 +539,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && ctx?.opponentsDiscardedTwo && /^opponent who didn't discard two nonland cards this way$/i.test(p)) return count({ kind: "players", opponents: true, discardedFewerNonland: 2 });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
+  // Wernog, Rider's Chaplain: "the number of opponents who investigated this way", after "each opponent may investigate":
+  // those who chose to (each of them did).
+  if (ctx?.eachChose && /^opponents? who investigated this way$/i.test(p)) return count({ kind: "players", opponents: true, choseThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
   // Sweep (Plow Through Reito): "for each Plains returned this way", "the number of Mountains returned this way".
@@ -740,6 +746,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
   // Domain.
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
+  // Niv-Mizzet, Guildpact: "the number of different color pairs among permanents you control that are exactly two colors".
+  if (/^different color pairs among permanents you control that are exactly two colors$/i.test(p)) return count({ kind: "colorPairs" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   // Loot, the Key to Everything: "the number of card types among other nonland permanents you control" (CR 205.2a; a

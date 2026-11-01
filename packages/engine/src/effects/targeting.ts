@@ -429,6 +429,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
   if (spec.notNamedAsYours) return false; // not worked out yet
+  if (spec.sharesTypeWithAttached) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.noManaAbility && (compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
@@ -519,7 +520,7 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
 
 /** An anyOf that's only "power N or less" / "toughness N or less" (Stern Scolding's "power or toughness 2 or less"). */
 const isPtAnyOf = (anyOf: TargetSpec[] | undefined): anyOf is TargetSpec[] => !!anyOf?.length && anyOf.every((a) => Object.keys(a).every((k) => ["kind", "types", "notTypes", "notColors", "power", "toughness", "text"].includes(k)) && !a.types?.length && !!(a.power || a.toughness));
-const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
+export const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
 /** What a player gained until end of turn or until their next turn. */
 const gainedBy = (s: GameState, pid: PlayerId): string[] => [...(s.players[pid]?.gained ?? []), ...(s.players[pid]?.gainedUntilNextTurn ?? [])];

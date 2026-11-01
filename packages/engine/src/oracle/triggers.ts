@@ -1846,7 +1846,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Look at the top five cards of your library. You may reveal a creature card from among them and put it into your
   // hand." (Horn of the Mark) too, and "a Hero card ... put that card into your hand" (Director Nick Fury).
   // Cosmic Cube: "Look at the top six cards of your library. You may cast a spell from among them ..." too.
-  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? (?:[a-z ]+|[A-Z][a-z]+) card from among them and put (?:it|that card) into your hand|You may cast a spell from among them [^.]+)\./;
+  // Choco, Seeker of Paradise: "look at that many cards from the top of your library. You may put one of them into your
+  // hand. Then put any number of land cards from among them ...": the cards.
+  const lookAt = /\b[Ll]ook at (?:the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? (?:[a-z ]+|[A-Z][a-z]+) card from among them and put (?:it|that card) into your hand|You may cast a spell from among them [^.]+)|that many cards from the top of your library\. You may put one of them into your hand\. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard)\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next

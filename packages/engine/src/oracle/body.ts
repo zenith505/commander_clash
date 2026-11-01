@@ -2355,6 +2355,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ],
       text,
     };
+  // Choco, Seeker of Paradise: "Whenever one or more Birds you control attack, look at that many cards from the top of your
+  // library. You may put one of them into your hand. Then put any number of land cards from among them onto the
+  // battlefield tapped and the rest into your graveyard.": the attacking Birds' number (the trigger's), one card to your
+  // hand, then the lands of the others, all of them in this one resolution.
+  if (/^[Ll]ook at (?:that many|X) cards from the top of your library\. You may put one of them into your hand\. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard\.$/.test(text.trim())) {
+    const many: Amount = { count: { kind: "eventAmount" } };
+    const land = parseSearchFilter("land card");
+    if (!land) return null;
+    const lands = (n: Amount): Effect => ({ type: "dig", n, count: 99, upTo: true, filter: land, into: "battlefield", tapped: true, rest: "graveyard", reveal: false });
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: many, count: 1, upTo: true, into: "hand", rest: "keep", reveal: false },
+        { type: "if", cond: { kind: "digTook" }, effects: [lands({ ...many, plus: -1 })], otherwise: [lands(many)] },
+      ],
+      text,
+    };
+  }
   // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
   // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
   // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
@@ -11319,6 +11337,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exileFaceDown" || prev.from !== "handCard") return null;
       effects[effects.length - 1] = { ...prev, look: true };
+      continue;
+    }
+    // Immortal Obligation: "Return target creature card from an opponent's graveyard to the battlefield under their control
+    // with a duty counter on it. For as long as that creature has a duty counter on it, it is goaded, can't attack you or a
+    // permanent you control, and can't block creatures you control.": effects on the permanent the card became (CR 400.7,
+    // 611.2c) while it has a duty counter (611.2b): goaded by you (CR 701.15), no attacking you or your planeswalkers and
+    // battles (508.1c), no blocking your creatures (509.1b).
+    const dutyCtr = new RegExp(`^For as long as that creature has an? ${COUNTER} counter on it, it is goaded, can't attack you or a permanent you control, and can't block creatures you control$`).exec(s);
+    if (dutyCtr) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(dutyCtr[1]!);
+      if (prev?.type !== "putOntoBattlefield" || !prev.counters?.[counter] || prev.what.ref !== "target" || prev.alsoMods || effects.length !== 1) return null;
+      effects[0] = { ...prev, alsoMods: [{ kind: "goad" }, { kind: "cantAttackYou" }, { kind: "cantBlockCreatures", filter: { kind: "object", types: ["Creature"], controller: "you", text: "creatures you control" } }], alsoModsWhileCounter: counter };
       continue;
     }
     // "Put a shadow counter on target creature. For as long as that creature has a shadow counter on it, it's a Wraith in

@@ -2624,6 +2624,8 @@ export type Effect =
       mayThen?: true;
       /** "That creature is a black Zombie in addition to its other colors and types": an effect on the permanent from then on (CR 611.2c). */
       alsoMods?: Modification[];
+      /** Immortal Obligation: "For as long as that creature has a duty counter on it, ...": `alsoMods` only while it has one of these (CR 611.2b). */
+      alsoModsWhileCounter?: string;
       /** Tune Up: "If it's a Vehicle, it becomes an artifact creature": `alsoMods` only for a permanent with this subtype as it enters. */
       alsoModsIfSubtype?: string;
       /** "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): they enter that way (rulings) when the X is at least `x`. */

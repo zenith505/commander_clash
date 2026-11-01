@@ -50,6 +50,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Cosmogoyf: "the number of cards you own in exile": face down or not, wherever ~ is (its rulings: it counts itself in
   // exile, CR 604.3).
   if (!each && /^the number of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" } } };
+  // Kaya, Orzhov Usurper: "the number of cards that player owns in exile" (the target player), face down or not.
+  if (!each && (m = /^the number of cards (that player|target player|target opponent) owns in exile$/i.exec(p))) {
+    const who = whosePlayer(`${m[1]!}'s`, ctx);
+    return who ? { count: { kind: "cardsInExile", who } } : null;
+  }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
   // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named
@@ -287,6 +292,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Aloy, Savior of Meridian: "... attack, discover X, where X is the greatest power among them": the same.
   if (!each && /^the greatest power among (?:those creatures|them)$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
     return { count: { kind: "greatestPower", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "those creatures" }, inEventGroup: true } };
+  // Witch-king, Sky Scourge: "the total power of those creatures": the attackers of the trigger's event, as they last
+  // existed if they've left the battlefield (rulings).
+  if (!each && /^the total power of those creatures$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
+    return { count: { kind: "greatestPower", total: true, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "those creatures" }, inEventGroup: true } };
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
   // "The total power of attacking creatures" (Klauth): every player's attackers.
@@ -726,6 +735,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  // Loot, the Key to Everything: "the number of card types among other nonland permanents you control" (CR 205.2a; a
+  // land's other card types don't count, rulings).
+  if ((m = /^(?:the number of )?card types among (other )?(nonland )?permanents you control$/i.exec(p)))
+    return count({ kind: "cardTypesAmongPermanents", ...(m[1] ? { other: true as const } : {}), ...(m[2] ? { nonland: true as const } : {}) });
   if (each && /^creature type among creatures you control$/i.test(p)) return count({ kind: "creatureTypesAmong" });
   if (/^planeswalker types among planeswalkers you control$/i.test(p)) return count({ kind: "planeswalkerTypesAmong" });
   // Odric, Blood-Cursed: "the number of abilities from among flying, first strike, ... found among creatures you control":

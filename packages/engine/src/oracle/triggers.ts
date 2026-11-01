@@ -1841,7 +1841,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // Lightmine Field: "Whenever one or more creatures attack, ~ deals damage to each of those creatures ...": anyone's
   // attackers of that declaration.
   // Aloy, Savior of Meridian: "discover X, where X is the greatest power among them": the attackers of the group.
-  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.");
+  // Witch-king, Sky Scourge: "exile the top X cards of your library, where X is their total power": the same attackers.
+  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.").replace(/, where X is their total power\. You may play those cards this turn\.$/, ", where X is the total power of those creatures. You may play those cards this turn.");
   // Vulture, Feathered Fiend: "Whenever one or more creatures you control with flying deal combat damage to a player, put a
   // +1/+1 counter on each of those creatures": the ones that dealt that player combat damage.
   const dealtThose = event === "creaturesYouControlDealCombatDamageToPlayer" && /^put an? \+1\/\+1 counter on each of those creatures and draw a card\.?$/.test(bodyText);

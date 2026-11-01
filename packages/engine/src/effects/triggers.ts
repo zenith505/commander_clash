@@ -862,7 +862,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
     // the same time (CR 603.10a), whatever zone it went to.
     if (ev.sacrificed && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.snapshot.isToken ? { token: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       // "Whenever a player sacrifices", "whenever an opponent sacrifices": the other players' permanents too, each
       // triggering for its own controller, "that player" being the one who sacrificed it.
@@ -2364,7 +2364,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       }
       // The only possible choice, unless choosing none is one too ("you may choose two").
       else if (n === min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
-      else if (printed.modal.random) {
+      else if (printed.modal.random && !(printed.modal.randomUnless && staticConditionNow(s, printed.modal.randomUnless, t.sourceId, t.controller))) {
         // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
         const can = legal.flatMap((ok, i) => (ok ? [i] : []));
         t.modes = [can[Math.floor(nextRandom(s) * can.length)]!];

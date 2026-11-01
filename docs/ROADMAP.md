@@ -1,6 +1,6 @@
 # Roadmap
 
-28,904 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,925 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
 9,979 (93%).
 
@@ -4172,6 +4172,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   choice of the top or bottom of their library" (Sudden Setback: a spell leaves the stack without being countered),
   "If it's (~ is) an Aura, enchanted creature gets ... instead" (Everflame Eidolon, Erebos's Emissary: bestowed, CR
   702.103), "target permanent you own or control" (Telim'Tor's Edict). +19 (28,904 of 31,936 with rounds 230 to 236).
+- Round B74 (abilities an Equipment or Aura grants that name it, from the bottom of the list): quoted granted text
+  naming the Equipment or Aura now points at that object (bound as the ability is granted, so it follows the object even
+  if the creature changes, CR 113.7, 607.2): "Sacrifice Blazing Torch: Blazing Torch deals 2 damage to any target"
+  (Blazing Torch: the damage source is the Torch as it last existed, CR 608.2h; only its controller can sacrifice it,
+  CR 701.21a; browser test), Sunfire Torch, Ninja's Kunai, Deconstruction Hammer, Citizen's Crowbar, Spare Dagger,
+  Surestrike Trident and Rakdos Riteknife ("Sacrifice ~", "counters on ~"), "{T}, Unattach Leonin Bola: Tap target
+  creature" (Leonin Bola, Heartseeker, Trusty Boomerang, Razor Boomerang: unattaching only from that creature, CR
+  701.3d; Razor Boomerang's damage comes from the Boomerang; browser test), "Return Blinding Powder to its owner's
+  hand" (Blinding Powder), Trickster's Talisman, Archery Training; "can't attack (block) unless a creature with greater
+  power also attacks (blocks)" (Okk, CR 508.1c, 509.1b: a blocker declared earlier in the combat counts), "each player
+  who didn't discard a creature card this way loses 4 life" (Strongarm Tactics), "If it isn't a creature or Vehicle, it
+  becomes a 0/0 Construct" (Lifecraft Awakening), "Whenever a card is put into your graveyard from your library"
+  (Pedantic Learning), "Whenever a permanent is returned to your hand" (Azorius Aethermage, tokens included), "Whenever
+  a permanent is returned to a player's hand, that player ..." (Warped Devotion: its owner). +21 (28,925 of
+  31,936 with rounds 230 to 236 and B71 to B73). Also faster: the characteristics cache's count check (it
+  was rebuilt as a string on every read) and the state copy, which took the slow Cocoon test from about 5 s to 1 s.
+- Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
+  removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
+  as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
+  (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend and
+  The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
+  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (Lane A's round 236, now
+  merged, changed the same keyword-binding code: next).
 - Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
   payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land
   types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight
@@ -4217,12 +4240,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   so after it merges), Desolation (who tapped a land for mana this turn), Nefarious Lich (damage replaced by exiling
   from the graveyard, losing if you can't).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet (`npm run popular -- --least`,
-  minus the names already in ROADMAP and HISTORY). After round B73 about 270 of those are ranked below 25,000 and about
+  minus the names already in ROADMAP and HISTORY). After round B74 about 265 of those are ranked below 25,000 and about
   440 between 25,000 and 19,700, mostly multi-line cards and mechanics not modeled yet (banding, text changes, mana
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
-  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
-  Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
+  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
   Succession, Drain Power, Volcano Hellion, Drain Life, Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,

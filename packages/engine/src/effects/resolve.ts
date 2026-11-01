@@ -352,6 +352,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
     });
   }
+  // The Equipment or Aura that gave this ability, while it's still that permanent (CR 400.7).
+  if (ref.ref === "grantSource") {
+    const o = ref.id ? s.objects[ref.id] : undefined;
+    return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === ref.zc ? [o] : [];
+  }
   if (ref.ref === "self") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // If it left the battlefield (even if it came back), it's a different object now (CR 400.7).
@@ -706,7 +711,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return apnap(s, livingPlayers(s).filter((p) => s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, filter, o, ctx.controller, false); })));
     }
     case "opponentsNotDiscarded":
-      return opponents(s, ctx.controller).filter((p) => !(s.resolving?.discardedAll ?? []).some((id) => s.objects[id]?.owner === p && printedMatches(ref.filter, defOf(s, s.objects[id]!))));
+      return (ref.players ? apnap(s, livingPlayers(s)) : opponents(s, ctx.controller)).filter((p) => !(s.resolving?.discardedAll ?? []).some((id) => s.objects[id]?.owner === p && printedMatches(ref.filter, defOf(s, s.objects[id]!))));
     case "opponentsLostLife":
       return opponents(s, ctx.controller).filter((p) => (s.turnLog?.lifeLost?.[p] ?? 0) >= ref.n);
     case "subjectControllerOpponents": {

@@ -2185,6 +2185,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Orcish Conscripts: "can't attack unless at least two other creatures attack", "can't block unless at least two other
   // creatures block": declared in the same combat (CR 508.1c, 509.1b).
   if ((m = new RegExp(`^can't (attack|block) unless at least ${NUM} other creatures (attack|block)$`).exec(rest)) && m[1] === m[3]) return [{ kind: m[1] === "attack" ? "cantAttackUnlessOthers" : "cantBlockUnlessOthers", n: num(m[2]!) }];
+  // Okk: "can't attack unless a creature with greater power also attacks", "can't block unless a creature with greater
+  // power also blocks": another creature declared in the same combat, powers compared as it's declared (CR 508.1c, 509.1b).
+  if ((m = /^can't (attack|block) unless a creature with greater power also (attacks|blocks)$/.exec(rest)) && m[2] === `${m[1]}s`) return [{ kind: m[1] === "attack" ? "cantAttackUnlessGreater" : "cantBlockUnlessGreater" }];
   // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
   // CR 508.1c).
   if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {

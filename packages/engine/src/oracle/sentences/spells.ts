@@ -73,8 +73,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Saheeli, the Gifted: "The next spell you cast this turn has affinity for artifacts": that spell costs {1} less for
   // each artifact you control as you cast it (CR 702.41a), counted as its total cost is determined (CR 601.2f; rulings),
   // generic mana only (rulings).
-  if ((m = /^[Tt]he next spell you cast this turn has affinity for (artifacts)$/.exec(s))) {
-    const change = parseCostChange(`Spells you cast cost {1} less to cast for each ${m[1]!.slice(0, -1)} you control`);
+  // Don & Raph, Hard Science: "the next noncreature spell you cast this turn has affinity for artifacts": the next
+  // noncreature one; two of them make two instances, which add up (rulings).
+  if ((m = /^[Tt]he next (noncreature )?spell you cast this turn has affinity for (artifacts)$/.exec(s))) {
+    const change = parseCostChange(`${m[1] ? "Noncreature spells" : "Spells"} you cast cost {1} less to cast for each ${m[2]!.slice(0, -1)} you control`);
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || !change.costMod.times) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true }];
   }
@@ -602,14 +604,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Gogo, Master of Mimicry: "... you control X times", the X paid for the ability (CR 107.3a).
   // The Peregrine Dynamo: "... from another legendary source that's not a commander": a legendary permanent, spell or
   // card in any zone (rulings), not the Dynamo itself, and not a commander (CR 903.3).
-  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source| from another legendary source that's not a commander)?( X times)?$/i.exec(s))) {
-    if (m[4] && (!ctx.activated || m[2])) return null;
+  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source| from another legendary source that's not a commander)?( X times| twice)?$/i.exec(s))) {
+    // Mister Fantastic: "Copy target triggered ability you control twice": two copies (CR 707.10).
+    const twice = m[4] === " twice";
+    if (m[4] && !twice && (!ctx.activated || m[2])) return null;
     const from = m[3]?.toLowerCase();
     const legendary = !!m[2] && !m[3];
     if (legendary && !ctx.activated) return null;
     const abilityFrom = legendary ? { supertypes: ["Legendary"], another: true as const, notCommander: true as const } : from === "colorless" ? { colorless: true as const } : from ? { types: [from[0]!.toUpperCase() + from.slice(1)] } : undefined;
     const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()} you control${m[2] ?? ""}` };
-    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: m[4] ? X : 1, newTargets: false }];
+    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: twice ? 2 : m[4] ? X : 1, newTargets: false }];
   }
   // Return the Favor: "Copy target instant spell, sorcery spell, activated ability, or triggered ability": a spell or an
   // ability on the stack (CR 707.10, 115.1c-d).

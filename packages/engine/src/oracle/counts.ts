@@ -385,7 +385,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // into the hand otherwise).
   // Heliod, the Warped Eclipse: "for each card your opponents have drawn this turn": all of them together.
   if (/^cards? your opponents have drawn this turn$/i.test(p)) return { count: { kind: "drawnThisTurn", who: { ref: "eachOpponent" } } };
-  if (/^cards? you've discarded this turn$/i.test(p)) return { count: { kind: "discardedThisTurn", who: { ref: "you" } } };
+  // Hollow One: "each card you've cycled or discarded this turn": cycling discards the card (CR 702.29a), so each is one
+  // card discarded, counted once; it counts wherever those cards are now (rulings).
+  if (/^cards? you've (?:cycled or )?discarded this turn$/i.test(p)) return { count: { kind: "discardedThisTurn", who: { ref: "you" } } };
   // Dream Salvage: "the number of cards target opponent discarded this turn" (every discard this turn, CR 701.9a).
   if ((m = /^(?:the number of )?cards? (target opponent|target player|that player) discarded this turn$/i.exec(p))) {
     const who = whosePlayer(`${m[1]!.toLowerCase()}'s`, ctx);
@@ -815,6 +817,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the discarded card's mana value|the mana value of the discarded card)$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
+  // Ellie and Alan, Paleontologists: "where X is the mana value of the exiled card" is "the exiled card's mana value".
+  if ((m = /^the (power|toughness|mana value) of the exiled card$/i.exec(p))) p = `the exiled card's ${m[1]}`;
   // Havoc Eater: "for each opponent, goad up to one target creature that player controls. Put X +1/+1 counters on ~, where
   // X is the total power of creatures goaded this way": the targets still there as it resolves.
   if (/^the total power of creatures goaded this way$/.test(p) && ctx?.lastTargets && ctx.targets[ctx.lastTargets.index]?.perOpponent && ctx.targets[ctx.lastTargets.index]?.types?.includes("Creature")) return count({ kind: "totalPowerOf", of: { ref: "target", ...ctx.lastTargets } });

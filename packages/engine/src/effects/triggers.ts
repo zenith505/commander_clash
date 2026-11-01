@@ -884,7 +884,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "blocksDeclared") {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"
     // once for each such creature, which is the trigger's subject (CR 509.3c-d).
-    const fits = (t: TriggeredAbility, subject: GameObject, you: PlayerId) => !t.subjectFilter || objectMatches(s, t.subjectFilter, subject, you, false);
+    const fits = (t: TriggeredAbility, subject: GameObject, you: PlayerId) => (!t.subjectFilter || objectMatches(s, t.subjectFilter, subject, you, false)) && (!t.blockedByAtLeast || (subject.blockedBy?.length ?? 0) >= t.blockedByAtLeast);
     // "Whenever a creature blocks", "whenever a creature you control becomes blocked": every permanent watching for it,
     // once for each such creature.
     const watchers = s.battlefield.map((id) => obj(s, id));
@@ -1412,7 +1412,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) !== ev.player) continue;
-      add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
+      add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou", undefined, undefined, undefined, undefined, undefined, undefined, { group: ev.ids.map((id) => ({ id, zc: s.objects[id]?.zoneChanges ?? 0 })) });
       // Norn's Decree: once for each opponent whose creatures dealt it (CR 603.2c), that opponent being "that opponent".
       for (const c of ev.controllers) if (c !== ev.player) add(o, ev.player, (e) => e === "opponentCreaturesDealCombatDamageToYou", undefined, undefined, undefined, undefined, undefined, undefined, { player: c });
     }
@@ -1604,6 +1604,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
+      // Syr Carah: "Whenever ~ or an instant or sorcery spell you control deals damage to a player": ~ itself too.
+      add(o, you, (e, t) => e === "spellYouControlDealsDamage" && !!t.spellDamage?.orSelf, undefined, undefined, undefined, undefined, undefined, undefined, info);
     }
     // "Whenever a source you control deals noncombat damage to an opponent" (Niv-Mizzet, Visionary): the source's
     // controller's permanents, once for each source and player.
@@ -1682,7 +1684,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "spellDealtDamage") {
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
     // a graveyard too): once for each player or battle dealt damage (CR 603.2c).
-    const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== ev.by);
+    const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== undefined && (!!t.spellDamage.anyPlayer || ev.player !== ev.by));
     const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t));
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.by && watch(o));

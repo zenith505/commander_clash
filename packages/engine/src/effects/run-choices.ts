@@ -282,7 +282,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!can.length) return;
         if (can.length === 1 && e.onlyDoable) sc.either = can[0]!;
         else {
-          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: can.map(String), labels: can.map((i) => e.labels[i]!), prompt: "choose one" };
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: can.map(String), labels: can.map((i) => e.labels[i]!.replace(/~/g, src)), prompt: "choose one" };
           return "paused";
         }
       }

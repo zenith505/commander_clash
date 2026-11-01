@@ -49,7 +49,7 @@ export function suspendExiled(s: GameState, o: GameObject, n: number): void {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind | CounterKind[], tapped?: boolean, transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind | CounterKind[], tapped0?: boolean | "lands", transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
   const counters = counter === undefined || (Array.isArray(counter) && !counter.length) ? undefined : Object.fromEntries((Array.isArray(counter) ? counter : [counter]).map((k) => [k, 1]));
   // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
   const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
@@ -59,6 +59,8 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
   enterTogether(s, () => {
     for (const c of back) {
       const d = asFace(s, c, faceOf(c), () => defOf(s, c));
+      // Silver Surfer, Cosmic Voyager: "If a land enters this way, it enters tapped": a land as it enters.
+      const tapped = tapped0 === true || (tapped0 === "lands" && d.types.includes("Land"));
       const host = hosts.get(c.id);
       if (d.subtypes.includes("Aura") && !host) {
         log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
@@ -2803,7 +2805,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
           addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : e.at === "nextBeginCombat" ? "nextBeginCombat" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.thenDiscardToughness ? { toughnessThisWay: true as const } : {}), ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }, ...(e.thenDiscardToughness ? [{ type: "discard" as const, who: { ref: "you" as const }, n: { count: { kind: "returnedToughness" as const } } }] : [])],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.thenDiscardToughness ? { toughnessThisWay: true as const } : {}), ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(e.landsTapped ? { landsTapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }, ...(e.thenDiscardToughness ? [{ type: "discard" as const, who: { ref: "you" as const }, n: { count: { kind: "returnedToughness" as const } } }] : [])],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control${e.thenDiscardToughness ? ", then discard cards equal to its toughness" : ""}.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
@@ -2917,7 +2919,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);
       const back = list.map((l) => s.objects[l.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === list[i]!.zc);
       const sc = (s.resolving!.scratch ??= {});
-      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counters ? [...(e.counter ? [e.counter] : []), ...e.counters] : e.counter, e.tapped, false, e.counterIfCreature, e.loyaltyIfPlaneswalker) === "paused") {
+      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counters ? [...(e.counter ? [e.counter] : []), ...e.counters] : e.counter, e.tapped || (e.landsTapped ? "lands" : undefined), false, e.counterIfCreature, e.loyaltyIfPlaneswalker) === "paused") {
         sc.returning ??= list.filter((l) => back.some((b) => b.id === l.id));
         return "paused";
       }

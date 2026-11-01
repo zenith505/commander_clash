@@ -4128,8 +4128,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Ventifact Bottle), "creature or planeswalker an opponent controls that's red or white" and "deals damage equal to its
   power to that permanent" (Flourishing Grapple: that permanent is the first target; it was read as the creature
   dealing the damage), "a basic, Sphere, or Locus land card" and "Activate only if there are nine or more lands with
-  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,855 of 31,936
-  with rounds 230 to 235).
+  different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,871 of 31,936
+  with rounds 230 to 236).
 - Round B72 (from EDHREC rank about 24,300 up to 13,300; every card left unread in that range that a "cards exiled
   with ~" or "while it has a counter" template could cover): cards exiled with ~ (CR 607.2a): "Put a creature card
   exiled with ~ onto the battlefield under your control. It gains haste until end of turn" (Yggdrasil, Rebirth Engine:
@@ -4150,7 +4150,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature's owner puts it on their choice of the top or bottom of their library" (Tolarian Contempt); "choose a
   suspended card you own and remove that many time counters from it" (Amy Pond: picked as it resolves, the last counter
   casts it, CR 702.62; browser test). Engine fix: a "top or bottom of their library" effect with several targets
-  looped forever (it moved the cards already put there again). +14 (28,869 of 31,936 with rounds 230 to 235).
+  looped forever (it moved the cards already put there again). +14 (28,885 of 31,936 with rounds 230 to 236).
 - Round B73 (from EDHREC rank about 27,700 up to 22,500; cards whose one blocking line a small template covers): "~ is every
   creature type (even if this card isn't on the battlefield)" (Mistform Ultimus: a characteristic-defining ability like
   changeling, in every zone, kept when it loses its abilities, CR 604.3, 613.3), "It gets -6/-0 instead as long as its
@@ -4171,7 +4171,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ability exiled, while it stays exiled, CR 607.2a), "The owner of target spell or nonland permanent puts it on their
   choice of the top or bottom of their library" (Sudden Setback: a spell leaves the stack without being countered),
   "If it's (~ is) an Aura, enchanted creature gets ... instead" (Everflame Eidolon, Erebos's Emissary: bestowed, CR
-  702.103), "target permanent you own or control" (Telim'Tor's Edict). +19 (28,845 of 31,936 with rounds 230 to 232).
+  702.103), "target permanent you own or control" (Telim'Tor's Edict). +19 (28,904 of 31,936 with rounds 230 to 236).
 - Round B74 (abilities an Equipment or Aura grants that name it, from the bottom of the list): quoted granted text
   naming the Equipment or Aura now points at that object (bound as the ability is granted, so it follows the object even
   if the creature changes, CR 113.7, 607.2): "Sacrifice Blazing Torch: Blazing Torch deals 2 damage to any target"

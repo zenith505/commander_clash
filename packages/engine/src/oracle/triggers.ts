@@ -1841,7 +1841,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // Lightmine Field: "Whenever one or more creatures attack, ~ deals damage to each of those creatures ...": anyone's
   // attackers of that declaration.
   // Aloy, Savior of Meridian: "discover X, where X is the greatest power among them": the attackers of the group.
-  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.");
+  // Witch-king, Sky Scourge: "exile the top X cards of your library, where X is their total power": the same attackers.
+  if (event === "creaturesYouControlAttack") bodyText = bodyText.replace(/, where X is the greatest power among them\.$/, ", where X is the greatest power among those creatures.").replace(/, where X is their total power\. You may play those cards this turn\.$/, ", where X is the total power of those creatures. You may play those cards this turn.");
   // Vulture, Feathered Fiend: "Whenever one or more creatures you control with flying deal combat damage to a player, put a
   // +1/+1 counter on each of those creatures": the ones that dealt that player combat damage.
   const dealtThose = event === "creaturesYouControlDealCombatDamageToPlayer" && /^put an? \+1\/\+1 counter on each of those creatures and draw a card\.?$/.test(bodyText);
@@ -2147,6 +2148,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Way of the Paradox: "Whenever you activate a loyalty ability, ..."; Keral Keep Disciples: "... of a Chandra
   // planeswalker"; Way of the Mind Sculptor: "..., if you removed two or more loyalty counters to activate it, ..." (CR
   // 606.3-4). The event player is you.
+  // Elspeth's Talent, Rowan's Talent: "... of enchanted planeswalker": the permanent this Aura is attached to as the
+  // ability is activated (the same check as Illusionist's Bracers' "equipped creature").
+  const loyalEnchanted = /^Whenever you activate a loyalty ability of enchanted planeswalker, (.+)$/.exec(line);
+  if (loyalEnchanted) {
+    const body = parseBody(loyalEnchanted[1]!, { activatedAbility: true });
+    return body ? { event: "abilityActivated", activates: { by: "you", loyalty: true, equipped: true }, body } : "fail";
+  }
   const loyal = /^Whenever you activate a loyalty ability(?: of an? ([A-Z][a-z]+) planeswalker)?, (?:if you removed (two|three|four|five) or more loyalty counters to activate it, )?(.+)$/.exec(line);
   if (loyal) {
     const of = loyal[1] ? parseTargetPhrase(`${loyal[1]} planeswalker`) : undefined;
@@ -3477,6 +3485,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damages) return damages;
   // Vraska the Unseen: "whenever a creature deals combat damage to ~, destroy that creature": once for each creature
   // dealing it combat damage, which "that creature" means.
+  // Liliana's Talent: "Whenever a creature deals damage to enchanted planeswalker, destroy that creature": any damage,
+  // not just combat damage (rulings), once for each creature dealing it.
+  const damagesHost = /^Whenever a creature deals damage to enchanted planeswalker, (.+)$/.exec(line);
+  if (damagesHost) {
+    const body = parseBody(damagesHost[1]!, { subjectIt: true });
+    return body ? { event: "creatureDealsDamageToAttached", host: "attached", body } : "fail";
+  }
   const damagedBy = /^Whenever a creature deals combat damage to ~, (.+)$/.exec(line);
   if (damagedBy) {
     const body = parseBody(damagedBy[1]!, { subjectIt: true });

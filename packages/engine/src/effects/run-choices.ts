@@ -12,7 +12,7 @@ import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, g
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
-import { lockedDoors } from "./run-permanents";
+import { canTransform, lockedDoors } from "./run-permanents";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
@@ -667,6 +667,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
+            : e.cond.kind === "subjectWasToken"
+            ? !!ctx.lki?.token
+            : e.cond.kind === "revealedSharesCardTypeWithSubject"
+            ? ((rv) => {
+                const card = rv && s.objects[rv.id];
+                if (!card || (card.zoneChanges ?? 0) !== rv.zc) return false;
+                const sub = objects(s, { ref: "subject" }, ctx)[0];
+                const types = sub?.zone === "battlefield" ? characteristics(s, sub).types : (ctx.lki?.types ?? []);
+                return defOf(s, card).types.some((t) => types.includes(t));
+              })(s.resolving!.revealed)
             : e.cond.kind === "targetExiled"
             ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === "exile" && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
             : e.cond.kind === "revealedMv"
@@ -730,7 +740,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "subjectCardIs"
             ? objects(s, { ref: "subjectCard" }, ctx).some((o) => printedMatches(e.cond.kind === "subjectCardIs" ? e.cond.filter : ({} as TargetSpec), defOf(s, o)))
             : e.cond.kind === "targetCardWas"
-            ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
+            ? Array.from({ length: e.cond.n ?? 1 }, (_, k) => (e.cond as { index: number }).index + k).some((i) => targetCardWas(s, ctx, i, (e.cond as { filter: TargetSpec }).filter))
             : e.cond.kind === "unlessPaid"
             ? !!s.resolving!.unlessPaid
             : e.cond.kind === "spellCountered"
@@ -989,6 +999,12 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // "You may discard a card or sacrifice a land" (Highway Robbery): only with one of them possible (rulings).
     if (e.type === "either" && e.onlyDoable && !e.options.some((o) => canDoNow(s, o, ctx))) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
+    // Ratchet, Field Medic: "you may convert ~. When you do, ...": only if it turns over now, the same object that hasn't
+    // transformed since the ability was put on the stack (CR 701.27f, rulings: a second trigger does nothing).
+    if (e.type === "transform" && e.what.ref === "self") {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || (me.transforms ?? 0) !== (ctx.sourceTransforms ?? 0) || (me.isToken ? !defOf(s, me).tokenBack || me.tokenBackUp : !canTransform(s, me))) return false;
+    }
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
     // (CR 609.3).

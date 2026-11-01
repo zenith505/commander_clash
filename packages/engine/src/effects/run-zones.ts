@@ -1758,7 +1758,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
       let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
-      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
+      if (e.filter) {
+        // "With mana value X" (Ashiok, Nightmare Weaver): the X of its loyalty cost.
+        const filter = bindBound(s, e.filter, amountCtx(s, ctx));
+        cards = cards.filter((c) => printedMatches(filter, defOf(s, c)));
+      }
       if (e.one) {
         if (!sc.linkedPick) {
           if (!cards.length) return;
@@ -1814,7 +1818,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       // Under their owners' control; an Aura's owner chooses what it enchants (CR 303.4f, Oblivion Ring rulings).
-      return returnFromExile(s, cards, (c) => c.owner, src);
+      return returnFromExile(s, cards, (c) => (e.yours ? ctx.controller : c.owner), src);
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
@@ -2759,7 +2763,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} exiles ${inHand.length ? inHand.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from ${p.name}'s hand.`);
         } else if (e.hand) {
           const n = p.hand.length;
-          for (const id of [...p.hand]) moveObject(s, id, "exile");
+          for (const id of [...p.hand]) {
+            moveObject(s, id, "exile");
+            const o = obj(s, id);
+            if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          }
           log(s, `${src} exiles ${p.name}'s hand (${n} card${n === 1 ? "" : "s"}).`);
         }
         const flashback = (id: ObjectId) => graveyardWays(s, obj(s, id)).some((w) => w.kind === "flashback" || w.kind === "grantedFlashback");
@@ -3142,11 +3150,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
       // "Exile the top card of each opponent's library" (Brainstealer Dragon, Stolen Strategy): the same, opponents only.
       // "Each of those opponents' libraries" (Breeches, Brazen Plunderer): the opponents dealt damage.
-      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent" || e.who?.ref === "eventPlayers") {
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent" || e.who?.ref === "eventPlayers" || (e.graveyards && e.who?.ref === "target")) {
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {
-          const ids = e.graveyards ? [...player(s, pid).graveyard] : player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          const ids = e.graveyards ? player(s, pid).graveyard.filter((id) => !e.graveyardFilter || printedMatches(e.graveyardFilter, defOf(s, obj(s, id)))) : player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
@@ -3155,7 +3163,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           all.push(...ids);
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
-        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? "each opponent's graveyard" : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? (e.who.ref === "target" ? `${players(s, e.who, ctx).map((pid) => player(s, pid).name).join("")}'s graveyard` : "each opponent's graveyard") : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "exiled" ? " for as long as they remain exiled" : ""}.`);
         return;
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
@@ -3215,7 +3223,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
         // Nahiri: free only if it's an Equipment card.
         const free = e.free && (!e.freeFor || printedMatches(e.freeFor, defOf(s, o)));
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.life ? { life: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };

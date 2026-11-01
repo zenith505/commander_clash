@@ -499,7 +499,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return at.length === 1 ? { ref: "target", index: at[0]! } : null;
   }
   // "Enchanted creature", "equipped creature": what the source is attached to (not targeted).
-  if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
+  if (/^(enchanted|equipped) (creature|permanent|artifact|land|planeswalker)$/i.test(x) && !ctx.spell) {
     ctx.lastAttached = true;
     return { ref: "attached" };
   }
@@ -746,6 +746,7 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "tappedThisWay":
     // Prismabasher: "the number of colors among permanents you control".
     case "colorsAmongPermanents":
+    case "cardTypesAmongPermanents":
     // Archipelagore: "the number of times ~ has mutated", fixed as the mutate trigger's targets are chosen.
     case "mutations":
     // Custodi Soulcaller: "the number of players you attacked this combat", fixed once attackers are declared.

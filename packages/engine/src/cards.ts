@@ -432,7 +432,14 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
   const c = characteristics(s, o);
   borrowing = true;
   try {
-    if (b.top) {
+    if (b.linked) {
+      // Myr Welder: the cards its exile ability exiled, linked to it as the object it is now (CR 607.2a, 400.7); their
+      // printed abilities (rulings: only activated ones, "~" in them being this permanent).
+      for (const l of s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []) {
+        const card = s.objects[l.id];
+        if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
+      }
+    } else if (b.top) {
       const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
       if (top && printedMatches(b.filter, defOf(s, top))) out.cards.push(defOf(s, top));
     } else if (b.graveyard) {

@@ -25,14 +25,9 @@ import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../k
  * the same object (712.18): its counters, damage, attachments and the effects on it stay.
  */
 export function transformPermanent(s: GameState, o: GameObject, byDayNight = false, convert = false): boolean {
-  const d = s.cards[o.cardId];
-  if (o.zone !== "battlefield" || o.faceDown || !d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return false;
-  // "Can't transform" (Bound by Moonsilver): not by any effect, daybound and nightbound too, nor convert (CR 701.28f).
-  if (characteristics(s, o).cantTransform) return false;
-  // A daybound or nightbound permanent transforms only as day and night say (CR 702.145b, e).
-  if (!byDayNight && (objHasKeyword(s, o, "Daybound") || objHasKeyword(s, o, "Nightbound"))) return false;
+  if (!canTransform(s, o, byDayNight)) return false;
+  const d = s.cards[o.cardId]!;
   const to = o.face === 1 ? 0 : 1;
-  if (d.faces[to]!.types.some((t) => t === "Instant" || t === "Sorcery")) return false;
   const was = defOf(s, o).name;
   setFace(s, o, to === 0 ? undefined : to);
   o.transforms = (o.transforms ?? 0) + 1;
@@ -46,6 +41,18 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   }
   fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
+}
+
+/** Whether transformPermanent would turn this permanent over now. */
+export function canTransform(s: GameState, o: GameObject, byDayNight = false): boolean {
+  const d = s.cards[o.cardId];
+  if (o.zone !== "battlefield" || o.faceDown || !d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return false;
+  // "Can't transform" (Bound by Moonsilver): not by any effect, daybound and nightbound too, nor convert (CR 701.28f).
+  if (characteristics(s, o).cantTransform) return false;
+  // A daybound or nightbound permanent transforms only as day and night say (CR 702.145b, e).
+  if (!byDayNight && (objHasKeyword(s, o, "Daybound") || objHasKeyword(s, o, "Nightbound"))) return false;
+  const to = o.face === 1 ? 0 : 1;
+  return !d.faces[to]!.types.some((t) => t === "Instant" || t === "Sorcery");
 }
 
 /**

@@ -1436,6 +1436,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked", combat: "this" }], duration: "endOfTurn" }];
   }
+  // Dulcet Sirens: "Target creature attacks target opponent this turn if able": that player, not a planeswalker of theirs
+  // (rulings), in each combat this turn (CR 508.1d). With either target illegal, nothing happens (rulings).
+  if (/^Target creature attacks target opponent this turn if able$/.test(s)) {
+    const what = parseObject("target creature", ctx);
+    const whom = parsePlayer("target opponent", ctx);
+    if (what && !isGroup(what) && whom?.ref === "target") return [{ type: "continuous", what, mods: [{ kind: "mustAttackPlayer", player: { target: whom.index } }], duration: "endOfTurn" }];
+    return null;
+  }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);

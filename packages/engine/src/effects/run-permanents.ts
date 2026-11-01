@@ -1300,6 +1300,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${defOf(s, o).name} ${describeMods(s, mods, ctx.controller, false)}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
         return;
       }
+      // Dulcet Sirens: with its target opponent illegal, the creature isn't made to attack anyone (rulings).
+      if (e.mods.some((m) => m.kind === "mustAttackPlayer" && typeof m.player === "object" && !ctx.legal[m.player.target])) return;
       // The affected set is locked in now (CR 611.2c).
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).
       const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId));

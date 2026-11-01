@@ -324,6 +324,10 @@ export type Count =
   | { kind: "lifeGainedThisTurn" }
   /** "For each {E} you've paid or lost this turn" (Blaster Hulk): energy counters you've paid or lost in total (CR 107.14, 122.1). */
   | { kind: "energyLostThisTurn" }
+  /** "The number of times you descended this turn" (The Mycotyrant): permanent cards put into your graveyard this turn (CR 700.11, rulings). */
+  | { kind: "descendedThisTurn" }
+  /** "The number of creatures that were exiled under your opponents' control this turn" (Vren, the Relentless): TurnLog.creaturesExiled of your opponents. */
+  | { kind: "opponentsCreaturesExiledThisTurn" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /**

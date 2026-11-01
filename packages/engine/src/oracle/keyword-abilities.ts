@@ -77,8 +77,10 @@ export function parseGraveyardKeyword(
     return parseManaCost(m[1]!).supported ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [], exile: false } } : "fail";
   // Scourge of Nel Toth: "You may cast this creature from your graveyard by paying {B}{B} and sacrificing two creatures
   // rather than paying its mana cost": the same, the sacrifice part of that cost (CR 118.9, 601.2h), at the usual timing.
-  if ((m = /^You may cast (?:~|this card|this creature) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) and sacrificing ([^.]+?) rather than paying its mana cost\.?$/.exec(line))) {
-    const sac = parseAdditionalCost(`Sacrifice ${m[2]}`, true);
+  // Squee, Dubious Monarch: "... by paying {3}{R} and exiling four other cards from your graveyard ...": the same, the
+  // cards exiled as it's cast from there (not escape, rulings).
+  if ((m = /^You may cast (?:~|this card|this creature) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) and (sacrificing|exiling) ([^.]+?) rather than paying its mana cost\.?$/.exec(line))) {
+    const sac = parseAdditionalCost(`${m[2] === "exiling" ? "Exile" : "Sacrifice"} ${m[3]}`, true);
     return parseManaCost(m[1]!).supported && sac ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [sac], exile: false } } : "fail";
   }
   // Risen Executioner: "You may cast ~ from your graveyard if you pay {1} more to cast it for each other creature card in

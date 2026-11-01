@@ -608,6 +608,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
   if (each && /^\{E\}(?: \(energy counter\))? you've paid or lost this turn$/i.test(p)) return count({ kind: "energyLostThisTurn" });
+  if (/^(?:the number of )?times you(?:'ve)? descended this turn$/i.test(p)) return count({ kind: "descendedThisTurn" });
+  if (/^(?:the number of )?creatures that were exiled under your opponents' control this turn$/.test(p)) return count({ kind: "opponentsCreaturesExiledThisTurn" });
+  // The Mycotyrant: "the number of creatures you control that are Fungi and/or Saprolings": one with either creature type,
+  // counted once (rulings).
+  if (/^(?:the number of )?creatures you control that are Fungi or Saprolings$/.test(p))
+    return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: ["Fungus", "Saproling"], controller: "you", text: "creatures you control that are Fungi and/or Saprolings" } });
   if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });
   // Willowdusk, Essence Seer: "the amount of life you gained this turn or the amount of life you lost this turn, whichever
   // is greater".

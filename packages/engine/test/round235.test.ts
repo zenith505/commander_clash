@@ -3,13 +3,18 @@
 // from combat. Then draw a card for each tapped creature its controller controls"); Expand the Sphere ("proliferate a
 // number of times equal to the difference"); Tromokratis ("hexproof unless it's attacking or blocking", "can't be blocked
 // unless all creatures defending player controls block it"); Damping Sphere; Izzet Generatorium and Aether Refinery
-// (energy replacements, "if you've paid or lost four or more {E} this turn"); Thieving Varmint ("spells you don't own").
+// (energy replacements, "if you've paid or lost four or more {E} this turn"); Thieving Varmint ("spells you don't own");
+// Obsessive Pursuit ("If X is three or more"); Squee, Dubious Monarch (cast from the graveyard exiling four other cards);
+// Agility Bobblehead ("can't be blocked this turn except by creatures with haste"); Brotherhood Headquarters (Assassin and
+// freerunning mana); The Mycotyrant ("Fungi and/or Saprolings", "the number of times you descended this turn"); Vren, the
+// Relentless ("creatures that were exiled under your opponents' control this turn"); Gornog, the Red Reaper ("becomes a
+// Coward").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, applyAction, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { abilityProblem, applyAction, destroyPermanent, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 import { putPlayerCounters } from "../src/counters";
-import { loseEnergy, loseLife } from "../src/game";
+import { loseEnergy, loseLife, moveObject } from "../src/game";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -55,6 +60,13 @@ const damping = (): CardDef => ({"oracleId":"fd50d76c-7654-47b9-a5b6-d075874e435
 const generatorium = (): CardDef => ({"oracleId":"6a618c4a-e604-4dce-a078-755fd35ac5d9","name":"Izzet Generatorium","manaCost":"{U}{R}","cmc":2,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"If you would get one or more {E} (energy counters), you get that many plus one {E} instead.\n{T}: Draw a card. Activate only if you've paid or lost four or more {E} this turn.","colors":["R","U"],"colorIdentity":["R","U"],"keywords":[],"layout":"normal"}) as CardDef;
 const refinery = (): CardDef => ({"oracleId":"9e9cde32-0568-44bc-a00a-9709f15c1350","name":"Aether Refinery","manaCost":"{4}{R}{R}","cmc":6,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"If you would get one or more {E} (energy counters), you get twice that many {E} instead.\n{T}: You get {E}, then you may pay one or more {E}. If you do, create an X/X black Aetherborn creature token, where X is the amount of {E} paid this way.","colors":["R"],"colorIdentity":["R"],"keywords":[],"layout":"normal"}) as CardDef;
 const varmint = (): CardDef => ({"oracleId":"b9f3cf9f-24c7-43ed-9ba1-f4570df3d09e","name":"Thieving Varmint","manaCost":"{1}{B}","cmc":2,"typeLine":"Creature — Varmint","supertypes":[],"types":["Creature"],"subtypes":["Varmint"],"oracleText":"Deathtouch, lifelink\n{T}, Pay 1 life: Add two mana of any one color. Spend this mana only to cast spells you don't own.","power":"2","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":["Lifelink","Deathtouch"],"layout":"normal"}) as CardDef;
+const pursuit = (): CardDef => ({"oracleId":"7e7abb44-47b0-4d80-b8a1-36f0c1032aa3","name":"Obsessive Pursuit","manaCost":"{1}{B}","cmc":2,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When this enchantment enters and at the beginning of your upkeep, you lose 1 life and create a Clue token. (It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nWhenever you attack, put X +1/+1 counters on target attacking creature, where X is the number of permanents you've sacrificed this turn. If X is three or more, that creature gains lifelink until end of turn.","colors":["B"],"colorIdentity":["B"],"keywords":[],"layout":"normal"}) as CardDef;
+const squee = (): CardDef => ({"oracleId":"124a5dd7-c4f8-479c-9eb0-669aca01d045","name":"Squee, Dubious Monarch","manaCost":"{2}{R}","cmc":3,"typeLine":"Legendary Creature — Goblin Noble","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Goblin","Noble"],"oracleText":"Haste\nWhenever Squee attacks, create a 1/1 red Goblin creature token that's tapped and attacking.\nYou may cast this card from your graveyard by paying {3}{R} and exiling four other cards from your graveyard rather than paying its mana cost.","power":"2","toughness":"2","colors":["R"],"colorIdentity":["R"],"keywords":["Haste"],"layout":"normal"}) as CardDef;
+const bobble = (): CardDef => ({"oracleId":"83a3897c-c245-4fad-b253-3f8bbe6445fb","name":"Agility Bobblehead","manaCost":"{3}","cmc":3,"typeLine":"Artifact — Bobblehead","supertypes":[],"types":["Artifact"],"subtypes":["Bobblehead"],"oracleText":"{T}: Add one mana of any color.\n{3}, {T}: Up to X target creatures you control each gain haste until end of turn and can't be blocked this turn except by creatures with haste, where X is the number of Bobbleheads you control as you activate this ability.","colors":[],"colorIdentity":[],"keywords":[],"layout":"normal"}) as CardDef;
+const hq = (): CardDef => ({"oracleId":"0d3a06d5-5bb9-4733-a55b-9e2c75de6b6e","name":"Brotherhood Headquarters","manaCost":"","cmc":0,"typeLine":"Land","supertypes":[],"types":["Land"],"subtypes":[],"oracleText":"{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast an Assassin spell or a spell that has freerunning, or to activate an ability of an Assassin source.","colors":[],"colorIdentity":[],"keywords":[],"layout":"normal"}) as CardDef;
+const myco = (): CardDef => ({"oracleId":"b69bbb8d-7f8c-45d6-983a-759b5fce6ebd","name":"The Mycotyrant","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Elder Fungus","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Elder","Fungus"],"oracleText":"Trample\nThe Mycotyrant's power and toughness are each equal to the number of creatures you control that are Fungi and/or Saprolings.\nAt the beginning of your end step, create X 1/1 black Fungus creature tokens with \"This token can't block,\" where X is the number of times you descended this turn. (You descend each time a permanent card is put into your graveyard from anywhere.)","power":"*","toughness":"*","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Trample"],"layout":"normal"}) as CardDef;
+const vren = (): CardDef => ({"oracleId":"1216900e-93e3-41a4-b354-9c81938639c2","name":"Vren, the Relentless","manaCost":"{2}{U}{B}","cmc":4,"typeLine":"Legendary Creature — Rat Rogue","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Rat","Rogue"],"oracleText":"Ward {2}\nIf a creature an opponent controls would die, exile it instead.\nAt the beginning of each end step, create X 1/1 black Rat creature tokens with \"This token gets +1/+1 for each other Rat you control,\" where X is the number of creatures that were exiled under your opponents' control this turn.","power":"3","toughness":"4","colors":["B","U"],"colorIdentity":["B","U"],"keywords":["Ward"],"layout":"normal"}) as CardDef;
+const gornog = (): CardDef => ({"oracleId":"adfd6c2d-a7f8-4f5c-bc31-d65c8150ed49","name":"Gornog, the Red Reaper","manaCost":"{2}{R}","cmc":3,"typeLine":"Legendary Creature — Minotaur Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Minotaur","Warrior"],"oracleText":"Haste\nCowards can't block Warriors.\nWhenever one or more Warriors you control attack a player, target creature that player controls becomes a Coward.\nAttacking Warriors you control get +X/+0, where X is the number of Cowards your opponents control.","power":"2","toughness":"3","colors":["R"],"colorIdentity":["R"],"keywords":["Haste"],"layout":"normal"}) as CardDef;
 
 const shock = card("Test Shock Land", "Land", "", { oracleText: "As this land enters, you may pay 2 life. If you don't, it enters tapped.\n{T}: Add {B}." });
 const drainSelf = card("Test Bleed", "Sorcery", "{B}", { cmc: 1, oracleText: "You lose 2 life." });
@@ -307,5 +319,195 @@ describe("round 235: Thieving Varmint", () => {
     // A spell goes to its owner's graveyard.
     expect(s.objects[theirs]!.zone).toBe("graveyard");
     expect(s.players[opp]!.graveyard).toContain(theirs);
+  });
+});
+
+const altar = card("Test Altar", "Artifact", "{0}", { oracleText: "Sacrifice a creature: You gain 1 life." });
+/** Sacrifices a creature for a cost (Test Altar's ability). */
+const sacrificeIt = (s: GameState, pid: PlayerId, id: ObjectId) => {
+  const alt = s.battlefield.find((x) => characteristics(s, s.objects[x]!).name === "Test Altar" && controllerOf(s, s.objects[x]!) === pid) ?? putOnBattlefield(s, pid, altar);
+  return settle(run(s, planActivate(s, pid, alt, 0, undefined, undefined, undefined, undefined, { sacrifice: [id] })));
+};
+/** Declares attackers, then passes (no blocks) until `me` has a question or combat ends. */
+const attack = (s: GameState, me: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId }[]) => {
+  s = passUntil(s, "declareAttackers", me);
+  s = act(s, { type: "declareAttackers", player: me, attacks });
+  for (let i = 0; i < 80 && s.step !== "endCombat" && s.step !== "main2"; i++) {
+    const p = s.pending;
+    if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+    else if (p && p.player === me) return s;
+    else if (p) s = act(s, botActions(s, p.player)[0]!);
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+
+describe("round 235: Obsessive Pursuit", () => {
+  it("is supported", () => supported(pursuit()));
+
+  it("whenever you attack, X +1/+1 counters on target attacking creature; lifelink too if X is three or more", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, pursuit());
+    const a = putOnBattlefield(s, ap, bear());
+    // Three permanents sacrificed this turn.
+    for (let i = 0; i < 3; i++) s = sacrificeIt(s, ap, putOnBattlefield(s, ap, bear()));
+    s = attack(s, ap, [{ attacker: a, defender: opp }]);
+    s = settle(s, { targets: [tgt(a)], me: ap });
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(3);
+    expect(characteristics(s, s.objects[a]!).keywords).toContain("Lifelink");
+  });
+
+  it("with fewer than three sacrificed, the counters but no lifelink", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, pursuit());
+    const a = putOnBattlefield(s, ap, bear());
+    s = sacrificeIt(s, ap, putOnBattlefield(s, ap, bear()));
+    s = attack(s, ap, [{ attacker: a, defender: opp }]);
+    s = settle(s, { targets: [tgt(a)], me: ap });
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+    expect(characteristics(s, s.objects[a]!).keywords).not.toContain("Lifelink");
+  });
+});
+
+describe("round 235: Squee, Dubious Monarch", () => {
+  it("is supported", () => supported(squee()));
+
+  it("is cast from the graveyard for {3}{R} and four other cards exiled from there; not with only three", () => {
+    let { s, ap } = setup([]);
+    const sq = into(s, ap, squee(), "graveyard");
+    const fodder = [1, 2, 3].map(() => into(s, ap, bear(), "graveyard"));
+    poolOnly(s, ap, { R: 4 });
+    expect(planCast(s, ap, sq, undefined, undefined, undefined, undefined, { via: "permission", exileCards: fodder })).toBeNull();
+    // It can't exile itself as one of the four (it's on the stack by then, CR 601.2a).
+    expect(planCast(s, ap, sq, undefined, undefined, undefined, undefined, { via: "permission", exileCards: [...fodder, sq] })).toBeNull();
+    fodder.push(into(s, ap, bear(), "graveyard"));
+    s = settle(run(s, planCast(s, ap, sq, undefined, undefined, undefined, undefined, { via: "permission", exileCards: fodder })));
+    expect(s.objects[sq]!.zone).toBe("battlefield");
+    expect(fodder.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile", "exile"]);
+  });
+});
+
+describe("round 235: Agility Bobblehead", () => {
+  it("is supported", () => supported(bobble()));
+
+  it("up to X targets, X the Bobbleheads you control: haste, and can't be blocked except by creatures with haste", () => {
+    let { s, ap, opp } = setup([]);
+    const b = putOnBattlefield(s, ap, bobble());
+    poolOnly(s, ap, { C: 3 });
+    s.objects[b]!.tapped = false;
+    const c1 = putOnBattlefield(s, ap, bear(), { sick: true });
+    const c2 = putOnBattlefield(s, ap, bear(), { sick: true });
+    // One Bobblehead: one target at most.
+    expect(planActivate(s, ap, b, 0, [tgt(c1), tgt(c2)])).toBeNull();
+    s = settle(run(s, planActivate(s, ap, b, 0, [tgt(c1)])));
+    expect(characteristics(s, s.objects[c1]!).keywords).toContain("Haste");
+    expect(characteristics(s, s.objects[c2]!).keywords).not.toContain("Haste");
+    const blocker = putOnBattlefield(s, opp, bear());
+    const hasty = putOnBattlefield(s, opp, card("Test Hasty", "Creature — Goblin", "{R}", { power: "1", toughness: "1", keywords: ["Haste"], oracleText: "Haste" }));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: c1, defender: opp }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: c1 }] })).toThrow();
+    const ok = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: hasty, attacker: c1 }] });
+    expect(ok.objects[c1]!.blockedBy).toEqual([hasty]);
+  });
+
+  it("two Bobbleheads: two targets", () => {
+    let { s, ap } = setup([]);
+    const b = putOnBattlefield(s, ap, bobble());
+    putOnBattlefield(s, ap, bobble());
+    const c1 = putOnBattlefield(s, ap, bear(), { sick: true });
+    const c2 = putOnBattlefield(s, ap, bear(), { sick: true });
+    poolOnly(s, ap, { C: 3 });
+    s.objects[b]!.tapped = false;
+    s = settle(run(s, planActivate(s, ap, b, 0, [tgt(c1), tgt(c2)])));
+    expect([c1, c2].every((id) => characteristics(s, s.objects[id]!).keywords.includes("Haste"))).toBe(true);
+  });
+});
+
+describe("round 235: Brotherhood Headquarters", () => {
+  it("is supported", () => supported(hq()));
+
+  it("its colored mana casts an Assassin spell or a spell with freerunning, not other spells", () => {
+    let { s, ap } = setup([]);
+    const land = putOnBattlefield(s, ap, hq());
+    const assassin = into(s, ap, card("Test Assassin", "Creature — Human Assassin", "{B}", { cmc: 1, power: "1", toughness: "1" }), "hand");
+    const runner = into(s, ap, card("Test Runner", "Sorcery", "{B}", { cmc: 1, keywords: ["Freerunning"], oracleText: "Freerunning {B}\\nYou gain 1 life." }), "hand");
+    const other = into(s, ap, card("Test Other", "Sorcery", "{B}", { cmc: 1, oracleText: "You gain 1 life." }), "hand");
+    poolOnly(s, ap, {});
+    s.objects[land]!.tapped = false;
+    s = act(s, { type: "activateMana", player: ap, objectId: land, mana: "B", ability: 1 });
+    expect(s.players[ap]!.manaPool.B).toBe(1);
+    expect(planCast(s, ap, other)).toBeNull();
+    s = settle(run(s, planCast(s, ap, assassin)));
+    expect(s.objects[assassin]!.zone).toBe("battlefield");
+    s.objects[land]!.tapped = false;
+    s = act(s, { type: "activateMana", player: ap, objectId: land, mana: "B", ability: 1 });
+    expect(planCast(s, ap, other)).toBeNull();
+    expect(planCast(s, ap, runner)).not.toBeNull();
+  });
+});
+
+describe("round 235: The Mycotyrant", () => {
+  it("is supported", () => supported(myco()));
+
+  it("power and toughness count your Fungi and Saprolings once each; X Fungus tokens for each time you descended this turn", () => {
+    let { s, ap } = setup([]);
+    const m = putOnBattlefield(s, ap, myco());
+    putOnBattlefield(s, ap, card("Test Saproling", "Creature — Saproling", "", { power: "1", toughness: "1" }));
+    putOnBattlefield(s, ap, card("Test Fungus Saproling", "Creature — Fungus Saproling", "", { power: "1", toughness: "1" }));
+    expect(characteristics(s, s.objects[m]!).power).toBe(3);
+    // Two permanent cards and a sorcery card into your graveyard: you descended twice.
+    for (const d of [bear(), bear(), insight]) moveObject(s, into(s, ap, d, "hand"), "graveyard");
+    expect(s.turnLog?.descended?.[ap]).toBe(2);
+    s = passUntil(s, "end", ap);
+    s = settle(s, { me: ap });
+    const fungi = s.battlefield.filter((id) => characteristics(s, s.objects[id]!).name === "Fungus Token" && controllerOf(s, s.objects[id]!) === ap);
+    expect(fungi).toHaveLength(2);
+    expect(characteristics(s, s.objects[m]!).power).toBe(5);
+  });
+});
+
+describe("round 235: Vren, the Relentless", () => {
+  it("is supported", () => supported(vren()));
+
+  it("opponents' creatures are exiled instead of dying; at each end step, a Rat for each creature exiled under your opponents' control this turn", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, vren());
+    const theirs = [putOnBattlefield(s, opp, bear()), putOnBattlefield(s, opp, bear())];
+    const mine = putOnBattlefield(s, ap, bear());
+    destroyPermanent(s, s.objects[theirs[0]!]!, "test");
+    s = settle(s);
+    expect(s.objects[theirs[0]!]!.zone).toBe("exile");
+    // A creature of yours exiled doesn't count.
+    moveObject(s, mine, "exile");
+    moveObject(s, theirs[1]!, "exile");
+    s = passUntil(s, "end", ap);
+    s = settle(s, { me: ap });
+    const rats = s.battlefield.filter((id) => characteristics(s, s.objects[id]!).name === "Rat Token" && controllerOf(s, s.objects[id]!) === ap);
+    expect(rats).toHaveLength(2);
+    // Each gets +1/+1 for each other Rat you control (Vren is a Rat too).
+    expect(characteristics(s, s.objects[rats[0]!]!).power).toBe(1 + 2);
+  });
+});
+
+describe("round 235: Gornog, the Red Reaper", () => {
+  it("is supported", () => supported(gornog()));
+
+  it("whenever Warriors attack a player, target creature that player controls becomes a Coward for good; Cowards can't block Warriors", () => {
+    let { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, gornog());
+    const target = putOnBattlefield(s, opp, card("Test Elf Druid", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1" }));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: opp }] });
+    s = settle(s, { targets: [tgt(target)], me: ap });
+    expect(characteristics(s, s.objects[target]!).subtypes).toEqual(["Coward"]);
+    // Attacking Warriors get +1/+0 for each Coward your opponents control.
+    expect(characteristics(s, s.objects[g]!).power).toBe(3);
+    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: target, attacker: g }] })).toThrow();
+    // It stays a Coward after the turn (no duration, rulings).
+    s = passUntil(s, "upkeep", opp);
+    expect(characteristics(s, s.objects[target]!).subtypes).toEqual(["Coward"]);
   });
 });

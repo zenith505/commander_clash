@@ -1529,6 +1529,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (what?.ref !== "target" || ctx.targets.length !== first + (self ? 1 : 2) || ctx.targets.slice(first).some((t) => t.kind !== "object" || t.skip)) return null;
     return [{ type: "exchangeControl", a: self ? { ref: "self" } : { ref: "target", index: first }, b: { ref: "target", index: self ? first : first + 1 } }];
   }
+  // Gornog, the Red Reaper: "target creature that player controls becomes a Coward": its creature types replaced by that
+  // one (CR 205.1a, 613.1d), other types and subtypes kept, with no duration: for as long as it stays on the battlefield
+  // (CR 611.2a; rulings).
+  if ((m = /^([Tt]arget creature(?: that player controls| an opponent controls)?) becomes an? ([A-Z][a-z]+)$/.exec(s)) && CREATURE_TYPES.has(m[2]!)) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref === "target" && !what.n) return [{ type: "continuous", what, mods: [{ kind: "setSubtypes", subtypes: [m[2]!] }], duration: "game" }];
+  }
   // Curious Colossus: "each creature target opponent controls loses all abilities, becomes a Coward in addition to its other
   // types, and has base power and toughness 1/1": with no duration, for as long as each stays on the battlefield (CR
   // 611.2a; rulings), the creatures there as it resolves (CR 611.2c).

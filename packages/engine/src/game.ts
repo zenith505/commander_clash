@@ -1201,6 +1201,12 @@ export function moveObject(
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
+  // Vren, the Relentless: "creatures that were exiled under your opponents' control this turn", tokens too (rulings), by the
+  // player who controlled each as it left.
+  if (fromZone === "battlefield" && to === "exile" && wasCreature) {
+    const ex = ((s.turnLog ??= {}).creaturesExiled ??= {});
+    ex[lastController] = (ex[lastController] ?? 0) + 1;
+  }
   if (fromZone === "battlefield" && to === "graveyard") {
     const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
     for (const t of last.types) if (!mine.includes(t)) mine.push(t);
@@ -1217,7 +1223,7 @@ export function moveObject(
     if (!last.types.includes("Land")) s.voidThisTurn = true;
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
-  if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
+  if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o))) noteDescended(s, o.owner);
   // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
   if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
@@ -1275,7 +1281,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
       const types = (s.turnLog.toGraveyardTypes ??= {});
       for (const t of defOf(s, p).types) types[t] = (types[t] ?? 0) + 1;
       noteOwnGraveyardTypes(s, p);
-      if (!(s.descendedThisTurn ??= []).includes(p.owner)) s.descendedThisTurn.push(p.owner);
+      if (isPermanentCard(defOf(s, p))) noteDescended(s, p.owner);
     }
     if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
     // A commander that went to the command zone instead isn't where the effect looks for the new objects.
@@ -1961,6 +1967,13 @@ export function payLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
   loseLife(s, pid, n);
   fireEvent(s, { type: "lifePaid", player: pid, amount: n });
+}
+
+/** `pid` descended (CR 700.11): a permanent card was put into their graveyard; counted for "the number of times you descended this turn" (The Mycotyrant). */
+function noteDescended(s: GameState, pid: PlayerId) {
+  if (!(s.descendedThisTurn ??= []).includes(pid)) s.descendedThisTurn.push(pid);
+  const n = ((s.turnLog ??= {}).descended ??= {});
+  n[pid] = (n[pid] ?? 0) + 1;
 }
 
 let lifeBatch: number | undefined;

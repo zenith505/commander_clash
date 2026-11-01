@@ -1252,6 +1252,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
+  // Calix, Destiny's Hand: "Exile target creature or enchantment you don't control until target enchantment you control
+  // leaves the battlefield" (CR 610.3): the card returns when that permanent leaves; if it's an illegal target as this
+  // resolves (it left), nothing is exiled (rulings, CR 610.3a).
+  if ((m = /^Exile (target .+?) until (target .+?) leaves the battlefield$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const anchor = what?.ref === "target" && !what.n ? parseObject(m[2]!, ctx) : null;
+    return what?.ref === "target" && anchor?.ref === "target" && !anchor.n && anchor.index !== what.index ? [{ type: "exile", what, until: "targetLeaves", untilTarget: anchor.index }] : null;
+  }
   // Consulate Crackdown: "exile all artifacts your opponents control until ~ leaves the battlefield", Temporary Lockdown:
   // "exile each nonland permanent with mana value 2 or less ...": the permanents there as it resolves, all returned
   // together when ~ leaves (CR 610.3); a token exiled this way ceases to exist (CR 704.5d).

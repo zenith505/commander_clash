@@ -2268,7 +2268,8 @@ export type Effect =
       type: "exile";
       what: ObjRef;
       /** Palace Jailer: "until an opponent becomes the monarch" (`opponentMonarch`), whoever controls the source then. */
-      until?: "sourceLeaves" | "opponentMonarch";
+      until?: "sourceLeaves" | "opponentMonarch" | /** Calix, Destiny's Hand: "until target enchantment you control leaves the battlefield": target `untilTarget`. */ "targetLeaves";
+      untilTarget?: number;
       linked?: boolean;
       /**
        * "For as long as that card remains exiled, its owner may cast it" (Aerial Extortionist), "... may play it" (`play`),
@@ -3158,7 +3159,7 @@ export type Effect =
    * under your control" (Lord of the Void): one of the cards the "exileTop" before it exiled that match `filter`, chosen as
    * it resolves; not optional when there is one (rulings).
    */
-  | { type: "putFromExiledTop"; filter: TargetSpec }
+  | { type: "putFromExiledTop"; filter: TargetSpec; /** "You may put any number of creature and/or land cards from among them onto the battlefield" (Xenagos, the Reveler): any of them, together. */ any?: true }
   /**
    * "Destroy all creatures, then return a creature card put into a graveyard this way to the battlefield under your
    * control" (Necromantic Selection): one of the cards this resolution's destroy put into graveyards, chosen as it
@@ -3555,7 +3556,7 @@ export type Effect =
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
    */
-  | { type: "cumulativeUpkeep"; pay: PayCost; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true } // "If you don't, ...": fabricate (CR 702.123a)
+  | { type: "cumulativeUpkeep"; pay: PayCost; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true; /** "Cumulative upkeep—Add {R}" (Braid of Fire): the cost is adding this mana for each age counter. */ addMana?: string } // "If you don't, ...": fabricate (CR 702.123a)
   /**
    * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
    * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
@@ -4186,7 +4187,7 @@ export type SpellCondition =
   /** "If you didn't create a token this way" (Springheart Nantuko): this resolution hasn't created any. */
   | { kind: "createdNone" }
   /** "If you put a Town card into your hand this way" (Town Greeter): a card the instruction before put into your hand from among the milled cards is one, still in the hand. */
-  | { kind: "putIntoHandIs"; filter: TargetSpec }
+  | { kind: "putIntoHandIs"; filter: TargetSpec; /** Cache Grab: "If you control a Squirrel or returned a Squirrel card to your hand this way": or this holds as it resolves. */ orState?: StaticCondition }
   /** "If you return a nonland card to your hand this way" (Vengeful Rebirth): a card this resolution returned to its owner's hand is one, still there. */
   | { kind: "returnedToHandIs"; filter: TargetSpec }
   /** "If you put a Cave onto the battlefield this way" (Spelunking): a permanent the instruction before put there matches, as it is now. */
@@ -4955,6 +4956,8 @@ export interface TriggeredAbility {
   ifEnteredUntapped?: true;
   /** "Whenever a player attacks one or more of your opponents" (Jolene): once for the declaration, not once for each opponent attacked. */
   anyOpponent?: true;
+  /** "Whenever an opponent attacks another one of your opponents" (Karazikar): playerAttacksYourOpponent, only when the attacking player is your opponent. */
+  attackerOpponent?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
   /** Addendum: "When this Aura enters, if you cast it during your main phase, ..." (Sentinel's Mark, CR 207.2c). */
@@ -6299,7 +6302,13 @@ export interface CompiledCard {
   /** "Your life total can't change." (Platinum Emperion, CR 119.7-8): its controller can't gain or lose life, nor pay more than 0 life. */
   lifeCantChange?: true;
   /** "Players can't pay life to cast spells or to activate abilities that aren't mana abilities" (Karn's Sylex): see game.ts sylexed. */
-  noLifeCosts?: true;
+  noLifeCosts?: true | "all";
+  /**
+   * Angel of Jubilation: "Players can't ... sacrifice creatures to cast spells or activate abilities" ("creatures");
+   * Yasharn: "... sacrifice nonland permanents ..." ("nonland"). Costs only, mana abilities' too (rulings); see
+   * cards.ts canSacrificeForCost.
+   */
+  noSacrificeCosts?: "creatures" | "nonland";
   /** "If a player would gain life, that player gains no life instead" (Sulfuric Vortex): a replacement (CR 614.1a), not "can't gain life". */
   gainsNoLife?: true;
   /** "If an opponent would gain life, that player loses that much life instead" (Tainted Remedy, CR 614.1a). */

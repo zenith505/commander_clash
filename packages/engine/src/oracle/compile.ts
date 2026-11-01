@@ -2369,6 +2369,14 @@ export function compile(d: CardDef): CompiledCard {
       out.noLifeCosts = true;
       continue;
     }
+    // Angel of Jubilation, Yasharn: costs only, of any spell or ability, mana abilities too: a resolving spell or ability may
+    // still have players pay life or sacrifice (rulings); a spell or ability with such a cost can't be cast or activated.
+    const noCosts = /^Players can't pay life or sacrifice (creatures|nonland permanents) to cast spells or activate abilities\.$/.exec(line);
+    if (noCosts) {
+      out.noLifeCosts = "all";
+      out.noSacrificeCosts = noCosts[1] === "creatures" ? "creatures" : "nonland";
+      continue;
+    }
     if (line === "If a player would gain life, that player gains no life instead.") {
       out.gainsNoLife = true;
       continue;

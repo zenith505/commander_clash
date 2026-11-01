@@ -1194,7 +1194,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // under your control with an additional -1/-1 counter on it".
   text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
   // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
-  text = text.replace(/^([Tt]ap (?:up to one )?target creature) and goad it\./, "$1. Goad it.");
+  // Karazikar, the Eye Tyrant: "tap target creature that player controls and goad it", the same.
+  text = text.replace(/^([Tt]ap (?:up to one )?target creature(?: (?:that player|defending player|an opponent) controls)?) and goad it\./, "$1. Goad it.");
   // Tamiyo's Compleation: "tap enchanted permanent. If it's an Equipment, unattach it.": "it" is the enchanted permanent.
   text = text.replace(/^tap enchanted permanent\. If it's an Equipment, unattach it\.$/, "Tap enchanted permanent. Unattach enchanted permanent if it's an Equipment.");
   // Bhaal, Lord of Murder: "put a +1/+1 counter on target creature and goad it": the same, counter first.
@@ -5235,6 +5236,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(putOne[1]!);
       if (!who || !filter) return null;
       effects.push({ type: "exileTop", who, n: num(exileTheirs[1]!) }, { type: "putFromExiledTop", filter });
+      si++;
+      continue;
+    }
+    // Xenagos, the Reveler: "Exile the top seven cards of your library. You may put any number of creature and/or land cards
+    // from among them onto the battlefield.": from exile, all at once (CR 608.2f); the rest stay exiled.
+    const putAny = exileTheirs && exileTheirs[2] === "your" && /^You may put any number of (.+? cards) from among them onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    if (exileTheirs && putAny) {
+      const filter = parseSearchFilter(putAny[1]!.replace(/\band\/or\b/g, "or").replace(/ cards$/, " card"));
+      if (!filter) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: num(exileTheirs[1]!) }, { type: "putFromExiledTop", filter, any: true });
       si++;
       continue;
     }
@@ -10054,6 +10065,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const dug = last?.type === "dig" && last.into === "hand" && !last.who && !last.each;
       if ((!dug && (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who)) || !filter || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(handThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
+      continue;
+    }
+    // Cache Grab: "Mill four cards. You may put a permanent card from among the cards milled this way into your hand. If you
+    // control a Squirrel or returned a Squirrel card to your hand this way, create a Food token.": either one, as it
+    // resolves; the card returned by its printed types (it's in the hand).
+    const orReturned = /^If you control an? ([A-Z][a-z]+) or returned an? ([A-Z][a-z]+) card to your hand this way, (.+)$/.exec(s);
+    if (orReturned && orReturned[1] === orReturned[2] && CREATURE_TYPES.has(orReturned[1]!)) {
+      const last = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${orReturned[1]} card`);
+      const state = parseStaticCondition(`you control a ${orReturned[1]}`, { affects: { kind: "self" }, mods: [], text: "" });
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(orReturned[3]!), ctx);
+      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !state || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(orReturned[3]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter, orState: state }, effects: inner });
       continue;
     }
     // Vengeful Rebirth: "Return target card from your graveyard to your hand. If you return a nonland card to your hand this

@@ -3539,6 +3539,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.ifCond) return "fail";
     return mostLife[1]!.startsWith("the player") ? { ...t, attacksMostLife: true } : { ...t, activeIf: { kind: "youMostLife" } };
   }
+  // Karazikar, the Eye Tyrant: "Whenever an opponent attacks another one of your opponents": once for each of your
+  // opponents that one of your opponents attacks (CR 508.3e), not a planeswalker or battle; "the attacking player" is the
+  // one who attacked. "Each draw a card and lose 1 life": both draw, then both lose the life.
+  const oppAttacksOther = /^Whenever an opponent attacks another one of your opponents, (.+)$/.exec(line);
+  if (oppAttacksOther) {
+    const rest = oppAttacksOther[1]!.replace(/\bthe attacking player\b/g, "that attacking player").replace(/^you and that attacking player each draw a card and lose (\d+) life\.$/, "you and that attacking player each draw a card. You and that attacking player each lose $1 life.");
+    const t = parseTrigger(`Whenever a player attacks one of your opponents, ${rest}`);
+    if (!t || t === "fail" || t.event !== "playerAttacksYourOpponent" || t.anyOpponent || t.ifCond) return "fail";
+    return { ...t, attackerOpponent: true, body: { ...t.body, text: oppAttacksOther[1]! } };
+  }
   // Jolene, the Plunder Queen: "Whenever a player attacks one or more of your opponents": once for each declaration of
   // attackers that attacks any of them (CR 508.3e).
   const attacksOpp = /^Whenever a player attacks (one|one or more) of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line);

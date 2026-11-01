@@ -1525,7 +1525,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const you = controllerOf(s, o);
         if (!abilitiesOf(s, o).triggers.some((t) => t.event === "playerAttacksYourOpponent")) continue;
         const theirs = s.turnOrder.filter((q) => attacked.includes(q) && opponents(s, you).includes(q));
-        for (const p of theirs) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
+        // Karazikar: only when the attacking player is one of the watcher's opponents too.
+        for (const p of theirs) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !t.anyOpponent && (!t.attackerOpponent || opponents(s, you).includes(ev.controller)), undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
         // "One or more of your opponents" (Jolene): once.
         if (theirs.length) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !!t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: theirs[0]!, attacker: ev.controller });
       }

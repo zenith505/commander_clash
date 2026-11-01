@@ -1501,7 +1501,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "exile": {
       // "Until ~ leaves the battlefield": if it already left, nothing is exiled (CR 610.3a-b).
-      const me = e.until === "sourceLeaves" ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      const me = e.until === "sourceLeaves" ? objects(s, { ref: "self" }, ctx)[0] : e.until === "targetLeaves" ? objects(s, { ref: "target", index: e.untilTarget! }, ctx).find((o) => o.zone === "battlefield") : undefined;
+      if (e.until === "targetLeaves" && !me) {
+        log(s, `${src}: the permanent it waits on is gone, so nothing is exiled.`);
+        return;
+      }
       const monarch = e.until === "opponentMonarch" ? { controller: ctx.controller, source: src, cards: [] as { id: ObjectId; zc: number }[] } : undefined;
       if (monarch) (s.exiledUntilMonarch ??= []).push(monarch);
       if (e.until === "sourceLeaves" && !me) {
@@ -1509,7 +1513,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
+        log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
         const fromYard = o.zone === "graveyard";

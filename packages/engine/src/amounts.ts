@@ -913,7 +913,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const filter = c.filter && { ...named(c.filter), ...(c.filter.anyOf ? { anyOf: c.filter.anyOf.map(named) } : {}) };
       // With no filter (Dreadlight Monstrosity: "if you own a card in exile"), any card, face down or not.
       const fits = (id: ObjectId) => !filter || (!s.objects[id]!.faceDown && printedMatches(filter, defOf(s, s.objects[id]!)));
-      const marked = (id: ObjectId) => !c.counter || (s.objects[id]!.counters[c.counter] ?? 0) > 0;
+      const marked = (id: ObjectId) => (!c.counter || (s.objects[id]!.counters[c.counter] ?? 0) > 0) && (!c.foretold || !!s.objects[id]!.foretold);
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id) && marked(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
     }
     case "greatestMvInExile":
@@ -1319,7 +1319,7 @@ function describeCount(c: Count): string {
     case "greatestMvInExile":
       return "the greatest mana value among cards in exile";
     case "cardsInExile":
-      return c.filter ? `#${c.filter.text}s in exile${c.graveyardToo ? " and graveyard" : ""}` : "#cards in exile";
+      return c.foretold ? "#foretold cards you own in exile" : c.filter ? `#${c.filter.text}s in exile${c.graveyardToo ? " and graveyard" : ""}` : "#cards in exile";
     case "greatestManaValue":
       return `the ${c.total ? "total mana value of" : c.least ? "lowest mana value among" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":

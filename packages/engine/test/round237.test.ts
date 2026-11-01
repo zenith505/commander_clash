@@ -7,11 +7,12 @@
 // shares a creature type with enchanted creature"); Niv-Mizzet, Guildpact ("different color pairs among permanents you
 // control", X checked once); Wernog, Rider's Chaplain ("each opponent may investigate ... one plus the number of opponents
 // who investigated this way"); Web of Inertia and Jace, Multiverse Architect ("creatures they control can't attack you /
-// Jaces you control this turn").
+// Jaces you control this turn"); Alrund, God of the Cosmos ("each foretold card you own in exile", "choose a card type, then
+// reveal ... and the rest on the bottom of your library in any order").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest as forestCard, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, planTurnFaceUp, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, characteristics, power, toughness, invalidateCharacteristics, isFullySupported, planActivate, planCast, planTurnFaceUp, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { attackProblem, destroyPermanent } from "../src/game";
 import { discardCards } from "../src/effects/run-library";
 import { closeZoneBatch } from "../src/effects";
@@ -66,6 +67,8 @@ const web = (): CardDef => ({"oracleId":"a96d24f1-7670-4cb2-9971-5dd1b4c67957","
 const jace = (): CardDef => ({"oracleId":"3321c134-bf5b-4f63-8035-fca0bbdfa86b","name":"Jace, Multiverse Architect","manaCost":"{1}{W}{U}{B}{R}","cmc":5,"typeLine":"Legendary Planeswalker — Jace","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Jace"],"oracleText":"At the beginning of combat on each opponent's turn, they may pay {2}. If they don't, creatures they control can't attack Jaces you control this turn.\n+1: Draw two cards, then put a card from your hand on the bottom of your library.\n−3: Exile another target planeswalker or creature you control. Reveal cards from the top of your library until you reveal a creature or planeswalker card. Put that card onto the battlefield and the rest on the bottom of your library in a random order.\nJace, Multiverse Architect can be your commander.","loyalty":"4","colors":["B","R","U","W"],"colorIdentity":["B","R","U","W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/5/55cd03d9-2535-4cf3-a8b2-1418e1190f4a.jpg?1789644316","artUrl":"https://cards.scryfall.io/art_crop/front/5/5/55cd03d9-2535-4cf3-a8b2-1418e1190f4a.jpg?1789644316","commanderLegal":"legal","set":"frc","releasedAt":"2026-10-02","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 
 const scout = () => card("Test Scout", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control explores." });
+
+const alrund = (): CardDef => ({"oracleId":"0a69c3dd-52a3-4ef6-b53f-b0780e0dc5f8","name":"Alrund, God of the Cosmos // Hakka, Whispering Raven","manaCost":"{3}{U}{U}","cmc":5,"typeLine":"Legendary Creature — God // Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Alrund gets +1/+1 for each card in your hand and each foretold card you own in exile.\nAt the beginning of your end step, choose a card type, then reveal the top two cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.","power":"1","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":["Scry","Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"mythic","layout":"modal_dfc","gameChanger":false,"faces":[{"name":"Alrund, God of the Cosmos","manaCost":"{3}{U}{U}","typeLine":"Legendary Creature — God","supertypes":["Legendary"],"types":["Creature"],"subtypes":["God"],"oracleText":"Alrund gets +1/+1 for each card in your hand and each foretold card you own in exile.\nAt the beginning of your end step, choose a card type, then reveal the top two cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.","power":"1","toughness":"1","colors":["U"],"imageUrl":"https://cards.scryfall.io/normal/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/front/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276"},{"name":"Hakka, Whispering Raven","manaCost":"{1}{U}","typeLine":"Legendary Creature — Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Bird"],"oracleText":"Flying\nWhenever Hakka deals combat damage to a player, return it to its owner's hand, then scry 2.","power":"2","toughness":"3","colors":["U"],"imageUrl":"https://cards.scryfall.io/normal/back/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276","artUrl":"https://cards.scryfall.io/art_crop/back/5/d/5d131784-c1a3-463e-a37b-b720af67ab62.jpg?1783928276"}]}) as CardDef;
 
 describe("round 237: Twists and Turns", () => {
   it("is supported", () => supported(twists()));
@@ -384,5 +387,42 @@ describe("round 237: Web of Inertia and Jace, Multiverse Architect", () => {
     s = combatOf(s, opp, false);
     expect(attackProblem(s, s.objects[c]!, ap, true, j)).toMatch(/Jaces/);
     expect(attackProblem(s, s.objects[c]!, ap)).toBeNull();
+  });
+});
+
+describe("round 237: Alrund, God of the Cosmos", () => {
+  it("is supported", () => supported(alrund()));
+
+  it("gets +1/+1 for each card in your hand and each foretold card you own in exile, not other exiled cards", () => {
+    const { s, ap, opp } = setup([]);
+    const a = putOnBattlefield(s, ap, alrund());
+    const base = power(s, s.objects[a]!);
+    const hand = s.players[ap]!.hand.length;
+    expect(base).toBe(1 + hand);
+    const foretold = into(s, ap, bear(), "exile");
+    s.objects[foretold]!.foretold = true;
+    s.objects[foretold]!.faceDown = true;
+    into(s, ap, bear(), "exile"); // exiled, not foretold
+    const theirs = into(s, opp, bear(), "exile"); // foretold, but not yours
+    s.objects[theirs]!.foretold = true;
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[a]!)).toBe(base + 1);
+    expect(toughness(s, s.objects[a]!)).toBe(base + 1);
+  });
+
+  it("end step: the chosen type's revealed cards go to your hand, the rest to the bottom of your library", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, alrund());
+    const land = into(s, ap, card("Test Wastes", "Land", "", {}), "library");
+    const creature = into(s, ap, bear(), "library"); // on top
+    const handBefore = s.players[ap]!.hand.length;
+    s = passUntil(s, "end", ap);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseOption"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).toContain("Creature");
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "Creature" }), { me: ap });
+    expect(s.objects[creature]!.zone).toBe("hand");
+    expect(s.players[ap]!.hand.length).toBe(handBefore + 1);
+    const lib = s.players[ap]!.library;
+    expect(lib[lib.length - 1]).toBe(land);
   });
 });

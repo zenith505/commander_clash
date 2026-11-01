@@ -5442,10 +5442,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
     // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
     // 608.2d): Mulch's dig with that type.
-    const typeThenReveal = /^Choose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
-    if (typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard$/.test(sentences[si + 2] ?? "")) {
+    // Alrund, God of the Cosmos: "... and the rest on the bottom of your library in any order" (its owner orders them, CR
+    // 401.4).
+    const typeThenReveal = /^[Cc]hoose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
+    const typeRevealRest = typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order)\.?$/.exec(sentences[si + 2] ?? "");
+    if (typeThenReveal && typeRevealRest) {
       const n = num(typeThenReveal[1]!);
-      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: typeRevealRest[1] === "into your graveyard" ? "graveyard" : "bottom", reveal: true, required: true });
       si += 2;
       continue;
     }

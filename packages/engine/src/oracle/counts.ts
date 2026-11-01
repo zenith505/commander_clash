@@ -47,6 +47,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Seize the Storm: "the number of cards with flashback you own in exile": face-up cards with a printed flashback.
   if (!each && /^the number of cards with flashback you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Flashback"], text: "card with flashback" } } };
+  // Alrund, God of the Cosmos: "for each foretold card you own in exile" (CR 702.143a): foretold cards are face down, so
+  // only the foretold mark counts.
+  if (each ? /^foretold card you own in exile$/i.test(p) : /^the number of foretold cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, foretold: true } };
   // Cosmogoyf: "the number of cards you own in exile": face down or not, wherever ~ is (its rulings: it counts itself in
   // exile, CR 604.3).
   if (!each && /^the number of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" } } };

@@ -385,6 +385,8 @@ export interface GameObject {
     orPay?: true;
     /** "During any turn you attacked with a token" (Neyali): only in a turn its player declared a token as an attacker (Player.tokenAttackedTurn). */
     attackedWithToken?: true;
+    /** "If you control a Kavu" (Possibility Technician): only while `player` controls a permanent like this. */
+    ifControl?: TargetSpec;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
@@ -805,12 +807,24 @@ export interface Player {
    * library. They may play it this turn." One entry for each, in turn `turn`; each replaces one draw (CR 614.1a).
    */
   nextDrawExiles?: { turn: number; source: string }[];
+  /**
+   * The Words (Words of Wilding, Words of Worship): "The next time you would draw a card this turn, create a 2/2 green
+   * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
+   * (CR 614.1a, 614.11); with different ones waiting, the player chooses (PendingDecision "drawInstead").
+   */
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec }[];
   /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
   combatDamagedTurn?: number;
   turnBegan?: number;
   /** How many turns this player has begun this game, extra turns too ("your first, second, or third turn of the game"). */
   turnsTaken?: number;
   lastTurnBegan?: number;
+  /**
+   * The latest turn of their own (s.turn) in which this player cast a spell or put a nontoken permanent onto the
+   * battlefield, for Arboria's "unless that player cast a spell or put a nontoken permanent onto the battlefield during
+   * their last turn" (what they did, whatever became of it, rulings).
+   */
+  actedTurn?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
   /** The turn this player last activated a loyalty ability of a planeswalker (The Chain Veil). */
@@ -1329,6 +1343,8 @@ export type PendingDecision =
        * many Alhammarret's Archives could still replace this one.
        */
       keep?: true;
+      /** Tomorrow, Azami's Familiar (CompiledCard.drawDigBottom): the rest go on the bottom of the library in any order. */
+      bottom?: true;
       made?: number[];
       archives?: number;
     }
@@ -1337,6 +1353,12 @@ export type PendingDecision =
    * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
    */
   | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
+  /**
+   * Different shields wait to replace this draw (Urabrask, Heretic Praetor, the Words): the drawing player chooses which
+   * applies (CR 616.1). `options` are game.ts drawShields keys, `labels` what each does; `left`, `made` and `after` are
+   * the draws after this one, as for "drawEmptyReturn".
+   */
+  | { kind: "drawInstead"; player: PlayerId; options: string[]; labels: string[]; left: number; made?: number[]; after?: "drawStep" }
   | {
       kind: "dredge";
       player: PlayerId;
@@ -2595,6 +2617,8 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   /** Answers PendingDecision "drawEmptyReturn": the creature card to return. */
   | { type: "drawEmptyReturn"; player: PlayerId; objectId: ObjectId }
+  /** Answers PendingDecision "drawInstead": one of its `options`. */
+  | { type: "drawInstead"; player: PlayerId; choice: string }
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }

@@ -597,6 +597,13 @@ export function compile(d: CardDef): CompiledCard {
       // Sludge Strider: "Whenever another artifact you control enters or leaves the battlefield, ...": two trigger events
       // (CR 603.1), an ability for each.
       .replace(/^Whenever another artifact you control enters or leaves the battlefield, ([^\n]+)$/m, "Whenever another artifact you control enters, $1\nWhenever another artifact you control leaves the battlefield, $1")
+      // Skeletal Swarming: "Each Skeleton you control has trample, attacks each combat if able, and gets +X/+0, where X is
+      // the number of other Skeletons you control.": the same group three ways, X counted for each Skeleton apart.
+      .replace(/^Each Skeleton you control has trample, attacks each combat if able, and gets \+X\/\+0, where X is the number of other Skeletons you control\.$/m, "Each Skeleton you control has trample.\nEach Skeleton you control attacks each combat if able.\nEach Skeleton you control gets +1/+0 for each other Skeleton you control.")
+      // Soul Exchange: "Put a +2/+2 counter on that creature if the exiled creature was a Thrull.", after an "exile a
+      // creature you control" additional cost: the creature that cost exiled, as it last existed (CR 608.2h, kept with
+      // what a cost sacrificed), the condition first; "that creature" is the one returned.
+      .replace(/^([^\n]+?)\. Put (an? [-+\/\d]+ counter) on that creature if the exiled creature was an? ([A-Z][a-z]+)\.$/m, (x, before: string, counter: string, type: string) => (/^As an additional cost to cast this spell, exile a creature you control\.$/m.test(d.oracleText ?? "") ? `${before}. If the sacrificed creature was a ${type}, put ${counter} on it.` : x))
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
@@ -1119,6 +1126,16 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "Each creature without mana value of the chosen quality enters tapped." && out.entersChoose?.some((c) => c.what === "parity")) {
       (out.othersEnterTapped ??= []).push({ filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "parity", parity: { of: "manaValue", not: true }, text: "creature without mana value of the chosen quality" }, text: line });
       continue;
+    }
+    // Uphill Battle: "Creatures played by your opponents enter tapped": creature spells they cast (a creature card is
+    // "played" by casting it, CR 601), not copies of spells or creatures put onto the battlefield. A spell enters under
+    // its controller's control (CR 608.3a), so the caster is the one who controls it as it enters.
+    if (line === "Creatures played by your opponents enter tapped.") {
+      const g = parseGroup("creatures your opponents control", true);
+      if (g && !g.other) {
+        (out.othersEnterTapped ??= []).push({ filter: g.filter, text: line, cast: true });
+        continue;
+      }
     }
     // "Creatures your opponents control enter tapped." "Artifacts and lands enter tapped." "Creatures and nonbasic
     // lands your opponents control enter tapped." An ability word may come first (CR 207.2c).
@@ -2092,6 +2109,18 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Niv-Mizzet, Supreme: "Each instant and sorcery card in your graveyard that's exactly two colors has jump-start": cast
+    // from your graveyard for its mana cost and a card discarded, then exiled (CR 702.133a), only an instant or sorcery.
+    const jumpGrant = /^Each ([a-z]+(?: and [a-z]+)?) card in your graveyard( that's exactly two colors)? has jump-start\.$/.exec(line);
+    if (jumpGrant) {
+      const filter = parseTargetPhrase(`${jumpGrant[1]!.replace(/ and /g, " or ")} card${jumpGrant[2] ?? ""} from a graveyard`);
+      if (filter?.kind !== "card" || !filter.types?.length || !filter.types.every((t) => t === "Instant" || t === "Sorcery")) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${jumpGrant[1]} cards${jumpGrant[2] ?? ""}` }, way: { kind: "jumpStart", costs: [{ kind: "discard", n: 1 }], exile: true } });
+      }
+      continue;
+    }
     // Underworld Breach, The Master of Keys, Lier, Return the Past, Six, Deeproot Historian: escape, flashback or retrace
     // for the cards in your graveyard (CR 702.138a, 702.34a, 702.81a). Each grant's cost is the card's own mana cost.
     const grant =
@@ -2224,6 +2253,23 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Players play with their hands revealed." || line === "Your opponents play with their hands revealed.") {
       out.revealHands = /^Players/.test(line) ? "players" : "opponents";
+      continue;
+    }
+    // Arboria: a rule for every creature attacking a player (CR 508.1c), not their planeswalkers (rulings).
+    if (line === "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn.") {
+      out.attackOnlyActive = true;
+      continue;
+    }
+    // Lens of Clarity, Found Footage: "You may look at the top card of your library and at face-down creatures you don't
+    // control any time", "You may look at face-down creatures your opponents control any time": information for its
+    // controller only, any time (rulings; in this game every other player is an opponent).
+    const lookDown = /^You may look at (the top card of your library and at )?face-down creatures (?:you don't control|your opponents control) any time\.$/.exec(line);
+    if (lookDown) {
+      if (out.lookFaceDown || (lookDown[1] && out.lookTop)) out.unsupported.push(raw);
+      else {
+        out.lookFaceDown = true;
+        if (lookDown[1]) out.lookTop = true;
+      }
       continue;
     }
     // "You may look at the top card of your library any time" (rulings on Vizier of the Menagerie): information for its
@@ -2555,6 +2601,13 @@ export function compile(d: CardDef): CompiledCard {
       out.drawDig = 3;
       continue;
     }
+    // Tomorrow, Azami's Familiar: the same look, the rest on the bottom in any order (CR 614.1a; rulings: each draw of
+    // several is its own look, an empty library does nothing).
+    if (line === "If you would draw a card, look at the top three cards of your library instead. Put one of those cards into your hand and the rest on the bottom of your library in any order.") {
+      out.drawDig = 3;
+      out.drawDigBottom = true;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;
@@ -2795,6 +2848,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${onceFree[1]} spell` }))(spec), once: true, yourTurn: true, fromHand: true };
       continue;
     }
+    // Vision, Spectral Synthezoid: "Once during each of your turns, you may cast a noncreature or Robot spell from your hand
+    // without paying its mana cost": the same, for a spell that's either one (a Robot creature spell too).
+    if (line === "Once during each of your turns, you may cast a noncreature or Robot spell from your hand without paying its mana cost.") {
+      const anyOf: TargetSpec[] = [{ kind: "card", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature" }, { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Robot"], text: "Robot" }];
+      out.payZero = { filter: { kind: "card", types: [], notTypes: [], notColors: [], anyOf, text: "noncreature or Robot spell" }, once: true, yourTurn: true, fromHand: true };
+      continue;
+    }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
       continue;
@@ -2994,6 +3054,20 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${firstConvoke[1]} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else ((firstConvoke[2] === "convoke" ? (out.spellsHaveConvoke ??= []) : (out.spellsHaveImprovise ??= [])) as { filter: TargetSpec; firstEachTurn?: true; text: string }[]).push({ filter: { ...f, text: `${firstConvoke[1]} spell` }, firstEachTurn: true, text: line });
+      continue;
+    }
+    // "Each red or green instant or sorcery spell you cast has conspire" (Wort, the Raidmother), "Each noncreature spell you
+    // cast has conspire" (Raiding Schemes), "... from exile" (Rassilon): the spell has it while it's cast (CR 702.78a), so
+    // its controller may pay the conspire cost, and its "when you cast this spell" copy triggers if they did.
+    const giveConspire = /^Each ([a-z]+(?: or [a-z]+)?(?: [a-z]+(?: or [a-z]+)?)?) spell you cast( from exile)? has conspire\.$/.exec(line);
+    if (giveConspire) {
+      // "Red or green instant or sorcery": the colors, then the card types, each "or" (Wort).
+      const colored = /^((?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))?) ([a-z]+(?: or [a-z]+)?)$/.exec(giveConspire[1]!);
+      const byColor = colored ? parseTargetPhrase(`${colored[1]} spell`) : null;
+      const byType = colored ? parseTargetPhrase(`${colored[2]} spell`) : null;
+      const f = colored ? (byColor?.kind === "spell" && byType?.kind === "spell" && byColor.colors?.length && !byType.colors?.length && byType.types?.length ? { ...byType, colors: byColor.colors } : null) : parseTargetPhrase(`${giveConspire[1]} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveConspire ??= []).push({ filter: { ...f, text: `${giveConspire[1]} spell` }, ...(giveConspire[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).

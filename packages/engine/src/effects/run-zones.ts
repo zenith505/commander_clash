@@ -183,7 +183,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const picker = e.youChoose ? ctx.controller : pid;
       // "{player}": whose permanents these are.
       const prompt = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`);
-      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, what: e.filter.text, options, count: Math.min(n, options.length), min: 0, ...(e.counter ? { counter: e.counter.kind } : {}), ...(prompt ? { prompt } : {}), ...(picker !== pid ? { of: pid } : {}) };
+      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, what: e.filter.text, options, count: Math.min(n, options.length), min: 0, ...(e.counter ? { counter: e.counter.kind } : {}), ...(prompt ? { prompt } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}) };
       return "paused";
     }
     // "Each player who can't discards a card" (Plaguecrafter): who had none.

@@ -7884,7 +7884,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   }
   if (!r?.scratch?.queue) throw new RulesError("nothing to pick");
   // Krenko's Buzzcrusher: picked by this player for the player whose turn it is to be picked for (pick `youChoose`).
-  r.scratch.chosen![pend.of !== undefined && r.scratch.queue[0] === pend.of ? pend.of : p.id] = ids;
+  r.scratch.chosen![pend.pickFor ?? p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;
   continueResolution(s);

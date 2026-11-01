@@ -483,7 +483,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           sourceZc: floating ? floating.sourceZc : (o.zoneChanges ?? 0),
           ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}) } : {}),
           ...(cause ? { cause } : {}),
-          ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : {}),
+          ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : floating?.about ? { subject: floating.about } : {}),
           ...(lki ? { lki } : {}),
           ...(t.xKicked ? (kicked?.length ? { x: kicked.length } : {}) : x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
           ...(kicked ? { kicked } : {}),

@@ -1473,6 +1473,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8294539d-7982-4ec9-8392-99eed78542f5",
+  "name": "Battle for Bretagard",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 1/1 white Human Warrior creature token.\nII — Create a 1/1 green Elf Warrior creature token.\nIII — Choose any number of artifact tokens and/or creature tokens you control with different names. For each of them, create a token that's a copy of it.",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
   "name": "Bayou",
   "manaCost": "",
@@ -2063,6 +2093,38 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/c/2/c204b7ca-0904-40fa-b20c-92400fae20b8.jpg?1783927336"
    }
   ]
+ },
+ {
+  "oracleId": "e80772e2-8623-4094-81a2-70828b2b151c",
+  "name": "Blightsteel Colossus",
+  "manaCost": "{12}",
+  "cmc": 12,
+  "typeLine": "Artifact Creature — Phyrexian Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Golem"
+  ],
+  "oracleText": "Trample, infect, indestructible\nIf Blightsteel Colossus would be put into a graveyard from anywhere, reveal Blightsteel Colossus and shuffle it into its owner's library instead.",
+  "power": "11",
+  "toughness": "11",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Indestructible",
+   "Trample",
+   "Infect"
+  ],
+  "commanderLegal": "legal",
+  "set": "2xm",
+  "releasedAt": "2020-08-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "a731f5bc-892c-4857-9590-4fa31c1caf00",
@@ -4425,6 +4487,36 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1b09d0cf-403c-4a15-aeee-602a1bdaf0c1",
+  "name": "Darksteel Colossus",
+  "manaCost": "{11}",
+  "cmc": 11,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)\nIndestructible (Damage and effects that say \"destroy\" don't destroy this creature.)\nIf Darksteel Colossus would be put into a graveyard from anywhere, reveal Darksteel Colossus and shuffle it into its owner's library instead.",
+  "power": "11",
+  "toughness": "11",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Indestructible",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2020-06-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12934,6 +13026,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c53ba31a-ba27-4e17-9a92-311acb1cab29",
+  "name": "Myr Battlesphere",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Artifact Creature — Myr Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Myr",
+   "Construct"
+  ],
+  "oracleText": "When this creature enters, create four 1/1 colorless Myr artifact creature tokens.\nWhenever this creature attacks, you may tap X untapped Myr you control. If you do, this creature gets +X/+0 until end of turn and deals X damage to the player or planeswalker it's attacking.",
+  "power": "4",
+  "toughness": "7",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-07-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d07d3be3-f69d-4484-8467-cffd43871788",
   "name": "Myr Retriever",
   "manaCost": "{2}",
@@ -19319,6 +19439,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e0321049-a3ed-4378-b607-7fb190b6f0fd",
+  "name": "The Capitoline Triad",
+  "manaCost": "{10}",
+  "cmc": 10,
+  "typeLine": "Legendary Creature — God Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "God",
+   "Artificer"
+  ],
+  "oracleText": "Those Who Came Before — This spell costs {1} less to cast for each historic card in your graveyard. (Artifacts, legendaries, and Sagas are historic.)\nExile any number of historic cards from your graveyard with total mana value 30 or greater: You get an emblem with \"Creatures you control have base power and toughness 9/9.\"",
+  "power": "7",
+  "toughness": "7",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Those Who Came Before"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "07799012-7051-400e-adde-b54b41b80c70",
   "name": "The Dalek Emperor",
   "manaCost": "{5}{B}{R}",
@@ -19405,6 +19556,38 @@
   "releasedAt": "2021-07-23",
   "rarity": "mythic",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc315174-d063-41dd-9379-11d95c5fd4ed",
+  "name": "The Horus Heresy",
+  "manaCost": "{3}{U}{B}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — For each opponent, gain control of up to one target nonlegendary creature that player controls for as long as this Saga remains on the battlefield.\nII — Draw a card for each creature you control but don't own.\nIII — Starting with you, each player chooses a creature. Destroy each creature chosen this way.",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

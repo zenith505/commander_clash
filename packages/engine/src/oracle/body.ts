@@ -205,6 +205,8 @@ function thenSubject(first: string, next: string): string {
   const who = /^(Target player|Target opponent|target player|target opponent|That player or that planeswalker's controller|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
+  // Grub's Command: "Target player mills five cards, then puts each Goblin card milled this way into their hand".
+  if (who && /^[Tt]arget /.test(who[1]!) && /^puts each .+ milled this way into their hand$/.test(next)) return `That player ${next}`;
   // Strangling Grasp: "enchanted permanent's controller sacrifices a nonland permanent of their choice, then that player
   // loses 1 life": the same player (as the permanent's controller now, or as it last existed: the sacrifice may be it).
   if (/^enchanted (?:permanent|creature)'s controller sacrifices /i.test(first) && /^that player loses \d+ life$/.test(next)) return `${capital(/^(enchanted (?:permanent|creature)'s controller) /i.exec(first)![1]!)} ${next.slice("that player ".length)}`;
@@ -247,6 +249,16 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${rest}.`);
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: that[2] === "combat" ? "endOfCombat" : "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
+  // Jaya, Fiery Negotiator: "Choose target creature an opponent controls. Whenever you attack this turn, ~ deals damage
+  // equal to the number of attacking creatures to that creature.": a delayed trigger about that creature (CR 603.7b-c), as
+  // the object it was (CR 400.7), the number counted as it resolves.
+  const youAttackThat = ctx?.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !after.length ? /^Whenever you attack this turn, (~ deals damage equal to the number of attacking creatures) to that creature$/.exec(s) : null;
+  if (youAttackThat) {
+    const trigger = parseTrigger(`Whenever you attack, ${youAttackThat[1]!} to target creature.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "creaturesYouControlAttack" || trigger.body.targets.length !== 1 || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    const body = { ...trigger.body, targets: [], effects: JSON.parse(JSON.stringify(trigger.body.effects).replaceAll('{"ref":"target","index":0}', '{"ref":"subject"}')) as Effect[] };
+    return { type: "floatingTrigger", trigger: { ...trigger, body }, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
   // Okoye, Mighty and Adored: "put a +1/+1 counter on target creature. Whenever that creature attacks the monarch this turn,
   // it gains double strike and trample until end of turn": a delayed trigger about that creature (CR 603.7b-c), "it" being
@@ -1525,6 +1537,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Agrus Kos, Wojek Veteran: "attacking red creatures get +2/+0 and attacking white creatures get +0/+2 until end of turn":
   // two instructions with the same duration (a creature that's both gets both).
   text = text.replace(/^(attacking (?:white|blue|black|red|green) creatures) (get [+-]\d+\/[+-]\d+) and (attacking (?:white|blue|black|red|green) creatures) (get [+-]\d+\/[+-]\d+) until end of turn\.$/, (_, a: string, b: string, c: string, d: string) => `${capital(a)} ${b} until end of turn. ${capital(c)} ${d} until end of turn.`);
+  // Gideon, Champion of Justice: "Until end of turn, ~ becomes a Human Soldier creature with power and toughness each equal
+  // to the number of loyalty counters on him and gains indestructible. He's still a planeswalker.": the number locked in
+  // as it resolves (rulings, CR 608.2h), like Gideon Jura's "becomes a 6/6 ... creature that's still a planeswalker".
+  text = text.replace(/^Until end of turn, ~ becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)*) creature with power and toughness each equal to the number of loyalty counters on ~ and gains indestructible\. (?:He|She|It)'s still a planeswalker\./, "Until end of turn, ~ becomes an X/X $1 creature with indestructible that's still a planeswalker, where X is the number of loyalty counters on it.");
   // Drag the Canal: "If a creature died this turn, you gain 2 life, surveil 2, then investigate": the same three
   // instructions in order, all under the condition.
   text = text.replace(/(you gain \d+ life, surveil \d+), then (investigate)\./, "$1, and $2.");
@@ -5474,6 +5490,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Chandra, Pyromaster: "Exile the top ten cards of your library. Choose an instant or sorcery card exiled this way and
+    // copy it three times. You may cast the copies without paying their mana costs.": the copies made in exile and cast
+    // as it resolves, any number of them, ignoring timing (rulings, CR 707.12); the card itself stays exiled.
+    const chandra = new RegExp(`^Exile the top ${NUM} cards of your library$`).exec(s);
+    if (chandra && /^Choose an instant or sorcery card exiled this way and copy it three times$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && sentences[si + 2]?.replace(/\.$/, "") === "You may cast the copies without paying their mana costs") {
+      const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(chandra[1]!), copies: true, copyTimes: 3, oneCard: true, filter });
+      si += 2;
+      continue;
+    }
     // Reenact the Crime: "Exile target nonland card in a graveyard that was put there from anywhere this turn. Copy it. You
     // may cast the copy without paying its mana cost." Cast as it resolves, or never (rulings); a permanent spell copy
     // becomes a token (CR 608.3f).
@@ -7064,6 +7090,39 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // are tied for greatest power, you choose one of them.": not targeted, chosen as it resolves (rulings).
     if (/^[Rr]eturn to your hand the creature card in your graveyard with the greatest power$/.test(s) && /^If two or more cards are tied for greatest power, you choose one of them\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "chooseFromGraveyard", n: 1, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card with the greatest power" }, greatestPower: true });
+      si++;
+      continue;
+    }
+    // Yidaro, Wandering Monster: "When you cycle ~, shuffle it into your library from your graveyard. If you've cycled a card
+    // named ~ four or more times this game, put it onto the battlefield from your graveyard instead.": the card, only while
+    // it's still in your graveyard as that object (CR 400.7); your library is shuffled either way unless it enters (rulings).
+    const yidaro = ctx.selfCard && /^[Ss]huffle (?:it|~) into your library from your graveyard$/.test(s) ? new RegExp(`^If you've cycled a card named ~ ${NUM} or more times this game, put (?:it|~) onto the battlefield from your graveyard instead\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (yidaro) {
+      effects.push({ type: "if", cond: { kind: "cycledSelfNamed", n: num(yidaro[1]!) }, effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", yours: true } }], otherwise: [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", yours: true } }] });
+      si++;
+      continue;
+    }
+    // Battle for Bretagard: "Choose any number of artifact tokens and/or creature tokens you control with different names.
+    // For each of them, create a token that's a copy of it.": chosen as it resolves, not targeted (rulings), then a copy
+    // of each, their copiable values as they are now (CR 707.2), all at once.
+    if (/^Choose any number of artifact tokens and\/or creature tokens you control with different names$/.test(s) && /^For each of them, create a token that's a copy of it\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature"], notTypes: [], notColors: [], token: true, controller: "you", text: "artifact or creature token you control" };
+      effects.push(
+        { type: "pick", who: { ref: "you" }, filter, n: 0, action: "choose", anyNumber: true, differentNames: true, prompt: "click any number of artifact and/or creature tokens you control with different names, then choose them. ~ creates a token that's a copy of each" },
+        { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "created" }, each: true },
+      );
+      si++;
+      continue;
+    }
+    // The Horus Heresy: "Starting with you, each player chooses a creature. Destroy each creature chosen this way.": any
+    // creature, anyone's, chosen in turn order (each player sees the earlier choices, CR 101.4), not targeted; then all of
+    // them are destroyed at once.
+    if (/^Starting with you, each player chooses a creature$/.test(s) && /^Destroy each creature chosen this way\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      effects.push(
+        { type: "pick", who: { ref: "eachPlayer" }, filter, n: 1, action: "choose", anyController: true, prompt: "click a creature (anyone's). ~ destroys each creature chosen this way." },
+        { type: "destroy", what: { ref: "created" } },
+      );
       si++;
       continue;
     }
@@ -10473,6 +10532,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "returnAllFromGraveyard", who: { ref: "you" }, filter, toHand: true, milled: true });
       continue;
     }
+    // Grub's Command: "Target player mills five cards, then puts each Goblin card milled this way into their hand": every
+    // one of the milled cards that matches, no choice, into its owner's hand.
+    const eachMilled = /^That player puts each (.+? card) milled this way into their hand$/.exec(s);
+    if (eachMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(eachMilled[1]!);
+      if (prev?.type !== "mill" || prev.who.ref !== "target" || !filter) return null;
+      effects.push({ type: "returnAllFromGraveyard", who: prev.who, filter, toHand: true, milled: true });
+      continue;
+    }
     // Seek Thrills: "Mill seven cards. Then put all cards that have an Adventure from among the milled cards into your
     // hand": every one of them, no choice (an adventurer card has an Adventure in the graveyard too, rulings).
     if (/^(?:Then )?[Pp]ut all cards that have an Adventure from among (?:them|the milled cards|the cards milled this way) into your hand$/.test(s)) {
@@ -10882,6 +10951,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = filter && parsePlayer(yardSpells[2]!.replace(/'s$/, ""), ctx);
       if (!filter || !who || who.ref !== "target") return null;
       effects.push({ type: "impulse", n: 0, until: "exiled", who, castOnly: true, anyType: true, graveyards: true, graveyardFilter: filter });
+      si++;
+      continue;
+    }
+    // Dead Man's Chest: "When enchanted creature dies, exile cards equal to its power from the top of its owner's library.
+    // You may cast spells from among those cards for as long as they remain exiled, and mana of any type can be spent to
+    // cast them.": its power as it last existed (CR 608.2h), its owner's library; you may cast them (not play lands, CR
+    // 601.2a), colored mana paid with any type (CR 609.4b).
+    if (/^[Ee]xile cards equal to its power from the top of its owner's library$/.test(s) && ctx.subjectIt && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards for as long as they remain exiled, and mana of any type can be spent to cast them") {
+      const n = parseCount("its power", ctx);
+      if (!n || !("count" in n) || n.count.kind !== "power") return null;
+      effects.push({ type: "impulse", n: { count: n.count }, until: "exiled", who: { ref: "subjectOwner" }, castOnly: true, anyType: true });
       si++;
       continue;
     }

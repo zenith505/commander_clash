@@ -6586,23 +6586,24 @@ const cardMv = (s: GameState, id: ObjectId) => defMv(defOf(s, obj(s, id)));
 export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
 
 /** The cards `pid` could exile to collect evidence: their graveyard, but not `not` (a spell on its way to the stack) or `taken`. */
-export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = []) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id));
+/** `filter`: only cards like this (The Capitoline Triad's historic cards). */
+export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))));
 
 /**
  * Why `ids` can't collect evidence N, or null: cards in `pid`'s graveyard with total mana value N or more (CR 701.59a).
  * Without `ids`, whether they could: without enough, they can't choose to (701.59b).
  */
-export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = []): string | null {
-  const pool = evidenceCandidates(s, pid, not, taken);
+export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): string | null {
+  const pool = evidenceCandidates(s, pid, not, taken, filter);
   if (!ids) return evidenceValue(s, pool) >= n ? null : `you need cards with total mana value ${n} or more in your graveyard`;
-  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return "collect evidence with cards from your graveyard";
+  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return filter ? `exile ${filter.text}s from your graveyard` : "collect evidence with cards from your graveyard";
   if (evidenceValue(s, ids) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
   return null;
 }
 
 /** Cards to collect evidence N with when nobody picked them: the fewest, biggest mana values first (null if it can't be done). */
-export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] {
-  const pool = evidenceCandidates(s, pid, not, taken).sort((a, b) => cardMv(s, b) - cardMv(s, a));
+export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): ObjectId[] {
+  const pool = evidenceCandidates(s, pid, not, taken, filter).sort((a, b) => cardMv(s, b) - cardMv(s, a));
   const out: ObjectId[] = [];
   for (const id of pool) {
     if (evidenceValue(s, out) >= n) break;
@@ -6614,7 +6615,13 @@ export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: Objec
 }
 
 /** Collect evidence N with these cards (CR 701.59a): they're exiled, and "whenever you collect evidence" triggers. */
-export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number) {
+export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number, notEvidence?: true) {
+  // The Capitoline Triad: the cards exiled, but no evidence collected.
+  if (notEvidence) {
+    log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
+    for (const id of ids) moveObject(s, id, "exile");
+    return;
+  }
   log(s, `${p.name} collects evidence ${n}${ids.length ? `, exiling ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard` : ""}.`);
   for (const id of ids) moveObject(s, id, "exile");
   fireEvent(s, { type: "evidenceCollected", player: p.id });
@@ -6764,7 +6771,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "collectEvidence") {
       // Each card pays one cost only: not also exiled for another cost, delve or the spell's own evidence.
       const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.evidence ?? [])];
-      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken);
+      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken, c.filter);
       if (problem) return `${problem} to ${doing}`;
       continue;
     }
@@ -7267,7 +7274,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         moveObject(s, id, "exile");
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       }
-    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
+    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter), c.n, c.notEvidence);
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
@@ -8109,6 +8116,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.differentNames && !namesDiffer(s, ids)) throw new RulesError("choose permanents with different names");
   if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
   if (pend.attackCost) {
     attackCostPaid(s, p, ids);

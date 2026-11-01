@@ -111,8 +111,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
   // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
   if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
-  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3).
-  if (each && p === "permanent you control but don't own") {
+  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3); The Horus Heresy: "for each creature ...".
+  if (each && (p === "permanent you control but don't own" || p === "creature you control but don't own")) {
     const filter = parseTargetPhrase(p);
     return filter?.kind === "object" ? { count: { kind: "permanents", filter: { ...filter, text: p } } } : null;
   }

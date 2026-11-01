@@ -2369,6 +2369,24 @@ export function compile(d: CardDef): CompiledCard {
       out.noLifeCosts = true;
       continue;
     }
+    // Everlasting Torment: every source's damage to a creature is dealt as -1/-1 counters (CR 702.80a-b, 120.3d), from any
+    // source, anywhere (rulings).
+    if (line === "All damage is dealt as though its source had wither.") {
+      out.allDamageWither = true;
+      continue;
+    }
+    // Minthara, Merciless Soul: "~ has ward {X}, where X is the number of experience counters you have": ward (CR 702.21a)
+    // whose {X} is counted as the payment is asked for, as the ward trigger resolves.
+    const wardX = /^~ has ward \{X\}, where X is (the number of experience counters you have)\.$/.exec(line);
+    if (wardX) {
+      const n = parseCount(wardX[1]!, null);
+      if (!n) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.triggers.push({ event: "becomesTargetOfOpponent", body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "", generic: n }, ward: true }], text: `Ward {X}: counter that spell or ability unless its controller pays {X}, where X is ${wardX[1]}.` } });
+      continue;
+    }
     // Angel of Jubilation, Yasharn: costs only, of any spell or ability, mana abilities too: a resolving spell or ability may
     // still have players pay life or sacrifice (rulings); a spell or ability with such a cost can't be cast or activated.
     const noCosts = /^Players can't pay life or sacrifice (creatures|nonland permanents) to cast spells or activate abilities\.$/.exec(line);

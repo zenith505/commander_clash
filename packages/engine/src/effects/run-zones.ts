@@ -2500,6 +2500,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
+      // Conspiracy Theorist: the card in exile (a new object, CR 400.7) may be cast this turn by the player who exiled it.
+      if (e.castExiledThisTurn)
+        for (const id of found) {
+          const o = obj(s, id);
+          if (o.zone !== "exile") continue;
+          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true };
+          log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} this turn.`);
+        }
       if (e.chooser && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
       s.resolving!.yardChosen = found;
       if (e.milled) s.resolving!.did = found.length > 0;

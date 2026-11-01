@@ -126,6 +126,8 @@ export interface Ctx {
   afterAnyMill?: boolean;
   /** An instruction before in this ability discarded cards of yours: "for each card discarded this way" (Pyretic Charge). */
   afterYourDiscard?: boolean;
+  /** A "whenever you discard one or more cards" trigger: "for each card discarded this way" is how many it discarded (Captain Howler). */
+  discardBatch?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
   discardedOne?: boolean;
   /** After "you may exile a creature card from your hand. If you do": "the exiled card" is that card (Nexus of Becoming). */
@@ -882,7 +884,7 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
   return undefined;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true } = {}): AbilityBody | null {
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
   // Increasing Ambition: "Search your library for a card and put that card into your hand. If ~ was cast from a graveyard,
@@ -961,7 +963,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
@@ -1165,6 +1167,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.costSacrificedX ? { costSacrificedX: opts.costSacrificedX } : {}),
     ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
     ...(opts.clashed ? { clashed: true } : {}),
+    ...(opts.discardBatch ? { discardBatch: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).

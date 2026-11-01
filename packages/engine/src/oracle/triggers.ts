@@ -2069,6 +2069,19 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!token) return "fail";
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token, pt: { count: { kind: "eventGroupPower" } } }], text: rest.replace(/\.$/, "") } };
   }
+  // Conspiracy Theorist: "Whenever you discard one or more nonland cards, you may exile one of them from your graveyard. If
+  // you do, you may cast it this turn.": one of the cards that event discarded, still in your graveyard (CR 400.7); cast
+  // with its normal timing (rulings).
+  if (/^you may exile one of them from your graveyard\. If you do, you may cast it this turn\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, eventGroup: true, ...(batch.filter ? { filter: batch.filter } : {}), dest: "exile", castExiledThisTurn: true }], text: "exile one of them from your graveyard (you may cast it this turn)" }], text: rest.replace(/\.$/, "") } };
+  // Captain Howler, Sea Scourge: "target creature gets +2/+0 until end of turn for each card discarded this way. Whenever
+  // that creature deals combat damage to a player this turn, you draw a card.": how many cards the event discarded (all of
+  // them, CR 603.2c, even those that left the graveyard since); "that creature" is the target.
+  const discardEach = batch.what === "discards" && !yourTurn ? /^(target creature gets [+-]\d+\/[+-]\d+ until end of turn for each card discarded this way\.)( Whenever that creature deals combat damage to a player this turn, [^.]+\.)?$/.exec(rest) : null;
+  if (discardEach) {
+    const body = parseBody(rest, { discardBatch: true });
+    return body ? { event: "batch", batch, body } : "fail";
+  }
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");

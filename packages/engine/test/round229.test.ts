@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, applyAction, botActions, characteristics, destroyPermanent, invalidateCharacteristics, isFullySupported, manaAbilityProblem, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { abilityProblem, applyAction, botActions, characteristics, closeZoneBatch, dealDamage, destroyPermanent, discardCards, objectSource, invalidateCharacteristics, isFullySupported, manaAbilityProblem, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -44,6 +44,13 @@ const settle = (s: GameState, opts: { may?: boolean; targets?: TargetChoice[]; m
 const zone = (s: GameState, id: ObjectId) => s.objects[id]!.zone;
 const pt = (s: GameState, id: ObjectId) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
 const tokensOf = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid);
+/** Puts a player's hand on top of their library, so no discard to hand size happens at cleanup. */
+const trimHand = (s: GameState, pid: PlayerId) => {
+  for (const id of s.players[pid]!.hand.splice(0)) {
+    s.objects[id]!.zone = "library";
+    s.players[pid]!.library.unshift(id);
+  }
+};
 const attach = (s: GameState, aura: ObjectId, to: ObjectId) => {
   s.objects[aura]!.attachedTo = to;
   invalidateCharacteristics(s);
@@ -58,6 +65,10 @@ const xenagos = card("Xenagos, the Reveler", "Legendary Planeswalker — Xenagos
 const cache = card("Cache Grab", "Instant", "{1}{G}", {"keywords":["Food","Mill"],"oracleText":"Mill four cards. You may put a permanent card from among the cards milled this way into your hand. If you control a Squirrel or returned a Squirrel card to your hand this way, create a Food token. (To mill four cards, put the top four cards of your library into your graveyard. A Food token is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")"});
 const karazikar = card("Karazikar, the Eye Tyrant", "Legendary Creature — Beholder", "{3}{B}{R}", {"power":"5","toughness":"5","keywords":["Goad"],"oracleText":"Whenever you attack a player, tap target creature that player controls and goad it. (Until your next turn, that creature attacks each combat if able and attacks a player other than you if able.)\nWhenever an opponent attacks another one of your opponents, you and the attacking player each draw a card and lose 1 life."});
 const calix = card("Calix, Destiny's Hand", "Legendary Planeswalker — Calix", "{2}{G}{W}", {"loyalty":"4","oracleText":"+1: Look at the top four cards of your library. You may reveal an enchantment card from among them and put that card into your hand. Put the rest on the bottom of your library in a random order.\n−3: Exile target creature or enchantment you don't control until target enchantment you control leaves the battlefield.\n−7: Return all enchantment cards from your graveyard to the battlefield."});
+const howler = card("Captain Howler, Sea Scourge", "Legendary Creature — Shark Pirate", "{2}{U}{R}", {"power":"5","toughness":"4","keywords":["Ward"],"oracleText":"Ward—{2}, Pay 2 life.\nWhenever you discard one or more cards, target creature gets +2/+0 until end of turn for each card discarded this way. Whenever that creature deals combat damage to a player this turn, you draw a card."});
+const theorist = card("Conspiracy Theorist", "Creature — Human Shaman", "{1}{R}", {"power":"2","toughness":"2","oracleText":"Whenever this creature attacks, you may pay {1} and discard a card. If you do, draw a card.\nWhenever you discard one or more nonland cards, you may exile one of them from your graveyard. If you do, you may cast it this turn."});
+const minthara = card("Minthara, Merciless Soul", "Legendary Creature — Elf Cleric", "{2}{W}{B}", {"power":"2","toughness":"2","keywords":["Ward"],"oracleText":"Minthara has ward {X}, where X is the number of experience counters you have.\nAt the beginning of your end step, if a permanent you controlled left the battlefield this turn, you get an experience counter.\nCreatures you control get +1/+0 for each experience counter you have."});
+const torment = card("Everlasting Torment", "Enchantment", "{2}{B/R}", {"oracleText":"Players can't gain life.\nDamage can't be prevented.\nAll damage is dealt as though its source had wither. (A source with wither deals damage to creatures in the form of -1/-1 counters.)"});
 // Helpers for the cost rules.
 const griselbrand = card("Griselbrand", "Legendary Creature — Demon", "{4}{B}{B}{B}{B}", {"power":"7","toughness":"7","keywords":["Flying","Lifelink"],"oracleText":"Flying, lifelink\nPay 7 life: Draw seven cards."});
 const fling = card("Fling", "Instant", "{1}{R}", {"oracleText":"As an additional cost to cast this spell, sacrifice a creature.\nFling deals damage equal to the sacrificed creature's power to any target."});
@@ -75,7 +86,7 @@ const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damag
 const glorious = card("Glorious Anthem", "Enchantment", "{1}{W}{W}", { oracleText: "Creatures you control get +1/+1." });
 
 describe("round 229 cards are supported", () => {
-  it("compiles every line", () => supported(braid, mystic, angel, yasharn, xenagos, cache, karazikar, calix));
+  it("compiles every line", () => supported(braid, mystic, angel, yasharn, xenagos, cache, karazikar, calix, howler, theorist, minthara, torment));
 });
 
 describe("Braid of Fire", () => {
@@ -362,5 +373,104 @@ describe("Calix, Destiny's Hand", () => {
     destroyPermanent(s, s.objects[anchor]!, "test");
     s = settle(s, { me: ap });
     expect(zone(s, theirs)).toBe("battlefield");
+  });
+});
+
+describe("Captain Howler, Sea Scourge", () => {
+  it("gives +2/+0 for each card discarded in the event, then draws when that creature deals combat damage to a player", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, howler);
+    const b = putOnBattlefield(s, ap, bear());
+    const cards = [shock, glorious, shock].map((c) => into(s, ap, c, "hand"));
+    discardCards(s, ap, cards);
+    closeZoneBatch(s);
+    s = settle(s, { targets: [tgt(b)], me: ap });
+    expect(pt(s, b)).toBe("8/2");
+    s = passUntil(s, "declareAttackers", ap);
+    const hand = s.players[ap]!.hand.length;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    s = passUntil(s, "main2", ap);
+    s = settle(s, { me: ap });
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    // It wore off at the end of the turn.
+    trimHand(s, ap);
+    s = passUntil(s, "upkeep", opp);
+    expect(pt(s, b)).toBe("2/2");
+  });
+});
+
+describe("Conspiracy Theorist", () => {
+  it("exiles one of the discarded nonland cards, which may be cast this turn", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, theorist);
+    const [sh, land] = [into(s, ap, shock, "hand"), into(s, ap, card("Wastes", "Basic Land"), "hand")];
+    const old = into(s, ap, glorious, "graveyard");
+    discardCards(s, ap, [sh, land]);
+    closeZoneBatch(s);
+    s = settle(s, { may: true, me: ap });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    const p = s.pending as Extract<typeof s.pending, { kind: "searchLibrary" }>;
+    // Only the nonland card that event discarded, not the land or an older card.
+    expect(p.cards).toEqual([sh]);
+    expect(p.cards).not.toContain(old);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [sh] }), { me: ap });
+    expect(zone(s, sh)).toBe("exile");
+    expect(zone(s, land)).toBe("graveyard");
+    const opp = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    expect(planCast(s, ap, sh, [{ kind: "player", id: opp }])).not.toBeNull();
+    // Not after this turn.
+    trimHand(s, ap);
+    s = passUntil(s, "upkeep", opp);
+    expect(planCast(s, ap, sh, [{ kind: "player", id: opp }])).toBeNull();
+  });
+  it("doesn't trigger for lands alone", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, theorist);
+    const land = into(s, ap, card("Wastes", "Basic Land"), "hand");
+    discardCards(s, ap, [land]);
+    closeZoneBatch(s);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+  });
+});
+
+describe("Minthara, Merciless Soul", () => {
+  const targetIt = (exp: number) => {
+    let { s, ap, opp } = setup([]);
+    const m = putOnBattlefield(s, ap, minthara);
+    s.players[ap]!.experience = exp;
+    const sh = into(s, opp, shock, "hand");
+    s.players[opp]!.manaPool.R = 1;
+    s = act(s, { type: "passPriority", player: ap });
+    while (waitingOn(s) !== opp) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planCast(s, opp, sh, [tgt(m)]));
+    s = settle(s, { me: ap });
+    return { s, m, sh };
+  };
+  it("has ward {X} for its controller's experience counters", () => {
+    const { s, m, sh } = targetIt(2);
+    expect(zone(s, sh)).toBe("graveyard");
+    expect(zone(s, m)).toBe("battlefield");
+    expect(s.objects[m]!.damage).toBe(0);
+  });
+  it("with no experience counters, ward {0} is paid", () => {
+    const { s, m } = targetIt(0);
+    expect(zone(s, m)).toBe("graveyard");
+  });
+});
+
+describe("Everlasting Torment", () => {
+  it("makes all damage to creatures -1/-1 counters, not to players", () => {
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, opp, torment);
+    const src = putOnBattlefield(s, ap, bear({ name: "Pinger" }));
+    const big = putOnBattlefield(s, opp, card("Big Bear", "Creature — Bear", "{3}", { power: "3", toughness: "3" }));
+    dealDamage(s, objectSource(s, s.objects[src]!), { object: s.objects[big]! }, 2);
+    expect(s.objects[big]!.counters["-1/-1"]).toBe(2);
+    expect(s.objects[big]!.damage).toBe(0);
+    invalidateCharacteristics(s);
+    expect(pt(s, big)).toBe("1/1");
+    const life = s.players[opp]!.life;
+    dealDamage(s, objectSource(s, s.objects[src]!), { player: opp }, 2);
+    expect(s.players[opp]!.life).toBe(life - 2);
   });
 });

@@ -805,12 +805,24 @@ export interface Player {
    * library. They may play it this turn." One entry for each, in turn `turn`; each replaces one draw (CR 614.1a).
    */
   nextDrawExiles?: { turn: number; source: string }[];
+  /**
+   * The Words (Words of Wilding, Words of Worship): "The next time you would draw a card this turn, create a 2/2 green
+   * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
+   * (CR 614.1a, 614.11), the oldest first.
+   */
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec }[];
   /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
   combatDamagedTurn?: number;
   turnBegan?: number;
   /** How many turns this player has begun this game, extra turns too ("your first, second, or third turn of the game"). */
   turnsTaken?: number;
   lastTurnBegan?: number;
+  /**
+   * The latest turn of their own (s.turn) in which this player cast a spell or put a nontoken permanent onto the
+   * battlefield, for Arboria's "unless that player cast a spell or put a nontoken permanent onto the battlefield during
+   * their last turn" (what they did, whatever became of it, rulings).
+   */
+  actedTurn?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
   /** The turn this player last activated a loyalty ability of a planeswalker (The Chain Veil). */

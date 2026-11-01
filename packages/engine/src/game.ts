@@ -1077,6 +1077,12 @@ export function moveObject(
       }
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
+  // Arboria: who put a nontoken permanent onto the battlefield (rulings: the player, not whose control it entered under):
+  // the controller of the spell or ability resolving, or the player casting it or playing the land.
+  if (to === "battlefield" && !o.isToken) {
+    const putter = s.resolving?.item.controller ?? opts.controller ?? o.controller;
+    if (putter === s.activePlayer && s.players[putter]) s.players[putter]!.actedTurn = s.turn;
+  }
   o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
   o.toGraveyardCombat = to === "graveyard" && inCombatPhase(s) ? { turn: s.turn, combat: s.combatsThisTurn ?? 0 } : undefined;
   o.fromLibraryTurn = to === "graveyard" && fromZone === "library" ? s.turn : undefined;
@@ -2240,6 +2246,39 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       log(s, `${p.name} exiles ${nameOf(s, top)} from the top of their library instead of drawing, and may play it this turn (${source}).`);
       continue;
     }
+    // The Words (Words of Wilding, Words of Worship): "The next time you would draw a card this turn, create a 2/2 green
+    // Bear creature token (you gain 5 life) instead." The draw doesn't happen (CR 614.6), so an empty library loses nothing
+    // (CR 614.11); a draw in the middle of several is replaced before the rest are drawn (CR 614.11a). With several
+    // Words waiting, the drawing player would choose which one applies (rulings, CR 616.1): the oldest is used first.
+    const words = player(s, pid).nextDrawInstead?.findIndex((x) => x.turn === s.turn) ?? -1;
+    if (words >= 0) {
+      const p = player(s, pid);
+      const w = p.nextDrawInstead!.splice(words, 1)[0]!;
+      p.nextDrawInstead = p.nextDrawInstead!.filter((x) => x.turn === s.turn);
+      if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
+      if (made.length) made.shift();
+      else n--;
+      if (w.gain !== undefined) {
+        log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
+        gainLife(s, pid, w.gain);
+      }
+      if (w.token) {
+        const token = w.token;
+        const { same, extra } = tokenBatch(s, pid, token, 1);
+        enterTogether(s, () => {
+          const made: GameObject[] = [];
+          for (let i = 0; i < same; i++) made.push(createToken(s, pid, token));
+          // Created by that Words' ability, not by whatever spell or ability is resolving now.
+          for (const t of made) {
+            if (w.sourceId !== undefined) t.createdWith = { id: w.sourceId, zc: w.sourceZc ?? 0 };
+            else delete t.createdWith;
+          }
+          createExtraTokens(s, pid, extra);
+        });
+        log(s, `${p.name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
+      }
+      continue;
+    }
     // Notion Thief: this draw is skipped and its controller draws instead.
     const thief = notionThief(s, pid);
     if (thief) {
@@ -3091,6 +3130,8 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.handOnlyUntil?.length) s.handOnlyUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
+  // The Words' shields last only for the turn they were made in (Player.nextDrawInstead).
+  for (const p of s.players) if (p.nextDrawInstead) p.nextDrawInstead = undefined;
   s.monarchAsTurnBegan = s.monarch;
   s.lifeAsTurnBegan = s.players.map((p) => p.life);
   s.handAsTurnBegan = s.players.map((p) => p.hand.length);
@@ -4117,6 +4158,16 @@ export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boole
         return !!a && (!!a.lookTop || (!!a.lookTopIf && staticConditionNow(s, a.lookTopIf, id, pid)));
       }))
   );
+}
+
+/**
+ * Whether `viewer` may see what face-down `o` is: their own face-down spells and permanents (CR 708.5), and other
+ * players' face-down creatures while they control Lens of Clarity or Found Footage (not spells on the stack, rulings).
+ */
+export function faceDownVisible(s: GameState, o: GameObject, viewer: PlayerId): boolean {
+  if (!o.faceDown) return true;
+  if (controllerOf(s, o) === viewer) return true;
+  return o.zone === "battlefield" && objIsType(s, o, "Creature") && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === viewer && !!abilitiesOf(s, obj(s, id)).lookFaceDown);
 }
 
 /** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
@@ -5787,6 +5838,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
+  if (p.id === s.activePlayer) p.actedTurn = s.turn; // Arboria: a spell cast during their own turn
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
@@ -9105,6 +9157,10 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   if (c.cantAttackPlayersOnly.includes(defender) && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name}`;
+  // Arboria: "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the
+  // battlefield during their last turn": that player, never their planeswalkers (rulings, CR 508.1c).
+  const arboria = !planeswalker && attacked === undefined ? s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).attackOnlyActive) : undefined;
+  if (arboria && !actedDuringLastTurn(s, defender)) return `${c.name} can't attack ${player(s, defender).name}: they didn't cast a spell or put a nontoken permanent onto the battlefield during their last turn (${nameOf(s, arboria)})`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;
   // Xantcha: nor its owner's planeswalkers (a battle its owner protects isn't one).
@@ -9153,6 +9209,12 @@ export function blockWithoutCompany(s: GameState, blocks: { blocker: ObjectId }[
 export function lastTurnOf(s: GameState, pid: PlayerId): number | undefined {
   const p = player(s, pid);
   return s.activePlayer === pid ? p.lastTurnBegan : p.turnBegan;
+}
+
+/** Arboria: whether `pid` cast a spell or put a nontoken permanent onto the battlefield during their last turn. */
+export function actedDuringLastTurn(s: GameState, pid: PlayerId): boolean {
+  const last = lastTurnOf(s, pid);
+  return last !== undefined && player(s, pid).actedTurn === last;
 }
 
 /** "That attacked during its controller's last turn" (Giant Turtle, Halls of Mist): whoever controls it now (rulings). */

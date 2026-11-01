@@ -2496,6 +2496,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
   // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
   text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
+  // Howl of the Horde's raid paragraph: "If you attacked this turn, when you next cast an instant or sorcery spell this
+  // turn, copy that spell an additional time. You may choose new targets for the copy.": a second, identical delayed
+  // trigger, so the next one is copied twice (rulings).
+  text = text.replace(/(^|\n|\. )If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell an additional time\. You may choose new targets for the copy\./, "$1If you attacked this turn, when you next cast an instant or sorcery spell this turn, copy that spell, and you may choose new targets for the copy.");
+  // Believe (Reason // Believe): "Look at the top card of your library. You may put it onto the battlefield if it's a
+  // creature card. If you don't, put it into your hand.": the same as Risen Reef's wording; a card that isn't put onto
+  // the battlefield, for any reason, goes to your hand without being revealed (rulings).
+  text = text.replace(/^Look at the top card of your library\. You may put it onto the battlefield if it's a creature card\. If you don't, put it into your hand\.$/, "Look at the top card of your library. If it's a creature card, you may put it onto the battlefield. If you don't put the card onto the battlefield, put it into your hand.");
   // Anthroplasm: "Remove all +1/+1 counters from ~ and put X +1/+1 counters on it": one, then the other.
   text = text.replace(/^Remove all \+1\/\+1 counters from ~ and put X \+1\/\+1 counters on it\.$/, "Remove all +1/+1 counters from ~. Put X +1/+1 counters on ~.");
   // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
@@ -3065,6 +3073,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature
+    // token (you gain 5 life) instead." A replacement effect for the controller's next draw this turn (Player.nextDrawInstead).
+    // Words of War (a target), Waste and Wind (choices) aren't done.
+    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token) instead$/.exec(s);
+    if (wordsOf && !ctx.spell) {
+      if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
+      else {
+        const before = ctx.targets.length;
+        const fx = parseOne(capital(wordsOf[1]!), ctx);
+        const t = fx?.length === 1 && fx[0]!.type === "createToken" ? fx[0]! : undefined;
+        if (!t || ctx.targets.length !== before || t.n !== 1 || Object.keys(t).some((k) => !["type", "who", "token", "n"].includes(k)) || t.who.ref !== "you") return null;
+        effects.push({ type: "nextDrawInstead", token: t.token });
+      }
+      continue;
+    }
     // Urabrask, Heretic Praetor, at the beginning of each opponent's upkeep: "the next time they would draw a card this
     // turn, instead they exile the top card of their library. They may play it this turn." That player's next draw.
     if (ctx.eventPlayer && /^[Tt]he next time (?:they|that player) would draw a card this turn, instead they exile the top card of their library$/.test(s) && /^They may play (?:it|that card) this turn$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
@@ -3427,6 +3450,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(anyExile[2]!);
       if (!filter) return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
+      continue;
+    }
+    // Take (Give // Take): "Remove all +1/+1 counters from target creature you control. Draw that many cards.": as many as
+    // were removed as it resolved (none with no counters there, rulings: any creature you control can be the target).
+    if (/^[Rr]emove all (?:[+-]1\/[+-]1|[a-z]+) counters from target [^.]+$/.test(s) && /^Draw that many cards\.?$/.test(sentences[si + 1] ?? "")) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "removeCounters" || fx[0]!.n !== "all" || ctx.targets.length !== before + 1) return null;
+      effects.push(...fx, { type: "draw", who: { ref: "you" }, n: { count: { kind: "countersRemovedThisWay" } } });
+      si++;
       continue;
     }
     // Garnet, Princess of Alexandria: "you may remove a lore counter from each of any number of Sagas you control. Put a
@@ -4189,6 +4222,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       if (!added.length || added.some((e) => e.only || e.keep)) return null;
       for (const e of added) e.keep = "combat";
+      continue;
+    }
+    // Shizuko, Caller of Autumn: "that player adds {G}{G}{G}. Until end of turn, they don't lose this mana as steps and
+    // phases end": the same, for the player who added it.
+    if (/^Until end of turn, they don't lose this mana as steps and phases end$/.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      if (!added.length || added.some((e) => e.only || e.keep || e.who?.ref !== "eventPlayer")) return null;
+      for (const e of added) e.keep = "turn";
       continue;
     }
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
@@ -7486,7 +7527,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
     // Tawnos's Tinkering: "If it isn't a creature, it becomes a 0/0 creature in addition to its other types": the same.
-    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?: or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s.replace(/^If it isn't (an?) /, "If it's not $1 "));
+    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?:(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s.replace(/^If it isn't (an?) /, "If it's not $1 "));
     // Systems Override: "If it's a Spacecraft, put ten charge counters on it. If you do, remove ten charge counters from it
     // at the beginning of the next end step": the delayed trigger only for counters put on a Spacecraft.
     const spaceIf = /^If it's a (Spacecraft|Vehicle), (put (?:a|two|three|four|five|ten) charge counters? on it)$/.exec(s);
@@ -7500,7 +7541,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (ifIts[2]!.split(" or ").every((x) => CREATURE_TYPES.has(x)) && !ifIts[1]))) {
+    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (ifIts[2]!.split(/,? or |, /).every((x) => CREATURE_TYPES.has(x)) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];

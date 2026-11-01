@@ -4144,6 +4144,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
+      if (ab.body.effects.some((e) => e.type === "nextDrawInstead") && !(only && s.step === "upkeep" && s.activePlayer === pid)) continue; // only for the draw step's draw (chooseTimed)
       // Metzali's "Choose a creature at random that attacked this turn. Destroy that creature.": only when none of them are
       // ours and there is one.
       const randomKill = ab.body.effects.find((e) => e.type === "destroyRandom");
@@ -4665,6 +4666,11 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
+  // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
+  if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
+    const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));
+    if (words) return words;
+  }
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
 }
 

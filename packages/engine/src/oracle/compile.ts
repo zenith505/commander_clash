@@ -2168,6 +2168,23 @@ export function compile(d: CardDef): CompiledCard {
       out.revealHands = /^Players/.test(line) ? "players" : "opponents";
       continue;
     }
+    // Arboria: a rule for every creature attacking a player (CR 508.1c), not their planeswalkers (rulings).
+    if (line === "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn.") {
+      out.attackOnlyActive = true;
+      continue;
+    }
+    // Lens of Clarity, Found Footage: "You may look at the top card of your library and at face-down creatures you don't
+    // control any time", "You may look at face-down creatures your opponents control any time": information for its
+    // controller only, any time (rulings; in this game every other player is an opponent).
+    const lookDown = /^You may look at (the top card of your library and at )?face-down creatures (?:you don't control|your opponents control) any time\.$/.exec(line);
+    if (lookDown) {
+      if (out.lookFaceDown || (lookDown[1] && out.lookTop)) out.unsupported.push(raw);
+      else {
+        out.lookFaceDown = true;
+        if (lookDown[1]) out.lookTop = true;
+      }
+      continue;
+    }
     // "You may look at the top card of your library any time" (rulings on Vizier of the Menagerie): information for its
     // controller only, any time; Radha adds "and you may play lands from the top of your library".
     const look = /^You may look at the top card of your library any time(?:, and (you may .+))?\.$/.exec(line);
@@ -2690,6 +2707,13 @@ export function compile(d: CardDef): CompiledCard {
       const spec = parseTargetPhrase(`${onceFree[1]} card from a graveyard`);
       if (spec?.kind !== "card") out.unsupported.push(raw);
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${onceFree[1]} spell` }))(spec), once: true, yourTurn: true, fromHand: true };
+      continue;
+    }
+    // Vision, Spectral Synthezoid: "Once during each of your turns, you may cast a noncreature or Robot spell from your hand
+    // without paying its mana cost": the same, for a spell that's either one (a Robot creature spell too).
+    if (line === "Once during each of your turns, you may cast a noncreature or Robot spell from your hand without paying its mana cost.") {
+      const anyOf: TargetSpec[] = [{ kind: "card", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature" }, { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Robot"], text: "Robot" }];
+      out.payZero = { filter: { kind: "card", types: [], notTypes: [], notColors: [], anyOf, text: "noncreature or Robot spell" }, once: true, yourTurn: true, fromHand: true };
       continue;
     }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {

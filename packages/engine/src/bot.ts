@@ -2641,8 +2641,8 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : c.kind === "tap" || c.kind === "reveal"
-                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand" are activated abilities' costs only
+              : c.kind === "tap" || c.kind === "reveal" || c.kind === "removeCounters"
+                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand", "Remove X +1/+1 counters from among ..." are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }

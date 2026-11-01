@@ -1790,6 +1790,8 @@ export interface GameState {
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
+  /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
+  blockTaxes?: { turn: number; n: number }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** "Until end of turn, if one or more tokens would be created under your control, twice that many ..." (Kaya, Geist Hunter): replacements made by a resolved ability, for the turn they were made in (CR 614.1a). */

@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch } from "./counters";
+import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -836,6 +836,13 @@ export function moveObject(
     const src = s.objects[by];
     if (x.linked && src?.zone === "battlefield" && by !== o.id) ((s.linkedExile ??= {})[`${by}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
     if (x.gainLife) gainLife(s, you, x.gainLife);
+    // Ravenous Slime: +1/+1 counters equal to the creature's power as it last existed (rulings), on the Slime if it's
+    // still on the battlefield (not if it's dying at the same time).
+    if (x.countersPower && src?.zone === "battlefield" && by !== o.id) {
+      const n = Math.max(0, power(s, o));
+      if (n > 0) withPutter(you, () => putCounters(s, src, "+1/+1", n));
+      if (n > 0) log(s, `${nameOf(s, by)} gets ${n} +1/+1 counter${n === 1 ? "" : "s"}.`);
+    }
     if (x.token) {
       const { same, extra } = tokenBatch(s, you, x.token, 1);
       for (let i = 0; i < same; i++) createToken(s, you, x.token);
@@ -9358,7 +9365,8 @@ export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: Pl
  * blocking with each of `blockers` costs itself (Qal Sisma Behemoth, Cowed by Wisdom, CR 509.1d-e).
  */
 export function blockCost(s: GameState, n: number, blockers: ObjectId[] = []): string {
-  const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0);
+  // War Cadence: for the rest of the turn (GameState.blockTaxes).
+  const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0) + (s.blockTaxes ?? []).reduce((t, b) => t + (b.turn === s.turn ? b.n : 0), 0);
   const own = blockers.reduce((t, id) => t + (s.objects[id]?.zone === "battlefield" ? characteristics(s, obj(s, id)).ownBlockTax : 0), 0);
   const total = (n ? per * n : 0) + own;
   return total ? `{${total}}` : "";

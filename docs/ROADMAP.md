@@ -3942,10 +3942,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Otherwise, scry 2, then draw two cards"), "Each other Dog you control has unleash" (Tesak, Judith's Hellhound),
   "Each instant and sorcery card in your graveyard that's exactly two colors has jump-start" (Niv-Mizzet, Supreme).
   +12 (28,736 of 31,936 with B67).
-- Known gaps from round B68: one spell with two instances of conspire (two Raiding Schemes, or Wort on a card with
-  printed conspire) copies once (CR 702.78b); a Words or Urabrask shield waiting with Underrealm Lich, Tomorrow, dredge,
-  Archives or Notion Thief is not offered as a choice against them (the shield goes first); Underrealm Lich and
-  Tomorrow together use the first one found.
+- Round B69 (from EDHREC rank about 19,700 up): B68's gaps fixed: each instance of conspire is its own optional cost
+  and its own copy (CR 702.78b: two Raiding Schemes, or Wort on a card with printed conspire; the UI asks again for each
+  instance, bots pay every instance they have the creatures for; browser test), and every replacement of a draw waiting
+  together is the drawing player's choice (CR 616.1): Words and Urabrask shields, Underrealm Lich, Tomorrow, dredge,
+  Alhammarret's Archive, Abundance, Notion Thief and Scion of Halaster's look (bots keep their own Words, then the
+  Archive, a look, the dredge card they want most; browser test). "Copy target triggered ability you control twice"
+  (Mister Fantastic), "the next noncreature spell you cast this turn has affinity for artifacts" (Don & Raph, Hard
+  Science), "Creature spells you cast have demonstrate" (Silverquill Lecturer), "As long as ~ has a conqueror counter
+  on him, nonbasic lands are Mountains" (Zhao, the Moon Slayer), "All lands have \"{T}: Add one mana of any color\" and
+  lose all other abilities" (Toxicrene, a basic land's own mana ability too), "transforms into a non-Human creature"
+  (Cult of the Waxing Moon), "instead exile it and put a number of +1/+1 counters equal to that creature's power on
+  this creature" (Ravenous Slime: its last known power; still exiled if the Slime dies at the same time, rulings),
+  "Until your next turn, he becomes a land" (Hydro-Man, Fluid Felon), "This turn, creatures can't block unless their
+  controller pays {X} for each blocking creature they control" (War Cadence), "Remove X +1/+1 counters from among
+  creatures you control" (Retribution of the Ancients; browser test). +10 (28,746 of 31,936).
+- Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen
+  (rulings: a block requirement can't make a player pay it); with Ravenous Slime and another "exile it instead" (two
+  Slimes, Kalitas), the first one found applies, not the dying creature's controller's choice (CR 616.1); bots never
+  activate "Remove X counters from among" abilities (Retribution of the Ancients); granted casualty (Anhelo, the
+  Painter; Ashad) still needs more than one instance of casualty (CR 702.153b).
+- Out after round B69 (looked at, not done): Day of the Moon (names chosen for the Saga each chapter, then goad by
+  them), Anhelo, the Painter and Ashad, the Lone Cyberman (granted casualty, several instances), Unidentified Hovership
+  (the owner of each card it exiled), Crafty Cutpurse (tokens an opponent would create, against token doubling and the
+  attack rulings), Insatiable Frugivore (a repeat loop), Galloping Lizrog (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard), Daredevil, Man
@@ -3963,10 +3983,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
-  Succession, The Rack, Xander's Pact, Infernal Tutor, Kalitas, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
+  Succession, The Rack, Xander's Pact, Infernal Tutor, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
   Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
-  included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
+  included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
   Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
   Curse of Inertia, Dreamshaper Shaman, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's Sanction, Kathril,
   Jump Scare, Feral Encounter, Gimli; then on up from 13,200.

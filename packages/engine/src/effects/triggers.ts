@@ -1848,6 +1848,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const n = Math.min(paid, conspireGranted(s, ev.controller, spell));
       for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CONSPIRE_BODY, cause: ev.stackId });
     }
+    // Demonstrate a permanent gives the spell (Silverquill Lecturer): one trigger for each instance (CR 702.144a-b).
+    if (spell && !ev.copy) {
+      const d = defOf(s, spell);
+      for (const id of s.battlefield) {
+        const p = obj(s, id);
+        if (controllerOf(s, p) !== ev.controller) continue;
+        for (const g of abilitiesOf(s, p).spellsHaveDemonstrate ?? []) if (printedMatches(g.filter, d)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: DEMONSTRATE_BODY, cause: ev.stackId });
+      }
+    }
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     const granted = spell && item && !ev.copy ? grantedCascades(s, item, spell, ev.controller) : [];
     // "Whenever you cast a spell with cascade" (Aurora Phoenix): printed, or given to it as it was cast.
@@ -2638,6 +2647,7 @@ function speedTrigger(s: GameState, loser: PlayerId) {
   });
 }
 
+const DEMONSTRATE_BODY: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true }], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." };
 const CONSPIRE_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Conspire: copy ~. You may choose new targets for the copy." };
 const STORM_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." };
 const CASCADE_BODY: AbilityBody = { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." };

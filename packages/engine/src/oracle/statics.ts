@@ -83,6 +83,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 }
 
 function parseConditionalStatic0(line: string): StaticAbility | null {
+  // Zhao, the Moon Slayer: "As long as ~ has a conqueror counter on him, ...": "him" (normalized to ~) is it.
+  const onSelf = /^(As long as ~ has an? [a-z]+ counter on) ~(, .+)$/.exec(line);
+  if (onSelf) return parseConditionalStatic0(`${onSelf[1]} it${onSelf[2]}`);
   // War Balloon: "As long as this Vehicle has three or more fire counters on it, it's an artifact creature.": "it" is ~.
   const itsVehicle = /^(As long as ~ has [^,]+ counters? on it), it's (an? artifact creature)\.$/.exec(line);
   if (itsVehicle) return parseConditionalStatic0(`${itsVehicle[1]}, ~ is ${itsVehicle[2]}.`);
@@ -414,7 +417,7 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     return condition ? { ...self, condition } : null;
   }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
-  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
+  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap|nonbasic) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
@@ -2491,6 +2494,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], subtypes: ["Vehicle"], text: "Vehicle creature you control" } }, mods: [{ kind: "modifyPT", power: Number(vehicleSurge[1]), toughness: Number(vehicleSurge[2]) }], text: line };
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
+  // Toxicrene: "All lands have "{T}: Add one mana of any color" and lose all other abilities": in layer 6 the loss comes
+  // first, so the ability given is kept (CR 613.1f); type-changing effects came before it (layer 4, rulings).
+  const loseOthers = /^(All lands) have ("[^"]+") and lose all other abilities$/.exec(text);
+  if (loseOthers) {
+    const st = parseStaticLine(`${loseOthers[1]} have ${loseOthers[2]}.`);
+    if (!st || st.condition || st.mods.length !== 1 || st.mods[0]!.kind !== "addAbility") return null;
+    return { ...st, mods: [{ kind: "loseAllAbilities" }, ...st.mods], text: line };
+  }
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };

@@ -383,6 +383,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
   // Joven's Ferrets: "all creatures that blocked ~ this turn": declared blocking it this turn, even if they've left combat.
   if (/^all creatures that blocked ~ this turn$/i.test(p.trim()) && !ctx.spell) return { ref: "blockHistory", of: { ref: "self" }, blockers: true };
+  // Wall of Nets: "exile all creatures blocked by ~": the attackers it's blocking as this resolves.
+  if (/^all creatures blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "blockingIt", blocked: true };
   // The Wretched: "gain control of all creatures blocking ~": the same.
   const blockingIt = !ctx.spell ? /^(?:each creature|all creatures) blocking (~|it|that creature)$/i.exec(p.trim()) : null;
   if (blockingIt) {
@@ -821,8 +823,12 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // Yosei, the Morning Star: "target player skips their next untap step. Tap up to five target permanents that player
   // controls": controlled by that player target (TargetSpec.controlledByTarget).
   const byTarget = !cards && !ctx.eventPlayer && !ctx.defending && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many ? / that player controls$/i.exec(phrase!) : null;
-  const byIndex = byTarget ? ctx.lastPlayerTarget : undefined;
-  const [mine1, theirs] = thatPlayerControls(byTarget ? phrase!.slice(0, byTarget.index) : phrase!, ctx);
+  // Chandra, Pyromaster: "1 damage to up to one target creature that player or that planeswalker's controller controls":
+  // as for one such target (Searing Blaze), the earlier "target player or planeswalker".
+  const lastAny = ctx.targets.length - 1;
+  const byAny = !byTarget && !cards && ctx.targets[lastAny]?.kind === "any" && ctx.targets[lastAny]!.types?.length === 1 && ctx.targets[lastAny]!.types![0] === "Planeswalker" ? / that player or that planeswalker's controller controls$/i.exec(phrase!) : null;
+  const byIndex = byTarget ? ctx.lastPlayerTarget : byAny ? lastAny : undefined;
+  const [mine1, theirs] = thatPlayerControls(byTarget ? phrase!.slice(0, byTarget.index) : byAny ? phrase!.slice(0, byAny.index) : phrase!, ctx);
   // Sorin, Lord of Innistrad: "up to three target creatures and/or other planeswalkers": other than the source, which
   // is a planeswalker, unless it's a creature too (rulings).
   const otherWalkers = !other && !another && !ctx.spell && !ctx.targets.length && /^creatures and\/or other planeswalkers$/.test(mine1);
@@ -864,7 +870,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
   if (byIndex !== undefined && (parsed.kind !== "object" || parsed.controller)) return null;
-  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: parsed.kind === "card" ? parsed.text.replace(/ from a graveyard$/, " from that player's graveyard") : `${parsed.text} that player controls` } : byIndex !== undefined ? { ...parsed, controlledByTarget: byIndex, text: `${parsed.text} that player controls` } : parsed;
+  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: parsed.kind === "card" ? parsed.text.replace(/ from a graveyard$/, " from that player's graveyard") : `${parsed.text} that player controls` } : byIndex !== undefined ? { ...parsed, controlledByTarget: byIndex, text: `${parsed.text} ${byAny ? "that player or that planeswalker's controller controls" : "that player controls"}` } : parsed;
   // One group with a total to each ability: the targets that have it are that group.
   if (total && ctx.targets.some((t) => t.total)) return null;
   if (equalToughness && (total || ctx.targets.some((t) => t.equalToughness))) return null;
@@ -2066,10 +2072,13 @@ export function parseTargetPhrase(
   if (outlaw && subtypes.length !== OUTLAW_TYPES.length) return null;
   // "red or green creature" means a creature that's red or green. Mixing colors with several
   // different type alternatives ("red creature or green artifact") isn't modeled.
-  if (colors.length && alts.filter((a) => a.split(/\s+/).some((w) => TYPE_WORDS[w])).length > 1) return null;
+  // "Red instant or sorcery spell" (Jaya, Fiery Negotiator's emblem): a leading color is for every alternative, as a
+  // leading "monocolored" is, only before bare card types.
+  const leadingColor = alts.length > 1 && ((ws) => ws.length === 2 && !!COLOR_WORDS[ws[0]!] && ws[1] === "instant")(alts[0]!.trim().split(/\s+/)) && alts.length === 2 && alts[1]!.trim() === "sorcery";
+  if (colors.length && !leadingColor && alts.filter((a) => a.split(/\s+/).some((w) => TYPE_WORDS[w])).length > 1) return null;
   // "Swamp, Mountain, black permanent, or red permanent": a color in only some alternatives would need
   // per-alternative filters too (the fields of a filter must all match).
-  if (colors.length && alts.length > 1 && alts.some((a) => !a.trim().split(/\s+/).some((w) => COLOR_WORDS[w]))) return null;
+  if (colors.length && !leadingColor && alts.length > 1 && alts.some((a) => !a.trim().split(/\s+/).some((w) => COLOR_WORDS[w]))) return null;
   // Supertypes are "and" requirements ("basic land"); with alternatives they'd need per-alternative filters.
   // "Nonlegendary, nonland card" is one card that's neither: only "non" words, so every one is required.
   const onlyNon = alts.every((a) => a.trim().split(/\s+/).every((w) => w.startsWith("non") || w === "permanent"));

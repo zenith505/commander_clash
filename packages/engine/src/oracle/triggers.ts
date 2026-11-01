@@ -79,6 +79,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // "When ~ blocks, return it to its owner's hand at end of combat" (Wall of Junk): the same event (CR 603.2).
   [/^When(?:ever)? ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever you pay life, (.+)$/, "youPayLife"],
   // The Millennium Calendar: the permanents you untap in your untap step's turn-based action (CR 502.3), all at once.
   [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
@@ -2678,6 +2679,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
     return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
   }
+  // Fire Lord Zuko: "Whenever you cast a spell from exile and whenever a permanent you control enters from exile": two
+  // trigger events for one ability (CR 603.2), the second a permanent put onto the battlefield or played from exile under
+  // your control (CR 603.6a). The Lost and the Damned: "Whenever a land you control enters from anywhere other than your
+  // hand or you cast a spell from anywhere other than your hand": the same with the land first.
+  const permFromExile = /^Whenever you cast a spell from exile and whenever a permanent you control enters from exile, (.+)$/.exec(line);
+  const landNotHand = /^Whenever a land you control enters from anywhere other than your hand or you cast a spell from anywhere other than your hand, (.+)$/.exec(line);
+  if (permFromExile || landNotHand) {
+    const rest = (permFromExile ?? landNotHand)![1]!;
+    if (/\b(it|its|that card|that spell|that land|that permanent)\b/.test(rest)) return "fail";
+    const t = parseTrigger(`Whenever you cast a spell from ${permFromExile ? "exile" : "anywhere other than your hand"}, ${rest}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== (permFromExile ? "exile" : "notHand")) return "fail";
+    return { ...t, cast: { ...t.cast, ...(permFromExile ? { orPermanentEntersFromExile: true as const } : { orLandEntersNotFromHand: true as const }) } };
+  }
   // Rendmaw, Creaking Nest: "whenever you play a card with two or more card types": a spell cast or a land played (CR
   // 305.1, 601.2) whose card has that many card types (CR 205.2a), as it was played.
   const playTypes = /^Whenever you play a card with (two|three) or more card types, (.+)$/.exec(line);
@@ -2774,6 +2788,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Narci, Fable Singer; Tom Bombadil: "whenever the final chapter ability of a Saga you control resolves": the chapter
   // ability with the greatest chapter number its Saga has (rulings), once it has finished resolving and left the stack
   // (rulings); "that Saga's mana value" is the event's amount.
+  // Historian's Boon: "Whenever the final chapter ability of a Saga you control triggers": as it triggers (CR 603.2), the
+  // chapter ability with the greatest chapter number its Saga has (rulings), whether or not it resolves.
+  const finalTriggers = /^Whenever the final chapter ability of a Saga you control triggers, (.+)$/.exec(line);
+  if (finalTriggers) {
+    if (/\b(that Saga|it|its|that ability)\b|\bX\b/.test(finalTriggers[1]!)) return "fail";
+    const body = parseBody(capital(finalTriggers[1]!));
+    return body ? { event: "youFinalChapterTriggers", body } : "fail";
+  }
   const finalChapter = /^Whenever the final chapter ability of a Saga you control resolves, (.+?)(, where X is that Saga's mana value)?\.$/.exec(line);
   if (finalChapter) {
     if (/\bthat Saga\b/.test(finalChapter[1]!) || /\bX\b/.test(finalChapter[1]!) !== !!finalChapter[2]) return "fail";
@@ -4123,9 +4145,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youPayLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youPayLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;

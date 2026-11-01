@@ -75,6 +75,14 @@ export function parseGraveyardKeyword(
   // permission with an alternative cost (CR 118.9), so at the usual timing (rulings).
   if ((m = /^You may cast (?:~|this card) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) rather than paying its mana cost\.?$/.exec(line)))
     return parseManaCost(m[1]!).supported ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [], exile: false } } : "fail";
+  // Scourge of Nel Toth: "You may cast this creature from your graveyard by paying {B}{B} and sacrificing two creatures
+  // rather than paying its mana cost": the same, the sacrifice part of that cost (CR 118.9, 601.2h), at the usual timing.
+  // Squee, Dubious Monarch: "... by paying {3}{R} and exiling four other cards from your graveyard ...": the same, the
+  // cards exiled as it's cast from there (not escape, rulings).
+  if ((m = /^You may cast (?:~|this card|this creature) from your graveyard by paying ((?:\{[WUBRGC\d]\})+) and (sacrificing|exiling) ([^.]+?) rather than paying its mana cost\.?$/.exec(line))) {
+    const sac = parseAdditionalCost(`${m[2] === "exiling" ? "Exile" : "Sacrifice"} ${m[3]}`, true);
+    return parseManaCost(m[1]!).supported && sac ? { fromGraveyard: { kind: "permission", mana: m[1]!, costs: [sac], exile: false } } : "fail";
+  }
   // Risen Executioner: "You may cast ~ from your graveyard if you pay {1} more to cast it for each other creature card in
   // your graveyard": a permission with a cost increase (CR 601.2f), at the usual timing (rulings).
   if ((m = /^You may cast (?:~|this creature) from your graveyard if you pay \{1\} more to cast it for each (.+)\.$/.exec(line))) {
@@ -333,6 +341,15 @@ export function parseCostKeyword(
         trigger: {
           event: "yourUpkeep",
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, drawCost: true }], text: "Cumulative upkeep—draw a card: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you draw a card for each age counter on it." },
+        },
+      };
+    // Phyrexian Soulgorger: "Cumulative upkeep—Sacrifice a creature": a different creature for each age counter, ~ itself
+    // one of them if you like, or ~ is sacrificed (rulings, CR 702.24a).
+    if (/^Cumulative upkeep—Sacrifice a creature\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, sacrificeCost: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature" } }], text: "Cumulative upkeep—sacrifice a creature: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you sacrifice a creature for each age counter on it." },
         },
       };
     // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can

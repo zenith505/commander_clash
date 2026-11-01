@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { attackingPermanentOf, castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, castProblem, freeCastable, draw, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
@@ -139,13 +139,24 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.milledExiled = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
-        for (const id of p.library.slice(0, n)) {
-          moveObject(s, id, "graveyard", { milled: true });
-          if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
-          else if (obj(s, id).zone === "exile") s.resolving!.milledExiled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+        // Grindstone: repeated while two cards that share a color are milled, each time anew; it ends with a library that
+        // runs out (fewer than two milled), so no shortcut is needed (CR 732).
+        for (let again = true; again; ) {
+          again = false;
+          const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
+          const ids = p.library.slice(0, n);
+          for (const id of ids) {
+            moveObject(s, id, "graveyard", { milled: true });
+            if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+            else if (obj(s, id).zone === "exile") s.resolving!.milledExiled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+          }
+          log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
+          if (e.repeatSharedColor && ids.length === 2) {
+            // The cards as milled: their colors in the zone they went to (a card's colors outside the battlefield, CR 105.2).
+            const [a, b] = ids.map((id) => characteristics(s, obj(s, id)).colors);
+            again = a!.some((c) => b!.includes(c));
+          }
         }
-        log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }
       return;
     case "exileTop":
@@ -886,7 +897,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
         if (pt.answer === "pay") {
-          loseLife(s, p.id, e.life);
+          payLife(s, p.id, e.life);
           log(s, `${p.name} pays ${e.life} life to keep a card (${src}).`);
         } else {
           moveObject(s, id, "library", { top: true });
@@ -1630,6 +1641,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             moveObject(s, id, "exile");
             const o = obj(s, id);
             if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : {}) };
+            // "If you do, it becomes plotted" (CR 702.170c): its owner may cast it without paying its mana cost on a later
+            // turn (702.170d).
+            if (e.plot && o.zone === "exile") {
+              o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
+              log(s, `${defOf(s, o).name} becomes plotted. ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
+              fireEvent(s, { type: "plotted", id });
+            }
           } else if (faceDown) {
             // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
             moveObject(s, id, "battlefield", { controller: p.id, faceDown });
@@ -1725,7 +1743,9 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       moveObject(s, id, "battlefield", { controller: pid, ...(c.discardedToBattlefieldCounters ? { counters: { "+1/+1": c.discardedToBattlefieldCounters } } : {}) });
       continue;
     }
-    const madness = c.madness;
+    // Falkenrath Gorger: madness a permanent its owner controls gives it, as it's discarded.
+    const given = c.madness ? undefined : grantedMadness(s, o);
+    const madness = c.madness ?? given;
     if (!madness) {
       moveObject(s, id, "graveyard");
       if (o.zone === "graveyard") o.discardedTurn = s.turn; // mayhem (CR 702.187b)
@@ -1741,7 +1761,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       controller: o.owner,
       index: -1,
       subject: { id, zc: o.zoneChanges ?? 0 },
-      body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
+      body: { targets: [], effects: [{ type: "madness", ...(given ? { cost: given } : {}) }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
     });
   }
   const tops = toTop.filter((id) => ids.includes(id));
@@ -1749,6 +1769,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
+  if (cycled) for (const c of cards) (player(s, pid).cycledNames ??= {})[c.name] = (player(s, pid).cycledNames?.[c.name] ?? 0) + 1;
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}), ...(cause !== undefined ? { cause } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }

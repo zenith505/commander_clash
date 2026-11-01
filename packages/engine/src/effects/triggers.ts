@@ -150,6 +150,8 @@ export type TriggerSourceEvent =
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
+  /** A player paid life (CR 119.4): "whenever you pay life" (Font of Agonies). */
+  | { type: "lifePaid"; player: PlayerId; amount: number }
   | { type: "lifeGained"; player: PlayerId; amount: number; /** The player's first life gain this turn. */ first?: boolean }
   /** The active player's permanents untapped by their untap step's turn-based action (CR 502.3), how many. */
   | { type: "untapStepUntapped"; player: PlayerId; amount: number }
@@ -485,7 +487,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           sourceZc: floating ? floating.sourceZc : (o.zoneChanges ?? 0),
           ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}) } : {}),
           ...(cause ? { cause } : {}),
-          ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : {}),
+          ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : floating?.about ? { subject: floating.about } : {}),
           ...(lki ? { lki } : {}),
           ...(t.xKicked ? (kicked?.length ? { x: kicked.length } : {}) : x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
           ...(kicked ? { kicked } : {}),
@@ -721,6 +723,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
       fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
     }
+    // Fire Lord Zuko: "whenever a permanent you control enters from exile"; The Lost and the Damned: "whenever a land you
+    // control enters from anywhere other than your hand" (not from its controller's own hand, CR 603.6a). The same ability
+    // as its cast trigger, one trigger for this event.
+    const fromExile = !!entering.enteredFromExile;
+    const notFromHand = objIsType(s, entering, "Land") && !(entering.enteredFromHand && entering.owner === you);
+    if (fromExile || notFromHand)
+      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "castSpell" && ((!!t.cast?.orPermanentEntersFromExile && fromExile) || (!!t.cast?.orLandEntersNotFromHand && notFromHand)));
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
     const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, ctrl)), undefined, undefined, entering);
@@ -987,6 +996,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youUntapInUntapStep", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "lifePaid") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youPayLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
   } else if (ev.type === "lifeGained") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1239,9 +1253,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
       // The final chapter ability: the greatest chapter number among the Saga's chapter abilities (rulings on Narci).
       const last = Math.max(0, ...abilitiesOf(s, o).triggers.map((t) => (t.event === "chapter" ? (t.chapter ?? 0) : 0)));
+      let finalTriggered = false;
       for (const t of s.triggerQueue.slice(from)) {
         t.chapter = true;
-        if (triggerOf(s, t)?.chapter === last) t.finalChapter = defMv(defOf(s, o));
+        if (triggerOf(s, t)?.chapter === last) {
+          t.finalChapter = defMv(defOf(s, o));
+          finalTriggered = true;
+        }
+      }
+      // Historian's Boon: "whenever the final chapter ability of a Saga you control triggers".
+      if (finalTriggered) {
+        const you = controllerOf(s, o);
+        for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "youFinalChapterTriggers");
       }
     }
     for (const id of s.battlefield) {

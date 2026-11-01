@@ -2,6 +2,7 @@
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, capital, counterKind, isGroup, num, singularWord } from "../words";
+import { parseManaCost } from "../../mana";
 import { CREATURE_TYPES } from "../../keywords";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
@@ -426,6 +427,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
 
 
+  // The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four
+  // other cards from your graveyard."": the cards there now (CR 611.2c), escape with that cost (CR 702.138a).
+  if ((m = /^(?:[Uu]ntil end of turn, )?[Ee]ach ([a-z]+) card in your graveyard gains "Escape—((?:\{[WUBRGC\d]\})+), Exile (two|three|four|five|six) other cards from your graveyard\.?"(?: until end of turn)?$/.exec(s))) {
+    if (!/^[Uu]ntil end of turn, /.test(s) === !/ until end of turn$/.test(s)) return null;
+    const filter = parseTargetPhrase(`${m[1]} card from your graveyard`);
+    if (filter?.kind !== "card" || !parseManaCost(m[2]!).supported) return null;
+    return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]} card in your graveyard` }, escape: { mana: m[2]!, exile: num(m[3]!) } }];
+  }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
   if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {
@@ -840,7 +849,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? ` with mana value ${withN ? withN[1] : "X"}${exactX ? "" : " or less"}` : ""} from a graveyard`, { chosen: true, x: !!withX && !withN });
     if (withN && spec?.kind === "card" && spec.manaValue?.max !== Number(withN[1])) return null;
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-    if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== (exactX ? "exact" : "most") || !ctx.spell)) return null;
+    // Hourglass of the Lost: "{T}, Remove X time counters from ~ and exile it: Return each nonland permanent card with mana
+    // value X ...": the X announced for the ability's cost (CR 107.3a, 602.2b), like a spell's.
+    if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== (exactX ? "exact" : "most") || !(ctx.spell || ctx.ownX))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
   // Garna, the Bloodflame: "return to your hand all creature cards in your graveyard that were put there from anywhere

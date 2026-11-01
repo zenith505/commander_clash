@@ -483,6 +483,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "blockingIt") {
     const me = ref.subject ? objects(s, { ref: "subject" }, ctx)[0] : objects(s, { ref: "self" }, ctx)[0];
+    // Wall of Nets: the creatures it's blocking, still on the battlefield (only while it's there itself, rulings).
+    if (ref.blocked) return me && me.zone === "battlefield" && me.blocking ? me.blocking.flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [obj(s, id)] : [])) : [];
     // Blocking it (CR 509.1h) while it's attacking.
     if (!me || me.attacking === undefined) return [];
     return s.battlefield.map((id) => obj(s, id)).filter((o) => o.blocking?.includes(me.id));
@@ -1003,6 +1005,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "increaseSpeed":
     case "ascend":
     case "gainLife":
+    case "noteLife":
     case "exchangeLife":
     case "exchangeLifeWithSelf":
     case "loseLife":
@@ -1052,6 +1055,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "meld":
     case "sacrificeEach":
     case "sacrificeRandom":
+    case "randomCounterKind":
     case "destroyRandom":
     case "keepRest":
     case "keepDestroyRest":

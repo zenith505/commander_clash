@@ -555,6 +555,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
     case "energyLostThisTurn":
       return s.turnLog?.energyLost?.[ctx.controller] ?? 0;
+    case "descendedThisTurn":
+      return s.turnLog?.descended?.[ctx.controller] ?? 0;
+    case "opponentsCreaturesExiledThisTurn":
+      return Object.entries(s.turnLog?.creaturesExiled ?? {}).reduce((n, [pid, k]) => n + (Number(pid) !== ctx.controller ? k : 0), 0);
     case "lifeLostThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":
@@ -742,7 +746,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "damageDealtToThisTurn": {
       // Whipkeeper: dealt to that object this turn, regenerated or not; prevented damage wasn't dealt (rulings).
       const o = refObjects(s, c.of, ctx)[0];
-      return o ? (s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
+      // Gone (Tangled Colony's dies trigger): the permanent it was, as it last existed on the battlefield (CR 608.2h).
+      // A leaves-the-battlefield trigger's source is the card in its new zone (ctx.sourceZc); the permanent was the one before.
+      const self = c.of.ref === "self" && ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      const lk = self && self.zone !== "battlefield" && ctx.sourceZc !== undefined ? s.lastKnown?.[self.id] : undefined;
+      const key = lk && (lk.zc === ctx.sourceZc! - 1 || lk.zc === ctx.sourceZc) ? `${self!.id}@${lk.zc}` : o ? `${o.id}@${o.zoneChanges ?? 0}` : undefined;
+      return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
     }
     case "power":
     case "toughness":

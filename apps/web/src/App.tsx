@@ -114,7 +114,7 @@ import {
   teamworkCandidates,
   teamworkPower,
   conspireCandidates,
-  hasConspire,
+  conspireInstances,
   dredgeOptions,
   madnessCastOf,
   planSuspend,
@@ -387,8 +387,10 @@ type CastDraft = {
   teamwork?: string[];
   /** Cast using harmonize: the creature tapped for it, or null for none (CR 702.180a-b). */
   harmonize?: string | null;
-  /** The two creatures tapped for conspire (CR 702.78a), or none. */
+  /** The creatures tapped for conspire, two for each instance paid (CR 702.78a-b), or none. */
   conspire?: string[];
+  /** No more instances of conspire to ask about (one skipped, CR 702.78b). */
+  conspireDone?: boolean;
   /** The opponent promised the gift (CR 702.174a), or null for no gift. */
   gift?: PlayerId | null;
   /** Invigorate's "have an opponent gain 3 life": who gains it. */
@@ -738,7 +740,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [c.kind === "removeCounters" ? `remove X ${c.counter ?? ""} counters from among ${c.filter.text}`.replace(/  +/g, " ") : `${c.kind === "sacrifice" ? "sacrifice" : c.kind === "exileFromGraveyard" ? "exile" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : c.kind === "exileFromGraveyard" ? `${plural(c.filter?.text ?? "card")} from your graveyard` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
@@ -892,7 +894,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
     else if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
     else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
-    else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else if (pick.kind === "conspire" && pick.draft) {
+      // Each instance of conspire is its own pick (CR 702.78b): add this pair to the ones already chosen.
+      const before = pick.draft.conspire ?? [];
+      continueCast({ ...pick.draft, conspire: [...before, ...pick.chosen], ...(pick.chosen.length ? {} : { conspireDone: true }) });
+    } else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -1083,11 +1089,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates = evidenceCandidates(s, HUMAN, d.objectId, [...(d.exileCards ?? []), ...(d.collect ?? [])]);
       if (evidenceValue(s, candidates) >= compiled.evidence) return setEvidencePick({ draft: d, key: "evidence", label: card.name, n: compiled.evidence, candidates, optional: true });
     }
-    // Conspire: you may tap two untapped creatures you control that share a color with it (CR 702.78a).
-    if (d.conspire === undefined && hasConspire(s, HUMAN, s.objects[d.objectId]!)) {
-      const candidates = conspireCandidates(s, HUMAN, d.objectId).filter((id) => !d.convoke?.includes(id) && !d.teamwork?.includes(id));
+    // Conspire: you may tap two untapped creatures you control that share a color with it (CR 702.78a), asked again for
+    // each further instance it has (two Raiding Schemes; each paid separately, 702.78b).
+    const conspires = conspireInstances(s, HUMAN, s.objects[d.objectId]!);
+    const conspirePaid = (d.conspire?.length ?? 0) / 2;
+    if (conspires > 0 && !d.conspireDone && (d.conspire === undefined || (conspirePaid > 0 && conspirePaid < conspires))) {
+      const candidates = conspireCandidates(s, HUMAN, d.objectId).filter((id) => !d.convoke?.includes(id) && !d.teamwork?.includes(id) && !d.conspire?.includes(id));
       if (candidates.length >= 2)
-        return setCostPick({ draft: d, kind: "conspire", label: card.name, what: "conspire: you may tap two untapped creatures you control that share a color with it to copy it", n: 2, candidates, chosen: [] });
+        return setCostPick({ draft: d, kind: "conspire", label: card.name, what: conspirePaid ? `conspire again (instance ${conspirePaid + 1} of ${conspires}): you may tap two more untapped creatures you control that share a color with it for another copy` : `conspire${conspires > 1 ? ` (${conspires} instances)` : ""}: you may tap two untapped creatures you control that share a color with it to copy it`, n: 2, candidates, chosen: [] });
     }
     const choices = {
       ...kicks,
@@ -4793,7 +4802,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>Replace this draw:</strong> choose which effect applies instead of drawing a card; the others wait for your next draw this turn
+          <strong>Replace this draw:</strong> choose which effect applies instead of drawing a card (CR 616.1); a "next time" shield not chosen waits for your next draw this turn
           {pending.left > 0 ? ` (${pending.left} more draw${pending.left === 1 ? "" : "s"} after this)` : ""}
         </span>
         {pending.options.map((choice, i) => (

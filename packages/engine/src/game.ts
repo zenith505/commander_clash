@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch } from "./counters";
+import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -836,6 +836,13 @@ export function moveObject(
     const src = s.objects[by];
     if (x.linked && src?.zone === "battlefield" && by !== o.id) ((s.linkedExile ??= {})[`${by}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
     if (x.gainLife) gainLife(s, you, x.gainLife);
+    // Ravenous Slime: +1/+1 counters equal to the creature's power as it last existed (rulings), on the Slime if it's
+    // still on the battlefield (not if it's dying at the same time).
+    if (x.countersPower && src?.zone === "battlefield" && by !== o.id) {
+      const n = Math.max(0, power(s, o));
+      if (n > 0) withPutter(you, () => putCounters(s, src, "+1/+1", n));
+      if (n > 0) log(s, `${nameOf(s, by)} gets ${n} +1/+1 counter${n === 1 ? "" : "s"}.`);
+    }
     if (x.token) {
       const { same, extra } = tokenBatch(s, you, x.token, 1);
       for (let i = 0; i < same; i++) createToken(s, you, x.token);
@@ -2233,17 +2240,22 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       break;
     }
     // Shields for the next draw this turn: Urabrask, Heretic Praetor's exile and the Words' tokens or life. The draw
-    // doesn't happen (CR 614.6). With different ones waiting, the drawing player chooses which applies to this draw (CR
-    // 616.1, the Words' rulings); the others wait for the next draw.
-    const shields = drawShields(s, pid);
-    if (shields.length) {
-      if (made.length) made.shift();
-      else n--;
-      if (shields.length > 1) {
-        s.pending = { kind: "drawInstead", player: pid, options: shields.map((x) => x.key), labels: shields.map((x) => x.label), left: n, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}) };
+    // doesn't happen (CR 614.6). With different replacements that could apply to this draw (two shields, a shield and
+    // Underrealm Lich or dredge, Underrealm Lich and Tomorrow, a Notion Thief and the player's own), the drawing player
+    // chooses which applies (CR 616.1, the Words' and Notion Thief's rulings); a shield not chosen waits for the next draw.
+    const fromMade = made.length > 0;
+    const choices = drawReplacementChoices(s, pid, fromMade ? made[0]! : undefined);
+    if (choices) {
+      const archives = fromMade ? made.shift()! : 0;
+      if (!fromMade) n--;
+      if (!fromMade) player(s, pid).firstWouldDraw = s.turn; // the turn's first would-be draw, whatever replaces it
+      if (choices.length > 1) {
+        s.pending = { kind: "drawInstead", player: pid, options: choices.map((x) => x.key), labels: choices.map((x) => x.label), left: n, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}), ...(fromMade ? { archives } : {}) };
         return false;
       }
-      applyDrawShield(s, pid, shields[0]!.key);
+      const done = applyDrawReplacement(s, pid, choices[0]!.key, n, after, made, fromMade ? archives : undefined);
+      if (done === "paused") return false;
+      if (done === "again") n++;
       continue;
     }
     // Notion Thief: this draw is skipped and its controller draws instead.
@@ -2294,13 +2306,14 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
  * card or none to look at and nothing else to choose, it just happens (an empty library loses no game: nothing is drawn).
  * `left` and `made` are the draws after this one. "paused" when it waits for the player, true when it replaced the draw.
  */
-function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], archives: number): "paused" | boolean {
-  const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
+function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], archives: number, chosen?: ObjectId): "paused" | boolean {
+  // `chosen`: the look the player chose among the draw's replacements (drawReplacementChoices), so nothing else is offered.
+  const src = chosen ?? s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
   if (!src) return false;
   const p = player(s, pid);
   const cards = p.library.slice(0, abilitiesOf(s, obj(s, src)).drawDig!);
-  const dredge = dredgeOptions(s, pid);
-  const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
+  const dredge = chosen ? [] : dredgeOptions(s, pid);
+  const abundance = chosen ? undefined : s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
   const instead = archives || dredge.length || abundance ? { ...(archives ? { archive: 2 } : {}), ...(dredge.length ? { dredge } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}) } : undefined;
   if (cards.length > 1 || instead) {
     s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}), ...(abilitiesOf(s, obj(s, src)).drawDigBottom ? { bottom: true as const } : {}) };
@@ -2785,6 +2798,78 @@ export function drawShields(s: GameState, pid: PlayerId): { key: string; label: 
   return out;
 }
 
+/**
+ * The replacement effects `pid` chooses among for their next draw (CR 616.1), when there's a choice to make or a shield
+ * to use: drawShields' shields, an opponent's Notion Thief ("thief"), each different look of Underrealm Lich or Tomorrow
+ * ("dig:<id>"), each card that could dredge ("dredge:<id>"), Alhammarret's Archive ("archive"), Scion of Halaster's
+ * first look ("look") and Abundance ("abundance:land", "abundance:nonland"). Undefined when none of the shields, two
+ * looks or a Notion Thief with another is there: the draw goes on as before, asking about the rest itself. `madeArchives`
+ * is set when the draw is one a replacement already made (how many Archives can still replace it, CR 614.5).
+ */
+function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: number): { key: string; label: string }[] | undefined {
+  const p = player(s, pid);
+  const shields = drawShields(s, pid);
+  const thief = notionThief(s, pid);
+  const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
+  const digs: ObjectId[] = [];
+  for (const id of mine((a) => a.drawDig)) if (!digs.some((d) => nameOf(s, d) === nameOf(s, id))) digs.push(id);
+  if (!shields.length && digs.length < 2 && !thief) return undefined;
+  const out = [...shields];
+  for (const id of digs) {
+    const a = abilitiesOf(s, obj(s, id));
+    out.push({ key: `dig:${id}`, label: `Look at the top ${a.drawDig} cards instead, keep one, the rest ${a.drawDigBottom ? "on the bottom of your library" : "into your graveyard"} (${nameOf(s, id)})` });
+  }
+  for (const id of dredgeOptions(s, pid)) out.push({ key: `dredge:${id}`, label: `Dredge ${nameOf(s, id)}: mill ${dredgeAmount(s, pid, id)} and return it to your hand` });
+  const archives = madeArchives ?? Math.log2(archiveDraws(s, pid));
+  if (archives > 0) out.push({ key: "archive", label: "Draw two cards instead (Alhammarret's Archive)" });
+  const look = madeArchives === undefined && p.firstWouldDraw !== s.turn ? mine((a) => a.firstDrawLook)[0] : undefined;
+  if (look !== undefined) out.push({ key: "look", label: `Look at the top two cards, one into your graveyard, then draw (${nameOf(s, look)})` });
+  const abundance = mine((a) => a.drawAbundance)[0];
+  if (abundance !== undefined) for (const k of ["land", "nonland"]) out.push({ key: `abundance:${k}`, label: `Choose ${k}, reveal until you reveal a ${k} card and put it into your hand (${nameOf(s, abundance)})` });
+  if (thief) out.push({ key: "thief", label: `${player(s, controllerOf(s, thief)).name} draws a card instead (${nameOf(s, thief.id)})` });
+  // A Notion Thief with nothing else to choose from goes on as before.
+  if (!shields.length && digs.length < 2 && out.length < 2) return undefined;
+  return out;
+}
+
+/**
+ * Applies the drawReplacementChoices one chosen for a draw of `pid`'s (`left` and `made` are the draws after it).
+ * "paused" when it waits for the player (Underrealm Lich's look and the like), "again" when a draw is still to come
+ * (Scion of Halaster's "Then draw a card").
+ */
+function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: "drawStep" | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
+  const p = player(s, pid);
+  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
+  if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
+  if (key.startsWith("dig:")) return digInstead(s, pid, left, after, made, 0, key.slice("dig:".length)) === "paused" ? "paused" : undefined;
+  if (key.startsWith("dredge:")) return dredgeInstead(s, p, key.slice("dredge:".length));
+  if (key === "archive") {
+    // The Archive first: two draws, which the other Archives and the rest can each still replace.
+    const n = (madeArchives ?? archivesFor(s, pid)) - 1;
+    log(s, `${p.name} draws two cards instead of one.`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    made.unshift(n, n);
+    return;
+  }
+  if (key === "look") {
+    const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook)!;
+    const cards = p.library.slice(0, 2);
+    if (cards.length === 2) {
+      s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}) };
+      return "paused";
+    }
+    lookInstead(s, p, nameOf(s, src), cards);
+    return "again";
+  }
+  const kind = key.slice("abundance:".length) as "land" | "nonland";
+  const name = nameOf(s, s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance)!);
+  const rest = abundanceInstead(s, p, kind, name);
+  if (rest.length > 1) {
+    s.pending = { kind: "orderLibrary", player: pid, cards: rest, bottom: true, source: name, thenDraw: { left, made: [...made], ...(after ? { after } : {}) } };
+    return "paused";
+  }
+}
+
 /** One of drawShields' shields replaces a draw of `pid`'s (CR 614.6), and is used up. */
 function applyDrawShield(s: GameState, pid: PlayerId, key: string) {
   const p = player(s, pid);
@@ -2838,9 +2923,13 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "drawInstead" || pend.player !== p.id) throw new RulesError("no draw to replace");
   if (!pend.options.includes(choice)) throw new RulesError("choose one of the replacement effects");
+  if (choice.startsWith("dredge:") && !dredgeOptions(s, p.id).includes(choice.slice("dredge:".length))) throw new RulesError("that card can't be dredged");
+  if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
   s.pending = null;
-  applyDrawShield(s, p.id, choice);
-  continueDraws(s, p.id, pend.left, pend.after, [...(pend.made ?? [])]);
+  const made = [...(pend.made ?? [])];
+  const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives);
+  if (done === "paused") return;
+  continueDraws(s, p.id, pend.left + (done === "again" ? 1 : 0), pend.after, made);
 }
 
 export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
@@ -5960,6 +6049,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     for (const c of choices.conspire) tapPermanent(s, obj(s, c));
     log(s, `${p.name} taps ${choices.conspire.map((c) => nameOf(s, c)).join(" and ")} (conspire).`);
     item.conspired = true;
+    // Two instances or more paid (CR 702.78b): each copies it for its own payment.
+    if (choices.conspire.length >= 4) item.conspiredTimes = choices.conspire.length / 2;
   }
   // Gift: "you may choose an opponent" (CR 702.174a); the gift is promised to them (702.174k).
   if (choices.gift !== undefined) {
@@ -6387,15 +6478,35 @@ function teamworkProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /**
  * Does `o`, cast by `pid`, have conspire (CR 702.78a)? Its own, or from a permanent `pid` controls ("each noncreature
  * spell you cast has conspire", Raiding Schemes), by its printed characteristics as a spell; "from exile" (Rassilon) is
- * where it's cast from. Two instances, each its own cost and copy (CR 702.78b), aren't modeled: one at most.
+ * where it's cast from.
  */
 export function hasConspire(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  return conspireInstances(s, pid, o) > 0;
+}
+
+/**
+ * How many instances of conspire `o` has as `pid` casts it: its own (printed) and one for each grant (two Raiding
+ * Schemes, or Wort on a card with printed conspire). Each is paid separately and copies the spell only for its own
+ * payment (CR 702.78b; the rulings of Raiding Schemes and Wort).
+ */
+export function conspireInstances(s: GameState, pid: PlayerId, o: GameObject): number {
+  return (conspirePrinted(s, o) ? 1 : 0) + conspireGranted(s, pid, o);
+}
+
+function conspirePrinted(s: GameState, o: GameObject): boolean {
+  return !!compileCard(defOf(s, o)).conspire;
+}
+
+/** The instances of conspire permanents `pid` controls give `o`. */
+export function conspireGranted(s: GameState, pid: PlayerId, o: GameObject): number {
   const d = defOf(s, o);
-  if (compileCard(d).conspire) return true;
-  return s.battlefield.some((id) => {
+  let n = 0;
+  for (const id of s.battlefield) {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConspire ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
-  });
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsHaveConspire ?? []) if (printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile")) n++;
+  }
+  return n;
 }
 
 /** Creatures `pid` could tap for conspire: untapped creatures they control that share a color with the spell (CR 702.78a). */
@@ -6413,7 +6524,9 @@ function conspireProblem(s: GameState, pid: PlayerId, spell: ObjectId, choices?:
   const ids = choices?.conspire;
   if (ids === undefined || !ids.length) return null;
   if (!hasConspire(s, pid, obj(s, spell))) return `${nameOf(s, spell)} doesn't have conspire`;
-  if (ids.length !== 2 || ids[0] === ids[1]) return "conspire taps two untapped creatures you control";
+  // Two creatures for each instance paid (CR 702.78b).
+  const n = conspireInstances(s, pid, obj(s, spell));
+  if (ids.length % 2 !== 0 || ids.length > 2 * n || new Set(ids).size !== ids.length) return n > 1 ? `conspire taps two untapped creatures you control for each of its ${n} instances you pay` : "conspire taps two untapped creatures you control";
   const ok = conspireCandidates(s, pid, spell);
   if (ids.some((id) => !ok.includes(id))) return "conspire taps untapped creatures you control that share a color with it";
   if (ids.some((id) => convoke?.includes(id) || choices?.teamwork?.includes(id))) return "a creature can't be tapped twice to cast it";
@@ -9286,7 +9399,8 @@ export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: Pl
  * blocking with each of `blockers` costs itself (Qal Sisma Behemoth, Cowed by Wisdom, CR 509.1d-e).
  */
 export function blockCost(s: GameState, n: number, blockers: ObjectId[] = []): string {
-  const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0);
+  // War Cadence: for the rest of the turn (GameState.blockTaxes).
+  const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0) + (s.blockTaxes ?? []).reduce((t, b) => t + (b.turn === s.turn ? b.n : 0), 0);
   const own = blockers.reduce((t, id) => t + (s.objects[id]?.zone === "battlefield" ? characteristics(s, obj(s, id)).ownBlockTax : 0), 0);
   const total = (n ? per * n : 0) + own;
   return total ? `{${total}}` : "";

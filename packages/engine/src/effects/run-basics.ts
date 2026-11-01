@@ -279,6 +279,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells ${e.duringTheirNextTurn ? "during their next turn" : e.untilYourNextTurnEnds ? `until the end of ${player(s, ctx.controller).name}'s next turn` : e.untilYourNextTurn ? `until ${player(s, ctx.controller).name}'s next turn` : "this turn"}.`);
       }
       return;
+    case "blockTaxThisTurn": {
+      const n = Math.max(0, evalAmount(s, e.n, amountCtx(s, ctx)));
+      s.blockTaxes = [...(s.blockTaxes ?? []).filter((b) => b.turn === s.turn), { turn: s.turn, n }];
+      log(s, `This turn, creatures can't block unless their controller pays {${n}} for each blocking creature they control (${src}).`);
+      return;
+    }
     case "cantPlayLands":
       for (const pid of players(s, e.who, ctx)) {
         (s.cantPlayLandsThisTurn ??= []).push({ player: pid, turn: s.turn, source: src });

@@ -1927,6 +1927,14 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, linked: true, ...(life ? { gainLife: Number(life[1]) } : {}), ...(token ? { token } : {}) };
       continue;
     }
+    // Ravenous Slime: "If a creature an opponent controls would die, instead exile it and put a number of +1/+1 counters
+    // equal to that creature's power on ~": one replacement (CR 614.1a), the power as it last existed (rulings).
+    if (line === "If a creature an opponent controls would die, instead exile it and put a number of +1/+1 counters equal to that creature's power on ~.") {
+      const filter = parseTargetPhrase("creature an opponent controls");
+      if (filter?.kind !== "object") out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, countersPower: true };
+      continue;
+    }
     // Nemata, Primeval Warden: "If a creature an opponent controls would die, exile it instead. When you do, create a 1/1
     // green Saproling creature token.": the replacement (CR 614.1a), and a reflexive trigger when it's applied (CR 603.12).
     const exileWhen = /^If an? (.+?) would die, exile it instead\. When you do, (.+)\.$/.exec(line);
@@ -3069,6 +3077,15 @@ export function compile(d: CardDef): CompiledCard {
       const f = colored ? (byColor?.kind === "spell" && byType?.kind === "spell" && byColor.colors?.length && !byType.colors?.length && byType.types?.length ? { ...byType, colors: byColor.colors } : null) : parseTargetPhrase(`${giveConspire[1]} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveConspire ??= []).push({ filter: { ...f, text: `${giveConspire[1]} spell` }, ...(giveConspire[2] ? { fromExile: true as const } : {}), text: line });
+      continue;
+    }
+    // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this
+    // spell, you may copy it ...", one for each instance (702.144b), while the permanent is there as it's cast.
+    const giveDemonstrate = /^([A-Z][a-z]+) spells you cast have demonstrate\.$/.exec(line);
+    if (giveDemonstrate) {
+      const f = parseTargetPhrase(`${giveDemonstrate[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveDemonstrate ??= []).push({ filter: { ...f, text: `${giveDemonstrate[1]!.toLowerCase()} spell` }, text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).

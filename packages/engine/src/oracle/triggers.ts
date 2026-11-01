@@ -3442,11 +3442,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Norn's Inquisitor: "Whenever a permanent you control transforms into a Phyrexian, ...": it transformed or converted,
   // either way, and is a Phyrexian right after (CR 701.27e, rulings); it's the subject.
-  const transformsInto = /^Whenever a permanent you control transforms into an? ([A-Z][a-z]+), (.+)$/.exec(line);
+  // Cult of the Waxing Moon: "... transforms into a non-Human creature, ...": a creature without that type right after.
+  const transformsInto = /^Whenever a permanent you control transforms into an? ([A-Z][a-z]+|non-[A-Z][a-z]+ creature), (.+)$/.exec(line);
   if (transformsInto) {
-    const filter = parseTargetPhrase(`${transformsInto[1]} permanent you control`);
+    const non = /^non-([A-Z][a-z]+) creature$/.exec(transformsInto[1]!);
+    const filter = parseTargetPhrase(non ? `non-${non[1]} creature you control` : `${transformsInto[1]} permanent you control`);
     const body = parseBody(transformsInto[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
-    return filter?.kind === "object" && filter.subtypes?.length === 1 && body ? { event: "permanentTransformsInto", tappedFilter: filter, body } : "fail";
+    const ok = filter?.kind === "object" && (non ? filter.types?.length === 1 && filter.types[0] === "Creature" && filter.notSubtypes?.length === 1 && filter.notSubtypes[0] === non[1] && !filter.subtypes?.length : filter.subtypes?.length === 1);
+    return ok && body ? { event: "permanentTransformsInto", tappedFilter: filter, body } : "fail";
   }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);

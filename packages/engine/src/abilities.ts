@@ -3752,6 +3752,8 @@ export type Effect =
   | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true; /** "Until your next turn" (Hope of Ghirapur). */ untilYourNextTurn?: true; /** "During that player's next turn" (Azor, the Lawbringer): only in each such player's next turn. */ duringTheirNextTurn?: true }
   /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
   | { type: "cantPlayLands"; who: PlayerRef }
+  /** War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they control" (GameState.blockTaxes). */
+  | { type: "blockTaxThisTurn"; n: Amount }
   /**
    * "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
    * (Conjurer's Ban; `lands`), "Opponents can't cast spells with the chosen name until your next turn" (Academic
@@ -5588,7 +5590,7 @@ export type AdditionalCost =
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
    * any mix of them (of `counter`'s kind if set), chosen as it's paid (CR 602.2b, 601.2h); CostChoices.counters.
    */
-  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true }
+  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true; /** "Remove a counter from ~" (Glen Elendra Guardian): any kind, from this permanent only. */ self?: true; /** "Remove X +1/+1 counters from among creatures you control" (Retribution of the Ancients): as many as the X announced (CR 107.3a). */ x?: true }
   /**
    * "Put a -1/-1 counter on a creature you control" (Hatchet Bully, Wandering Mage): on one permanent you control that
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters
@@ -5779,6 +5781,8 @@ export interface CompiledCard {
     gainLife?: number;
     /** "Instead exile that card and create a 2/2 black Zombie creature token" (Kalitas). */
     token?: TokenSpec;
+    /** "Instead exile it and put a number of +1/+1 counters equal to that creature's power on ~" (Ravenous Slime). */
+    countersPower?: true;
     linked?: true;
     /** "Exile it instead. When you do, create a 1/1 green Saproling creature token." (Nemata, Primeval Warden): a reflexive trigger each time this replacement is applied (CR 603.12). */
     reflexive?: AbilityBody;
@@ -6467,6 +6471,8 @@ export interface CompiledCard {
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
+  /** "Creature spells you cast have demonstrate" (Silverquill Lecturer, CR 702.144a): each grant is an instance (702.144b). */
+  spellsHaveDemonstrate?: { filter: TargetSpec; text: string }[];
   /** "Each noncreature spell you cast has conspire" (Raiding Schemes, Wort, Rassilon): as for spellsHaveConvoke (CR 702.78a). */
   spellsHaveConspire?: { filter: TargetSpec; fromExile?: true; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];

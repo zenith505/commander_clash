@@ -1335,6 +1335,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: "noncreature spell" } } : {}), untilYourNextTurn: true }];
   }
+  // War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they
+  // control": a cost to block for the rest of the turn (CR 509.1d), the X of the ability; blocks already declared don't
+  // pay it (rulings).
+  if ((m = /^This turn, creatures can't block unless their controller pays \{(X|\d+)\} for each blocking creature they control$/.exec(s))) {
+    if (m[1] === "X" && !ctx.activated) return null;
+    return [{ type: "blockTaxThisTurn", n: m[1] === "X" ? X : Number(m[1]) }];
+  }
   // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
   if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);

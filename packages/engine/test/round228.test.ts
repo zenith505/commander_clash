@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { applyAction, botActions, castProblem, characteristics, graveyardWays, invalidateCharacteristics, isFullySupported, legalActions, manaValue, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+import { applyAction, abilityProblem, botActions, draw, castProblem, characteristics, graveyardWays, invalidateCharacteristics, isFullySupported, legalActions, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -75,6 +75,9 @@ const peter = scry("modal_dfc", [{"name":"Peter Parker","mana_cost":"{1}{W}","ty
 const noctis = card("Noctis, Prince of Lucis", "Legendary Creature — Human Noble", "{1}{W}{U}{B}", {"power":"4","toughness":"3","keywords":["Lifelink"],"oracleText":"Lifelink\nYou may cast artifact spells from your graveyard by paying 3 life in addition to paying their other costs. If you cast a spell this way, that artifact enters with a finality counter on it."});
 const miles = scry("modal_dfc", [{"name":"Miles Morales","mana_cost":"{1}{G}","type_line":"Legendary Creature — Human Citizen Hero","oracle_text":"When Miles Morales enters, put a +1/+1 counter on each of up to two target creatures.\n{3}{R}{G}{W}: Transform Miles Morales. Activate only as a sorcery.","power":"1","toughness":"2"},{"name":"Ultimate Spider-Man","mana_cost":"{3}{R}{G}{W}","type_line":"Legendary Creature — Spider Human Hero","oracle_text":"First strike, haste\nCamouflage — {2}: Put a +1/+1 counter on Ultimate Spider-Man. He gains hexproof and becomes colorless until end of turn.\nWhenever you attack, double the number of each kind of counter on each Spider and legendary creature you control.","power":"4","toughness":"3"}], { keywords: ["Camouflage","Transform","First strike","Haste","Double"], color_identity: ["G","R","W"] });
 const henzie = card("Henzie \"Toolbox\" Torre", "Legendary Creature — Devil Rogue", "{B}{R}{G}", {"power":"3","toughness":"3","oracleText":"Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost. (You may choose to cast that spell for its blitz cost. If you do, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)\nBlitz costs you pay cost {1} less for each time you've cast your commander from the command zone this game."});
+const keranos = card("Keranos, God of Storms", "Legendary Enchantment Creature — God", "{3}{U}{R}", {"power":"6","toughness":"5","keywords":["Indestructible"],"oracleText":"Indestructible\nAs long as your devotion to blue and red is less than seven, Keranos isn't a creature.\nReveal the first card you draw on each of your turns. Whenever you reveal a land card this way, draw a card. Whenever you reveal a nonland card this way, Keranos deals 3 damage to any target."});
+const dynamo = card("The Peregrine Dynamo", "Legendary Artifact Creature — Construct", "{3}", {"power":"1","toughness":"5","keywords":["Haste"],"oracleText":"Haste\n{1}, {T}: Copy target activated or triggered ability you control from another legendary source that's not a commander. You may choose new targets for the copy. (Mana abilities can't be targeted.)"});
+const superior = card("Superior Spider-Man", "Legendary Creature — Spider Human Hero", "{2}{U}{B}", {"power":"4","toughness":"4","keywords":["Mind Swap"],"oracleText":"Mind Swap — You may have Superior Spider-Man enter as a copy of any creature card in a graveyard, except his name is Superior Spider-Man and he's a 4/4 Spider Human Hero in addition to his other types. When you do, exile that card."});
 // Other cards the tests use.
 const harlequin = card("Merciless Harlequin", "Creature — Human Assassin", "{2}{B}", { power: "2", toughness: "1", keywords: ["Freerunning"], oracleText: "Freerunning {1}{B} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nWhen this creature enters, you draw a card and you lose 1 life." });
 const hitman = card("Test Hitman", "Creature — Human Assassin", "{3}{B}{B}", { power: "4", toughness: "4", oracleText: "" });
@@ -266,5 +269,84 @@ describe("round 228", () => {
     s = settle(s);
     expect(s.objects[giant]!.zone).toBe("graveyard");
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  it("Keranos: the first card you draw on each of your turns is revealed; a land draws a card, a nonland deals 3 damage", () => {
+    supported(keranos);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, keranos);
+    // A land first: one more card.
+    into(s0, ap, divination, "library");
+    into(s0, ap, desert, "library");
+    s0.players[ap]!.draws = undefined;
+    const hand = s0.players[ap]!.hand.length;
+    draw(s0, ap, 1);
+    let s = settle(s0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.log.some((l) => /reveals Test Desert/.test(typeof l === "string" ? l : l.text))).toBe(true);
+    // The second card drawn this turn isn't revealed: nothing more happens.
+    into(s, ap, bolt, "library");
+    draw(s, ap, 1);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    // A nonland first: 3 damage to any target.
+    const { s: t0, ap: me, opp: them } = setup([]);
+    putOnBattlefield(t0, me, keranos);
+    into(t0, me, bolt, "library");
+    t0.players[me]!.draws = undefined;
+    draw(t0, me, 1);
+    let t = t0;
+    for (let i = 0; i < 20 && t.pending?.kind !== "chooseTargets"; i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    expect(t.pending?.kind).toBe("chooseTargets");
+    const life = t.players[them]!.life;
+    t = act(t, { type: "chooseTargets", player: me, targets: [{ kind: "player", id: them }] });
+    t = settle(t);
+    expect(t.players[them]!.life).toBe(life - 3);
+    // Not on another player's turn.
+    let u = passUntil(t, "upkeep", them);
+    u.players[me]!.draws = undefined;
+    into(u, me, desert, "library");
+    const before = u.players[me]!.hand.length;
+    draw(u, me, 1);
+    expect(u.players[me]!.hand.length).toBe(before + 1);
+    expect(u.triggerQueue.length).toBe(0);
+    void opp;
+  });
+
+  it("The Peregrine Dynamo: copies an ability of another legendary source you control, not a nonlegendary one or a commander's", () => {
+    supported(dynamo);
+    const sage = (legendary: boolean) => card(legendary ? "Test Sage" : "Test Clerk", `${legendary ? "Legendary " : ""}Creature — Human`, "{1}{W}", { power: "1", toughness: "1", oracleText: "{1}: You gain 2 life." });
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, dynamo);
+    const legend = putOnBattlefield(s0, ap, sage(true));
+    const clerk = putOnBattlefield(s0, ap, sage(false));
+    const cmd = putOnBattlefield(s0, ap, card("Test Elder", "Legendary Creature — Human", "{1}{W}", { power: "1", toughness: "1", oracleText: "{1}: You gain 2 life." }), { commander: true });
+    let s = s0;
+    const life = s.players[ap]!.life;
+    for (const id of [clerk, cmd, legend]) s = run(s, planActivate(s, ap, id, 0));
+    const [onClerk, onCmd, onLegend] = s.stack.map((x) => x.id);
+    expect(planActivate(s, ap, d, 0, [{ kind: "stack", id: onClerk! }])).toBeNull();
+    expect(planActivate(s, ap, d, 0, [{ kind: "stack", id: onCmd! }])).toBeNull();
+    expect(abilityProblem(s, ap, d, 0, [{ kind: "stack", id: onClerk! }])).toMatch(/target/);
+    s = run(s, planActivate(s, ap, d, 0, [{ kind: "stack", id: onLegend! }]));
+    s = settle(s);
+    // Three abilities and the copy: 8 life.
+    expect(s.players[ap]!.life).toBe(life + 8);
+  });
+
+  it("Superior Spider-Man: enters as a copy of a creature card in a graveyard, a 4/4 Spider Human Hero named Superior Spider-Man; that card is exiled", () => {
+    supported(superior);
+    const { s: s0, ap, opp, ids } = setup([superior]);
+    const dead = into(s0, opp, card("Test Wurm", "Creature — Wurm", "{6}{G}", { power: "7", toughness: "7", keywords: ["Trample"], oracleText: "Trample" }), "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto"));
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseOption"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).toContain(dead);
+    s = act(s, { type: "chooseOption", player: ap, choice: dead });
+    const c = characteristics(s, s.objects[ids[0]!]!);
+    expect(c.name).toBe("Superior Spider-Man");
+    expect([c.power, c.toughness]).toEqual([4, 4]);
+    expect(c.subtypes).toEqual(expect.arrayContaining(["Wurm", "Spider", "Human", "Hero"]));
+    expect(c.keywords).toContain("Trample");
+    s = settle(s);
+    expect(s.objects[dead]!.zone).toBe("exile");
   });
 });

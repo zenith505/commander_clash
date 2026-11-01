@@ -285,7 +285,7 @@ export type TriggerSourceEvent =
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
-  | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true }
+  | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true; /** The card drawn, in their hand. */ card?: ObjectId }
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
@@ -2117,6 +2117,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
         if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
+        // Keranos: the card revealed as it was drawn, a land or not (as it is in the hand).
+        if (t.draws.revealed) {
+          const c = ev.card !== undefined ? s.objects[ev.card] : undefined;
+          if (!c || c.zone !== "hand" || objIsType(s, c, "Land") !== (t.draws.revealed === "land")) return false;
+        }
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });

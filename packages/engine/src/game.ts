@@ -1439,6 +1439,9 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
+    // Superior Spider-Man: "When you do, exile that card" (CR 603.12): that card, if it's still the same object then.
+    if (own.exileCopied && target.zone === "graveyard")
+      s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: o.controller, index: -1, subject: { id: target.id, zc: target.zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "exile", what: { ref: "subjectCard", zone: "graveyard" } }], text: "When you do, exile that card." } });
     // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
     const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0, controllerOf(s, target) === o.controller);
     if (Object.keys(more).length) {
@@ -2601,7 +2604,10 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   // draw that was replaced (CR 614.6).
   const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
   if (firstInDrawStep) p.drewInDrawStep = s.turn;
-  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}) });
+  // Keranos, God of Storms: "Reveal the first card you draw on each of your turns" (a static ability: revealed as it's drawn).
+  if (p.draws.n === 1 && s.activePlayer === pid && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed)))
+    log(s, `${p.name} reveals ${defOf(s, drawnCard).name}, the first card they drew this turn.`);
+  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}), card: top });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
   // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.
   const card = obj(s, top);

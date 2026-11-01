@@ -2270,7 +2270,10 @@ export function compile(d: CardDef): CompiledCard {
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
     // Vesuva: "You may have ~ enter tapped as a copy of any land on the battlefield": tapped only as a copy (rulings).
-    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    // Superior Spider-Man: "... a copy of any creature card in a graveyard, except ... When you do, exile that card.": a
+    // reflexive trigger as it enters as that copy (CR 603.12), exiling the card copied.
+    const exileCopied = / When you do, exile that card\.$/.test(line);
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line.replace(/ When you do, exile that card\.$/, ""));
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
@@ -2280,11 +2283,11 @@ export function compile(d: CardDef): CompiledCard {
     if (clone && fromYard) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped, ...(exileCopied ? { exileCopied: true as const } : {}) };
         continue;
       }
     }
-    if (clone && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
+    if (clone && !exileCopied && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
       // Mockingbird: "any creature on the battlefield with mana value less than or equal to the amount of mana spent to
       // cast ~": the mana spent on the spell it was, all of it (rulings), as it enters.
       const spentBound = / with mana value less than or equal to the amount of mana spent to cast ~$/.exec(clone[1]!);
@@ -4746,6 +4749,19 @@ export function compile(d: CardDef): CompiledCard {
     // the spell sets up (CR 603.7a), its own paragraph part of the spell's text.
     if (isSpell && spellLines.length && /^Whenever [^,]+ this turn, /.test(line)) {
       spellLines.push(line);
+      continue;
+    }
+    // Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this
+    // way, draw a card. Whenever you reveal a nonland card this way, ~ deals 3 damage to any target.": a static ability
+    // that reveals the card as it's drawn, and two triggers on that reveal (the first draw of each of your own turns).
+    const revealDraw = /^Reveal the first card you draw on each of your turns\. Whenever you reveal a land card this way, (.+?\.) Whenever you reveal a nonland card this way, (.+\.)$/.exec(line);
+    if (revealDraw) {
+      const ts = ([["land", revealDraw[1]!], ["nonland", revealDraw[2]!]] as const).map(([kind, text]) => {
+        const t = parseTrigger(`Whenever you draw your first card each turn, ${text}`);
+        return t && t !== "fail" && t.event === "playerDraws" && t.draws && !t.ifCond ? { ...t, draws: { ...t.draws, ownTurn: true as const, revealed: kind } } : null;
+      });
+      if (ts.some((t) => !t)) out.unsupported.push(raw);
+      else for (const t of ts) out.triggers.push(bindThisAbility(t!, line));
       continue;
     }
     const trig = parseTrigger(line);

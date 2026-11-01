@@ -462,4 +462,18 @@ describe("Lane B round 74", () => {
     const s1 = settle(activateNow(s0, ap, b, abs[0]![1], [tgt(wurm)]));
     expect(s1.objects[wurm]!.damage).toBe(1);
   });
+
+  it("a granted trigger that sacrifices the Equipment by name: the creature's attack trigger, you may sacrifice it", () => {
+    // The text granted-abilities.test.ts used to keep unsupported, now bound to the Equipment as it's granted.
+    const dagger = card("Dagger Test", "Artifact — Equipment", "{1}", { oracleText: 'Equipped creature has "Whenever this creature attacks, you may sacrifice Dagger Test."\nEquip {1}' });
+    expect(isFullySupported(dagger)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    emptyHands(s0);
+    const b = ready(s0, putOnBattlefield(s0, ap, grizzlyBears()));
+    const d = attach(s0, ap, dagger, b);
+    let s = attackWith(s0, [{ attacker: b, defender: opp }], ap);
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect([zone(s, d), zone(s, b)]).toEqual(["graveyard", "battlefield"]);
+  });
 });

@@ -2,9 +2,9 @@
 // whether it can be activated, and which one to use for a given mana.
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
-import { abilitiesOf, basicLandManaAbility, canBeSacrificed, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
+import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
-import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -412,7 +412,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (banned) return banned;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
-  if (ab.sacrificeSelf && !canBeSacrificed(s, o)) return `${name} can't be sacrificed`; // CR 701.21, 602.2b
+  if (ab.sacrificeSelf && !canSacrificeForCost(s, o)) return `${name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
@@ -421,7 +421,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.instantOnly && (s.priority !== pid || s.pending || s.resolving || s.triggerQueue.length)) return `${name}'s ability can be activated only when you could cast an instant`;
   if (ab.sorceryOnly && (!canActAtSorcerySpeed(s, pid) || s.resolving || s.triggerQueue.length)) return `${name}'s ability can be activated only as a sorcery`;
   const p = player(s, pid);
-  if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
+  if (ab.lifeCost && sylexed(s, payableLife(s, pid), true) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;

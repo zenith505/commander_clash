@@ -302,6 +302,18 @@ export function canBeSacrificed(s: GameState, o: GameObject): boolean {
   return !characteristics(s, o).cantBeSacrificed;
 }
 
+/**
+ * Whether it can be sacrificed to pay a cost to cast a spell or activate an ability (mana abilities too): not while
+ * Angel of Jubilation ("creatures") or Yasharn ("nonland permanents") says players can't (rulings).
+ */
+export function canSacrificeForCost(s: GameState, o: GameObject): boolean {
+  if (!canBeSacrificed(s, o)) return false;
+  return !s.battlefield.some((id) => {
+    const r = abilitiesOf(s, s.objects[id]!).noSacrificeCosts;
+    return r === "creatures" ? objIsType(s, o, "Creature") : r === "nonland" ? !objIsType(s, o, "Land") : false;
+  });
+}
+
 export function objHasKeyword(s: GameState, o: GameObject, k: SupportedKeyword | string): boolean {
   return characteristics(s, o).keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 }

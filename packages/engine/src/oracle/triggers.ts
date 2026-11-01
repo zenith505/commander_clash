@@ -2069,6 +2069,19 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!token) return "fail";
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token, pt: { count: { kind: "eventGroupPower" } } }], text: rest.replace(/\.$/, "") } };
   }
+  // Conspiracy Theorist: "Whenever you discard one or more nonland cards, you may exile one of them from your graveyard. If
+  // you do, you may cast it this turn.": one of the cards that event discarded, still in your graveyard (CR 400.7); cast
+  // with its normal timing (rulings).
+  if (/^you may exile one of them from your graveyard\. If you do, you may cast it this turn\.?$/.test(rest) && batch.what === "discards" && batch.whose === "you" && !batch.first && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, eventGroup: true, ...(batch.filter ? { filter: batch.filter } : {}), dest: "exile", castExiledThisTurn: true }], text: "exile one of them from your graveyard (you may cast it this turn)" }], text: rest.replace(/\.$/, "") } };
+  // Captain Howler, Sea Scourge: "target creature gets +2/+0 until end of turn for each card discarded this way. Whenever
+  // that creature deals combat damage to a player this turn, you draw a card.": how many cards the event discarded (all of
+  // them, CR 603.2c, even those that left the graveyard since); "that creature" is the target.
+  const discardEach = batch.what === "discards" && !yourTurn ? /^(target creature gets [+-]\d+\/[+-]\d+ until end of turn for each card discarded this way\.)( Whenever that creature deals combat damage to a player this turn, [^.]+\.)?$/.exec(rest) : null;
+  if (discardEach) {
+    const body = parseBody(rest, { discardBatch: true });
+    return body ? { event: "batch", batch, body } : "fail";
+  }
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
@@ -3538,6 +3551,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${/^Whenever equipped/.test(line) ? "equipped creature" : "~"} attacks, ${mostLife[2]!}`);
     if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.ifCond) return "fail";
     return mostLife[1]!.startsWith("the player") ? { ...t, attacksMostLife: true } : { ...t, activeIf: { kind: "youMostLife" } };
+  }
+  // Karazikar, the Eye Tyrant: "Whenever an opponent attacks another one of your opponents": once for each of your
+  // opponents that one of your opponents attacks (CR 508.3e), not a planeswalker or battle; "the attacking player" is the
+  // one who attacked. "Each draw a card and lose 1 life": both draw, then both lose the life.
+  const oppAttacksOther = /^Whenever an opponent attacks another one of your opponents, (.+)$/.exec(line);
+  if (oppAttacksOther) {
+    const rest = oppAttacksOther[1]!.replace(/\bthe attacking player\b/g, "that attacking player").replace(/^you and that attacking player each draw a card and lose (\d+) life\.$/, "you and that attacking player each draw a card. You and that attacking player each lose $1 life.");
+    const t = parseTrigger(`Whenever a player attacks one of your opponents, ${rest}`);
+    if (!t || t === "fail" || t.event !== "playerAttacksYourOpponent" || t.anyOpponent || t.ifCond) return "fail";
+    return { ...t, attackerOpponent: true, body: { ...t.body, text: oppAttacksOther[1]! } };
   }
   // Jolene, the Plunder Queen: "Whenever a player attacks one or more of your opponents": once for each declaration of
   // attackers that attacks any of them (CR 508.3e).

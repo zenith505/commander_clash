@@ -168,6 +168,22 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     case "putFromExiledTop": {
       const sc = (s.resolving!.scratch ??= {});
+      if (e.any) {
+        // Only permanent cards can be put onto the battlefield (CR 110.4b); still exiled face up as they're chosen.
+        const fits = (id: ObjectId) => s.objects[id]?.zone === "exile" && printedMatches(e.filter, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id)));
+        if (!sc.found) {
+          const looked = (s.resolving?.exiledTopCards ?? []).filter((id) => s.objects[id]?.zone === "exile");
+          const cards = looked.filter(fits);
+          if (!cards.length) return;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `any number of ${e.filter.text}s`, cards, min: 0, max: cards.length, exiled: true, dig: { looked, to: "to put onto the battlefield", rest: "stay in exile" } };
+          return "paused";
+        }
+        const found = sc.found.filter(fits);
+        sc.found = undefined;
+        if (found.length) log(s, `${player(s, ctx.controller).name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile onto the battlefield.`);
+        enterTogether(s, () => found.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+        return;
+      }
       if (!sc.impulseChoice) {
         // Only permanent cards can be put onto the battlefield (CR 110.4b).
         const ids = (s.resolving?.exiledTopCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && printedMatches(e.filter, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id))));

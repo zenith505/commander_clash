@@ -1,7 +1,7 @@
 # Roadmap
 
-28,826 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,259 of
+28,842 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,275 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1470,6 +1470,29 @@ line blocks.
    turn, ~ deals damage ... to that creature" and "a red instant or sorcery spell" (Jaya, Fiery Negotiator; also
    Unyaro Griffin); "exile all creatures blocked by this creature" (Wall of Nets, returned when it leaves). +14
    (28,826 of 31,936 with B69 and B70).
+   Round 235 (top of the list, now done): "Whenever you pay life" (Font of Agonies: a lifePaid event from every life
+   payment, CR 119.4, game.ts payLife); "You may have this land enter tapped. If you do, you get two rad counters"
+   (Mariposa Military Base; land menu buttons and browser test); "remove enchanted creature from combat. Then draw a
+   card for each tapped creature its controller controls" (Observed Stasis); "If you put fewer than two lands onto the
+   battlefield this way, proliferate a number of times equal to the difference" (Expand the Sphere); "hexproof unless
+   it's attacking or blocking" and "can't be blocked unless all creatures defending player controls block it"
+   (Tromokratis); "If a land is tapped for two or more mana, it produces {C} instead" (after other mana replacements,
+   CR 106.12b, 616.1) and "costs {1} more ... for each other spell that player has cast this turn" (Damping Sphere);
+   "you get that many plus one {E}" / "twice that many {E}" and "Activate only if you've paid or lost four or more {E}
+   this turn" (Izzet Generatorium, Aether Refinery); "Spend this mana only to cast spells you don't own" (Thieving
+   Varmint); "where X is the number of permanents you've sacrificed this turn. If X is three or more" (Obsessive
+   Pursuit); "by paying {3}{R} and exiling four other cards from your graveyard" (Squee, Dubious Monarch); "can't be
+   blocked this turn except by creatures with haste" (Agility Bobblehead); "to cast an Assassin spell or a spell that
+   has freerunning, or to activate an ability of an Assassin source" (Brotherhood Headquarters); "creatures you control
+   that are Fungi and/or Saprolings" and "the number of times you descended this turn" (The Mycotyrant, TurnLog.descended);
+   "the number of creatures that were exiled under your opponents' control this turn" (Vren, the Relentless,
+   TurnLog.creaturesExiled); "target creature that player controls becomes a Coward" (Gornog, the Red Reaper). +16
+   (28,842 of 31,936 with B69 and B70).
+   Out after round 235 (looked at, not done): Squandered Resources (mana of a type the sacrificed land could produce);
+   Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
+   players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
+   Pili-Pala (the untap symbol {Q} as a cost); Radiant Lotus (sacrifice one or more artifacts, another player adds the
+   mana).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
    activated abilities); Brutal Hordechief (you choose how opponents' creatures block); Sudden Substitution (exchange

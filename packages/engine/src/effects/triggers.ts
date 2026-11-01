@@ -150,6 +150,8 @@ export type TriggerSourceEvent =
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
+  /** A player paid life (CR 119.4): "whenever you pay life" (Font of Agonies). */
+  | { type: "lifePaid"; player: PlayerId; amount: number }
   | { type: "lifeGained"; player: PlayerId; amount: number; /** The player's first life gain this turn. */ first?: boolean }
   /** The active player's permanents untapped by their untap step's turn-based action (CR 502.3), how many. */
   | { type: "untapStepUntapped"; player: PlayerId; amount: number }
@@ -983,6 +985,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youUntapInUntapStep", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "lifePaid") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youPayLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
   } else if (ev.type === "lifeGained") {
     for (const id of s.battlefield) {

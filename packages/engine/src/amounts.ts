@@ -552,6 +552,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
     case "energyLostThisTurn":
       return s.turnLog?.energyLost?.[ctx.controller] ?? 0;
+    case "descendedThisTurn":
+      return s.turnLog?.descended?.[ctx.controller] ?? 0;
+    case "opponentsCreaturesExiledThisTurn":
+      return Object.entries(s.turnLog?.creaturesExiled ?? {}).reduce((n, [pid, k]) => n + (Number(pid) !== ctx.controller ? k : 0), 0);
     case "lifeLostThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":

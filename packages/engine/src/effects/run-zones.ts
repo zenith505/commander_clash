@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -554,7 +554,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       invalidateCharacteristics(s);
     } else if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}${e.payLife !== undefined ? ` and pays ${lifeEach * kept.size} life` : ""}.`);
     // Killing Wave: the life is paid as the creatures are sacrificed, all at once (rulings).
-    if (e.payLife !== undefined && kept.size && lifeEach > 0) loseLife(s, pid, lifeEach * kept.size);
+    if (e.payLife !== undefined && kept.size && lifeEach > 0) payLife(s, pid, lifeEach * kept.size);
     keptAll.push(...kept);
     gone.push(...among(pid).filter((id) => !kept.has(id)));
   }

@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { attackingPermanentOf, castProblem, freeCastable, draw, grantedMadness, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, castProblem, freeCastable, draw, grantedMadness, gainLife, log, loseLife, payLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
@@ -885,7 +885,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
         if (pt.answer === "pay") {
-          loseLife(s, p.id, e.life);
+          payLife(s, p.id, e.life);
           log(s, `${p.name} pays ${e.life} life to keep a card (${src}).`);
         } else {
           moveObject(s, id, "library", { top: true });

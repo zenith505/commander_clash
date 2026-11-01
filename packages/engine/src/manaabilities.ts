@@ -222,12 +222,28 @@ export function tapManaTimes(s: GameState, pid: PlayerId, tapped?: GameObject): 
 export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1 ? mana : mana.flatMap((m) => Array<ManaType>(n).fill(m)));
 
 /**
+ * The mana a permanent tapped for mana produces after the replacement effects on it (CR 106.12b, 614.1a): Mana
+ * Reflection's multipliers, and Damping Sphere's "If a land is tapped for two or more mana, it produces {C} instead of
+ * any other type and amount". The player chooses the order (CR 616.1; rulings on Damping Sphere): Damping Sphere first
+ * when the land makes two or more, then the multipliers (it can't apply to the event twice, CR 614.5); a land that
+ * makes one only becomes two or more by a multiplier, after which Damping Sphere applies (CR 616.1e).
+ */
+export function tappedForMana(s: GameState, pid: PlayerId, tapped: GameObject | undefined, made: ManaType[]): ManaType[] {
+  const n = tapManaTimes(s, pid, tapped);
+  const land = !!tapped && tapped.zone === "battlefield" && objIsType(s, tapped, "Land");
+  if (!land || !made.length || !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).dampsLandMana)) return timesAsMuch(made, n);
+  if (made.length >= 2) return timesAsMuch(["C"], n);
+  const more = timesAsMuch(made, n);
+  return more.length >= 2 ? ["C"] : more;
+}
+
+/**
  * Exactly what activating it with `choice` (or the combination numbered `combo`, for "combos") adds to the pool:
  * multiplied when it's tapped for mana (`tapManaTimes`).
  */
 export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const made = baseManaProduced(s, o, ab, choice, combo);
-  return ab.tap && made.length ? timesAsMuch(made, tapManaTimes(s, controllerOf(s, o), o)) : made;
+  return ab.tap && made.length ? tappedForMana(s, controllerOf(s, o), o, made) : made;
 }
 
 function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {

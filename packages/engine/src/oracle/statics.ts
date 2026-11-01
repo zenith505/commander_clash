@@ -53,6 +53,8 @@ export function parseEntersChoice(line: string): EntersChoice | null {
     if (!subtypes.every((x) => BASIC_TYPES.includes(x) || CREATURE_TYPES.has(x))) return null;
     return { kind: "reveal", filter: { kind: "card", subtypes, text: `${m[1]} card` } };
   }
+  // Mariposa Military Base: entering tapped is the choice, with rad counters for it (CR 614.1c, 728).
+  if ((m = /^You may have ~ enter(?: the battlefield)? tapped\. If you do, you get (two|three) rad counters\.$/.exec(line))) return { kind: "mayTapRad", n: m[1] === "two" ? 2 : 3 };
   // Temple of the Dragon Queen: "... enters tapped unless you revealed a Dragon card this way or you control a Dragon."
   // Controlling one as it enters is enough, with nothing revealed (CR 614.1d).
   if ((m = /^As ~ enters(?: the battlefield)?, you may reveal an? ([A-Z][a-z]+) card from your hand\. ~ enters(?: the battlefield)? tapped unless you revealed an? ([A-Z][a-z]+) card this way or you control an? ([A-Z][a-z]+)\.$/.exec(line))) {
@@ -335,7 +337,8 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
   // Tadeas, Juniper Ascendant: "~ has hexproof unless it's attacking": while it isn't an attacking creature (CR 506.4).
-  else if ((m = /^(~ has [a-z]+) unless it's attacking$/.exec(text))) [statement, cond] = [m[1], "it isn't attacking"];
+  // Tromokratis: "~ has hexproof unless it's attacking or blocking".
+  else if ((m = /^(~ has [a-z]+) unless it's attacking( or blocking)?$/.exec(text))) [statement, cond] = [m[1], `it isn't attacking${m[2] ?? ""}`];
   // Training Drone: "~ can't attack or block unless it's equipped".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's (equipped|enchanted)$/.exec(text))) [statement, cond] = [m[1], `~ isn't ${m[2]}`];
   // Ketramose, the New Dawn: "~ can't attack or block unless there are seven or more cards in exile": while there are fewer.
@@ -547,6 +550,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[3]!, null, true);
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, n: 0, times: c, coloredOrGeneric: m[2] as Color, text: line } };
+  }
+  // Damping Sphere: "Each spell a player casts costs {1} more to cast for each other spell that player has cast this turn":
+  // counted for the caster as the cost is determined (CR 601.2f), before this spell becomes cast (601.2i), spells cast
+  // before Damping Sphere arrived included (rulings).
+  if ((m = /^Each spell a player casts costs \{(\d+)\} more to cast for each other spell that player has cast this turn$/.exec(text))) {
+    const base = parseCostChange(`Spells cost {${m[1]}} more to cast`);
+    const c = parseCount("spell you've cast this turn", null, true);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.who !== "all" || !c) return "fail";
+    return { costMod: { ...base.costMod, times: c, timesForCaster: true, text: line } };
   }
   // Hum of the Radix: "Each artifact spell costs {1} more to cast for each artifact its controller controls": everyone's
   // artifact spells, counted for the spell's caster as it's cast (CR 601.2f).
@@ -909,6 +921,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(the number of .+ plus the number of .+) is ${NUM} or greater$`).exec(text))) {
     const amount = parseCount(m[1]!, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[2]!) } : null;
+  }
+  // Izzet Generatorium: "Activate only if you've paid or lost four or more {E} this turn" (TurnLog.energyLost, CR 107.14).
+  if ((m = new RegExp(`^you've paid or lost ${NUM} or more \\{E\\} this turn$`).exec(text))) {
+    const amount = parseCount("{E} you've paid or lost this turn", null, true);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // ED-E, Lonesome Eyebot: "if the number of attacking creatures is greater than the number of quest counters on ~".
   if ((m = /^the number of (.+) is greater than the number of (.+)$/.exec(text))) {
@@ -2233,6 +2250,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
+  if (rest === "can't be blocked unless all creatures defending player controls block it") return [{ kind: "blockedOnlyByAll" }];
   // "Can't be blocked except by creatures with flying or reach", "... except by black creatures", "... except by
   // Walls and/or creatures with flying" (CR 509.1b).
   // "Can't be blocked except by Krakens, Leviathans, Octopuses, and Serpents" (Serpent of Yawning Depths): a creature of

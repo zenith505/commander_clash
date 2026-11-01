@@ -1571,6 +1571,10 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Creatures exiled from the battlefield, by the player who controlled each (Vren, the Relentless). */
+  creaturesExiled?: Record<number, number>;
+  /** How many times each player descended (CR 700.11): permanent cards put into their graveyard (The Mycotyrant). */
+  descended?: Record<number, number>;
   /** Energy counters each player paid or lost in total (Blaster Hulk). */
   energyLost?: Record<number, number>;
   /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */

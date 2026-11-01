@@ -1,8 +1,8 @@
 # Roadmap
 
-28,909 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,276 of
-9,979 (92%).
+28,925 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
+9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -4185,16 +4185,16 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   who didn't discard a creature card this way loses 4 life" (Strongarm Tactics), "If it isn't a creature or Vehicle, it
   becomes a 0/0 Construct" (Lifecraft Awakening), "Whenever a card is put into your graveyard from your library"
   (Pedantic Learning), "Whenever a permanent is returned to your hand" (Azorius Aethermage, tokens included), "Whenever
-  a permanent is returned to a player's hand, that player ..." (Warped Devotion: its owner). +21 (28,909 of
-  31,936 with rounds 230 to 235 and B71 to B73).
+  a permanent is returned to a player's hand, that player ..." (Warped Devotion: its owner). +21 (28,925 of
+  31,936 with rounds 230 to 236 and B71 to B73). Also faster: the characteristics cache's count check (it
+  was rebuilt as a string on every read) and the state copy, which took the slow Cocoon test from about 5 s to 1 s.
 - Out after round B74 (looked at, not done): Hankyu (remove all aim counters as a cost, damage equal to the number
   removed), Fishing Pole ("Tap Fishing Pole" as a cost of the granted ability), Hold for Ransom (the Aura's controller
   as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
   (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend and
   The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
-  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (after Lane A's round 236,
-  which changes the same keyword-binding code). Known gap: when Lane A's round 236 merges, the granted "Sacrifice ~"
-  cost (Blazing Torch) must pass `cost: true` so Sigarda doesn't stop it.
+  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (Lane A's round 236, now
+  merged, changed the same keyword-binding code: next).
 - Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
   payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land
   types chosen, the first changed into the second), Chromatic Armor (the last chosen color, chosen again with sleight

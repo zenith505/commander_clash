@@ -145,9 +145,10 @@ describe("protection from qualities (CR 702.16a)", () => {
     expect(characteristics(s, s.objects[o]!).keywords).toContain("Protection from black");
   });
 
-  it("an Aura whose protection doesn't remove it is read (see chosen-protection.test.ts), unless it spares all Auras", () => {
+  // Round B71: "This effect doesn't remove Auras" is read too (CR 702.16c; see laneb-round71.test.ts).
+  it("an Aura whose protection doesn't remove it is read (see chosen-protection.test.ts), and so is one that spares all Auras", () => {
     supported(card("Ward Test", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature has protection from black. This effect doesn't remove this Aura.", keywords: ["Enchant"] }));
-    unsupported(card("Spectra Ward", "Enchantment — Aura", "{3}{W}{W}", { oracleText: "Enchant creature\nEnchanted creature gets +2/+2 and has protection from all colors. This effect doesn't remove Auras.", keywords: ["Enchant"] }));
+    supported(card("Spectra Ward", "Enchantment — Aura", "{3}{W}{W}", { oracleText: "Enchant creature\nEnchanted creature gets +2/+2 and has protection from all colors. This effect doesn't remove Auras.", keywords: ["Enchant"] }));
   });
 });
 

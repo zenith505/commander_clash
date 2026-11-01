@@ -98,6 +98,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
     return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
   }
+  // Amy Pond: "choose a suspended card you own and remove that many time counters from it" ("that many" read as X by the
+  // trigger): one chosen as it resolves, not targeted (CR 702.62b: in exile, with suspend and a time counter); the last
+  // one removed, its suspend casts it (rulings).
+  if (/^[Cc]hoose a suspended card you own and remove X time counters from it$/.test(s) && !ctx.spell) return [{ type: "removeTimeSuspended", n: { count: { kind: "x" } } }];
+  // Izzet Chemister: "Cast any number of cards exiled with ~ without paying their mana costs": one at a time as this
+  // resolves, any number of them (none too), the rest staying exiled (rulings).
+  if (/^Cast any number of cards exiled with ~ without paying their mana costs$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true }];
   // Idol of Endurance: "Exile all creature cards with mana value 3 or less from your graveyard until ~ leaves the
   // battlefield": they return to the graveyard when it leaves (CR 610.3).
   if ((m = /^[Ee]xile all (.+?) cards( with mana value \d+ or less)? from your graveyard until ~ leaves the battlefield$/.exec(s)) && !ctx.spell) {
@@ -455,6 +462,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("three target creature cards from your graveyard", ctx, true);
     if (what?.ref !== "target" || what.n !== 3) return null;
     return [{ type: "randomTargetsToBottom", what, keep: 2 }, { type: "putOntoBattlefield", what }];
+  }
+  // Wild Swing: one of the three targets still legal as it resolves, chosen at random then (rulings: one of the other two if
+  // one has become illegal, the last one if two have; no time to respond between the choice and the destruction).
+  if (/^Destroy one of three target nonenchantment permanents at random$/.test(s)) {
+    const what = parseObject("three target nonenchantment permanents", ctx);
+    if (what?.ref !== "target" || what.n !== 3) return null;
+    return [{ type: "destroyRandomTarget", what }];
   }
   if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on (?:it|~))?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
@@ -1175,6 +1189,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.
   if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it (on their choice of the top or bottom of their library|into their library second from the top or on the bottom)$/i.exec(s))) {
     // Subtlety: "up to one target creature or planeswalker spell": one spell, or none (CR 115.6, 601.2c).
+    // Sudden Setback: "The owner of target spell or nonland permanent puts it ...": one target, a spell (it leaves the
+    // stack, not countered, so even one that can't be countered) or a nonland permanent, its owner choosing as it
+    // resolves (rulings); like Airbend's spell or permanent.
+    if (m[2] === "target spell or nonland permanent" && !/second from the top/.test(m[3]!)) {
+      const perm = parseTargetPhrase("nonland permanent");
+      if (perm?.kind !== "object") return null;
+      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or nonland permanent" });
+      return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
+    }
     const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
     const spellSpec = spellUpTo ? parseTargetPhrase(spellUpTo[1]!) : undefined;
     // Temporal Cleansing: "puts it into their library second from the top or on the bottom", a permanent only.
@@ -1346,6 +1369,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Return all cards exiled with ~ to the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield" }];
     if ((m = /^Return each creature card exiled with ~ to the battlefield under (your|its owner's) control$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] === "your" ? {} : { ownersControl: true }) }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
+    // Bottled Cloister: "return all cards you own exiled with this artifact to your hand": only the ones you own (rulings:
+    // the errata), face down ones too.
+    if (/^Return all cards you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true }];
     // Endless Horizons: "put a card you own exiled with ~ into your hand": the same.
     if (/^(?:Return a card you own exiled with ~ to|Put a card you own exiled with ~ into) your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
@@ -1354,10 +1380,27 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Ethereal Forager: "return an instant or sorcery card exiled with ~ to its owner's hand": one of them, chosen as it
     // resolves.
     if (/^Return an instant or sorcery card exiled with ~ to its owner's hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } }];
+    // Roads Go Ever, Ever On: "Put a card exiled with this Saga into its owner's hand": one of them, chosen as it resolves.
+    if (/^Put a card exiled with ~ into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true }];
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
     if (/^Put a creature card exiled with ~ onto the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
+    // Clone Shell: the controller looks at the top four, exiles one of them face down (one must be exiled, rulings) and puts
+    // the rest on the bottom in the order they choose.
+    if (/^Exile one of the top four cards of your library face down and put the rest on the bottom of your library in any order$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 4, pickOne: true, bottomAnyOrder: true }];
+    // Clone Shell, Summoner's Egg: the card exiled face down with it is turned face up; a creature card goes onto the
+    // battlefield under your control, anything else stays exiled face up (rulings). compile.ts checks it has one imprint.
+    if (/^Turn the exiled card face up and put it onto the battlefield under your control if it's a creature card$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", turnFaceUp: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
+    // Skyship Weatherlight: a card exiled with it chosen at random as it resolves, into its owner's hand (rulings: the
+    // errata's owner).
+    if (/^Put a card exiled with ~ chosen at random into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, random: true }];
+    // Bag of Devouring: "Return up to X cards from among cards exiled with ~ to their owners' hands, where X is the result":
+    // chosen as it resolves, from the cards its sacrifice trigger exiled (CR 607.2a).
+    if (/^Return up to X cards from among cards exiled with ~ to their owners' hands$/.test(s)) return [{ type: "moveLinked", dest: "hand", upTo: { count: { kind: "x" } } }];
+    // Yggdrasil, Rebirth Engine: "Put a creature card exiled with ~ onto the battlefield under your control. It gains haste
+    // until end of turn." The permanent it became (CR 400.7).
+    if (/^Put a creature card exiled with ~ onto the battlefield under your control, and it gains haste until end of turn$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, haste: "endOfTurn" }];
     // Ashiok, Nightmare Weaver: "Put a creature card with mana value X exiled with ~ onto the battlefield under your control":
     // chosen as it resolves, the X announced for the loyalty cost (rulings; none, nothing happens).
     if (/^Put a creature card with mana value X exiled with ~ onto the battlefield under your control$/.test(s)) {

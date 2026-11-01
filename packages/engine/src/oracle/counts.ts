@@ -316,7 +316,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Recursive Recruitment: "for every three cards in your graveyard": each whole group of three, rounded down.
   if (each && (m = /^(two|three|four|five) cards in your graveyard$/.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" } }, per: num(m[1]!) };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
-  if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  // Ventifact Bottle: "Add {C} for each charge counter removed this way" in a triggered ability (no cost to remove them).
+  if (each && (/^counter removed this way$/i.test(p) || (!ctx?.activated && /^(?:[+-]1\/[+-]1|[a-z]+) counter removed this way$/i.test(p)))) return { count: { kind: "countersRemovedThisWay" } };
   // After "Remove all +1/+1 counters from ~" paid as a cost (StackItem.countersRemoved): "for each +1/+1 counter removed
   // this way" (Vish Kal), "the number of charge counters removed this way" (Geometric Nexus), "for each five counters
   // removed this way" (Sage of Hours: each whole group of five).

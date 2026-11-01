@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan", "Room"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Sphere", "Spacecraft", "Planet", "Plan", "Room"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 const CREATURE_OR_LEGENDARY: TargetSpec[] = [{ kind: "object", types: ["Creature"], text: "creature" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }];
@@ -1157,6 +1157,9 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Telim'Tor's Edict: "target permanent you own or control": yours by either (CR 108.3, 110.2).
+  if (phrase.trim() === "permanent you own or control")
+    return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: [], notTypes: [], notColors: [], owner: "you", text: "permanent you own" }, { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }], text: "target permanent you own or control" };
   // Ice Cream Kitty: "Sacrifice another creature or token": a permanent that's either (a token of any type too).
   const orToken = /^(artifact|creature|enchantment|land) or token$/.exec(phrase.trim());
   if (orToken) {
@@ -1227,7 +1230,8 @@ export function parseTargetPhrase(
   if (thatsCombat) return parseTargetPhrase(`${thatsCombat[1] ?? ""}${thatsCombat[3]} ${thatsCombat[2]}creature`, opts);
   // Terminal Criticism: "creature or planeswalker that's blue or red"; Essence Burn: "black or green creature or
   // planeswalker": a creature or planeswalker of either color.
-  const huedTypes = /^(target )?(?:(white|blue|black|red|green) or (white|blue|black|red|green) (creature or planeswalker)|(creature or planeswalker) that's (white|blue|black|red|green) or (white|blue|black|red|green))$/.exec(phrase.trim());
+  // Flourishing Grapple: "creature or planeswalker an opponent controls that's red or white".
+  const huedTypes = /^(target )?(?:(white|blue|black|red|green) or (white|blue|black|red|green) (creature or planeswalker)|(creature or planeswalker(?: an opponent controls| you control)?) that's (white|blue|black|red|green) or (white|blue|black|red|green))$/.exec(phrase.trim());
   if (huedTypes) {
     const head = parseTargetPhrase(`${huedTypes[1] ?? ""}${huedTypes[4] ?? huedTypes[5]}`, opts);
     const colors = [huedTypes[2] ?? huedTypes[6], huedTypes[3] ?? huedTypes[7]].map((c) => COLOR_WORDS[c!]!);
@@ -1588,7 +1592,7 @@ export function parseTargetPhrase(
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
   // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

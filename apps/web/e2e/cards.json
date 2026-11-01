@@ -311,6 +311,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23b2de61-a29c-4a32-b38c-408c723727ce",
+  "name": "Agency Outfitter",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Sphinx Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx",
+   "Detective"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may search your graveyard, hand and/or library for a card named Magnifying Glass and/or a card named Thinking Cap and put them onto the battlefield. If you search your library this way, shuffle.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
   "name": "Agitator Ant",
   "manaCost": "{2}{R}",
@@ -546,6 +579,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "aa7d3e99-fc14-4f62-bf00-c0428c11e4f2",
+  "name": "Amy Pond",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human"
+  ],
+  "oracleText": "Partner with Rory Williams (When this creature enters, target player may put Rory into their hand from their library, then shuffle.)\nWhenever Amy Pond deals combat damage to a player, choose a suspended card you own and remove that many time counters from it.\nDoctor's companion (You can have two commanders if the other is the Doctor.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Partner with",
+   "Partner",
+   "Doctor's companion"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "db5380ed-ba28-4ea2-abc3-4998e2022903",
   "name": "Ancestral Mask",
   "manaCost": "{2}{G}",
@@ -572,6 +641,34 @@
   "set": "ema",
   "releasedAt": "2016-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9728dec9-d482-4c7a-8cdc-44d010dc878d",
+  "name": "Ancestral Vision",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Suspend 4—{U} (Rather than cast this card from your hand, pay {U} and exile it with four time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)\nTarget player draws three cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "ima",
+  "releasedAt": "2017-11-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -2228,6 +2325,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cef9e0d3-5e28-4c5f-88fc-0d78af5a4db1",
+  "name": "Boggart Forager",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Rogue"
+  ],
+  "oracleText": "{R}, Sacrifice this creature: Target player shuffles their library.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "21695c70-f746-4d77-b6d3-e2713a5c929e",
   "name": "Bogslither's Embrace",
   "manaCost": "{1}{B}",
@@ -3461,6 +3589,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "94ab7d13-bcd7-419f-9e68-bd8e7ef66d42",
+  "name": "Clone Shell",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Imprint — When this creature enters, look at the top four cards of your library, exile one face down, then put the rest on the bottom of your library in any order.\nWhen this creature dies, turn the exiled card face up. If it's a creature card, put it onto the battlefield under your control.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2a838818-d590-4374-9a63-d9e6381a0f0d",
   "name": "Cloud Key",
   "manaCost": "{3}",
@@ -3902,6 +4059,36 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "685c4665-e04c-4012-aa5b-888a042c2a21",
+  "name": "Convincing Mirage",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant land\nAs this Aura enters, choose a basic land type.\nEnchanted land is the chosen type.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11701,6 +11888,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f2ce9e55-07c0-4f36-a59e-127693fc0f62",
+  "name": "Magnifying Glass",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{4}, {T}: Investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Investigate"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -15078,6 +15292,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad5e2cb0-00d7-4dad-b20e-23bd41ada398",
+  "name": "Prismatic Ward",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAs this Aura enters, choose a color.\nPrevent all damage that would be dealt to enchanted creature by sources of the chosen color.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fecbbc79-2f74-46b3-a049-45736f904f58",
   "name": "Prisoner's Dilemma",
   "manaCost": "{3}{R}{R}",
@@ -15180,6 +15424,32 @@
   "commanderLegal": "legal",
   "set": "som",
   "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e5128230-3535-4f77-8b97-20d0791e7b1d",
+  "name": "Psychic Surgery",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an opponent shuffles their library, you may look at the top two cards of that library. You may exile one of those cards. Then put the rest on top of that library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -20046,6 +20316,32 @@
   "set": "znr",
   "releasedAt": "2020-09-25",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a54fb3de-0581-461e-be33-dc4f4d16a33e",
+  "name": "Thinking Cap",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+2.\nEquip Detective {1}\nEquip {3} ({3}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

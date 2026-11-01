@@ -1066,7 +1066,7 @@ function preventedAll(s: GameState, e: DamageEvent): boolean {
   if (from?.zone === "battlefield" && characteristics(s, from).preventDamage?.some((p) => p.by && kind(p))) return true;
   if (!("object" in e.to)) return false;
   const to = obj(s, e.to.object);
-  return !!characteristics(s, to).preventDamage?.some((p) => p.to && kind(p) && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))));
+  return !!characteristics(s, to).preventDamage?.some((p) => p.to && kind(p) && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))) && (!p.fromColors || p.fromColors.some((c) => (e.src.colors as string[]).includes(c))));
 }
 
 /** Which of the permanents and players a rule protects its controller would rather it took damage away from: a creature the damage would destroy first, then the player. */

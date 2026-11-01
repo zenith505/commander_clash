@@ -211,6 +211,15 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     if (first?.length !== 1 || first[0]!.type !== "damage" || a === undefined || ctx.targets.length !== a + 1) return null;
     return [...first, { type: "damage", amount: { count: { kind: "power", of: { ref: "target", index: a } } }, to: { ref: "you" }, by: { target: a } }];
   }
+  // Dwarven Catapult: "~ deals X damage divided evenly, rounded down, among all creatures target opponent controls": the
+  // same damage to each of them, X divided by how many there are as it resolves (rulings: none if there are more than X).
+  const evenly = /^~ deals X damage divided evenly, rounded down, among all creatures (target opponent) controls$/.exec(s);
+  if (evenly) {
+    const each = parseSentence(`~ deals X damage to each creature ${evenly[1]} controls`, ctx);
+    const e = each?.length === 1 ? each[0]! : undefined;
+    if (e?.type !== "damage" || e.to.ref !== "each" || e.to.of?.ref !== "target" || typeof e.amount !== "object" || e.amount.count.kind !== "x") return null;
+    return [{ ...e, amount: { ...e.amount, divBy: { kind: "permanents", filter: e.to.filter, whose: e.to.of } } }];
+  }
   // Deep Spawn: "~ gains shroud until end of turn and doesn't untap during your next untap step": both, in order.
   const andNoUntap = /^(~ gains [a-z ]+ until end of turn) and (doesn't untap during your next untap step)$/.exec(s);
   if (andNoUntap) {

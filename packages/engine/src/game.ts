@@ -20,7 +20,7 @@ import { countersBanned, countersStay, putCounters, putPlayerCounters, removable
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, SPARES_AURAS, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -4090,7 +4090,8 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
     // Evendo Brushrazer's: while its condition holds, paying as usual.
-    const plain = !!a.playLinkedWhile && staticConditionNow(s, a.playLinkedWhile, id, pid);
+    // Rona, Disciple of Gix: spells only, so not a land card.
+    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && isType(defOf(s, o), "Land")) && staticConditionNow(s, a.playLinkedWhile, id, pid);
     if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
@@ -10775,7 +10776,7 @@ function attachmentSBAs(s: GameState): boolean {
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
-      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
+      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id && hc.sparedBy?.[k.toLowerCase()] !== SPARES_AURAS) : [];
       const legal =
         !!host &&
         host.zone === "battlefield" &&

@@ -267,6 +267,14 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = /^destroy both creatures\.$/.test(text) ? { targets: [], effects: [{ type: "destroy" as const, what: { ref: "eventGroup" as const } }], text } : parseBody(text, { subject: true });
     return body ? { event: "selfBlocksOrBlockedByCreature", body, host: "attached", ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) } : "fail";
   }
+  // Shield of the Righteous: "Whenever equipped creature blocks a creature, that creature doesn't untap during its
+  // controller's next untap step": once for each creature it blocks, "that creature" that attacker, whoever controls it
+  // then (rulings: it isn't tapped by this, and it's that creature's next untap step under whoever controls it).
+  const blocksOne = m[2] === "creature" && !m[1] && !yours ? /^blocks a creature, (that creature doesn't untap during its controller's next untap step\.)$/.exec(m[3]!) : null;
+  if (blocksOne) {
+    const body = parseBody(blocksOne[1]!, { subject: true });
+    return body ? { event: "selfBlocksCreature", body, host: "attached" } : "fail";
+  }
   // Hedron Blade: "Whenever equipped creature becomes blocked by one or more colorless creatures, it gains deathtouch until
   // end of turn": once per combat, however many there are (as for Serra Inquisitors), "it" the equipped creature.
   const byMany = m[2] === "creature" && !m[1] && !yours ? /^becomes blocked by one or more (.+?), (.+)$/.exec(m[3]!) : null;
@@ -2623,6 +2631,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = cond && parseTrigger(`Whenever ${attacksWhile[1]}, ${attacksWhile[3]}`);
     return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
+  // Social Snub: "When you cast ~ while you control a creature, you may copy ~": the same, checked as it's cast only (CR
+  // 603.2), not again as the trigger resolves.
+  const castWhile = /^When you cast ~ while (you control an? [a-z]+), (.+)$/.exec(line);
+  if (castWhile) {
+    const cond = parseActivateCondition(castWhile[1]!);
+    const t = cond && parseTrigger(`When you cast ~, ${castWhile[2]}`);
+    return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
+  }
   // Bristlebane Battler, Moonshadow: "Whenever ... while this creature has a -1/-1 counter on it, ...": a condition on the
   // event, checked as it happens only (CR 603.2), not an intervening if (CR 603.4).
   const whileCounter = /^(Whenever .+?) while ~ has an? ([+-]\d\/[+-]\d) counter on it, (.+)$/.exec(line);
@@ -2785,10 +2801,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // "Whenever a counter is put on a creature you control, ..." (Hollowmurk Siege): once for each counter, but only the
     // first of them each turn does anything, so it's the same as "one or more counters".
     // Mikey & Leo, Chaos & Order: "Whenever you put a counter on a creature you control, ...": the same. Ant-Man, Colony
-    // Commander: "Whenever you put a +1/+1 counter on a creature" (any creature, of that kind): the same.
+    // Commander: "Whenever you put a +1/+1 counter on a creature" (any creature, of that kind): the same. Knight of
+    // Wundagore: "on another creature" (anyone's, not ~): the same.
     // Cloaked Cadet: "Whenever one or more +1/+1 counters are put on one or more Humans you control": once for each Human
     // they're put on, only the first each turn doing anything (rulings: one card however many).
-    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|a creature), /, "Whenever you put one or more $1counters on $2, "));
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only
@@ -3411,6 +3428,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (auraYours) {
     const body = parseBody(auraYours[1]!);
     return body && !body.targets.length ? { event: "auraAttachedToYours", body } : "fail";
+  }
+  // Enormous Energy Blade: "Whenever ~ becomes attached to a creature, tap that creature": attached to it by equip or any
+  // other effect (CR 701.3a), or entering attached to it; the creature is the subject.
+  const attachedTo = /^Whenever ~ becomes attached to a creature, (.+)$/.exec(line);
+  if (attachedTo) {
+    const body = parseBody(attachedTo[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
+    return body ? { event: "selfBecomesAttached", body } : "fail";
   }
   // "Whenever this Equipment becomes unattached from a permanent, sacrifice that permanent" (Grafted Wargear).
   const unattached = /^Whenever ~ becomes unattached from a permanent, (.+)$/.exec(line);
@@ -4160,6 +4184,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
+      // Jagged Poppet: "that player discards cards equal to the damage": that many, the combat damage dealt to them.
+      if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^that player discards cards equal to the damage\.$/, "that player discards that many cards.");
       // Storm the Citadel's grant: "Whenever this creature deals combat damage to a player or planeswalker, destroy target
       // artifact or enchantment defending player controls": the player dealt the damage, or the planeswalker's controller
       // (rulings), which is the trigger's player (see the planeswalker's combatDamageToPlayer event).

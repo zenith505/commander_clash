@@ -1035,6 +1035,7 @@ export function moveObject(
   o.damage = 0;
   o.damagedBy = undefined;
   o.wasDealtDamage = undefined;
+  o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
@@ -3795,6 +3796,7 @@ function finishCleanup(s: GameState) {
     if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) o.damage = 0;
     o.damagedBy = undefined;
     o.wasDealtDamage = undefined;
+    o.wasDealtNoncombatDamage = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
@@ -8960,12 +8962,19 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
   for (const id of ids) {
     const x = s.objects[id];
     if (x?.zone !== "battlefield") continue;
+    if (devour?.bounce) {
+      // Rescuer Sphinx: returned instead (CR 614.12).
+      log(s, `${player(s, controllerOf(s, x)).name} returns ${defOf(s, x).name} to its owner's hand as ${d.name} enters.`);
+      moveObject(s, id, "hand");
+      n++;
+      continue;
+    }
     log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} ${devour?.defines || devour?.n === 1 ? "as" : "to"} ${d.name}${devour?.defines || devour?.n === 1 ? " enters" : "'s devour"}.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
     n++;
   }
   s.leftTogether = undefined;
-  o.devoured = n;
+  if (!devour?.bounce) o.devoured = n;
   if (devour?.defines === "total") {
     // Its power and toughness become those totals (layer 7b, CR 613.4b) for as long as it's on the battlefield.
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: d.name, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "setPT", power: totals.power, toughness: totals.toughness }] });
@@ -8974,7 +8983,7 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
   if (n && devour && devour.n) {
     invalidateCharacteristics(s);
     const put = putCounters(s, o, "+1/+1", n * (devour.n === "devoured" ? n : devour.n), true);
-    log(s, `${d.name} devours ${n} and enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+    log(s, devour.bounce ? `${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.` : `${d.name} devours ${n} and enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
   }
   invalidateCharacteristics(s);
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
@@ -9093,7 +9102,7 @@ function askEntersChoice(s: GameState): boolean {
       // the battlefield yet as they're chosen, so it can't devour itself.
       const devour = compileCard(defOf(s, o)).devour;
       const you = controllerOf(s, o);
-      const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false) && canBeSacrificed(s, obj(s, id))) : [];
+      const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false) && (devour.bounce || canBeSacrificed(s, obj(s, id)))) : [];
       if (!options.length) {
         q.shift();
         devourChosen(s, o, [], c.enters);
@@ -9101,7 +9110,11 @@ function askEntersChoice(s: GameState): boolean {
       }
       // Not devour itself (Wood Elemental, Dracoplasm, Shimatsu): what the sacrifice does, said in the prompt.
       const said = devour!.defines === "count" ? "its power and toughness are how many" : devour!.defines === "total" ? "it gets their total power and toughness" : devour!.n === 1 && devour!.filter.text === "permanent" ? "a +1/+1 counter for each" : undefined;
-      s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : {}) };
+      if (devour!.bounce) {
+        s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "bounce", what: devour!.filter.text, options, count: Math.min(options.length, devour!.max ?? options.length), min: 0, objectId: o.id, prompt: `you may return a ${devour!.filter.text} you control to its owner's hand as it enters (if you do, it enters with a +1/+1 counter): click it, then return.` };
+        return true;
+      }
+      s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : devour!.n === 2 && devour!.filter.types?.includes("Planeswalker") ? { prompt: `sacrifice any number of creatures and/or planeswalkers as it enters (two +1/+1 counters for each): click them, then sacrifice.` } : {}) };
       return true;
     }
     if (c.what === "discardKeywords") {

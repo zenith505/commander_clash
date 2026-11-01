@@ -277,7 +277,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // Opponents who have left the game too (rulings).
       return Math.max(0, ...s.players.filter((p) => p.id !== ctx.controller).map((p) => (p.draws?.turn === s.turn ? p.draws.n : 0)));
     case "playersAttacked":
-      return s.players.filter((p) => !p.lost && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent)).length;
+      return s.players.filter((p) => !p.lost && (!c.byYou || p.id !== ctx.controller) && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent && (!c.byYou || controllerOf(s, s.objects[id]!) === ctx.controller))).length;
     case "drawnThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.draws?.turn === s.turn ? s.players[pid]!.draws!.n : 0), 0);
     case "discardedThisTurn": {
@@ -288,6 +288,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     {
       // "For each card with the chosen name revealed this way" (Thought Hemorrhage): the name chosen as it resolves.
       const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      // Adamaro: the one hand with the most cards (0 with no opponents left).
+      if (c.most) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.hand.length));
       if (c.differentManaValues) return new Set(refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.hand.map((id) => defMv(defOf(s, s.objects[id]!))))).size;
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     }
@@ -721,6 +723,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
           return (c.drewAtLeast === undefined || drew >= c.drewAtLeast) && (c.landsEnteredAtLeast === undefined || lands >= c.landsEnteredAtLeast);
         }).length;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
+    case "unlockedDoors":
+      return s.battlefield.reduce((n, id) => {
+        const o = s.objects[id]!;
+        // Read through the layers applied so far (a static ability counting this is applied in them).
+        const ch = o.unlocked?.length ? view(o) : undefined;
+        return n + (ch && ch.controller === ctx.controller && ch.subtypes.includes("Room") ? o.unlocked!.length : 0);
+      }, 0);
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
       return a?.turn === s.turn ? a.players.filter((pid) => pid !== ctx.controller).length : 0;
@@ -1388,8 +1397,10 @@ function describeCount(c: Count): string {
       return "#cards drawn this turn";
     case "discardedThisTurn":
       return "#cards discarded this turn";
+    case "unlockedDoors":
+      return "#unlocked doors among your Rooms";
     case "playersAttacked":
-      return "#players being attacked";
+      return c.byYou ? "#opponents you're attacking" : "#players being attacked";
     case "treasureSpent":
       return "mana from Treasures spent";
     case "snowSpent":

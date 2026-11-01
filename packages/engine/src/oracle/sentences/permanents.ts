@@ -1,7 +1,7 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { AmountExpr, Count, Effect, Modification, ObjRef, TargetSpec } from "../../abilities";
-import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
+import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular, X } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
@@ -576,6 +576,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
     return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : m[1] === "Creatures" ? ["Creature"] : ["Creature", "Land"] }] : null;
   }
+  // Imaginary Threats: "Creatures target opponent controls attack this turn if able. During that player's next untap step,
+  // creatures they control don't untap.": the targeted player's, every creature they control then (rulings).
+  if (/^During that player's next untap step, creatures they control don't untap$/.test(s) && ctx.lastPlayerTarget !== undefined) return [{ type: "noUntapNext", who: { ref: "target", index: ctx.lastPlayerTarget }, types: ["Creature"] }];
   // Pollen Lullaby: "If you win, creatures that player controls don't untap during the player's next untap step": the
   // opponent clashed with, whatever creatures they control when that step comes, as for Misstep.
   if (/^Creatures that player controls don't untap during the player's next untap step$/.test(s) && ctx.clashOpp) return [{ type: "noUntapNext", who: { ref: "clashOpponent" }, types: ["Creature"] }];
@@ -609,6 +612,28 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
   if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Galion, Elvenking's Butler: "choose up to one other target creature you control. Its base power and toughness become
+  // equal to ~'s power and toughness until end of turn"; Exuberant Wolfbear: "you may have the base power and toughness of
+  // target Human you control become equal to ~'s power and toughness until end of turn"; Unruly Krasis: "... become X/X
+  // until end of turn, where X is ~'s power". ~'s actual power and toughness as this resolves, locked in then (as it last
+  // existed if it has left, rulings; CR 608.2h), in layer 7b (CR 613.4b); the "you may" is chosen as it resolves (rulings).
+  const ptOfSelf = (): Modification => ({ kind: "setPT", power: { count: { kind: "power", of: { ref: "self" } } }, toughness: { count: { kind: "toughness", of: { ref: "self" } } } });
+  if (/^(?:Its|That creature's) base power and toughness become equal to ~'s power and toughness until end of turn$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "continuous", what: { ref: "target", index: ctx.lastObjectTarget }, mods: [ptOfSelf()], duration: "endOfTurn" }];
+  // (body.ts turns "You may have the base power and toughness of X become ..." into a may of "The base power and toughness
+  // of X becomes ...".)
+  if ((m = /^The base power and toughness of ((?:another )?target [a-zA-Z ]+? you control) becomes (equal to ~'s power and toughness|X\/X) until end of turn$/.exec(s)) && !ctx.spell && ctx.mayNow && (m[2] === "X/X") === !!ctx.whereX) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref !== "target" || what.n) return null;
+    // "X/X ..., where X is ~'s power": the X the "where" defines, both numbers (body.ts defineX).
+    return [{ type: "continuous", what, mods: [m[2] === "X/X" ? { kind: "setPT", power: X, toughness: X } : ptOfSelf()], duration: "endOfTurn" }];
+  }
+  // Master of Winds: "you may have ~'s base power and toughness become 4/1 or 1/4 until end of turn": either one or neither,
+  // chosen as it resolves (rulings), in layer 7b (CR 613.4b). (The may is body.ts's, as above.)
+  if ((m = /^~'s base power and toughness becomes (\d+)\/(\d+) or (\d+)\/(\d+) until end of turn$/.exec(s)) && !ctx.spell && ctx.mayNow) {
+    const pt = (p: string, t: string): Effect[] => [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: Number(p), toughness: Number(t) }], duration: "endOfTurn" }];
+    return [{ type: "either", options: [pt(m[1]!, m[2]!), pt(m[3]!, m[4]!)], labels: [`${m[1]}/${m[2]}`, `${m[3]}/${m[4]}`] }];
+  }
   // Tanazir Quandrix: "the base power and toughness of other creatures you control become equal to ~'s power and toughness
   // until end of turn": its actual power and toughness as this resolves, locked in then (rulings, CR 608.2h), in layer 7b
   // (CR 613.4b), for the creatures there then (CR 611.2c).
@@ -1497,13 +1522,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what?.ref === "target" && !what.n ? parseChanges(m[2]!) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
-  // Cyclopean Giant: "target land becomes a Swamp"; Alchor's Tomb: "Target permanent you control becomes the color of your
+  // Cyclopean Giant: "target land becomes a Swamp"; Sealock Monster: "... becomes an Island in addition to its other types"
+  // (it keeps its other land types and abilities, CR 305.7); Alchor's Tomb: "Target permanent you control becomes the color of your
   // choice"; Prismatic Lace: "... the color or colors of your choice". With no duration, for as long as it stays on the
   // battlefield (CR 611.2a, 400.7): a land loses its other land types and the abilities from its rules text (CR 305.7), a
   // permanent's new colors replace its old ones (CR 105.3).
   // Dream Coat: "{0}: Enchanted creature becomes the color or colors of your choice": the creature it enchants as the
   // ability resolves (CR 611.2c), for as long as it's on the battlefield, attached or not (rulings: it doesn't wear off).
-  if ((m = /^((?:up to one )?[Tt]arget (?:land|permanent|creature)(?: you control)?|Enchanted creature) becomes (an? (?:Plains|Island|Swamp|Mountain|Forest)|the chosen (?:color|colors|basic land type))$/.exec(s))) {
+  if ((m = /^((?:up to one )?[Tt]arget (?:land|permanent|creature)(?: you control)?|Enchanted creature) becomes (an? (?:Plains|Island|Swamp|Mountain|Forest)(?: in addition to its other types)?|the chosen (?:color|colors|basic land type))$/.exec(s))) {
     const what = parseObject(m[1]!.replace(/^Enchanted/, "enchanted"), ctx);
     const mods = (what?.ref === "target" && !what.n) || (m[1] === "Enchanted creature" && !ctx.spell) ? parseBecomes(m[2]!) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

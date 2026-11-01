@@ -303,6 +303,13 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Equip ${equip[1] ? `${equip[1]} ` : ""}${equip[2]}` });
       continue;
     }
+    // Outlast is an activated ability (CR 702.107a): "Other Sliver creatures you control have outlast {2}" (Enduring
+    // Sliver), one more of its own on each of them.
+    const outlast = /^outlast ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(w);
+    if (outlast) {
+      out.push({ kind: "addAbility", text: `Outlast ${outlast[1]}` });
+      continue;
+    }
     // "Is a Vehicle artifact with crew 5" (Swift Reconfiguration): a crew ability of its own (CR 702.122a), on top of any
     // it has (rulings).
     const crew = /^crew (\d+)$/i.exec(w);

@@ -947,6 +947,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  // Rampaging Soulrager: "there are two or more unlocked doors among Rooms you control" (CR 709.5c).
+  if ((m = new RegExp(`^there are ${NUM} or more unlocked doors among Rooms you control$`).exec(text))) return { kind: "amount", amount: { count: { kind: "unlockedDoors" } }, min: num(m[1]!) };
   // Vampire Nocturnus: "the top card of your library is black"; Mul Daya Channelers: "... is a creature card".
   if ((m = /^the top card of your library is (white|blue|black|red|green)$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} card` } };
   if ((m = /^the top card of your library is an? (artifact|creature|enchantment|instant|land|planeswalker|sorcery) card$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", types: [capital(m[1]!)], text: `${m[1]} card` } };
@@ -1368,6 +1370,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
       return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
+  // Cleaving Reaper: "if you had an Angel or Berserker enter the battlefield under your control this turn": either one, any
+  // time this turn, whether or not you still control it (rulings).
+  if ((m = /^you had an? ([A-Z][a-z]+) or ([A-Z][a-z]+) enter the battlefield under your control this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature" && subtypeSet(m[2]!) === "Creature")
+    return { kind: "youEntered", types: [], subtype: m[1]!, orSubtype: m[2]!, n: 1 };
   // Zimone, All-Questioning: "if a land entered the battlefield under your control this turn and you control a prime number
   // of lands": both, the second counted as it triggers and again as it resolves (rulings: it won't resolve otherwise).
   if ((m = /^(an? land entered the battlefield under your control this turn) and (you control a prime number of lands)$/.exec(text))) {
@@ -1384,7 +1390,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
-  if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spell this turn$/.exec(text)))
+  // Sandstalker Moloch: "if an opponent cast a blue and/or black spell this turn", a spell of either color or both.
+  if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: (?:and\/)?or (white|blue|black|red|green))? spell this turn$/.exec(text)))
     return { kind: "opponentCast", colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])] };
   if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
@@ -1640,6 +1647,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   // Ray of Frost: "When this Aura enters, if enchanted creature is red": its colors now.
+  // Historian's Wisdom: "if enchanted permanent is a creature with the greatest power among creatures on the battlefield":
+  // tied counts too (as High Score), checked as it triggers and as it resolves (rulings, CR 603.4).
+  if (text === "enchanted permanent is a creature with the greatest power among creatures on the battlefield") {
+    const greatest = parseCount("the greatest power among creatures on the battlefield", null);
+    if (greatest?.count.kind !== "greatestPower") return null;
+    return { kind: "allOf", conds: [{ kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } }, { kind: "amount", amount: { count: { kind: "power", of: { ref: "attached" } }, plus: 1 }, moreThan: greatest }] };
+  }
   if ((m = /^enchanted creature is (white|blue|black|red|green)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} creature` } };
   // Synchronized Eviction: "if you control at least two creatures that share a creature type": two or more of yours with
   // one creature type in common. Littjara Kinseekers: "if you control three or more creatures that share a creature type".
@@ -2426,6 +2440,9 @@ function parseTransform(line: string): StaticAbility | null {
   for (const c of clauses) {
     let m: RegExpExecArray | null;
     if (/^loses all (?:other )?abilities$/.test(c)) mods.push({ kind: "loseAllAbilities" });
+    // Lithoform Blight: "Enchanted land loses all land types and abilities and has ...": no land types (layer 4, CR 305.7;
+    // its card types and supertypes stay), then no abilities but the ones it's given (layer 6).
+    else if (/^loses all land types and abilities$/.test(c) && head[1] === "Enchanted land") mods.push({ kind: "setLandTypes", subtypes: [] }, { kind: "loseAllAbilities" });
     else if (/^loses all other card types$/.test(c)) only = true;
     else if (/^loses all other (?:card types and abilities|abilities, card types, and creature types)$/.test(c)) {
       only = true;

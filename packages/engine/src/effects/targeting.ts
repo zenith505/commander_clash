@@ -380,6 +380,9 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
   const q = same ? (o.zone === "battlefield" ? characteristics(s, o) : defOf(s, o)) : lk && lk.zc === item.sourceZc && lk.source ? lk.source : d;
   if (!q) return false;
   if (from.colorless && q.colors.length) return false;
+  if (from.supertypes?.some((t) => !(q.supertypes ?? []).includes(t))) return false;
+  // Being a commander is the card's, in whatever zone it is (CR 903.3).
+  if (from.notCommander && o?.isCommander) return false;
   return !from.types?.length || from.types.some((t) => q.types.includes(t));
 }
 
@@ -843,6 +846,8 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
+  // "An ability ... from another legendary source" (The Peregrine Dynamo): not one of its own.
+  if (spec.abilityFrom?.another && t.kind === "stack" && sourceId !== undefined && s.stack.find((x) => x.id === t.id)?.sourceId === sourceId) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.damagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.damagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;

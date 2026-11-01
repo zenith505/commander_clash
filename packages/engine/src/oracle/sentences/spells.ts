@@ -600,10 +600,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).
   // Gogo, Master of Mimicry: "... you control X times", the X paid for the ability (CR 107.3a).
-  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source)?( X times)?$/i.exec(s))) {
+  // The Peregrine Dynamo: "... from another legendary source that's not a commander": a legendary permanent, spell or
+  // card in any zone (rulings), not the Dynamo itself, and not a commander (CR 903.3).
+  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source| from another legendary source that's not a commander)?( X times)?$/i.exec(s))) {
     if (m[4] && (!ctx.activated || m[2])) return null;
     const from = m[3]?.toLowerCase();
-    const abilityFrom = from === "colorless" ? { colorless: true as const } : from ? { types: [from[0]!.toUpperCase() + from.slice(1)] } : undefined;
+    const legendary = !!m[2] && !m[3];
+    if (legendary && !ctx.activated) return null;
+    const abilityFrom = legendary ? { supertypes: ["Legendary"], another: true as const, notCommander: true as const } : from === "colorless" ? { colorless: true as const } : from ? { types: [from[0]!.toUpperCase() + from.slice(1)] } : undefined;
     const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()} you control${m[2] ?? ""}` };
     return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: m[4] ? X : 1, newTargets: false }];
   }

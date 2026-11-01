@@ -6223,6 +6223,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3017ac79-37f1-4cc1-8efd-4add027618a2",
+  "name": "Ezio Auditore da Firenze",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Assassin",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin"
+  ],
+  "oracleText": "Menace\nAssassin spells you cast have freerunning {B}{B}. (You may cast a spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nWhenever Ezio deals combat damage to a player, you may pay {W}{U}{B}{R}{G} if that player has 10 or less life. When you do, that player loses the game.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "437b2dab-15e0-4b9a-a204-58622d37a3b3",
   "name": "Fact or Fiction",
   "manaCost": "{3}{U}",
@@ -8571,6 +8610,43 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5320f5a6-8066-47d4-aa0a-4c879f39d413",
+  "name": "Henzie \"Toolbox\" Torre",
+  "manaCost": "{B}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Devil Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Devil",
+   "Rogue"
+  ],
+  "oracleText": "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost. (You may choose to cast that spell for its blitz cost. If you do, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)\nBlitz costs you pay cost {1} less for each time you've cast your commander from the command zone this game.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14027,6 +14103,98 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f1b7488c-c675-42e9-818a-24a50347ec2c",
+  "name": "Peter Parker // Amazing Spider-Man",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Scientist Hero // Legendary Creature — Spider Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist",
+   "Hero"
+  ],
+  "oracleText": "When Peter Parker enters, create a 2/1 green Spider creature token with reach.\n{1}{G}{W}{U}: Transform Peter Parker. Activate only as a sorcery.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Reach",
+   "Vigilance",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Peter Parker",
+    "manaCost": "{1}{W}",
+    "typeLine": "Legendary Creature — Human Scientist Hero",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Scientist",
+     "Hero"
+    ],
+    "oracleText": "When Peter Parker enters, create a 2/1 green Spider creature token with reach.\n{1}{G}{W}{U}: Transform Peter Parker. Activate only as a sorcery.",
+    "power": "0",
+    "toughness": "1",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367"
+   },
+   {
+    "name": "Amazing Spider-Man",
+    "manaCost": "{1}{G}{W}{U}",
+    "typeLine": "Legendary Creature — Spider Human Hero",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Spider",
+     "Human",
+     "Hero"
+    ],
+    "oracleText": "Vigilance, reach\nEach legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}. (You may cast a spell for its web-slinging cost if you also return a tapped creature you control to its owner's hand.)",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "G",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/3/c/3ce33422-5dba-4a42-8375-dd8ccc692a7b.jpg?1783905367"
+   }
+  ]
+ },
+ {
   "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
   "name": "Phyrexian Altar",
   "manaCost": "{3}",
@@ -15700,6 +15868,37 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9ed6f28f-a3db-48c5-9ab0-b90a7fba5f57",
+  "name": "Royal Assassin",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Assassin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin"
+  ],
+  "oracleText": "{T}: Destroy target tapped creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

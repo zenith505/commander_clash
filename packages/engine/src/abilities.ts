@@ -939,7 +939,7 @@ export interface TargetSpec {
    * colorless source" (Abstruse Archaic): what the ability's source must be (CR 113.7, 113.7a). An ability with no
    * source, like the monarch's, never matches (rulings on Abstruse Archaic).
    */
-  abilityFrom?: { types?: string[]; colorless?: true };
+  abilityFrom?: { types?: string[]; colorless?: true; /** "From another legendary source that's not a commander" (The Peregrine Dynamo): a source with these supertypes, not the ability's own source, and not a commander (CR 903.3). */ supertypes?: string[]; another?: true; notCommander?: true };
   /**
    * For "spell" targets: a permanent matching this can be the target instead, "target spell or nonland permanent an
    * opponent controls" (Sink into Stupor, Venser, Shaper Savant). One target, either kind (CR 115.1, 115.2).
@@ -4746,7 +4746,7 @@ export interface TriggeredAbility {
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. */ revealed?: "land" | "nonland" };
   /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
   eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**
@@ -5610,7 +5610,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
 /** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl" | /** Kentaro, the Smiling Cat: {X} where X is the spell's mana value (CompiledCard.payZero `genericMv`). */ "genericMv";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | /** Freerunning a permanent gives a spell (Ezio Auditore da Firenze: "Assassin spells you cast have freerunning {B}{B}"): a cost of its own beside the spell's own freerunning (CR 702.173a). */ "grantedFreerunning" | /** Web-slinging a permanent gives a spell (Amazing Spider-Man: "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}"), CR 702.188a, beside any of the spell's own. */ "grantedWebSlinging" | /** Blitz a permanent gives a spell (Henzie "Toolbox" Torre: "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost"), CR 702.152a, beside any blitz of the spell's own. */ "grantedBlitz" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl" | /** Kentaro, the Smiling Cat: {X} where X is the spell's mana value (CompiledCard.payZero `genericMv`). */ "genericMv";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -5899,7 +5899,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
@@ -6451,6 +6451,14 @@ export interface CompiledCard {
   devotionBonus?: number;
   /** "Dinosaur spells you cast have prowl {2}{R}" (Hunting Velociraptor), CR 702.76a: that alternative cost, for those spells. */
   spellsHaveProwl?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Assassin spells you cast have freerunning {B}{B}" (Ezio Auditore da Firenze), CR 702.173a: that alternative cost, for those spells (AltCostKind "grantedFreerunning"). */
+  spellsHaveFreerunning?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}" (Amazing Spider-Man), CR 702.188a: that alternative cost, for those spells (AltCostKind "grantedWebSlinging"). */
+  spellsHaveWebSlinging?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost." (Henzie "Toolbox" Torre), CR 702.152a: blitz for those spells, its cost their mana cost (AltCostKind "grantedBlitz"). */
+  spellsHaveBlitz?: { filter: TargetSpec; text: string }[];
+  /** Henzie "Toolbox" Torre: "Blitz costs you pay cost {1} less for each time you've cast your commander from the command zone this game" (CR 601.2f): this much generic mana per such cast, off each blitz cost its controller pays. */
+  blitzLessPerCommanderCast?: number;
   /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
   handWarp?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian): miracle for those cards in its controller's hand (CR 702.94a), so drawing one as the first card drawn this turn triggers it. */

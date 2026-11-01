@@ -3302,6 +3302,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(auraAttached[1]!);
     return body && !body.targets.length ? { event: "auraAttachedToSelf", body } : "fail";
   }
+  // Siona, Captain of the Pyleas: "Whenever an Aura you control becomes attached to a creature you control, create ...".
+  const auraYours = /^Whenever an Aura you control becomes attached to a creature you control, (create [^"]+(?:"[^"]*")?[^"]*)$/.exec(line);
+  if (auraYours) {
+    const body = parseBody(auraYours[1]!);
+    return body && !body.targets.length ? { event: "auraAttachedToYours", body } : "fail";
+  }
   // "Whenever this Equipment becomes unattached from a permanent, sacrifice that permanent" (Grafted Wargear).
   const unattached = /^Whenever ~ becomes unattached from a permanent, (.+)$/.exec(line);
   if (unattached) {
@@ -3711,6 +3717,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (tappedFirst) {
     const t = parseTrigger(`Whenever ${tappedFirst[1]} becomes tapped, ${tappedFirst[2]}`);
     return t && t !== "fail" && t.event === "permanentBecomesTapped" && !t.activeIf && !t.ifCond ? { ...t, activeIf: { kind: "yourTurn" }, ifCond: { kind: "subjectFirstTapThisTurn" } } : "fail";
+  }
+  // Tale of Katara and Toph (granted): "Whenever this creature becomes tapped for the first time during each of your
+  // turns": only during its controller's turn, and only the first time it becomes tapped that turn (GameObject.tapsThisTurn);
+  // a trigger condition, not an intervening if (CR 603.2, 603.4).
+  const tappedFirstYours = /^Whenever ~ becomes tapped for the first time during each of your turns, (.+)$/.exec(line);
+  if (tappedFirstYours) {
+    const t = parseTrigger(`Whenever ~ becomes tapped, ${tappedFirstYours[1]}`);
+    return t && t !== "fail" && t.event === "selfBecomesTapped" && !t.activeIf && !t.firstEachTurn ? { ...t, activeIf: { kind: "yourTurn" }, firstEachTurn: true } : "fail";
   }
   // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
   // controller's turn, whether it triggers at all.

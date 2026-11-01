@@ -1,7 +1,7 @@
 # Roadmap
 
-28,661 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,198 of
+28,688 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,946 of 4,988 (99%), top 10,000: 9,213 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1329,6 +1329,27 @@ line blocks.
    Territorial Hellkite (an opponent at random it didn't attack last combat); Boreas Charger (an opponent who controls
    more lands, a search for the difference); Eivor, Wolf-Kissed ("a Saga card and/or a land card" from among the milled
    ones).
+   Round 227 (fresh cards from the top): "Other creatures you control are Assassins ... The same is true for creature
+   spells you control and creature cards you own that aren't on the battlefield" (Roshan, Hidden Magister); "becomes
+   tapped for the first time during each of your turns" (Tale of Katara and Toph); "you may pay an amount of {E} equal to
+   target nonland permanent's mana value. When you do, destroy that permanent" (Behemoth of Vault 0); "Whenever an Aura
+   you control becomes attached to a creature you control" (Siona, Captain of the Pyleas); "exile it. When you do, return
+   up to X target cards ..., where X is the number of opponents who have three or more poison counters" (Glissa's
+   Retriever); "It's a Skeleton in addition to its other types and has no abilities" (Xu-Ifit, Osteoharmonist); "Put a
+   deathtouch counter on either of them. Then put a menace counter on either of them" (Call of the Death-Dweller);
+   "choose two abilities from among first strike, vigilance, and lifelink" as it enters, and "have each of the chosen
+   abilities" (Greymond, Avacyn's Stalwart; e2e test); "The first time you flip one or more coins each turn, those coins
+   come up heads and you win those flips" (Edgar, King of Figaro); Mana Clash's repeated flips (with Krark's Thumb its
+   coins are flipped twice and a heads is kept without asking: a known gap); Kaito, Bane of Nightmares (a 3/4 Ninja
+   creature with hexproof during your turn while he has loyalty); "Add {U}, {R}, or {W}" (Narset of the Ancient Way);
+   "its starting loyalty is 1" on a token copy and "Remove a number of loyalty counters equal to that card's mana value"
+   (Jace, Mirror Mage); "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian: a card
+   with its own miracle triggers twice); "Lands you control and land cards you own that aren't on the battlefield are
+   Deserts" (Dune Chanter). +15 (28,688 of 31,936 with B64-B66).
+   Out after round 227 (looked at, not done): Sigarda, Host of Herons ("Spells and abilities your opponents control
+   can't cause you to sacrifice permanents": every effect sacrifice, edict, "may sacrifice" and "unless you sacrifice"
+   option would need to know who controls the source, while costs, mana abilities and the legend rule stay allowed,
+   rulings; about thirty sacrifice sites).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

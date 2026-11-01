@@ -1133,6 +1133,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // resolves (rulings: "You aren't limited to one color").
   // "+1: Add {R} or {G}" (Domri, Anarch of Bolas): one mana of either, chosen as it resolves.
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\}$/.exec(s)) && m[1] !== m[2]) return [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times: 1 }];
+  // Narset of the Ancient Way: "Add {U}, {R}, or {W}" (not a mana ability, CR 605.1a): one mana of one of those colors,
+  // chosen as it resolves.
+  if ((m = /^[Aa]dd \{([WUBRG])\}, \{([WUBRG])\}, or \{([WUBRG])\}$/.exec(s)) && new Set([m[1], m[2], m[3]]).size === 3)
+    return [{ type: "choose", choice: "color", options: [m[1]!, m[2]!, m[3]!].map((c) => ({ W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" })[c as "W"]) }, { type: "addMana", chosen: 1 }];
   // "Add three mana in any combination of {R} and/or {G}" (Orcish Lumberjack): each of either, chosen as it resolves.
   // "Add X mana in any combination of {B} and/or {R}, where X is the sacrificed creature's mana value" (Burnt Offering).
   if ((m = new RegExp(`^[Aa]dd ${NUMX} mana in any combination of \\{([WUBRG])\\} and/or \\{([WUBRG])\\}$`).exec(s)) && m[2] !== m[3])

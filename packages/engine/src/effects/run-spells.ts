@@ -260,7 +260,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // it is offered too, as finding nothing was (CR 701.23b).
       const sc = (s.resolving!.scratch ??= {});
       const id = s.resolving!.searchCast;
-      if (sc.playLinked || !id || s.objects[id]?.zone !== "library") return;
+      // Bring to Light: from exile, where the search put it (SearchDest.castFree); it stays there if it isn't cast (rulings).
+      if (sc.playLinked || !id || (s.objects[id]?.zone !== "library" && s.objects[id]?.zone !== "exile")) return;
       sc.playLinked = true;
       s.pending = { kind: "castFree", player: ctx.controller, objectId: id, source: src };
       if (freeCastable(s, ctx.controller, id)) return "paused";

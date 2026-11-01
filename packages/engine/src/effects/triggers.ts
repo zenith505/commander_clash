@@ -249,7 +249,7 @@ export type TriggerSourceEvent =
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number; /** Combat damage (a batch is all combat damage or none, CR 510.2). */ combat?: true }
   /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
-  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true }
+  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true; /** The source was a creature as it dealt the damage. */ creature?: true }
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
@@ -1748,6 +1748,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealtDamageBySource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
     // "Until your next turn, whenever a creature deals combat damage to ~, destroy that creature" (Vraska the Unseen): once
     // for each creature dealing it combat damage (only creatures deal combat damage, CR 510.1), that creature the subject.
+    // Liliana's Talent: "Whenever a creature deals damage to enchanted planeswalker": a creature as it dealt the damage,
+    // combat damage or not (rulings), that creature the subject.
+    const creature = ev.srcId && ev.creature ? s.objects[ev.srcId] : undefined;
+    if (o?.zone === "battlefield" && creature) addHosted(o, (e) => e === "creatureDealsDamageToAttached", undefined, creature, { amount: ev.amount, player: ev.by });
     const dealer = ev.combat && ev.srcId ? s.objects[ev.srcId] : undefined;
     if (o?.zone === "battlefield" && dealer) {
       add(o, controllerOf(s, o), (e) => e === "creatureDealsCombatDamageToSelf", undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });

@@ -499,7 +499,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return at.length === 1 ? { ref: "target", index: at[0]! } : null;
   }
   // "Enchanted creature", "equipped creature": what the source is attached to (not targeted).
-  if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
+  if (/^(enchanted|equipped) (creature|permanent|artifact|land|planeswalker)$/i.test(x) && !ctx.spell) {
     ctx.lastAttached = true;
     return { ref: "attached" };
   }

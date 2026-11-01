@@ -514,6 +514,33 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (ids.length) phaseOut(s, ids);
       return;
     }
+    case "removeTimeSuspended": {
+      // Amy Pond: one suspended card its controller owns (CR 702.62b), chosen as it resolves; that many time counters off
+      // it, or all it has. The last one removed triggers its suspend (rulings, CR 702.62a).
+      const you = ctx.controller;
+      const sc = (s.resolving!.scratch ??= {});
+      const options = player(s, you).exile.filter((id) => obj(s, id).owner === you && isSuspended(s, obj(s, id)));
+      if (!sc.timeTravel) {
+        if (!options.length) return;
+        sc.timeTravel = { ids: [], picks: {} };
+        delete sc.found;
+        s.pending = { kind: "searchLibrary", player: you, source: src, what: "a suspended card you own", cards: options, min: 1, max: 1, dig: { looked: options, to: `to remove ${amountNow(s, e.n, ctx)} time counters from`, rest: "keep their time counters" } };
+        return "paused";
+      }
+      sc.timeTravel = undefined;
+      const id = (sc.found ?? []).find((x) => options.includes(x));
+      if (!id) return;
+      const o = obj(s, id);
+      const n = Math.min(amountNow(s, e.n, ctx), removableCounters(s, o, "time"));
+      if (n <= 0) return;
+      const left = o.counters.time! - n;
+      if (left > 0) o.counters.time = left;
+      else delete o.counters.time;
+      invalidateCharacteristics(s);
+      log(s, `${player(s, you).name} removes ${n} time counter${n === 1 ? "" : "s"} from ${defOf(s, o).name} (${src}).`);
+      if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
+      return;
+    }
     case "timeTravel": {
       // CR 701.56a: "choose any number of permanents you control with one or more time counters on them and/or suspended
       // cards you own in exile with one or more time counters on them and, for each of those objects, put a time counter

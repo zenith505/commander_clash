@@ -777,6 +777,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.dies && !ev.wasCreature && !d.anyPermanent) continue;
       if (d.underControl && ev.controller !== d.controller) continue;
       if (d.ownedByController && o.owner !== d.controller) continue;
+      if (d.ifHadCounter && !((ev.counters[d.ifHadCounter] ?? 0) > 0)) continue;
       if (d.to?.includes(ev.to))
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }

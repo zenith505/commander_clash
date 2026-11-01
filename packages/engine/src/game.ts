@@ -4088,7 +4088,8 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
     // Evendo Brushrazer's: while its condition holds, paying as usual.
-    const plain = !!a.playLinkedWhile && staticConditionNow(s, a.playLinkedWhile, id, pid);
+    // Rona, Disciple of Gix: spells only, so not a land card.
+    const plain = !!a.playLinkedWhile && !(a.playLinkedCastOnly && isType(defOf(s, o), "Land")) && staticConditionNow(s, a.playLinkedWhile, id, pid);
     if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";

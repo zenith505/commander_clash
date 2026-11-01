@@ -2279,6 +2279,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.playLinkedWhile = { kind: "allOf", conds: [] };
       continue;
     }
+    // Rona, Disciple of Gix: "You may cast spells from among cards exiled with ~": the same, spells only (not lands).
+    if (line === "You may cast spells from among cards exiled with ~.") {
+      if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedCastOnly = true);
+      continue;
+    }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
       if (out.playLinked) out.unsupported.push(raw);
       else out.playLinked = true;
@@ -5412,7 +5418,16 @@ function linkExile(out: CompiledCard) {
   }
   // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
   // (CR 607.2a); Nightveil Specter's "that player exiles the top card of their library" likewise.
-  if (out.playLinkedWhile) {
+  if (out.playLinkedWhile && out.playLinkedCastOnly) {
+    // Rona, Disciple of Gix: its "exile target historic card from your graveyard" as it enters and its "exile the top card
+    // of your library" both (CR 607.2a: each ability printed on it that exiles cards; rulings).
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "you" && !e.putAll);
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong");
+    if (others || out.spell || tops.length + exiles.length === 0) out.unsupported.push("(casts cards exiled with it that it can't link to its exile abilities)");
+    else for (const e of [...tops, ...exiles]) e.linked = true;
+  } else if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     // Nightveil Specter: "that player exiles the top card of their library", the damaged player's card, linked the same.
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && (e.who.ref === "you" || e.who.ref === "eventPlayer") && !e.putAll);
@@ -5483,10 +5498,22 @@ function linkExile(out: CompiledCard) {
     // Ashiok, Nightmare Weaver: "a creature card ... exiled with ~" is any card exiled by its "exile the top three cards" and
     // its "exile all cards from all opponents' hands and graveyards" abilities (CR 607.2a, rulings), all linked to it.
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    // Yggdrasil, Rebirth Engine: its "exile all creature cards from your graveyard" as it enters and its "exile the top three
+    // cards of your library" both (CR 607.2a: each ability printed on it that exiles cards).
+    const permanentTops = !others && tops.length && !out.spell && !searches.length && exiles.every((e) => !e.until) && !all.some((e) => e.type === "impulse" || e.type === "castFromAmong" || (e.type === "chooseFromGraveyard" && e.dest === "exile") || e.type === "exileHand");
     if (!others && tops.length && out.activated.every((a) => a.loyalty !== undefined || a.loyaltyX) && !out.triggers.length && !out.spell) for (const e of [...exiles, ...tops]) e.linked = true;
+    else if (permanentTops) for (const e of [...exiles, ...tops]) e.linked = true;
     else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
     else if (!others && exiles.length === 1) exiles[0]!.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
+  }
+  // Clone Shell, Summoner's Egg: "turn the exiled card face up" is about the one card its imprint exiled face down as it
+  // entered (CR 607.2a), its only exile instruction.
+  if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked" && e.turnFaceUp))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const faceDown = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "exileFaceDown" && (e.from === "handCard" || (e.pickOne && !e.who)));
+    const exiles = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (out.spell || faceDown.length !== 1 || exiles.length !== 1) out.unsupported.push("(turns face up an exiled card it can't link to one imprint ability)");
   }
   // Ethereal Forager: with delve and no exile instruction of its own, "cards exiled with ~" are those its delve exiled as
   // it was cast (rulings; linked to the permanent it becomes, CR 607.2q).

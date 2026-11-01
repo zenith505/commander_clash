@@ -1,7 +1,7 @@
 # Roadmap
 
-28,858 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,290 of
+28,885 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,291 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4130,6 +4130,38 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   dealing the damage), "a basic, Sphere, or Locus land card" and "Activate only if there are nine or more lands with
   different names among the basic, Sphere, and Locus lands you control" (Monument to Perfection). +13 (28,871 of 31,936
   with rounds 230 to 236).
+- Round B72 (from EDHREC rank about 24,300 up to 13,300; every card left unread in that range that a "cards exiled
+  with ~" or "while it has a counter" template could cover): cards exiled with ~ (CR 607.2a): "Put a creature card
+  exiled with ~ onto the battlefield under your control. It gains haste until end of turn" (Yggdrasil, Rebirth Engine:
+  the cards both its exile abilities exiled), "Choose a card at random that was exiled with ~. Put that card into its
+  owner's hand" (Skyship Weatherlight), "Return up to X cards from among cards exiled with ~ to their owners' hands,
+  where X is the result" (Bag of Devouring: the die roll, picked as it resolves), "Cast any number of cards exiled with ~
+  without paying their mana costs" (Izzet Chemister), imprint "look at the top four cards of your library, exile one
+  face down, then put the rest on the bottom of your library in any order" (Clone Shell; browser test) and "turn the
+  exiled card face up. If it's a creature card, put it onto the battlefield" (Clone Shell, Summoner's Egg: otherwise it
+  stays exiled face up, rulings), "You may cast spells from among cards exiled with ~" (Rona, Disciple of Gix: spells
+  only, so not a land; not once Rona has left, rulings), "return all cards you own exiled with ~ to your hand" (Bottled
+  Cloister, as errata'd), "Put a card exiled with this Saga into its owner's hand" (Roads Go Ever, Ever On); counters:
+  "If you do, that creature has base power and toughness 3/1 and has flying for as long as it has a feather counter on
+  it" (Aven Mimeomancer, CR 611.2b), "For as long as that land has a blaze counter on it, it has ..." (Obsidian
+  Fireheart), "When that creature dies, if it has an egg counter on it, draw a card and create ..." (Xira, the Golden
+  Sting: a delayed trigger that outlives Xira, checked with the counters it died with, CR 603.4, 603.10a), rejection
+  counters and "for each opponent, choose up to one target creature they control with a rejection counter on it. That
+  creature's owner puts it on their choice of the top or bottom of their library" (Tolarian Contempt); "choose a
+  suspended card you own and remove that many time counters from it" (Amy Pond: picked as it resolves, the last counter
+  casts it, CR 702.62; browser test). Engine fix: a "top or bottom of their library" effect with several targets
+  looped forever (it moved the cards already put there again). +14 (28,885 of 31,936 with rounds 230 to 236).
+- Out after round B72 (looked at, not done): Ghost Ark (unearth until end of turn: Lane A's round 233 added escape until
+  end of turn, now in main, to build on), Kheru Mind-Eater (whoever controls it may look at and play the face-down card),
+  Lodestone Bauble (up to four basic land cards from one player's graveyard, the player chosen even with no target),
+  Gather Specimens (creatures entering under an opponent's control this turn, against other replacement effects),
+  Varchild's War-Riders (cumulative upkeep tokens each for a different opponent), Shaun & Rebecca, Agents (a reflexive
+  trigger inside a mana ability), Timecrafting (a permanent with time counters or a suspended card as one target),
+  Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (destroy the
+  creature when ~ leaves the battlefield or becomes untapped), Fortune's Favor (an opponent splits the cards into two
+  piles, face down), Templar Knight (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
+  linked yet; "choose a card exiled with ~, you may play it this turn"), Purgatory (pay {4} and 2 life at upkeep to
+  return a card exiled with it, the exile from a "put into your graveyard" trigger not linked yet).
 - Out after round B71 (looked at, not done): Say Its Name ("Exile this card and two other cards named ~ from your
   graveyard" as a cost), Valleymaker ("Choose a player. That player adds {G}{G}{G}" is a mana ability with a sacrifice
   cost, which would use the stack here, see the mana abilities gap below), Sewers of Estark ("If it's blocking, prevent
@@ -4166,13 +4198,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
-  Succession, The Rack, Infernal Tutor, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
-  Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
+  Succession, Drain Power, Volcano Hellion, Drain Life, Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
-  Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,
-  Curse of Inertia, Dreamshaper Shaman, Triarch Stalker, Fishing Pole, Infernal Vessel, Regna's Sanction, Kathril,
-  Jump Scare, Feral Encounter, Gimli; then on up from 13,200.
+  Eriette, Manifold Insights, Fortune's Favor, Curse of Inertia, Dreamshaper Shaman, Fishing Pole, Regna's Sanction,
+  Kathril, Feral Encounter; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

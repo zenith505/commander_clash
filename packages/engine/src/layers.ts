@@ -84,6 +84,9 @@ export interface PTPart {
   untilEndOfTurn: boolean;
 }
 
+/** Characteristics.sparedBy: protection from "This effect doesn't remove Auras" (Spectra Ward), sparing every Aura. */
+export const SPARES_AURAS = "*auras" as const;
+
 export interface Characteristics {
   name: string;
   supertypes: string[];
@@ -99,7 +102,7 @@ export interface Characteristics {
    * Keywords (lowercase) it has only from one effect that "doesn't remove" that effect's source (Cho-Manno's Blessing):
    * that protection doesn't make the source fall off (CR 702.16c), protection from anywhere else does.
    */
-  sparedBy?: Record<string, ObjectId>;
+  sparedBy?: Record<string, ObjectId | typeof SPARES_AURAS>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
   /** "Lose ... ward" (Shay Cormac): its ward abilities, printed or gained before, don't trigger; one gained later does (CR 613.7). */
@@ -1472,8 +1475,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
-          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = e.sourceId;
-        } else if (c.sparedBy?.[key] !== undefined && !(m.spares && c.sparedBy[key] === e.sourceId)) delete c.sparedBy[key]; // it has it from elsewhere too
+          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = m.spares === "auras" ? SPARES_AURAS : e.sourceId;
+        } else if (c.sparedBy?.[key] !== undefined) {
+          // It has it from elsewhere too: an Aura is spared only if every effect giving it spares that Aura (White Ward
+          // and Spectra Ward: White Ward stays, Spectra Ward goes, rulings).
+          const was = c.sparedBy[key]!;
+          const now = m.spares && e.sourceId ? (m.spares === "auras" ? SPARES_AURAS : e.sourceId) : undefined;
+          const both = now === undefined ? undefined : was === now || now === SPARES_AURAS ? was : was === SPARES_AURAS ? now : undefined;
+          if (both === undefined) delete c.sparedBy[key];
+          else c.sparedBy[key] = both;
+        }
       }
       return;
     case "removeKeywords":

@@ -1516,7 +1516,7 @@ export type Modification =
    * creature card in your graveyard has flying. The same is true for ..." (Bleeding Effect): those a creature card in
    * its controller's graveyard has as it resolves.
    */
-  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true | "graveyard" }
+  | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. */ spares?: true | "auras"; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**

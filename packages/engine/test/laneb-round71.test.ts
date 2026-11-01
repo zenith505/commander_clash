@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { abilityProblem, botActions, castProblem, power, runStateBasedActions, toughness, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -22,6 +22,19 @@ const settle = (s: GameState, opts: { may?: boolean; me?: PlayerId } = {}) => {
     else s = act(s, { type: "passPriority", player: waitingOn(s)! });
   }
   return s;
+};
+/** Plays on (no attacks or blocks, the bots answering other questions) until `stop`. */
+const goUntil = (s: GameState, stop: (s: GameState) => boolean) => {
+  for (let i = 0; i < 3000; i++) {
+    if (stop(s)) return s;
+    const p = s.pending;
+    const pid = waitingOn(s)!;
+    if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: pid, attacks: [] });
+    else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: pid, blocks: [] });
+    else if (p) for (const a of botActions(s, p.player)) s = act(s, a);
+    else s = act(s, { type: "passPriority", player: pid });
+  }
+  throw new Error("never got there");
 };
 const tgt = (id: string): TargetChoice => ({ kind: "object", id });
 const ply = (id: PlayerId): TargetChoice => ({ kind: "player", id });
@@ -71,6 +84,13 @@ const forager = (): CardDef => ({"oracleId":"cef9e0d3-5e28-4c5f-88fc-0d78af5a4db
 const grizzly = (): CardDef => ({"oracleId":"14c8f55d-d177-4c25-a931-ebeb9e6062a0","name":"Grizzly Bears","manaCost":"{1}{G}","cmc":2,"typeLine":"Creature — Bear","supertypes":[],"types":["Creature"],"subtypes":["Bear"],"oracleText":"","power":"2","toughness":"2","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","artUrl":"https://cards.scryfall.io/art_crop/front/2/4/24a5e5fb-d1d4-4f09-9593-f2b25d0dcabf.jpg?1787745798","commanderLegal":"legal","set":"slz","releasedAt":"2026-09-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const cleric = (): CardDef => ({"oracleId":"84a2a592-0e31-434f-b3b4-f2013d86f29d","name":"Cleric of the Forward Order","manaCost":"{1}{W}","cmc":2,"typeLine":"Creature — Human Cleric","supertypes":[],"types":["Creature"],"subtypes":["Human","Cleric"],"oracleText":"When this creature enters, you gain 2 life for each creature you control named Cleric of the Forward Order.","power":"2","toughness":"2","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/f/cfcea783-e9f0-4d44-ac74-5aee9a07aa69.jpg?1783938363","artUrl":"https://cards.scryfall.io/art_crop/front/c/f/cfcea783-e9f0-4d44-ac74-5aee9a07aa69.jpg?1783938363","commanderLegal":"legal","set":"ori","releasedAt":"2015-07-17","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const stomping = (): CardDef => ({"oracleId":"16052b52-ade1-406f-a06b-ce7ea607fb63","name":"Stomping Ground","manaCost":"","cmc":0,"typeLine":"Land — Mountain Forest","supertypes":[],"types":["Land"],"subtypes":["Mountain","Forest"],"oracleText":"({T}: Add {R} or {G}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.","colors":[],"colorIdentity":["G","R"],"keywords":[],"producedMana":["G","R"],"imageUrl":"https://cards.scryfall.io/normal/front/1/e/1ee8255a-44f6-4faa-9843-15432bf751ea.jpg?1784065855","artUrl":"https://cards.scryfall.io/art_crop/front/1/e/1ee8255a-44f6-4faa-9843-15432bf751ea.jpg?1784065855","commanderLegal":"legal","set":"trk","releasedAt":"2026-11-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const tattoo = (): CardDef => ({"oracleId":"ddb44519-1345-4990-a8a5-30e91d274a35","name":"Tattoo Ward","manaCost":"{2}{W}","cmc":3,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature gets +1/+1 and has protection from enchantments. This effect doesn't remove this Aura.\nSacrifice this Aura: Destroy target enchantment.","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/8/9/89920480-9b39-47dd-988a-c040067da7fb.jpg?1783945269","artUrl":"https://cards.scryfall.io/art_crop/front/8/9/89920480-9b39-47dd-988a-c040067da7fb.jpg?1783945269","commanderLegal":"legal","set":"ody","releasedAt":"2001-10-01","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const spectra = (): CardDef => ({"oracleId":"effb99e6-db1b-4ada-879d-431d9d13d4b7","name":"Spectra Ward","manaCost":"{3}{W}{W}","cmc":5,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature gets +2/+2 and has protection from each color. This effect doesn't remove Auras. (It can't be blocked, targeted, or dealt damage by anything that's white, blue, black, red, or green.)","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/6/9/69c1b7a2-a4ff-485c-9fe5-04c88e5e8886.jpg?1783939198","artUrl":"https://cards.scryfall.io/art_crop/front/6/9/69c1b7a2-a4ff-485c-9fe5-04c88e5e8886.jpg?1783939198","commanderLegal":"legal","set":"m15","releasedAt":"2014-07-18","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const whiteWard = (): CardDef => ({"oracleId":"860468b3-625a-4663-a5ae-336ae10fc7d0","name":"White Ward","manaCost":"{W}","cmc":1,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature has protection from white. This effect doesn't remove this Aura.","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/4/9/49b22665-1501-420a-82ad-f71f6768bcf8.jpg?1783948709","artUrl":"https://cards.scryfall.io/art_crop/front/4/9/49b22665-1501-420a-82ad-f71f6768bcf8.jpg?1783948709","commanderLegal":"legal","set":"lea","releasedAt":"1993-08-05","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const holy = (): CardDef => ({"oracleId":"9357de36-f8be-4f49-b2c8-9fe9eaf82b07","name":"Holy Strength","manaCost":"{W}","cmc":1,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature gets +1/+2.","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/e/2/e21264cb-d915-4431-92fd-b0aa32a715fc.jpg?1783943078","artUrl":"https://cards.scryfall.io/art_crop/front/e/2/e21264cb-d915-4431-92fd-b0aa32a715fc.jpg?1783943078","commanderLegal":"legal","set":"10e","releasedAt":"2007-07-13","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const pacifism = (): CardDef => ({"oracleId":"5f5e0b10-c8cf-450c-bfd3-bcb0528ec330","name":"Pacifism","manaCost":"{1}{W}","cmc":2,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature can't attack or block.","colors":["W"],"colorIdentity":["W"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/4/3/433eed50-81af-4a59-b624-57b6f5f1bb0f.jpg?1783903091","artUrl":"https://cards.scryfall.io/art_crop/front/4/3/433eed50-81af-4a59-b624-57b6f5f1bb0f.jpg?1783903091","commanderLegal":"legal","set":"msc","releasedAt":"2026-06-26","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const unholy = (): CardDef => ({"oracleId":"090d88a9-7f2d-4bd1-a30a-7c48d05068be","name":"Unholy Strength","manaCost":"{B}","cmc":1,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature\nEnchanted creature gets +2/+1.","colors":["B"],"colorIdentity":["B"],"keywords":["Enchant"],"imageUrl":"https://cards.scryfall.io/normal/front/8/a/8adc48d8-7ff9-46d4-921a-03e63ca41a66.jpg?1783943025","artUrl":"https://cards.scryfall.io/art_crop/front/8/a/8adc48d8-7ff9-46d4-921a-03e63ca41a66.jpg?1783943025","commanderLegal":"legal","set":"10e","releasedAt":"2007-07-13","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const bottle = (): CardDef => ({"oracleId":"8f167e2f-7b89-4ae2-8332-7c978f71522e","name":"Ventifact Bottle","manaCost":"{3}","cmc":3,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{X}{1}, {T}: Put X charge counters on this artifact. Activate only as a sorcery.\nAt the beginning of your first main phase, if this artifact has a charge counter on it, tap it and remove all charge counters from it. Add {C} for each charge counter removed this way.","colors":[],"colorIdentity":[],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/5/2/520f4a24-fb1a-4964-887c-2f08a752fae2.jpg?1783947035","artUrl":"https://cards.scryfall.io/art_crop/front/5/2/520f4a24-fb1a-4964-887c-2f08a752fae2.jpg?1783947035","commanderLegal":"legal","set":"mir","releasedAt":"1996-10-08","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 describe("Lane B round 71", () => {
   it("Dark Supplicant: graveyard and hand only, no shuffle; or the library too (CR 701.23, rulings)", () => {
@@ -239,5 +259,56 @@ describe("Lane B round 71", () => {
     expect(s.pending).toMatchObject({ kind: "arrangeTop", player: ap, owner: opp });
     s = settle(act(s, { type: "arrangeTop", player: ap, top: [b!, a!], away: [] }));
     expect(s.players[opp]!.library.slice(0, 2)).toEqual([b, a]);
+  });
+
+  it("Tattoo Ward: +1/+1 and protection from enchantments that doesn't remove it; another Aura falls off (CR 702.16c)", () => {
+    const { s: s0, ap } = setup([]);
+    supported(tattoo());
+    const b = putOnBattlefield(s0, ap, grizzly());
+    const h = putOnBattlefield(s0, ap, holy());
+    s0.objects[h]!.attachedTo = b;
+    const w = putOnBattlefield(s0, ap, tattoo());
+    s0.objects[w]!.attachedTo = b;
+    invalidateCharacteristics(s0);
+    runStateBasedActions(s0);
+    expect(zone(s0, w)).toBe("battlefield");
+    expect(zone(s0, h)).toBe("graveyard");
+    expect(`${power(s0, s0.objects[b]!)}/${toughness(s0, s0.objects[b]!)}`).toBe("3/3");
+  });
+
+  it("Spectra Ward: protection from each color doesn't remove any Aura, but White Ward's protection from white removes Spectra Ward (rulings)", () => {
+    const { s: s0, ap, ids } = setup([pacifism()]);
+    supported(spectra());
+    const b = putOnBattlefield(s0, ap, grizzly());
+    const u = putOnBattlefield(s0, ap, unholy());
+    s0.objects[u]!.attachedTo = b;
+    const w = putOnBattlefield(s0, ap, spectra());
+    s0.objects[w]!.attachedTo = b;
+    invalidateCharacteristics(s0);
+    runStateBasedActions(s0);
+    expect([zone(s0, w), zone(s0, u)]).toEqual(["battlefield", "battlefield"]);
+    expect(`${power(s0, s0.objects[b]!)}/${toughness(s0, s0.objects[b]!)}`).toBe("6/5");
+    // A colored Aura spell can't target it.
+    expect(castProblem(s0, ap, ids[0]!, [tgt(b)])).not.toBeNull();
+    const ww = putOnBattlefield(s0, ap, whiteWard());
+    s0.objects[ww]!.attachedTo = b;
+    invalidateCharacteristics(s0);
+    runStateBasedActions(s0);
+    expect([zone(s0, w), zone(s0, ww), zone(s0, u)]).toEqual(["graveyard", "battlefield", "battlefield"]);
+  });
+
+  it("Ventifact Bottle: X charge counters, then at the beginning of the next first main phase it taps and adds {C} for each", () => {
+    const { s: s0, ap } = setup([]);
+    supported(bottle());
+    const b = putOnBattlefield(s0, ap, bottle());
+    poolOnly(s0, ap, { C: 3 });
+    let s = settle(run(s0, planActivate(s0, ap, b, 0, [], undefined, undefined, 2)));
+    expect(s.objects[b]!.counters.charge).toBe(2);
+    expect(s.objects[b]!.tapped).toBe(true);
+    const turn = s.turn;
+    s = goUntil(s, (st) => st.turn > turn && st.activePlayer === ap && st.step === "main1" && !st.stack.length && !st.pending && st.players[ap]!.manaPool.C > 0);
+    expect(s.players[ap]!.manaPool.C).toBe(2);
+    expect(s.objects[b]!.counters.charge ?? 0).toBe(0);
+    expect(s.objects[b]!.tapped).toBe(true);
   });
 });

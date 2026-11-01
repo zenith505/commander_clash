@@ -983,6 +983,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     .replace(/\b([Ss]acrifice ~ and it deals damage equal to the number of \+1\/\+1 counters on) it\b/g, "$1 ~")
     // Yawgmoth Demon: "tap ~ and it deals 2 damage to you": the same.
     .replace(/\b([Tt]ap ~ and) it (deals \d+ damage to you)\b/g, "$1 ~ $2")
+    // Ventifact Bottle: "tap it and remove all charge counters from it. Add {C} for each charge counter removed this
+    // way": two instructions about ~.
+    .replace(/\b([Tt]ap ~) and remove all ((?:[+-]1\/[+-]1|[a-z]+) counters) from it\./g, "$1. Remove all $2 from ~.")
     // Touch of the Eternal: "count the number of permanents you control. Your life total becomes that number.": the number
     // counted as it resolves (CR 119.5).
     .replace(/^count the number of permanents you control\. Your life total becomes that number\.$/, "Your life total becomes the number of permanents you control.");
@@ -2749,6 +2752,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|: |\. )[Pp]ut (an? [+-]\d\/[+-]\d counter) on ~, then it deals /, "$1Put $2 on ~. ~ deals ");
   // Trygon Prime: "Whenever ~ attacks, put a +1/+1 counter on it and a +1/+1 counter on up to one other target attacking
   // creature": "it" is ~ there.
+  // Ventifact Bottle: "At the beginning of your first main phase, if ~ has a charge counter on it, tap it and remove all
+  // charge counters from it": with nothing else "it" could be at the start, ~.
+  if (opts.selfIt || (!opts.subjectIt && !opts.subject && !opts.sacrificedIt && !opts.selfCard)) text = text.replace(/^([Tt]ap) it and remove all ((?:[+-]1\/[+-]1|[a-z]+) counters) from it\./, "$1 ~. Remove all $2 from ~.");
   if (opts.selfIt) text = text.replace(/^[Pp]ut (an? [+-]\d\/[+-]\d counter) on it and (an? [+-]\d\/[+-]\d counter) on ((?:up to one )?(?:other )?target [^.]+)\./, "Put $1 on ~. Put $2 on $3.");
   // Oblivion's Hunger: "Draw a card if that creature has a +1/+1 counter on it": the condition first, the same instruction.
   text = text.replace(/(^|\. )Draw a card if that creature has (an? [^.,]+ counter on it)\./, "$1If that creature has $2, draw a card.");

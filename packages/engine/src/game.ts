@@ -20,7 +20,7 @@ import { countersBanned, countersStay, putCounters, putPlayerCounters, removable
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, SPARES_AURAS, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -10677,7 +10677,7 @@ function attachmentSBAs(s: GameState): boolean {
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
-      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
+      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id && hc.sparedBy?.[k.toLowerCase()] !== SPARES_AURAS) : [];
       const legal =
         !!host &&
         host.zone === "battlefield" &&

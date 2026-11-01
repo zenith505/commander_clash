@@ -1,7 +1,7 @@
 # Roadmap
 
-28,787 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,246 of
+28,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,950 of 4,988 (99%), top 10,000: 9,252 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1437,6 +1437,26 @@ line blocks.
    "creature cards exiled with this creature"); Dawnbreak Reclaimer (an opponent chooses a card in your graveyard);
    Cryptic Gateway, Mogg Assassin, Karplusan Minotaur, The Phasing of Zhalfir, Mirror of Life Trapping, Grasping Shadows
    ("transform it" is the enchantment, not the attacker).
+   Round 233 (top of the list, now done): "you may pay one or more {E}. If you do, create an X/X ... Vehicle token"
+   (Pia Nalaar, Chief Mechanic); "If a Hero enters this way, it enters with an additional +1/+1 counter" (Winter Soldier,
+   Reborn Avenger); "you draw a card and that player may draw a card. If they do, that player can't attack you ...
+   during their next turn" (Willie Lumpkin, Postman: only the players who drew); "you may exile the top card ... If that
+   card is a Hero card, you may play it this turn" (Daredevil, Man Without Fear, from the B68 list); "If it's a green
+   card, add one mana of any color" (Tamiyo, Seasoned Scholar); a look's "exile a card from among them. If you do, it
+   becomes plotted" (Make Your Own Luck, CR 702.170); "cast this card from your graveyard by paying {B}{B} and sacrificing
+   two creatures" (Scourge of Nel Toth); "each creature card in your graveyard gains escape" until end of turn (The Grim
+   Captain's Locker, CR 702.138; offered only while no permanent already grants escape); madness for Vampire cards you
+   own (Falkenrath Gorger, CR 702.35); "Whenever a creature you control dealt damage this way dies this turn, add {R}"
+   (Reckless Blaze); "then transform an Incubator token you control" (Sunder the Gateway; picker and browser test);
+   "During any turn you attacked with a commander, you may play those cards" (Neriv, Crackling Vanguard); "It becomes
+   foretold. Its foretell cost is its mana cost reduced by {2}" (Ethereal Valkyrie, CR 702.143; hand picker and browser
+   test; a card with its own foretell uses the cheaper cost). Pick prompts now show the effect's own prompt text. +13
+   (28,812 of 31,936 with B67 to B70).
+   Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
+   trigger); Sorceress's Schemes (target a card in exile that has flashback); Cursecloth Wrappings (embalm granted to a
+   graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage
+   Brawler; Augusta, Order Returned; Avatar Destiny; Vault 101: Birthday Party; The First Tyrannic War; Kitt Kanto;
+   Daretti, Ingenious Iconoclast (its −6); Expedited Inheritance; Monstrous Emergence; Nyssa of Traken.
    Out after round 231 (looked at, not done): Ecstatic Beauty ("put four time counters on each of those cards that
    has suspend": counters on the impulsed cards that already have suspend, without granting it); Knowledge Vault
    ("{0}: Sacrifice ~. If you do, discard your hand, then ..." and its leaves trigger putting the cards into the
@@ -4038,8 +4058,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attack rulings), Insatiable Frugivore (a repeat loop), Galloping Lizrog (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment ("up to one Equipment"
-  chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard), Daredevil, Man
-  Without Fear ("you may exile ... if it's a Hero").
+  chosen as it resolves), Chandra, Chill of Compliance (which cards surveil put into the graveyard).
 - Out after round B67 (looked at, not done): Words of War, Words of Waste and Words of Wind (a target or choices in the
   middle of a draw), Hedonist's Trove (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and

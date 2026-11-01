@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { attackingPermanentOf, castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, castProblem, freeCastable, draw, grantedMadness, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
@@ -1626,6 +1626,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             moveObject(s, id, "exile");
             const o = obj(s, id);
             if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : {}) };
+            // "If you do, it becomes plotted" (CR 702.170c): its owner may cast it without paying its mana cost on a later
+            // turn (702.170d).
+            if (e.plot && o.zone === "exile") {
+              o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
+              log(s, `${defOf(s, o).name} becomes plotted. ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
+              fireEvent(s, { type: "plotted", id });
+            }
           } else if (faceDown) {
             // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
             moveObject(s, id, "battlefield", { controller: p.id, faceDown });
@@ -1720,7 +1727,9 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       moveObject(s, id, "battlefield", { controller: pid, ...(c.discardedToBattlefieldCounters ? { counters: { "+1/+1": c.discardedToBattlefieldCounters } } : {}) });
       continue;
     }
-    const madness = c.madness;
+    // Falkenrath Gorger: madness a permanent its owner controls gives it, as it's discarded.
+    const given = c.madness ? undefined : grantedMadness(s, o);
+    const madness = c.madness ?? given;
     if (!madness) {
       moveObject(s, id, "graveyard");
       if (o.zone === "graveyard") o.discardedTurn = s.turn; // mayhem (CR 702.187b)
@@ -1736,7 +1745,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       controller: o.owner,
       index: -1,
       subject: { id, zc: o.zoneChanges ?? 0 },
-      body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
+      body: { targets: [], effects: [{ type: "madness", ...(given ? { cost: given } : {}) }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
     });
   }
   const tops = toTop.filter((id) => ids.includes(id));

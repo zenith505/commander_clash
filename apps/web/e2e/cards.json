@@ -5888,6 +5888,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f0f7c3df-52f8-4835-a18f-69e56ffa3432",
+  "name": "Ethereal Valkyrie",
+  "manaCost": "{4}{W}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Spirit Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Angel"
+  ],
+  "oracleText": "Flying\nWhenever this creature enters or attacks, draw a card, then exile a card from your hand face down. It becomes foretold. Its foretell cost is its mana cost reduced by {2}. (On a later turn, you may cast it for its foretell cost, even if this creature has left the battlefield.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "khc",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "65c32889-3d70-449f-af76-05385c78c5a9",
   "name": "Evercoat Ursine",
   "manaCost": "{4}{G}",
@@ -18737,6 +18772,35 @@
   "set": "blc",
   "releasedAt": "2024-08-02",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "88d49309-e7d7-486d-8696-cd66bec2fe33",
+  "name": "Sunder the Gateway",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Destroy target nontoken artifact or enchantment an opponent controls. Incubate 2. (Create an Incubator token with two +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)\n• Incubate 2, then transform an Incubator token you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Incubate",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

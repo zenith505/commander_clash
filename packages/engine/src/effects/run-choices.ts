@@ -667,6 +667,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
+            : e.cond.kind === "subjectWasToken"
+            ? !!ctx.lki?.token
+            : e.cond.kind === "revealedSharesCardTypeWithSubject"
+            ? ((rv) => {
+                const card = rv && s.objects[rv.id];
+                if (!card || (card.zoneChanges ?? 0) !== rv.zc) return false;
+                const sub = objects(s, { ref: "subject" }, ctx)[0];
+                const types = sub?.zone === "battlefield" ? characteristics(s, sub).types : (ctx.lki?.types ?? []);
+                return defOf(s, card).types.some((t) => types.includes(t));
+              })(s.resolving!.revealed)
             : e.cond.kind === "targetExiled"
             ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === "exile" && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
             : e.cond.kind === "revealedMv"
@@ -730,7 +740,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "subjectCardIs"
             ? objects(s, { ref: "subjectCard" }, ctx).some((o) => printedMatches(e.cond.kind === "subjectCardIs" ? e.cond.filter : ({} as TargetSpec), defOf(s, o)))
             : e.cond.kind === "targetCardWas"
-            ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
+            ? Array.from({ length: e.cond.n ?? 1 }, (_, k) => (e.cond as { index: number }).index + k).some((i) => targetCardWas(s, ctx, i, (e.cond as { filter: TargetSpec }).filter))
             : e.cond.kind === "unlessPaid"
             ? !!s.resolving!.unlessPaid
             : e.cond.kind === "spellCountered"

@@ -886,6 +886,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
           least = Math.min(least ?? n, n);
         }
       }
+      // Those of the event's group that have left the battlefield count as they last existed (Witch-king's rulings).
+      if (c.total && c.inEventGroup)
+        for (const g of ctx.event?.group ?? []) {
+          const o = s.objects[g.id];
+          const lk = s.lastKnown?.[g.id];
+          if (o && (o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== g.zc) && lk?.zc === g.zc) best += (c.toughness ? lk.toughness : lk.power) ?? 0;
+        }
       return c.least ? (least ?? 0) : best;
     }
     case "cardsInExile": {
@@ -940,6 +947,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (ch && ch.controller === ctx.controller && (!c.filter || objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view))) for (const col of ch.colors) colors.add(col);
       }
       return colors.size;
+    }
+    case "cardTypesAmongPermanents": {
+      const types = new Set<string>();
+      for (const id of s.battlefield) {
+        if (c.other && id === ctx.sourceId) continue;
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || (c.nonland && ch.types.includes("Land"))) continue;
+        for (const t of ch.types) types.add(t);
+      }
+      return types.size;
     }
     case "creatureTypesAmong": {
       const types = new Set<string>();
@@ -1261,6 +1278,8 @@ function describeCount(c: Count): string {
       return "#planeswalker types among your planeswalkers";
     case "keywordsAmong":
       return "#abilities among your creatures";
+    case "cardTypesAmongPermanents":
+      return `#card types among ${c.other ? "other " : ""}${c.nonland ? "nonland " : ""}permanents you control`;
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":

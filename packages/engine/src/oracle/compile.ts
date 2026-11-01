@@ -5288,7 +5288,12 @@ function linkExile(out: CompiledCard) {
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     // Endless Horizons: "search your library for any number of Plains cards, exile them" as its one exile instruction.
     const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
-    if (!others && exiles.length === 1) exiles[0]!.linked = true;
+    // Ashiok, Nightmare Weaver: "a creature card ... exiled with ~" is any card exiled by its "exile the top three cards" and
+    // its "exile all cards from all opponents' hands and graveyards" abilities (CR 607.2a, rulings), all linked to it.
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    if (!others && tops.length && out.activated.every((a) => a.loyalty !== undefined || a.loyaltyX) && !out.triggers.length && !out.spell) for (const e of [...exiles, ...tops]) e.linked = true;
+    else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
+    else if (!others && exiles.length === 1) exiles[0]!.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
@@ -5313,7 +5318,8 @@ function linkExile(out: CompiledCard) {
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
-  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && e.what.ref === "target");
+  // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it": the card the sacrifice put in a graveyard.
+  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && (e.what.ref === "target" || (e.what.ref === "subjectCard" && t.event === "youSacrifice"))));
   // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
   // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
   // that became this permanent (CR 607.2q, recorded as it's cast).

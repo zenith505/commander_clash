@@ -950,6 +950,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Worldfire: "Exile all cards from all hands and graveyards."
   if (s === "Exile all cards from all hands and graveyards") return [{ type: "exileGraveyard", who: { ref: "eachPlayer" }, hand: true }];
+  // Ashiok, Nightmare Weaver: "Exile all cards from all opponents' hands and graveyards": each opponent's hand, then graveyard.
+  if (s === "Exile all cards from all opponents' hands and graveyards") return [{ type: "exileGraveyard", who: { ref: "eachOpponent" }, hand: true }];
+  // Ashiok, Nightmare Weaver: "Exile the top three cards of target opponent's library": face up (CR 406.3), fewer if the
+  // library has fewer.
+  if ((m = new RegExp(`^Exile the top (card|${NUM} cards) of (target opponent|target player)'s library$`).exec(s))) {
+    const who = parsePlayer(m[3]!, ctx);
+    return who ? [{ type: "exileTop", who, n: m[1] === "card" ? 1 : num(m[2]!) }] : null;
+  }
   // Identity Crisis: "Exile all cards from target player's hand and graveyard."
   if ((m = /^Exile all cards from (target player's|target opponent's) hand and graveyard$/.exec(s))) {
     const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
@@ -1215,6 +1223,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Admonition Angel: "When ~ leaves the battlefield, return all cards exiled with it to the battlefield under their owners'
   // control": the same.
   if (/^[Rr]eturn all cards exiled with (?:it|~) to the battlefield under their owners' control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];
+  // Prowling Geistcatcher: "return each card exiled with it to the battlefield under your control": the same, under the
+  // ability's controller's control (rulings: cards it doesn't own too).
+  if (/^[Rr]eturn each card exiled with (?:it|~) to the battlefield under your control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield", yours: true }];
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
   if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
@@ -1287,6 +1298,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Duplicity, Gustha's Scepter: cards exiled face down with ~, and what happens to them later (CR 406.3, 607.2a).
   if (!ctx.spell) {
     if ((m = new RegExp(`^Exile the top ${NUM} cards of your library face down$`, "i").exec(s))) return [{ type: "exileFaceDown", from: "top", n: num(m[1]!) }];
+    // Connecting the Dots: "exile the top card of your library face down" (no one may look at it, CR 406.3).
+    if (/^Exile the top card of your library face down$/i.test(s)) return [{ type: "exileFaceDown", from: "top", n: 1 }];
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
@@ -1307,11 +1320,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Endless Horizons: "put a card you own exiled with ~ into your hand": the same.
     if (/^(?:Return a card you own exiled with ~ to|Put a card you own exiled with ~ into) your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Bag of Holding: "Return all cards exiled with ~ to their owner's hand": the ones its discard trigger exiled (CR 607.2a).
-    if (/^Return all cards exiled with ~ to their owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
+    // Connecting the Dots: "Put all cards exiled with ~ into their owners' hands": the same, face down ones too.
+    if (/^Return all cards exiled with ~ to their owner's hand$|^Put all cards exiled with ~ into their owners' hands$/.test(s)) return [{ type: "moveLinked", dest: "hand" }];
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
     if (/^Put a creature card exiled with ~ onto the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
+    // Ashiok, Nightmare Weaver: "Put a creature card with mana value X exiled with ~ onto the battlefield under your control":
+    // chosen as it resolves, the X announced for the loyalty cost (rulings; none, nothing happens).
+    if (/^Put a creature card with mana value X exiled with ~ onto the battlefield under your control$/.test(s)) {
+      const filter = parseSearchFilter("creature card with mana value X");
+      return filter ? [{ type: "moveLinked", dest: "battlefield", one: true, filter }] : null;
+    }
     if (/^Put a creature card exiled with ~ onto the battlefield under your control with a finality counter on it, and it gains haste until it is sacrificed when the next end step begins$/i.test(s))
       return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, counters: { finality: 1 }, haste: "game", atEndStep: "sacrifice" }];
   }

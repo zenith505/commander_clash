@@ -746,6 +746,7 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "tappedThisWay":
     // Prismabasher: "the number of colors among permanents you control".
     case "colorsAmongPermanents":
+    case "cardTypesAmongPermanents":
     // Archipelagore: "the number of times ~ has mutated", fixed as the mutate trigger's targets are chosen.
     case "mutations":
     // Custodi Soulcaller: "the number of players you attacked this combat", fixed once attackers are declared.

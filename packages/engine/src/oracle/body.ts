@@ -2580,6 +2580,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Each of your opponents discards\b/g, "$1Each opponent discards");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
+  // Kaya, Orzhov Usurper: "~ deals damage to target player equal to the number of cards that player owns in exile and you
+  // gain that much life": that number, whatever damage is dealt (rulings).
+  text = text.replace(/^(~ deals damage to target player equal to (the number of cards that player owns in exile)) and you gain that much life\./, "$1. You gain life equal to $2.");
   // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
   // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
   // Ziatora: "~ deals damage equal to that creature's power to any target and you create three Treasure tokens": two
@@ -4725,6 +4728,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += any ? 2 : 1;
       continue;
     }
+    // Inside Information: "Exile the top X cards of target opponent's library. You may play those cards this turn. If you
+    // cast a spell this way, pay life equal to its mana value rather than pay its mana cost." Face up, the permission
+    // yours with the normal timing; a spell for life only, no alternative cost (rulings, CR 118.9).
+    const tgtTop = new RegExp(`^Exile the top ${NUMX} cards of (target opponent|target player)'s library$`).exec(s);
+    if (tgtTop && sentences[si + 1]?.replace(/\.$/, "") === "You may play those cards this turn" && sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost") {
+      const who = parsePlayer(tgtTop[2]!.toLowerCase(), ctx);
+      if (!who) return null;
+      effects.push({ type: "impulse", n: amt(tgtTop[1]!), until: "thisTurn", who, life: true });
+      si += 2;
+      continue;
+    }
     // Rakdos, the Muscle: "exile cards equal to its mana value from the top of target player's library. Until your next
     // end step, you may play those cards, and mana of any type can be spent to cast those spells." The sacrificed
     // creature's mana value as it last existed (rulings); the permission yours, with the normal timing (rulings).
@@ -6193,6 +6207,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         may.effects.push(...then);
         si++;
       }
+      continue;
+    }
+    // Amareth, the Lustrous: "Whenever another permanent you control enters, look at the top card of your library. If it
+    // shares a card type with that permanent, you may reveal that card and put it into your hand." Card types only (CR
+    // 205.2a, rulings); not revealed, the card stays on top.
+    if (lookTop?.[1] === "your" && (ctx.subject || ctx.subjectIt) && sentences[si + 1]?.replace(/\.$/, "") === "If it shares a card type with that permanent, you may reveal that card and put it into your hand") {
+      effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedSharesCardTypeWithSubject" }, effects: revealedAction("you may reveal it and put it into your hand", ctx)! });
+      si++;
       continue;
     }
     // Sorin the Mirthless: "Look at the top card of your library. You may reveal that card and put it into your hand. If you
@@ -8861,6 +8883,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = sentences.length;
       continue;
     }
+    // Kaya, Orzhov Usurper: "Exile up to two target cards from a single graveyard. You gain 2 life if at least one creature
+    // card was exiled this way": any of those targets, chosen and still legal as this resolves (so exiled).
+    const atLeastOne = /^(.+) if at least one ([a-z]+) card was exiled this way$/.exec(s);
+    if (atLeastOne) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${atLeastOne[2]!} card`);
+      if (prev?.type !== "exile" || prev.what.ref !== "target" || !prev.what.n || prev.what.index + prev.what.n !== ctx.targets.length || !filter) return null;
+      const first = prev.what.index;
+      if (ctx.targets.slice(first).some((t) => t.kind !== "card" || t.many)) return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(atLeastOne[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: first, n: prev.what.n, filter }, effects: inner });
+      continue;
+    }
     const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card (?:was|is) exiled this way, (.+)$/.exec(s);
     if (ifCardExiled) {
       const i = ctx.targets.length - 1;
@@ -10636,6 +10673,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Shadow of the Enemy: "Exile all creature cards from target player's graveyard. You may cast spells from among those
+    // cards for as long as they remain exiled, and mana of any type can be spent to cast them." The same, from that one
+    // graveyard and those cards only, with no end.
+    const yardSpells = /^Exile all ([a-z]+) cards from (target player's|target opponent's) graveyard$/.exec(s);
+    if (yardSpells && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards for as long as they remain exiled, and mana of any type can be spent to cast them") {
+      const filter = parseSearchFilter(`${yardSpells[1]!} card`);
+      const who = filter && parsePlayer(yardSpells[2]!.replace(/'s$/, ""), ctx);
+      if (!filter || !who || who.ref !== "target") return null;
+      effects.push({ type: "impulse", n: 0, until: "exiled", who, castOnly: true, anyType: true, graveyards: true, graveyardFilter: filter });
+      si++;
+      continue;
+    }
     // "At the beginning of the next end step, if any of those cards remain exiled, return them to their owners'
     // graveyards" (Mnemonic Betrayal): a delayed trigger (CR 603.7) with an intervening if (CR 603.4) about those cards.
     if (/^At the beginning of the next end step, if any of those cards remain exiled, return them to their owners' graveyards$/.test(s) && effects[effects.length - 1]?.type === "impulse") {
@@ -10854,6 +10903,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mods = parseBecomes(`a ${theyAre[1]} in addition to its other types`);
       if (prev?.type !== "putOntoBattlefield" || !spec?.perOpponent || !mods || prev.alsoMods) return null;
       prev.alsoMods = mods;
+      continue;
+    }
+    // Prowling Geistcatcher: "Whenever you sacrifice another creature, exile it. If that creature was a token, put a +1/+1
+    // counter on ~": whether the sacrificed permanent was a token as it last existed (a token can't be exiled, CR 704.5d).
+    const wasToken = /^If that creature was a token, (.+)$/.exec(s);
+    if (wasToken && ctx.subjectIt) {
+      const prev = effects[effects.length - 1];
+      const before = ctx.targets.length;
+      const then = prev?.type === "exile" && prev.what.ref === "subjectCard" ? parseOne(capital(wasToken[1]!), ctx) : null;
+      if (!then || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "subjectWasToken" }, effects: then });
+      continue;
+    }
+    // Ashiok, Nightmare Weaver: "Put a creature card with mana value X exiled with ~ onto the battlefield under your
+    // control. That creature is a Nightmare in addition to its other types": as it enters, from then on.
+    const nightmare = /^That creature is an? ([A-Z][a-z]+) in addition to its other types$/.exec(s);
+    if (nightmare && CREATURE_TYPES.has(nightmare[1]!)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "moveLinked" || prev.dest !== "battlefield" || !prev.one || prev.alsoMods || prev.ownersControl) return null;
+      prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [nightmare[1]!] }];
       continue;
     }
     // Oriq Loremage: "Search your library for a card, put it into your graveyard, then shuffle. If it's an instant or

@@ -3355,6 +3355,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.oneOfUsed = s.oneOfUsed?.filter((g) => Object.values(s.objects).some((o) => o.zone === "exile" && o.mayPlay?.oneOf === g && o.mayPlay.until !== "thisTurn"));
   if (!s.oneOfUsed?.length) s.oneOfUsed = undefined;
   s.linkedFreeCasts = undefined;
+  s.linkedPlays = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
   s.diedNamesThisTurn = undefined;
@@ -4068,7 +4069,7 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
 function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
-  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" ? {} : undefined;
+  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
 }
 
 /**
@@ -4148,7 +4149,7 @@ export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): bo
 }
 
 /** May `pid` play this exiled card now other than for Court of Locthwain's "without paying its mana cost"? */
-const mayPlayExiledOtherwise = (s: GameState, o: GameObject, pid: PlayerId): boolean => ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
+const mayPlayExiledOtherwise = (s: GameState, o: GameObject, pid: PlayerId): boolean => ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid) || linkedPlayGrant(s, o, pid) >= 0;
 
 /**
  * Court of Locthwain: the index in GameState.linkedFreeCasts of a grant this turn that lets `pid` cast this exiled card
@@ -4157,6 +4158,23 @@ const mayPlayExiledOtherwise = (s: GameState, o: GameObject, pid: PlayerId): boo
 export function linkedFreeGrant(s: GameState, o: GameObject, pid: PlayerId): number {
   if (o.zone !== "exile" || !s.linkedFreeCasts?.length || isType(defOf(s, o), "Land")) return -1;
   return s.linkedFreeCasts.findIndex((g) => g.player === pid && g.turn === s.turn && (!g.filter || printedMatches(g.filter, defOf(s, o))) && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
+}
+
+/**
+ * Raphael, Most Attitude: the index in GameState.linkedPlays of a grant this turn that lets `pid` play this exiled card,
+ * one exiled with that grant's source (CR 607.2a); -1 if none.
+ */
+export function linkedPlayGrant(s: GameState, o: GameObject, pid: PlayerId): number {
+  if (o.zone !== "exile" || !s.linkedPlays?.length) return -1;
+  const d = defOf(s, o);
+  return s.linkedPlays.findIndex((g) => g.player === pid && g.turn === s.turn && (!g.castOnly || !isType(d, "Land")) && (!g.owned || o.owner === pid) && (!g.filter || printedMatches(g.filter, d)) && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
+}
+
+/** Playing this exiled card with a one-card GameState.linkedPlays grant (no other permission of its) uses the grant up. */
+function useLinkedPlay(s: GameState, o: GameObject, pid: PlayerId): void {
+  if (o.zone !== "exile" || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid)) return;
+  const at = linkedPlayGrant(s, o, pid);
+  if (at >= 0 && !s.linkedPlays![at]!.all) s.linkedPlays!.splice(at, 1);
 }
 
 /** "You may cast ~ from exile" (Squee): its owner, a face-up card; cast, not played as a land. */
@@ -4432,6 +4450,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const o = obj(s, id);
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
@@ -5875,6 +5894,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
+  if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
   // Court of Locthwain: one spell for each time its ability resolved.
   if (choices.alt === "linkedFree") s.linkedFreeCasts!.splice(linkedFreeGrant(s, o, p.id), 1);
@@ -5988,6 +6008,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
+  // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
+  // (rulings, CR 607.2q).
+  if (choices.delve?.length && compileCard(d).delveLinked) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = choices.delve.flatMap((c) => (s.objects[c]?.zone === "exile" ? [{ id: c, zc: s.objects[c]!.zoneChanges ?? 0 }] : []));
   // Each cost paid is an event of its own for "one or more" triggers (rulings on Conspiracy Unraveler).
   closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
@@ -7386,6 +7409,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canSacrificeForCost(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
+  if (ab.keyword === "Power-up" && s.extraTurn?.noPowerUp) return "power-up abilities can't be activated this turn"; // Kang the Conqueror
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).

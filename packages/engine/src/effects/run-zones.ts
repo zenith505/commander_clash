@@ -1154,6 +1154,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: pl.ids, declined: [] };
       }
+      if (!sc.castAmong && e.fromLinked) {
+        // Kaho, Jeleva, Shell of the Last Kappa: the cards exiled with this object (CR 607.2a), still in exile (CR 400.7).
+        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [], ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}) };
+      }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
         const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
@@ -3156,6 +3160,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o.zone === "exile" && !o.isToken) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "warp", turn: s.turn };
       }
       return;
+    case "playLinkedThisTurn": {
+      // Raphael, Serpent's Soul-Jar, Kayla's Music Box: the cards its own exile took (CR 607.2a), for the rest of this turn.
+      if (!ctx.sourceId) return;
+      (s.linkedPlays ??= []).push({ player: ctx.controller, source: `${ctx.sourceId}@${ctx.sourceZc ?? 0}`, turn: s.turn, sourceName: src, ...(e.filter ? { filter: e.filter } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.all ? { all: true as const } : {}), ...(e.owned ? { owned: true as const } : {}) });
+      log(s, `${player(s, ctx.controller).name} may ${e.castOnly ? "cast" : "play"} ${e.all ? "cards" : e.filter ? `a ${e.filter.text.replace(/ card$/, "")} ${e.castOnly ? "spell" : "card"}` : "a card"} ${e.all && e.owned ? "they own " : ""}exiled with ${src} this turn.`);
+      return;
+    }
     case "castLinkedFree": {
       // Court of Locthwain: one spell from among the cards its own exile took (CR 607.2a), for the rest of this turn.
       if (!ctx.sourceId) return;

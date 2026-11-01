@@ -185,6 +185,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "exileTop", who, n: m[2] === "card" ? 1 : amt(m[3]!) }] : null;
   }
+  // Circu, Dimir Lobotomist: "exile the top card of target player's library": that player's card, face up (CR 406.3).
+  if ((m = new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of (target player|target opponent)'s library$`).exec(s))) {
+    const who = parsePlayer(m[3]!, ctx);
+    return who ? [{ type: "exileTop", who, n: m[1] === "card" ? 1 : amt(m[2]!) }] : null;
+  }
   // Mystic Forge, Precognition Field: "Exile the top card of your library" with nothing more (a sentence after it that
   // lets you play the card is impulse draw, read with it).
   if ((m = new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of your library$`).exec(s))) return [{ type: "exileTop", who: { ref: "you" }, n: m[1] === "card" ? 1 : amt(m[2]!) }];

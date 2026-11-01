@@ -2,7 +2,7 @@ import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, hasConspire, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, conspireGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -1841,7 +1841,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
     // Conspire a permanent gave the spell (Raiding Schemes): the spell's own "if its conspire cost was paid, copy it" (CR 702.78a).
     // Only if it still has conspire as it becomes cast: sacrificing Wort to cast it takes it away (rulings).
-    if (spell && item?.conspired && !ev.copy && !compileCard(defOf(s, spell)).conspire && hasConspire(s, ev.controller, spell)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CONSPIRE_BODY, cause: ev.stackId });
+    // Each instance paid copies it (CR 702.78b): its printed one first (its own trigger above), then one for each grant
+    // still there as it becomes cast.
+    if (spell && item?.conspired && !ev.copy) {
+      const paid = (item.conspiredTimes ?? 1) - (compileCard(defOf(s, spell)).conspire ? 1 : 0);
+      const n = Math.min(paid, conspireGranted(s, ev.controller, spell));
+      for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CONSPIRE_BODY, cause: ev.stackId });
+    }
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     const granted = spell && item && !ev.copy ? grantedCascades(s, item, spell, ev.controller) : [];
     // "Whenever you cast a spell with cascade" (Aurora Phoenix): printed, or given to it as it was cast.

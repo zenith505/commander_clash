@@ -983,6 +983,8 @@ export interface StackItem {
   casualty?: boolean;
   /** For a spell: its conspire cost was paid (CR 702.78a). */
   conspired?: boolean;
+  /** For a spell: how many instances of conspire were paid, when more than one (CR 702.78b). */
+  conspiredTimes?: number;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
@@ -1354,11 +1356,23 @@ export type PendingDecision =
    */
   | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
   /**
-   * Different shields wait to replace this draw (Urabrask, Heretic Praetor, the Words): the drawing player chooses which
-   * applies (CR 616.1). `options` are game.ts drawShields keys, `labels` what each does; `left`, `made` and `after` are
-   * the draws after this one, as for "drawEmptyReturn".
+   * Different replacements could apply to this draw (shields of Urabrask, Heretic Praetor and the Words, with each other
+   * or with Underrealm Lich, Tomorrow, dredge, Notion Thief, Alhammarret's Archive, Scion of Halaster or Abundance; two
+   * looks): the drawing player chooses which applies (CR 616.1). `options` are game.ts drawReplacementChoices keys,
+   * `labels` what each does; `left`, `made` and `after` are the draws after this one, as for "drawEmptyReturn".
    */
-  | { kind: "drawInstead"; player: PlayerId; options: string[]; labels: string[]; left: number; made?: number[]; after?: "drawStep" }
+  | {
+      kind: "drawInstead";
+      player: PlayerId;
+      /** drawReplacementChoices' keys: a shield ("exile", "words:<i>"), "thief", "dig:<id>", "dredge:<id>", "archive", "look", "abundance:<land|nonland>". */
+      options: string[];
+      labels: string[];
+      left: number;
+      made?: number[];
+      after?: "drawStep";
+      /** This draw is one a replacement made: how many Alhammarret's Archives can still replace it (CR 614.5). */
+      archives?: number;
+    }
   | {
       kind: "dredge";
       player: PlayerId;

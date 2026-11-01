@@ -15029,6 +15029,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "854cac11-9a22-4dea-8c1b-c49a4858a754",
+  "name": "Raiding Schemes",
+  "manaCost": "{3}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each noncreature spell you cast has conspire. (As you cast a noncreature spell, you may tap two untapped creatures you control that share a color with it. When you do, copy it and you may choose new targets for the copy. A copy of a permanent spell becomes a token.)",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "074e467e-f574-4b44-b5a3-798b592a5a87",
   "name": "Rain of Rust",
   "manaCost": "{3}{R}{R}",

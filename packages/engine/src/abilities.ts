@@ -872,6 +872,8 @@ export interface TargetSpec {
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
   dealtDamageThisTurn?: true;
+  /** Grisly Sigil: "If it was dealt noncombat damage this turn". */
+  dealtNoncombatDamageThisTurn?: true;
   /** "Target creature that dealt damage this turn" (Executioner's Swing): it dealt damage as this object (CR 400.7). */
   dealtDamageAsSourceThisTurn?: true;
   /** true: a token; false: "nontoken". */
@@ -3313,6 +3315,8 @@ export type Effect =
       plot?: true;
       /** Talara's Bane: "You gain life equal to that creature card's toughness, then that player discards that card." */
       gainToughness?: true;
+      /** Disciple of Phenax: "reveals a number of cards from their hand equal to your devotion to black. You choose one of them": that player first reveals this many cards of their choice (all of them if they have no more, CR 609.3), and the card is chosen among those. */
+      reveal?: Amount;
       /** Never Happened: "a nonland card from that player's graveyard or hand": one card from either zone (action "exile"). */
       orGraveyard?: true;
       /** With `orGraveyard`: Agonizing Remorse's "a nonland card from it or a card from their graveyard": `filter` is for the hand's cards only. */
@@ -6060,7 +6064,14 @@ export interface CompiledCard {
    * sacrificed as it entered" (its CDA reads GameObject.devoured); "total", Dracoplasm's "power becomes the total
    * power of those creatures and its toughness becomes their total toughness" (a layer 7b effect from then on).
    */
-  devour?: { n: number | "devoured"; filter: TargetSpec; defines?: "count" | "total" };
+  devour?: {
+    n: number | "devoured";
+    filter: TargetSpec;
+    defines?: "count" | "total";
+    /** Rescuer Sphinx: "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1 counter on it.": the same choice, returned instead of sacrificed, at most `max`. */
+    bounce?: true;
+    max?: number;
+  };
   /**
    * "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor; CR 614.12, 119.4): the amount, kept
    * as GameObject.lifePaidAsEntered. `max`: Nameless Race's "The amount you pay can't be more than ...".

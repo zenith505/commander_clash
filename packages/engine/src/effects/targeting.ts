@@ -165,6 +165,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
+  if (spec.dealtNoncombatDamageThisTurn && !o.wasDealtNoncombatDamage) return false;
   if (spec.dealtDamageAsSourceThisTurn && !Object.values(s.turnLog?.damageSources ?? {}).some((keys) => keys.includes(`${o.id}@${o.zoneChanges ?? 0}`))) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
@@ -787,7 +788,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const subjectBound = (t: TargetSpec) => (t.bound?.amount.count.kind === "manaValue" || t.bound?.amount.count.kind === "toughness") && t.bound.amount.count.of.ref === "subject";
   // Grishnákh, Brash Instigator: "with power less than or equal to the amassed Army's power", as the target is chosen.
   const amassedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "power" && t.bound.amount.count.of.ref === "amassed";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t);
+  // Sundering Archaic: "the number of colors of mana spent to cast ~" in its enters trigger, as it was cast.
+  const colorsBound = (t: TargetSpec) => t.bound?.amount.count.kind === "colorsSpent" && !t.bound.amount.count.of;
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -803,6 +806,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
     // it was cast (rulings), which can't change.
     if (castBound(t) && ctx.cause !== undefined) t = bindBound(s, t, ctx);
+    if (colorsBound(t)) {
+      const n = bindBound(s, t, ctx);
+      t = { ...n, text: n.text.replace(/ less than or equal to the number of colors of mana spent to cast .+$/, ` ${ctx.colorsSpent ?? 0} or less`) };
+    }
     if (subjectBound(t)) {
       // Lesser than 0 is nothing (rulings: a mana value can't be less than 0).
       const { bound, ...rest } = t;

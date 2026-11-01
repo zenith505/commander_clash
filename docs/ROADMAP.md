@@ -1,6 +1,6 @@
 # Roadmap
 
-28,970 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+28,993 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,292 of
 9,979 (93%).
 
@@ -4224,6 +4224,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Brotherhood Outcast: what it enchants is chosen as it enters, CR 303.4f); "discard a number of cards equal to"
   (Cabal Conditioning); "Enchanted creature deals 1 damage to target creature with flying" (Dizzying Gaze: the creature
   is the source). +24 (28,970 of 31,936).
+- Round B77 (one-line templates from the bottom of the list): "target player reveals a number of cards from their hand
+  equal to ... You choose one of them. That player discards that card" (Disciple of Phenax, Klaw, Sonic Subjugator,
+  Acquisitions Expert, Bala Ged Thief, Mire's Toll; "reveals X cards" Cabal Interrogator and Hollow Specter): that
+  player picks which cards to reveal (new prompt, browser test; a bot reveals its cheapest), all of them if they have no
+  more (CR 609.3); "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters with
+  twice that many +1/+1 counters" (Devouring Hellion) and "you may return a nonland permanent you control to its owner's
+  hand. If you do, ~ enters with a +1/+1 counter" (Rescuer Sphinx, browser test), devour's choice as it enters (CR
+  614.12); converge in an enters trigger: a target "with mana value less than or equal to the number of colors of mana
+  spent to cast ~" (Sundering Archaic) and "draw X cards ... If you draw one or more cards this way, discard two cards"
+  (Transcendent Archaic); "If it was dealt noncombat damage this turn" (Grisly Sigil, GameObject.wasDealtNoncombatDamage);
+  "During that player's next untap step, creatures they control don't untap" (Imaginary Threats); "if enchanted
+  permanent is a creature with the greatest power among creatures on the battlefield" (Historian's Wisdom); "choose a
+  player. That player adds two mana of any one color they choose" (Stadium Vendors); "Choose a card type. Target opponent
+  reveals their hand. ... for each card of the chosen type revealed this way" (Fertile Imagination, Blood Oath); "an Aura
+  card with enchant creature" (Tallowisp); "both gain your choice of first strike or lifelink" (Ballroom Brawlers);
+  "Return a Pirate card ..., then do the same for Vampire, Dinosaur, and Merfolk" (Grim Captain's Call); "choose target
+  creature you don't control and tap it" (Celestial Regulator); "discards cards equal to the damage" (Jagged Poppet);
+  "put a +1/+1 counter on another target creature you control, and that creature gains flying" (Skyrider Patrol). +23
+  (28,993 of 31,936).
+- Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
+  Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
+  (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
+  opponent's choice": an opponent picks the target).
 - Out after round B76 (looked at, not done): Mind Roots (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death ("Other creatures that player controls can't block this
   turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (the target player looks at

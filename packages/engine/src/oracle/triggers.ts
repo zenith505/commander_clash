@@ -4157,6 +4157,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
+      // Jagged Poppet: "that player discards cards equal to the damage": that many, the combat damage dealt to them.
+      if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^that player discards cards equal to the damage\.$/, "that player discards that many cards.");
       // Storm the Citadel's grant: "Whenever this creature deals combat damage to a player or planeswalker, destroy target
       // artifact or enchantment defending player controls": the player dealt the damage, or the planeswalker's controller
       // (rulings), which is the trigger's player (see the planeswalker's combatDamageToPlayer event).

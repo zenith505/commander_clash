@@ -489,11 +489,29 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${src} has left the battlefield, so nothing is exiled.`);
         return;
       }
+      // Disciple of Phenax: "target player reveals a number of cards from their hand equal to your devotion to black. You
+      // choose one of them": the number as it resolves (rulings); the player told to reveal them picks which (as with a
+      // discard, CR 701.9b), every card in their hand if they have that many or fewer (CR 609.3); none if it's 0 (rulings
+      // on Acquisitions Expert and Hollow Specter). Revealed to all (CR 701.20a).
+      if (e.reveal !== undefined && !sc.handRevealed) {
+        const n = Math.max(0, amountNow(s, e.reveal, ctx));
+        if (n > 0 && n < p.hand.length && !sc.found) {
+          s.pending = { kind: "searchLibrary", player: pid, source: src, what: `${n} card${n === 1 ? "" : "s"}`, cards: [...p.hand], min: n, max: n, fromHand: true, reveal: true, revealFor: ctx.controller };
+          return "paused";
+        }
+        sc.handRevealed = n <= 0 ? [] : n < p.hand.length ? sc.found!.filter((id) => obj(s, id).zone === "hand") : [...p.hand];
+        delete sc.found;
+        if (!sc.handRevealed.length) {
+          log(s, `${p.name} reveals no cards.`);
+          return;
+        }
+        log(s, `${p.name} reveals ${sc.handRevealed.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.`);
+      }
       if (!sc.found) {
         // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         // Never Happened: the graveyard's cards too, after the hand's.
-        const pool = e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
+        const pool = e.reveal !== undefined ? sc.handRevealed!.filter((id) => p.hand.includes(id)) : e.orGraveyard ? [...p.hand, ...p.graveyard] : p.hand;
         const cards = pool.filter((id) => !filter || (e.anyFromYard && obj(s, id).zone === "graveyard") || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
         s.resolving!.exiledFromHandCards = [];

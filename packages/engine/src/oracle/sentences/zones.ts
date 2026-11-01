@@ -138,6 +138,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.revealedFromHand = true;
     return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
   }
+  // Vault 21: House Gambit: "Reveal up to five nonland cards from your hand": at most five, chosen as it resolves.
+  if ((m = new RegExp(`^[Rr]eveal up to ${NUM} (?:(.+?) )?cards (?:in|from) your hand$`).exec(s))) {
+    const filter = m[2] ? parseSearchFilter(`${m[2]} card`) : undefined;
+    const max = num(m[1]!);
+    if (filter === null || (m[2] && !filter) || !Number.isInteger(max) || max < 2) return null;
+    ctx.revealedFromHand = true;
+    return [{ type: "revealFromHand", ...(filter ? { filter } : {}), max }];
+  }
   // "Reveal a creature card in your hand" (Assembly Hall), "Reveal a card from your hand" (Infernal Tutor): one, chosen as
   // it resolves, if you have one (not a "may"); "that card" is it for the search after ("with the same name as that card").
   if ((m = /^[Rr]eveal an? (?:(.+?) )?card (?:in|from) your hand$/.exec(s)) && !ctx.revealedFromHand) {
@@ -703,6 +711,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (who === null || filter === null || !Number.isInteger(n)) return null;
     return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
   }
+  // Augusta, Order Returned: "each player exiles a card from their graveyard": each chooses one in APNAP order, then all
+  // the chosen cards are exiled at the same time (CR 101.4, rulings).
+  if (/^[Ee]ach player exiles a card from their graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", who: { ref: "eachPlayer" } }];
   // "Choose an opponent. That player returns a card from their graveyard to their hand" (Skullwinder): that player
   // chooses which, as it resolves (rulings).
   if ((m = /^(Target player|Target opponent|That player) returns (an?|one|two|three) (.+?) from their graveyard to their hand$/.exec(s))) {

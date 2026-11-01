@@ -22,6 +22,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
   // Collision Course: "the number of permanents you control that are creatures and/or Vehicles".
   p = p.replace(/^the number of permanents you control that are (creatures|artifacts) or (Vehicles)$/, "the number of $1 or $2 you control");
+  // Erestor of the Council: in its "whenever players finish voting" trigger, the opponents who voted for a choice you
+  // didn't (each counted once, even with several votes; one may count both ways, rulings).
+  if (!each && p === "the number of opponents who voted for a choice you didn't vote for" && ctx?.votesEvent) return { count: { kind: "opponentsVotedOtherwise" } };
   // Ral Zarek, Guest Lecturer: "where X is the number of coins that came up heads", after uncalled flips (see body.ts).
   if (!each && /^the number of coins that came up heads$/i.test(p) && ctx?.uncalledFlips) return { count: { kind: "flipsWon", heads: true } };
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
@@ -853,6 +856,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Havoc Eater: "for each opponent, goad up to one target creature that player controls. Put X +1/+1 counters on ~, where
   // X is the total power of creatures goaded this way": the targets still there as it resolves.
   if (/^the total power of creatures goaded this way$/.test(p) && ctx?.lastTargets && ctx.targets[ctx.lastTargets.index]?.perOpponent && ctx.targets[ctx.lastTargets.index]?.types?.includes("Creature")) return count({ kind: "totalPowerOf", of: { ref: "target", ...ctx.lastTargets } });
+  // Goliath Hatchery: "its total toxic value" (CR 702.164b), of the creature chosen just before.
+  if ((m = /^(its|that creature's) total toxic value$/.exec(p))) {
+    const of = whoseObject(m[1]!, ctx);
+    return of && count({ kind: "toxicValue", of });
+  }
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
   if ((m = /^(~'s|its|equipped creature's|enchanted creature's|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
@@ -1113,6 +1121,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
     const type = x === "that artifact's" ? "Artifact" : "Enchantment";
     return ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets[ctx.lastObjectTarget]!.types?.includes(type) ? { ref: "target", index: ctx.lastObjectTarget } : null;
   }
+  // Goliath Hatchery: "choose a creature you control, then draw cards equal to its total toxic value": the one chosen.
+  if ((x === "its" || x === "that creature's") && ctx.lastChosen && ctx.lastObjectTarget === undefined) return { ref: "created" };
   if (x === "its" || x === "that creature's" || x === "that permanent's") {
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };

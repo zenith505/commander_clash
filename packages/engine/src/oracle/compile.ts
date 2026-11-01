@@ -1549,6 +1549,18 @@ export function compile(d: CardDef): CompiledCard {
       out.entersDiscardHand = true;
       continue;
     }
+    // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
+    // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
+    // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
+    const indominus = /^As ~ enters, discard any number of creature cards\. It enters with a flying counter on it if a card discarded this way has flying\. The same is true for (.+), and ([a-z ]+)\.$/.exec(line);
+    if (indominus) {
+      const kinds = ["flying", ...indominus[1]!.split(", "), indominus[2]!];
+      const known = ["flying", "first strike", "double strike", "deathtouch", "hexproof", "haste", "indestructible", "lifelink", "menace", "reach", "trample", "vigilance"];
+      if (kinds.every((k) => known.includes(k)) && new Set(kinds).size === kinds.length && !out.entersDiscardKeywords) {
+        out.entersDiscardKeywords = kinds;
+        continue;
+      }
+    }
     // Arsenal Thresher: "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a
     // +1/+1 counter on it for each card revealed this way.": amplify 1's choice (CR 702.38a, 614.12), of artifact cards.
     if (line === "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a +1/+1 counter on it for each card revealed this way.") {
@@ -2368,7 +2380,11 @@ export function compile(d: CardDef): CompiledCard {
     // Superior Spider-Man: "... a copy of any creature card in a graveyard, except ... When you do, exile that card.": a
     // reflexive trigger as it enters as that copy (CR 603.12), exiling the card copied.
     const exileCopied = / When you do, exile that card\.$/.test(line);
-    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line.replace(/ When you do, exile that card\.$/, ""));
+    // Protean Raider: "Raid — If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield":
+    // the option only exists if you attacked with a creature this turn, as it enters (rulings).
+    const raidClone = /^If you attacked this turn, you may have ~ enter as a copy of any creature on the battlefield\.$/.test(line);
+    const cloneLine = raidClone ? line.replace(/^If you attacked this turn, you/, "You") : line;
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(cloneLine.replace(/ When you do, exile that card\.$/, ""));
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
@@ -2398,7 +2414,7 @@ export function compile(d: CardDef): CompiledCard {
       const ifEmbalmed = clone[3] === "if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" ? { noManaCost: true, colors: ["W" as const], addSubtypes: ["Zombie"] } : undefined;
       const except = others ? { text: others } : ifEmbalmed ? undefined : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped, ...(raidClone ? { ifAttacked: true as const } : {}) };
         continue;
       }
     }

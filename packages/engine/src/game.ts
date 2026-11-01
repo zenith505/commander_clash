@@ -1183,7 +1183,7 @@ export function moveObject(
     const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
-    if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
@@ -1399,7 +1399,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -8233,7 +8233,8 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
       sacrificedInstead(s, obj(s, pend.objectId), ids, entry.enters);
       return;
     }
-    if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    if (pend.action === "discard") discardKeywordsChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    else if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     return;
   }
@@ -8391,7 +8392,7 @@ export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
 function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
-  if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
+  if (pend.what === "devour" || pend.what === "amplify" || pend.what === "discardKeywords") throw new RulesError(`${pend.what} is chosen by picking cards`);
   const inRange = pend.numberRange && /^\d+$/.test(choice) && Number(choice) >= pend.numberRange.min && Number(choice) <= pend.numberRange.max;
   // "The color or colors of your choice" (CR 105.3): one or more different colors, named together ("White,Blue").
   if (pend.what === "colors") {
@@ -8930,6 +8931,32 @@ export function amplifyOptions(s: GameState, o: GameObject): ObjectId[] {
   return player(s, controllerOf(s, o)).hand.filter((id) => shareCreatureType(mine, creatureTypesOf(s, obj(s, id))));
 }
 
+/** Indominus Rex, Alpha: the creature cards in its controller's hand it could discard as it enters. */
+export function discardKeywordOptions(s: GameState, o: GameObject): ObjectId[] {
+  return player(s, controllerOf(s, o)).hand.filter((id) => id !== o.id && objIsType(s, obj(s, id), "Creature"));
+}
+
+/** The keyword counters the cards `ids` would give Indominus Rex, Alpha (CR 122.1b): one of each kind any of them has. */
+export function discardKeywordKinds(s: GameState, o: GameObject, ids: ObjectId[]): string[] {
+  const kinds = compileCard(defOf(s, o)).entersDiscardKeywords ?? [];
+  return kinds.filter((k) => ids.some((id) => objHasKeyword(s, obj(s, id), k.replace(/^./, (c) => c.toUpperCase()))));
+}
+
+/**
+ * Indominus Rex, Alpha: the cards are discarded as it enters (CR 614.12), then it enters with a counter of each keyword
+ * kind a discarded card has, one of each (rulings). Then it has entered.
+ */
+function discardKeywordsChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const you = controllerOf(s, o);
+  const cards = ids.filter((id) => player(s, you).hand.includes(id) && objIsType(s, obj(s, id), "Creature"));
+  const kinds = discardKeywordKinds(s, o, cards);
+  if (cards.length) discardCards(s, you, cards, "", false, false, you);
+  for (const k of kinds) putCounters(s, o, k, 1, true);
+  if (kinds.length) log(s, `${defOf(s, o).name} enters with ${kinds.map((k) => `a ${k} counter`).join(", ")}.`);
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
 /** Dragon's Disciple: does its controller control a Dragon (other than it) as it would enter? */
 function amplifyOneControls(s: GameState, o: GameObject): boolean {
   const one = compileCard(defOf(s, o)).amplifyOne;
@@ -9006,6 +9033,17 @@ function askEntersChoice(s: GameState): boolean {
       // Not devour itself (Wood Elemental, Dracoplasm, Shimatsu): what the sacrifice does, said in the prompt.
       const said = devour!.defines === "count" ? "its power and toughness are how many" : devour!.defines === "total" ? "it gets their total power and toughness" : devour!.n === 1 && devour!.filter.text === "permanent" ? "a +1/+1 counter for each" : undefined;
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : {}) };
+      return true;
+    }
+    if (c.what === "discardKeywords") {
+      // Indominus Rex: any number of creature cards from its controller's hand (not itself, it isn't there).
+      const options = discardKeywordOptions(s, o);
+      if (!options.length) {
+        q.shift();
+        discardKeywordsChosen(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "discard", what: "creature card", options, count: options.length, min: 0, objectId: o.id, prompt: "discard any number of creature cards as it enters (a counter for each of flying, first strike, double strike, deathtouch, hexproof, haste, indestructible, lifelink, menace, reach, trample and vigilance among them): click them, then discard." };
       return true;
     }
     if (c.what === "amplify") {

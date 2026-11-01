@@ -14,7 +14,7 @@ import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from 
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
 import { creatureTypesOf, opponents, shareCreatureType } from "./game";
-import { CREATURE_TYPES } from "./keywords";
+import { CREATURE_TYPES, toxicValue } from "./keywords";
 
 export interface AmountCtx {
   controller: PlayerId;
@@ -350,6 +350,17 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
       return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).length;
+    case "opponentsVotedOtherwise": {
+      const votes = ctx.event?.votes ?? [];
+      const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
+      return new Set(votes.filter((v) => v.voter !== ctx.controller && opponents(s, ctx.controller).includes(v.voter) && !mine.has(v.choice)).map((v) => v.voter)).size;
+    }
+    case "revealedSharedMv": {
+      const mvs = (s.resolving?.revealedFromHandIds ?? []).filter((id) => !!s.objects[id]).map((id) => defMv(defOf(s, s.objects[id]!)));
+      return mvs.filter((v, i) => mvs.some((w, j) => j !== i && w === v)).length;
+    }
+    case "yardChosenThisWay":
+      return (s.resolving?.yardChosen ?? []).filter((id) => !!s.objects[id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "discardedThisWay": {
       if (c.filter) return (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id] && printedMatches(c.filter!, defOf(s, s.objects[id]!))).length;
       const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
@@ -751,6 +762,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const key = lk && (lk.zc === ctx.sourceZc! - 1 || lk.zc === ctx.sourceZc) ? `${self!.id}@${lk.zc}` : o ? `${o.id}@${o.zoneChanges ?? 0}` : undefined;
       return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
     }
+    case "toxicValue": {
+      const o = refObjects(s, c.of, ctx)[0];
+      return o && o.zone === "battlefield" ? toxicValue(characteristics(s, o).keywords) : 0;
+    }
     case "power":
     case "toughness":
     case "manaValue": {
@@ -1096,6 +1111,12 @@ function describeCount(c: Count): string {
       return "#poison counters its controller has";
     case "cardsInLibrary":
       return "#cards in library";
+    case "opponentsVotedOtherwise":
+      return "#opponents who voted for a choice you didn't";
+    case "revealedSharedMv":
+      return "#revealed cards sharing a mana value with another";
+    case "yardChosenThisWay":
+      return `#${c.filter?.text ?? "card"}s exiled this way`;
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "discardedManaValue":

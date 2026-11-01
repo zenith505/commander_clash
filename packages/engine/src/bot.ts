@@ -116,6 +116,7 @@ import {
   conspireInstances,
   walkersFreeToAttack,
   attackTargetScore,
+  discardKeywordKinds,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -400,6 +401,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Revealing from the hand for a search for its name (Assembly Hall, Infernal Tutor): a card with another copy left in
     // our library first. Otherwise the costliest.
+    // Vault 21: House Gambit: cards whose mana value others share, the biggest groups first.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.reveal && JSON.stringify(s.resolving?.body.effects ?? []).includes('"revealedSharedMv"')) {
+      const same = (id: ObjectId) => pend.cards.filter((x) => mv(s, x) === mv(s, id)).length;
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => same(b) - same(a) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
       const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
@@ -487,6 +493,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
+    // Indominus Rex: a card only for a keyword counter no card chosen so far gives (each counter draws a card back), the
+    // cheapest first.
+    if (pend.kind === "pickPermanents" && pend.action === "discard" && pend.objectId) {
+      const rex = s.objects[pend.objectId]!;
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => mv(s, a) - mv(s, b)))
+        if (discardKeywordKinds(s, rex, [...ids, id]).length > discardKeywordKinds(s, rex, ids).length) ids.push(id);
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
     // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.

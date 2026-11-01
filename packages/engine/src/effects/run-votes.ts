@@ -5,6 +5,7 @@ import { invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { dealDamageBatch } from "../damage";
 import { discardCards, discardToTop } from "./run-library";
+import { fireEvent } from "./triggers";
 import { controllerOf } from "../layers";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, ctxSource, players, runEffect } from "./resolve";
@@ -225,6 +226,8 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         v.may = undefined;
       }
       if (e.secret) log(s, `The votes are revealed: ${r.votes!.map((x) => `${player(s, x.voter).name} for ${voteLabel(s, x.choice)}`).join(", ") || "none"}.`);
+      // "Whenever players finish voting" (Erestor of the Council): a vote, not "each player may choose" (CR 701.38).
+      if (!e.choose && r.votes!.length) fireEvent(s, { type: "votesDone", votes: r.votes!.map((x) => ({ ...x })) });
       return;
     }
   }

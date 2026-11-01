@@ -404,7 +404,6 @@ describe("round 237: Alrund, God of the Cosmos", () => {
     expect(base).toBe(1 + hand);
     const foretold = into(s, ap, bear(), "exile");
     s.objects[foretold]!.foretold = true;
-    s.objects[foretold]!.faceDown = true;
     into(s, ap, bear(), "exile"); // exiled, not foretold
     const theirs = into(s, opp, bear(), "exile"); // foretold, but not yours
     s.objects[theirs]!.foretold = true;

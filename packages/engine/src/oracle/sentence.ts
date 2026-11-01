@@ -208,6 +208,19 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseSentence(`~ ${sourceDeals[1]}`, ctx);
     return fx?.length === 1 && fx[0]!.type === "damage" && !fx[0]!.by && !fx[0]!.also ? [{ ...fx[0]!, by: { ref: "grantSource" } }] : null;
   }
+  // Eldrazi Obligator, Yasova Dragonclaw: "gain control of target creature until end of turn, untap that creature, and it
+  // gains haste until end of turn": the three instructions in order, each about that target (CR 608.2c).
+  const threaten = /^([Gg]ain control of target .+? until end of turn), untap that creature, and it gains haste until end of turn$/.exec(s);
+  if (threaten) {
+    const before = ctx.targets.length;
+    const first = parseSentence(`G${threaten[1]!.slice(1)}`, ctx);
+    const index = ctx.lastObjectTarget;
+    if (first?.length !== 1 || first[0]!.type !== "continuous" || index === undefined || ctx.targets.length !== before + 1 || index !== before) return null;
+    const rest = ["Untap that creature", "That creature gains haste until end of turn"].map((x) => parseSentence(x, ctx));
+    if (rest.some((r) => r?.length !== 1) || ctx.targets.length !== before + 1) return null;
+    const all = [...first, ...(rest.flat() as Effect[])];
+    return all.every((e) => JSON.stringify(e).includes(`"ref":"target","index":${index}`)) ? all : null;
+  }
   // Form of the Dinosaur: "~ deals 15 damage to target creature an opponent controls and that creature deals damage equal to
   // its power to you": two damage events in order, the second from that creature, its power as it resolves; none from it
   // if it's an illegal target by then (rulings).

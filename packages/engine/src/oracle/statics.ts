@@ -944,6 +944,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  // Rampaging Soulrager: "there are two or more unlocked doors among Rooms you control" (CR 709.5c).
+  if ((m = new RegExp(`^there are ${NUM} or more unlocked doors among Rooms you control$`).exec(text))) return { kind: "amount", amount: { count: { kind: "unlockedDoors" } }, min: num(m[1]!) };
   // Vampire Nocturnus: "the top card of your library is black"; Mul Daya Channelers: "... is a creature card".
   if ((m = /^the top card of your library is (white|blue|black|red|green)$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} card` } };
   if ((m = /^the top card of your library is an? (artifact|creature|enchantment|instant|land|planeswalker|sorcery) card$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", types: [capital(m[1]!)], text: `${m[1]} card` } };
@@ -1365,6 +1367,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
       return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
+  // Cleaving Reaper: "if you had an Angel or Berserker enter the battlefield under your control this turn": either one, any
+  // time this turn, whether or not you still control it (rulings).
+  if ((m = /^you had an? ([A-Z][a-z]+) or ([A-Z][a-z]+) enter the battlefield under your control this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature" && subtypeSet(m[2]!) === "Creature")
+    return { kind: "youEntered", types: [], subtype: m[1]!, orSubtype: m[2]!, n: 1 };
   // Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn" (once, however
   // many entered; a noncreature permanent that became a creature later doesn't count, rulings).
   if (/^you had another creature enter the battlefield under your control last turn$/.test(text)) return { kind: "youEntered", types: ["Creature"], n: 1, other: true, lastTurn: true };
@@ -2417,6 +2423,9 @@ function parseTransform(line: string): StaticAbility | null {
   for (const c of clauses) {
     let m: RegExpExecArray | null;
     if (/^loses all (?:other )?abilities$/.test(c)) mods.push({ kind: "loseAllAbilities" });
+    // Lithoform Blight: "Enchanted land loses all land types and abilities and has ...": no land types (layer 4, CR 305.7;
+    // its card types and supertypes stay), then no abilities but the ones it's given (layer 6).
+    else if (/^loses all land types and abilities$/.test(c) && head[1] === "Enchanted land") mods.push({ kind: "setLandTypes", subtypes: [] }, { kind: "loseAllAbilities" });
     else if (/^loses all other card types$/.test(c)) only = true;
     else if (/^loses all other (?:card types and abilities|abilities, card types, and creature types)$/.test(c)) {
       only = true;

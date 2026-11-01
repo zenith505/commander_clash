@@ -1252,7 +1252,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
   // trigger's subject.
-  if ((m = /^Put (target .+?|~|that creature) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && (m[1] !== "that creature" || (ctx.subject && ctx.lastObjectTarget === undefined))) {
+  // Dovin's Dismissal: "Put up to one target tapped creature on top of its owner's library": the same, or nothing with no
+  // target chosen (CR 115.1, 601.2c).
+  if ((m = /^Put ((?:up to one )?target .+?|~|that creature) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && (m[1] !== "that creature" || (ctx.subject && ctx.lastObjectTarget === undefined))) {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || (what.ref === "subject" && m[1] === "that creature")) ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }

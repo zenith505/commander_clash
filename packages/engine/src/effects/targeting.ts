@@ -396,6 +396,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "")) return false;
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.hasAdventure && d.layout !== "adventure") return false;
+  if (spec.enchantCreature && !/^Enchant creature$/m.test(d.oracleText)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.minCardTypes !== undefined && d.types.length < spec.minCardTypes) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;

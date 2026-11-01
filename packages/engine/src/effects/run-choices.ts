@@ -1040,7 +1040,10 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => (e.byController || controllerOf(s, o) === ctx.controller) && canBeSacrificed(s, o))) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
-    if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
+    // Only tapped permanents can be untapped (CR 701.26b), but with more to do it does only as much as it can (CR 609.3):
+    // Yasova Dragonclaw's "you may pay ... If you do, gain control of target creature ..., untap that creature, and it gains
+    // haste" can be paid for an untapped creature.
+    if (e.type === "untap" && e.what.ref === "target" && effects.length === 1 && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;

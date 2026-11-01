@@ -997,7 +997,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const selfZc = sourceZc ?? s.objects[sourceId]?.zoneChanges ?? 0;
       // "Last turn": the creatures that entered then, under your control then (Ephara rulings: whatever happened to them since).
       if (cond.lastTurn) return (s.lastTurn?.creaturesEntered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc)).length >= cond.n;
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype))).length >= cond.n;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype) || (!!cond.orSubtype && !!e.subtypes?.includes(cond.orSubtype)))).length >= cond.n;
     }
     case "destroyedByOpponent":
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);

@@ -2185,6 +2185,7 @@ export type Effect =
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** Banefire: "If X is 5 or more, ... the damage can't be prevented": while the spell's X is at least this (CR 615.12). */ unpreventableX?: number;
+      /** Demonfire: "If you have no cards in hand, ... the damage can't be prevented": while this holds as the damage is dealt (CR 615.12). */ unpreventableIf?: StaticCondition;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
@@ -4438,6 +4439,7 @@ export type TriggerEvent =
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
   | "youUntapInUntapStep" // "Whenever you untap one or more permanents during your untap step": "that many" is how many (CR 502.3)
   | "opponentGainsLife" // "Whenever an opponent gains life": "that player", "that much" (CR 119.9)
+  | "playerGainsLife" // False Cure: "whenever a player gains life", any player's life gain event (CR 119.9, 119.10)
   /** "Whenever you win a coin flip", "whenever you lose a coin flip" (CR 705.2): once per flip. */
   | "youWinFlip"
   | "youLoseFlip"
@@ -5606,7 +5608,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
 /** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl" | /** Kentaro, the Smiling Cat: {X} where X is the spell's mana value (CompiledCard.payZero `genericMv`). */ "genericMv";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -5988,7 +5990,12 @@ export interface CompiledCard {
   /** Nine Lives: "If a source would deal damage to you, prevent that damage and put an incarnation counter on ~": the counter kind, one for each source (rulings, CR 615.5, 615.12). */
   preventToYouCounter?: string;
   /** "Prevent all noncombat damage that would be dealt to you and other permanents you control." (The Wanderer, CR 615.1): see staticRules in damage.ts. */
-  preventToYou?: { combat?: "only" | "non"; others?: true };
+  preventToYou?: { combat?: "only" | "non"; others?: true; /** Purity: "You gain life equal to the damage prevented this way" (CR 615.5). */ gain?: true };
+  /**
+   * Stormwild Capridor: "If noncombat damage would be dealt to ~, prevent that damage. Put a +1/+1 counter on ~ for each 1
+   * damage prevented this way" (CR 615.5): no counters for damage that can't be prevented (rulings). See staticRules in damage.ts.
+   */
+  preventToSelfCounters?: { combat?: "only" | "non"; counter: string };
   /**
    * "All damage that would be dealt to you is dealt to enchanted creature instead" (Pariah, CR 614.9): `to` is where it
    * goes (this permanent, or the creature it's attached to); `others`: "you and other permanents you control" (Palisade
@@ -6366,7 +6373,7 @@ export interface CompiledCard {
    * `minus`: Winter, Misanthropic Guide's "each opponent's maximum hand size is equal to seven minus the number of those
    * card types", `set` less this, counted as it applies; `if`: only while this holds (its delirium).
    */
-  handSize?: { who: "you" | "opponents"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition }[];
+  handSize?: { who: "you" | "opponents"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition; /** Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~", counted whenever it's checked. */ equal?: Amount }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
@@ -6575,6 +6582,8 @@ export interface CompiledCard {
     fromHandOrTop?: true;
     /** Demon of Fate's Design: life equal to the spell's mana value rather than {0} (AltCostKind "lifeForMv"). */
     life?: true;
+    /** Kentaro, the Smiling Cat: generic mana equal to the spell's mana value rather than {0} (AltCostKind "genericMv"). */
+    genericMv?: true;
     /** Weftwalking: "The first spell each player casts during each of their turns may be cast without paying its mana cost": any player's, during their own turn, while they haven't cast a spell this turn. */
     eachPlayerFirst?: true;
     /** Aluren: "Any player may cast creature spells with mana value 3 or less without paying their mana costs and as though they had flash": any player's spells, at instant speed when cast this way. */

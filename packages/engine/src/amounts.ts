@@ -435,6 +435,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
+    case "unlockedDoors": {
+      // Misty Salon, Promising Stairs (CR 709.5c): the unlocked doors of Rooms you control as it resolves; a Room has the
+      // names of its unlocked doors only (CR 709.5d, rulings).
+      const rooms = s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && o.unlocked && controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Room"));
+      if (c.names) return new Set(rooms.flatMap((o) => characteristics(s, o).name.split(" // ").filter(Boolean))).size;
+      return rooms.reduce((n, o) => n + o.unlocked!.length, 0);
+    }
     case "milledManaValue":
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopManaValue":
@@ -1178,6 +1185,8 @@ function describeCount(c: Count): string {
       return "#cards returned to your hand";
     case "milledManaValue":
       return "the total mana value of the milled cards";
+    case "unlockedDoors":
+      return c.names ? "different names among unlocked doors of Rooms you control" : "unlocked doors among Rooms you control";
     case "exiledTopMatching":
       return `#${c.filter.text}s exiled`;
     case "exiledTopManaValue":

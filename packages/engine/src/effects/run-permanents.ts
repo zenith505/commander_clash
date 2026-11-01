@@ -538,6 +538,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       else delete o.counters.time;
       invalidateCharacteristics(s);
       log(s, `${player(s, you).name} removes ${n} time counter${n === 1 ? "" : "s"} from ${defOf(s, o).name} (${src}).`);
+      if (o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
@@ -581,6 +582,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       sc.timeTravel = undefined;
       const changed: string[] = [];
       const last: ObjectId[] = [];
+      const removedExiled: ObjectId[] = [];
       for (const x of st.ids) {
         const o = s.objects[x.id];
         const pick = st.picks[x.id];
@@ -593,12 +595,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           if (left > 0) o.counters.time = left;
           else delete o.counters.time;
           changed.push(`-1 on ${name}`);
+          if (o.zone === "exile") removedExiled.push(o.id);
           if (!left) last.push(o.id);
         }
       }
       invalidateCharacteristics(s);
       log(s, `${src}: ${player(s, you).name} time travels${changed.length ? ` (${changed.join(", ")})` : ""}.`);
       // Removing the last one triggers suspend's cast ability and vanishing's sacrifice (CR 702.62a, 702.63a).
+      for (const id of removedExiled) fireEvent(s, { type: "timeCountersRemovedExiled", id, n: 1 });
       for (const id of last) fireEvent(s, { type: "lastCounterRemoved", id, counter: "time" });
       return;
     }

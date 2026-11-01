@@ -2459,7 +2459,7 @@ export interface Resolving {
     exploreScries?: number; // scries still to do before an explore (Twists and Turns, one each)
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
-    cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
+    cascade?: { exiled: ObjectId[]; hit?: ObjectId; /** Discover: its value, for "whenever you discover" (Curator of Sun's Creation). */ n?: number }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId; seen?: ObjectId[] }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
@@ -2663,7 +2663,8 @@ export type Action =
   /** Answers "handToTop": the cards from the hand, the first one ending on top of the library. */
   | { type: "handToTop"; player: PlayerId; objectIds: ObjectId[] }
   /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
-  | { type: "suspend"; player: PlayerId; objectId: ObjectId }
+  /** `x`: for "Suspend X" (Aeon Chronicler), the X paid and the time counters, at least 1 (CR 702.62a, 107.3). */
+  | { type: "suspend"; player: PlayerId; objectId: ObjectId; x?: number }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
   /** Pay a locked door's mana cost to unlock it: a special action (CR 116.2m, 709.5e). `door`: 0 left, 1 right. */

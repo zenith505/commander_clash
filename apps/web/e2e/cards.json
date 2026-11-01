@@ -309,6 +309,38 @@
   ]
  },
  {
+  "oracleId": "a1399cb8-f22a-487e-b539-2db47b09a790",
+  "name": "Aeon Chronicler",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Aeon Chronicler's power and toughness are each equal to the number of cards in your hand.\nSuspend X—{X}{3}{U}. X can't be 0.\nWhenever a time counter is removed from this card while it's exiled, draw a card.",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "151c867f-cc77-42de-9ae5-5fd2233ccdab",
   "name": "Afterlife from the Loam",
   "manaCost": "{5}{B}{B}{B}",

@@ -1378,6 +1378,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Brought Back: "Choose up to two target permanent cards in your graveyard that were put there from the battlefield this
   // turn. Return them to the battlefield tapped." is one instruction; they return at the same time. Continue?: up to four.
   text = text.replace(/^[Cc]hoose (up to (?:one|two|three|four) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
+  // The War in Heaven III: "Choose up to three target creature cards with total mana value 8 or less in your graveyard.
+  // Return each of them to the battlefield with a necrodermis counter on it. They're artifacts in addition to their other
+  // types." One instruction: they return at the same time, each entering with the counter (CR 614.1c) and as an
+  // artifact from then on (CR 611.2c).
+  text = text.replace(/^[Cc]hoose (up to (?:two|three|four) target [^.]*?creature cards with total mana value \d+ or less) in your graveyard\. Return each of them to the battlefield with an? ([a-z]+) counter on it\. They're artifacts in addition to their other types\.$/, "Return $1 from your graveyard to the battlefield with an additional $2 counter on it. Each of those creatures is an artifact in addition to its other types.");
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
   // can't be the targets of blue or black spells this turn": two instructions.
   text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
@@ -3971,6 +3976,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (filter?.kind !== "object") return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice", anyNumber: true }, { type: "gainLife", who: { ref: "you" }, n: { count: { kind: "sacrificedThisWayCount" }, times: Number(lifeEach[1]) } });
       si++;
+      continue;
+    }
+    // The Hunger Tide Rises IV: "Sacrifice any number of creatures. Search your library and/or graveyard for a creature card
+    // with mana value less than or equal to the number of creatures sacrificed this way ...": chosen as it resolves, the
+    // search reading how many were sacrificed.
+    if (renounce && renounce[1] === "creatures" && /^Search your library (?:and\/or graveyard )?for .+ with mana value less than or equal to the number of creatures sacrificed this way\b/.test(sentences[si + 1] ?? "")) {
+      const filter = pickFilter(renounce[1]!);
+      if (filter?.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice", anyNumber: true });
       continue;
     }
     // Mana Seism: "Sacrifice any number of lands, then add that much {C}": one {C} for each land sacrificed.
@@ -8784,8 +8798,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const paidText = payFirst.payX?.color ? whenPaid[1]!.replace(/^it deals that much damage\b/, "~ deals X damage") : whenPaid[1]!;
         if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
         // Numa, Joraga Chieftain: "distribute X +1/+1 counters among any number of target Elves": the X paid, divided as
-        // the reflexive ability is put on the stack (CR 603.12, 601.2d).
-        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && /^distribute X /.test(paidText));
+        // the reflexive ability is put on the stack (CR 603.12, 601.2d). Fire Lord Sozin: "put any number of target creature
+        // cards with total mana value X or less ...": the X paid bounds the targets chosen then.
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && (/^distribute X /.test(paidText) || / target .+? with total mana value X or less /.test(paidText)));
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -12144,6 +12159,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner) return null;
       const n = num(selfPTIf.n);
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : selfPTIf.cmp === "exactly" ? { min: n, max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
+    // Promising Stairs: "You win the game if there are eight or more different names among unlocked doors of Rooms you
+    // control": counted as it resolves, a Room with two unlocked doors having two names (rulings, CR 709.5d).
+    const doorNames = !ctx.spell ? new RegExp(`^[Yy]ou win the game if there are ${NUM} or more different names among unlocked doors of Rooms you control$`).exec(s) : null;
+    if (doorNames) {
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "unlockedDoors", names: true } }, min: num(doorNames[1]!) }, effects: [{ type: "winGame", who: { ref: "you" } }] });
       continue;
     }
     // Twenty-Toed Toad: "you win the game if there are twenty or more counters on it or you have twenty or more cards in

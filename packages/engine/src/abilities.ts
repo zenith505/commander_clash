@@ -166,6 +166,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
+  /** "The number of unlocked doors among Rooms you control" (Misty Salon, CR 709.5c); `names`: "different names among unlocked doors of Rooms you control" (Promising Stairs: a Room with two unlocked doors has two names, rulings). */
+  | { kind: "unlockedDoors"; names?: true }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue" }
   /** "Reveal the top card of your library. Draw cards equal to that card's mana value." (Interpret the Signs): the card "revealTop" revealed, while it's still that card. */
@@ -2926,7 +2928,7 @@ export type Effect =
      * of its targets. `caster`: the spell's caster copies it (Precursor Golem), else this ability's controller.
      * `onlySelf`: an intervening "if that spell targets only ~" (CR 603.4), checked again as it resolves.
      */
-    eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true; /** Ivy, Gleeful Spellthief: "The copy targets ~": one copy, aimed at this ability's source, made even if the spell has left the stack (rulings), if ~ could be every target of it. */ toSource?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
+    eachOther?: { among: TargetSpec; self?: true; caster?: true; /** Mirrorwing Dragon: "each other creature they control": `among` as the spell's caster sees it ("you" is that player). */ casterControls?: true; onlySelf?: true; /** Ivy, Gleeful Spellthief: "The copy targets ~": one copy, aimed at this ability's source, made even if the spell has left the stack (rulings), if ~ could be every target of it. */ toSource?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
     /** "That player copies it and may choose new targets for the copy" (Bonus Round): the spell's controller copies it and chooses the copy's targets, not this ability's controller. */ byController?: true }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; /** "allButOne": "remove all but one +1/+1 counter from it" (Lily Bowen). */ n: Amount | "all" | "allButOne"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
@@ -4601,6 +4603,8 @@ export type TriggerEvent =
   | "youInvestigate"
   /** "Whenever you give a gift" (Jolly Gerbils): a spell of yours whose gift was promised, or a gift trigger of yours, resolved (CR 702.174c). */
   | "youGiveGift"
+  /** "Whenever you discover" (Curator of Sun's Creation): the event's amount is the discover value. */
+  | "youDiscover"
   /** "Whenever you foretell a card" (Dream Devourer): exiling one from your hand with foretell, not casting it later (rulings, CR 702.143a). */
   | "youForetell"
   | "youFinalChapterTriggers" // Historian's Boon: the final chapter ability of a Saga you control triggered (CR 714.2c-d)
@@ -4698,6 +4702,10 @@ export type TriggerEvent =
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   /** "Whenever you pay ~'s cumulative upkeep" (Hibernation's End, CR 702.24a). */
   | "selfCumulativeUpkeepPaid"
+  /** "Whenever a time counter is removed from ~ while it's exiled" (Aeon Chronicler; works in exile, CR 113.6): once for each counter. */
+  | "selfTimeCounterRemovedExiled"
+  /** "When the last time counter is removed from ~ while it's exiled" (Riftmarked Knight; works in exile, CR 113.6). */
+  | "selfLastTimeCounterRemovedExiled"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
   | "selfExploits"
@@ -4865,7 +4873,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -5532,6 +5540,8 @@ export interface ManaSpend {
   classLevel?: true;
   /** "Or activate an equip ability" (Freya Crescent): any equip ability (CR 702.6a), whatever its source. */
   equipAbilities?: true;
+  /** "And unlock doors" (Smoky Lounge): the special action of unlocking a Room's door (CR 709.5e, 116.2m). */
+  unlockDoors?: true;
   /** "This mana can't be spent to pay generic mana costs" (Jegantha): spent on anything, but only on colored, hybrid or Phyrexian symbols' colored mana. */
   notGeneric?: true;
   /**
@@ -7072,7 +7082,8 @@ export interface CompiledCard {
   /** "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): life paid as part of the madness cost (CR 702.35a, 119.4). */
   madnessLife?: number;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
-  suspend?: { n: number; cost: string };
+  /** `x`: "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X time counters, X chosen as it's suspended, at least 1 (CR 702.62a, 107.3). */
+  suspend?: { n: number; cost: string; x?: true };
   /** Reconfigure (CR 702.151): attached to a creature, this Equipment isn't a creature (702.151b). */
   reconfigure?: true;
   /** Impending N—[cost] (CR 702.176a): cast for that cost (AltCostKind "impending"), it enters with N time counters. */

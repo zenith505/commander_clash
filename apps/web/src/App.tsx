@@ -466,7 +466,9 @@ type XPick =
   | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string }
   /** Turning a face-down permanent face up for "Disguise {X}{3}{W}" (CR 107.3d). */
-  | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string };
+  | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string }
+  /** "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X time counters, `min` 1 (CR 702.62a). */
+  | { mode: "suspend"; objectId: string; label: string; cost: string; max: number; value: number; extra?: string; min: number };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
@@ -1147,6 +1149,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setXPick(null);
     if (!pick) return;
     if (pick.mode === "cast") continueCast({ ...pick.draft, x: pick.value });
+    else if (pick.mode === "suspend") dispatch(planSuspend(s!, HUMAN, pick.objectId, pick.value) ?? [{ type: "suspend", player: HUMAN, objectId: pick.objectId, x: pick.value }]);
     else if (pick.mode === "faceUp") dispatch(planTurnFaceUp(s!, HUMAN, pick.objectId, pick.way, pick.value) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: pick.objectId, ...(pick.way ? { way: pick.way } : {}), ...(pick.value ? { x: pick.value } : {}) }]);
     else useAbility(pick.objectId, pick.index, pick.modes, pick.value);
   }
@@ -1676,6 +1679,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               }}
               onSuspend={() => {
                 setMenu(null);
+                // "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X first, as many time counters (CR 702.62a).
+                const sus = compileCard(cardOf(s, menu)).suspend;
+                if (sus?.x) {
+                  const max = Math.max(1, maxX((n) => planSuspend(s, HUMAN, menu, Math.max(1, n))));
+                  return setXPick({ mode: "suspend", objectId: menu, label: `Suspend ${cardOf(s, menu).name}`, cost: sus.cost, max, value: Math.min(max, 1), min: 1 });
+                }
                 dispatch(planSuspend(s, HUMAN, menu) ?? [{ type: "suspend", player: HUMAN, objectId: menu }]);
               }}
               onPlot={() => {
@@ -2237,7 +2246,7 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
 
 /** The bar shown while announcing X. */
 function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange: (x: number) => void; onDone: () => void; onCancel: () => void }) {
-  const min = pick.mode === "cast" ? (pick.min ?? 0) : 0;
+  const min = pick.mode === "cast" || pick.mode === "suspend" ? (pick.min ?? 0) : 0;
   const set = (n: number) => onChange(Math.max(min, Math.min(pick.max, Math.floor(n) || 0)));
   return (
     <div className="targeting x-pick">
@@ -4435,8 +4444,8 @@ function AbilityMenu({
             </button>
           ))}
       {suspend && (
-        <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
-          Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.x ? "X" : suspend.n} time counter${suspend.n === 1 ? "" : "s"}${suspend.x ? " (you choose X, at least 1)" : ""}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
+          Suspend {suspend.x ? "X" : suspend.n} <ManaCost cost={suspend.cost} size="sm" />
         </button>
       )}
       {foretell && (

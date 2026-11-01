@@ -2406,10 +2406,19 @@ function chooseSuspend(s: GameState, pid: PlayerId): Action[] | null {
   const mana = availableMana(s, pid);
   const options = player(s, pid)
     .hand.map((id) => ({ id, sus: compileCard(defOf(s, obj(s, id))).suspend }))
-    .filter((x): x is { id: string; sus: { n: number; cost: string } } => !!x.sus)
+    .filter((x): x is { id: string; sus: { n: number; cost: string; x?: true } } => !!x.sus)
     .filter((x) => !defOf(s, obj(s, x.id)).manaCost || mv(s, x.id) > mana + 1)
-    .sort((a, b) => a.sus.n - b.sus.n);
+    .sort((a, b) => (a.sus.x ? 1 : a.sus.n) - (b.sus.x ? 1 : b.sus.n));
   for (const x of options) {
+    // "Suspend X": the most time counters we can pay for, up to 4 (each one a trigger for Aeon Chronicler and its kin,
+    // but a longer wait).
+    if (x.sus.x) {
+      for (let n = 4; n >= 1; n--) {
+        const plan = planSuspend(s, pid, x.id, n);
+        if (plan) return plan;
+      }
+      continue;
+    }
     const plan = planSuspend(s, pid, x.id);
     if (plan) return plan;
   }

@@ -417,6 +417,9 @@ function parseManaProduced(text: string): ManaProduce | null {
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only on costs that contain {X}.") return { xCosts: true, text: sentence };
+  // Smoky Lounge: "Spend this mana only to cast Room spells and unlock doors": a Room spell (an enchantment subtype, CR
+  // 205.3h), or unlocking a door (a special action, CR 709.5e).
+  if (sentence === "Spend this mana only to cast Room spells and unlock doors.") return { spells: { kind: "spell", subtypes: ["Room"], text: "Room spells" }, unlockDoors: true, text: sentence };
   // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
   // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.

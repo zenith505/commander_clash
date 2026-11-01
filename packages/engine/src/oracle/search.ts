@@ -97,7 +97,9 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // Light-Paws: "an Aura card with mana value less than or equal to that Aura and with a different name than each Aura you
   // control": the Aura that entered (the trigger's subject, as it last existed), and the names of those you control as it
   // resolves.
-  const unlike = / and with a different name than each ([A-Z][a-z]+) you control$/.exec(m[3]!);
+  // Central Elevator: "a Room card that doesn't have the same name as a Room you control": the names of the unlocked doors
+  // of Rooms you control as it resolves (a Room has only those, rulings).
+  const unlike = / and with a different name than each ([A-Z][a-z]+) you control$/.exec(m[3]!) ?? / that doesn't have the same name as an? ([A-Z][a-z]+) you control$/.exec(m[3]!);
   const unlikeSpec = unlike ? parseSearchFilter(`${unlike[1]} card`) : undefined;
   if (unlike && (!unlikeSpec || n !== 1 || eachX || share || total)) return null;
   const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : unlike ? m[3]!.slice(0, unlike.index).replace(/ with mana value less than or equal to that Aura$/, " with mana value less than or equal to that permanent's mana value") : m[3]!;

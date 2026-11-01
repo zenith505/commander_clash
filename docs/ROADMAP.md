@@ -1,7 +1,7 @@
 # Roadmap
 
-28,676 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,946 of 4,988 (99%), top 10,000: 9,213 of
+28,686 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,946 of 4,988 (99%), top 10,000: 9,223 of
 9,979 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1350,6 +1350,30 @@ line blocks.
    can't cause you to sacrifice permanents": every effect sacrifice, edict, "may sacrifice" and "unless you sacrifice"
    option would need to know who controls the source, while costs, mana abilities and the legend rule stay allowed,
    rulings; about thirty sacrifice sites).
+   Round 228 (fresh cards from the top): "During your turn, you may play cards from your graveyard" (Emet-Selch //
+   Hades, Sorcerer of Eld: lands and spells, all costs paid, the timing rules followed); "Once during each of your turns,
+   you may cast a spell from your hand by paying life equal to its mana value" (Cramped Vents // Access Maze); "Assassin
+   spells you cast have freerunning {B}{B}" and "you may pay {W}{U}{B}{R}{G} if that player has 10 or less life. When you
+   do, that player loses the game" (Ezio Auditore da Firenze); "Each legendary spell you cast that's one or more colors
+   has web-slinging {G}{W}{U}" (Peter Parker // Amazing Spider-Man); "You may cast artifact spells from your graveyard by
+   paying 3 life in addition to paying their other costs. If you cast a spell this way, that artifact enters with a
+   finality counter on it" (Noctis, Prince of Lucis; with a free permission too, the one that asks nothing more is used);
+   "each Spider and legendary creature you control" (Miles Morales // Ultimate Spider-Man); "Each creature spell you cast
+   with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost" and "Blitz costs you pay cost {1}
+   less for each time you've cast your commander from the command zone" (Henzie "Toolbox" Torre); "Reveal the first card
+   you draw on each of your turns" (Keranos, God of Storms); "Copy target activated or triggered ability you control from
+   another legendary source that's not a commander" (The Peregrine Dynamo); "When you do, exile that card" after
+   entering as a copy of a creature card in a graveyard (Superior Spider-Man). The granted Blitz, Web-slinging and
+   Freerunning cast-menu entries have an e2e test; `npm run e2e:cards` now also reads single-quoted names. +10 (28,686
+   of 31,936 with round 227).
+   Out after round 228 (looked at, not done): Bilbo, Thief in the Night (a paid cast from a graveyard during
+   resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
+   card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade ("until
+   end of combat on your next turn"); Auntie Ool, Cursewretch (Ward—Blight); Arlinn's back face (a temporary "enters with
+   an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief, Ninja Teen (granted sneak from
+   the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
+   Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
+   mechanism).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

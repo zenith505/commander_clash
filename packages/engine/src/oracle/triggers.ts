@@ -120,6 +120,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // dealt to a player at once added up, rulings).
   [/^Whenever one or more opponents each lose exactly 1 life, (.+)$/, "opponentsLoseOneLife"],
   [/^Whenever an opponent gains life, (.+)$/, "opponentGainsLife"],
+  [/^Whenever a player gains life, (.+)$/, "playerGainsLife"],
   [/^Whenever you lose life, (.+)$/, "youLoseLife"],
   // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
   [/^Whenever you play a land, (.+)$/, "youPlayLand"],
@@ -2895,6 +2896,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard" } };
   }
+  // Bridge from Below: "Whenever a nontoken creature is put into your graveyard from the battlefield, if ~ is in your
+  // graveyard, create a 2/2 black Zombie creature token", "When a creature is put into an opponent's graveyard from the
+  // battlefield, if ~ is in your graveyard, exile ~": abilities that work only there (CR 113.6m), with an intervening if
+  // (CR 603.4), so no token once it has left (rulings); not a card dying at the same time (CR 603.10a, triggers.ts).
+  const inYardDo = /^((?:When|Whenever)\b[^,]+), if ~ is in your graveyard, (create [^.~]+ tokens?|exile ~)\.$/.exec(line);
+  if (inYardDo && !/^(?:When|Whenever) ~ /.test(inYardDo[1]!)) {
+    const exileSelf = inYardDo[2] === "exile ~";
+    const t = parseTrigger(`${inYardDo[1]}, ${exileSelf ? "draw a card" : inYardDo[2]}.`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host || t.body.effects.length !== 1) return "fail";
+    const body = exileSelf ? { targets: [], effects: [{ type: "exile" as const, what: { ref: "selfCard" as const } }], text: "exile ~." } : t.body;
+    return { ...t, body, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
+  }
   // Vengeful Pharaoh: "Whenever combat damage is dealt to you or a planeswalker you control, if ~ is in your graveyard,
   // destroy target attacking creature, then put ~ on top of your library": an ability that works only in the graveyard
   // with an intervening if (CR 603.4); once for you and once for each planeswalker dealt combat damage (rulings).
@@ -4005,6 +4018,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Cradle of Vitality: "put a +1/+1 counter on target creature for each 1 life you gained": one counter per life of
       // that one life-gaining event (rulings), as "that many".
       if (event === "youGainLife") text = text.replace(/\bput a \+1\/\+1 counter on (target creature) for each 1 life you gained\.$/, "put that many +1/+1 counters on $1.");
+      // False Cure: "that player loses 2 life for each 1 life they gained": twice the life of that one life-gaining event.
+      if (event === "playerGainsLife") text = text.replace(/^that player loses 2 life for each 1 life they gained\.$/, "that player loses twice that much life.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).
@@ -4012,9 +4027,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "playerGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
@@ -4044,7 +4059,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // much life": the attacking player is the active player (CR 506.2), parsed as "that player" and then made that one.
       const attackingPlayer = event === "selfIsDealtCombatDamage" && /\battacking player\b/.test(text) && !/\b(?:that|defending|the active) player\b/.test(text);
       if (attackingPlayer) text = text.replace(/\battacking player\b/g, "that player");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: attackingPlayer || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: attackingPlayer || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "playerGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       // Brood of Cockroaches: "When ~ is put into your graveyard from the battlefield, at the beginning of the next end step,
       // you lose 1 life and return ~ to your hand": one delayed trigger doing both (rulings), about the card in the
       // graveyard now; if it has left there by then, it stays where it went (CR 400.7).

@@ -974,6 +974,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
     fromFloating((o, ctrl, triggers) => ctrl === ev.player && add(o, ctrl, (e) => e === "youGainLife", triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
+    // False Cure: "Until end of turn, whenever a player gains life, ...": any player's, "that player" the one who gained it.
+    for (const id of s.battlefield) add(obj(s, id), controllerOf(s, obj(s, id)), (e) => e === "playerGainsLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    fromFloating((o, ctrl, triggers) => add(o, ctrl, (e) => e === "playerGainsLife", triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);

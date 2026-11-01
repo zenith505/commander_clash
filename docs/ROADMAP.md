@@ -3828,17 +3828,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or pay {1}"), Druid of the Emerald Grove (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
   cards named ~"), Faces of the Past (creatures that share a creature type with it), Diaochan, Artful Beauty (a target
   of an opponent's choice).
+- Round B66 (eight from the B10 list, and Stormwild Capridor, Kentaro, the Smiling Cat, Majestic Myriarch and
+  Thunderous Orator from EDHREC rank about 19,700 up): "If damage would be dealt to you, prevent that damage. You gain
+  life equal to the damage prevented this way" (Purity: one life gain for each damage event, CR 615.5 and 119.10), "If
+  noncombat damage would be dealt to ~, prevent that damage. Put a +1/+1 counter on ~ for each 1 damage prevented this
+  way" (Stormwild Capridor; static damage rules' extra effects now apply, before only the plan saw them), "Whenever a
+  creature you control dies, if ~ is in your graveyard" and "When a nontoken creature is put into your graveyard from
+  the battlefield, if ~ is in your graveyard, exile ~" (Bridge from Below), "If you have no cards in hand, ~ can't be
+  countered and the damage can't be prevented" (Demonfire: checked when something would counter it and as it deals the damage), Sadistic
+  Sacrament's kicked search, "You may pay {X} rather than pay the mana cost for Samurai spells you cast, where X is that
+  spell's mana value" (Kentaro: a new alternative cost, "Cast it for" in the card's menu, X is 0 for spells with {X},
+  CR 107.3 and 601.2f), "Your maximum hand size is equal to the number of hour counters on ~" (Midnight Oil), "At the
+  beginning of the next end step, sacrifice it. If you do, you gain life equal to its toughness" (Spinal Embrace: its
+  toughness as it last existed), "Whenever a player gains life, that player loses 2 life for each 1 life they gained"
+  (False Cure), "loses 2 life plus 2 life for each Spirit sacrificed this way" (Devouring Greed), "~ gains X until end
+  of turn if you control a creature with X. The same is true for ..." (Majestic Myriarch, Thunderous Orator: each
+  hexproof variant as that variant, rulings). +12 (28,673 of 31,936 with round 226).
+- Out after round B66 (looked at, not done): Swans of Bryn Argoll (its draws in the middle of damage could be replaced
+  by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Soul Exchange (the exiled
+  creature's last known types for "if it was a Thrull"), Domri, Chaos Bringer (riot on mana spent from a loyalty
+  ability), Dreamshaper Shaman (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
+  (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way"), Murktide Regent (which cards
+  delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche, Light Up the Night, Arachnus
+  Spinner, Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
+  granted abilities with their own costs).
 - Next for Lane B, least played first: the unsupported ones no round has written down yet, from EDHREC rank about
-  19,700 up (rounds B54 to B65 took the easier ones up to about 15,000 but left some of that range unread: about 110
+  19,700 up (rounds B54 to B66 took the easier ones up to about 15,000 but left some of that range unread: about 110
   there are still unsupported and unlisted, among them Dulcet Sirens; `npm run popular -- --least`, minus the names
   already in ROADMAP and HISTORY), then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
-  Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Spinal Embrace, Song of Inspiration, Countersculpt,
-  Order of Succession, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Devouring Greed, Infernal
-  Tutor, Sadistic Sacrament, Kalitas, Drain Power, Purity, Cloudkill, Volcano Hellion, Bridge from Below, Demonfire,
-  Drain Life, Desolation, War Tax, Urza's Sylex, Diabolic Servitude, Murktide Regent, Shared Fate, Soul
-  Exchange.
+  Reweave, Kheru Mind-Eater, Day of the Dragons, Bloodbond March, Song of Inspiration, Countersculpt, Order of
+  Succession, The Rack, Xander's Pact, Infernal Tutor, Kalitas, Drain Power, Cloudkill, Volcano Hellion, Drain Life,
+  Desolation, Urza's Sylex, Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Turtle Van, Haunting Imitation, The Fugitive Doctor, Shifting Shadow, Prince of Thralls,
   Eriette, Gastal Thrillroller, Manifold Insights, Glorfindel, Renegade Krasis, Fortune's Favor,

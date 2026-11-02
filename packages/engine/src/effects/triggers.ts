@@ -6,7 +6,7 @@ import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, dr
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
-import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
+import type { CardDef, Color, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
@@ -256,10 +256,10 @@ export type TriggerSourceEvent =
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number; /** Combat damage (a batch is all combat damage or none, CR 510.2). */ combat?: true }
   /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
-  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true; /** The source was a creature as it dealt the damage. */ creature?: true }
+  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true; /** The source was a creature as it dealt the damage. */ creature?: true; /** The source was a spell (Tephraderm). */ spell?: true }
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
-  | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
+  | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
   | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true }
   /** A permanent dealt damage to a creature (`id`). */
@@ -1720,16 +1720,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
     // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.
     const fromPermanent = o?.zone === "battlefield" ? o : undefined;
-    const fits = (t: TriggeredAbility) => {
+    const fits = (t: TriggeredAbility, w?: GameObject) => {
       const d = t.damagesYou;
       if (!d || (d.combat && !ev.combat)) return false;
+      if (d.chosenColor) return !!w?.chosen?.color && !!ev.colors?.includes(w.chosen.color);
       if (d.by) return d.by === "any" || (d.by === "you") === (ev.by === ev.player);
       return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
     };
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.player) continue;
-      add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+      add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t, w), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
     }
     // Harsh Justice: "This turn, whenever an attacking creature deals combat damage to you, ...": a delayed trigger of the
     // damaged player's (CR 603.7b).
@@ -1846,6 +1847,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // combat damage or not (rulings), that creature the subject.
     const creature = ev.srcId && ev.creature ? s.objects[ev.srcId] : undefined;
     if (o?.zone === "battlefield" && creature) addHosted(o, (e) => e === "creatureDealsDamageToAttached", undefined, creature, { amount: ev.amount, player: ev.by });
+    if (o?.zone === "battlefield" && creature) add(o, controllerOf(s, o), (e) => e === "creatureDealsDamageToSelf", undefined, undefined, creature, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
+    if (o?.zone === "battlefield" && ev.spell) add(o, controllerOf(s, o), (e) => e === "spellDealsDamageToSelf", undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
     const dealer = ev.combat && ev.srcId ? s.objects[ev.srcId] : undefined;
     if (o?.zone === "battlefield" && dealer) {
       add(o, controllerOf(s, o), (e) => e === "creatureDealsCombatDamageToSelf", undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });

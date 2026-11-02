@@ -659,6 +659,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the (?:total )?(?:amount of )?damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsDamage" });
   // Discordant Spirit: "for each 1 damage dealt to you this turn": by any source, what was really dealt.
   if (each ? /^1 damage dealt to you this turn$/i.test(p) : /^the (?:total )?(?:amount of )?damage dealt to you this turn$/i.test(p)) return count({ kind: "playerDamageThisTurn", who: { ref: "you" } });
+  // Reverse Polarity: "the damage dealt to you so far this turn by artifacts": by sources that were artifacts as they dealt
+  // it (TurnLog.artifactDamage), what was really dealt.
+  if (!each && /^the damage dealt to you so far this turn by artifacts$/i.test(p)) return count({ kind: "playerDamageThisTurn", who: { ref: "you" }, byArtifacts: true });
   // Knollspine Dragon: "the damage dealt to target opponent this turn": by any source, what was really dealt (rulings).
   if (!each && ctx && /^the damage dealt to target opponent this turn$/i.test(p)) {
     const i = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });

@@ -407,6 +407,8 @@ export interface GameObject {
     more?: number;
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */
     oneOf?: string;
+    /** With `oneOf`: "up to two of those cards" (March of Reckless Joy): this many of the group may be played. */
+    oneOfMax?: number;
     /**
      * "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only a spell like
      * this, the face cast counting (an instant Adventure of a creature card, rulings).
@@ -2546,7 +2548,7 @@ export interface Resolving {
     /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
     join?: { queue: PlayerId[]; paid: number; asked?: number; by: Record<PlayerId, number> };
     /** "Then repeat this process X more times": the passes left (this one too), the next instruction, and the scratch from before it started. */
-    repeat?: { left: number; step?: number; keep: string[] };
+    repeat?: { left: number; step?: number; keep: string[]; gathered?: ObjectId[] };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */

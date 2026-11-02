@@ -277,6 +277,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const one: Effect = { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, ...(who ? { who } : {}) };
     return m[2] ? [one, one] : [one];
   }
+  // Valgavoth's Onslaught: "Manifest dread X times" (the spell's X): one manifest dread after another (rulings: players
+  // can't act between them), every face-down creature remembered for "each of those creatures".
+  if (/^Manifest dread X times$/.test(s) && ctx.spell) return [{ type: "repeat", n: amt("X"), gather: true, effects: [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false }] }];
   // "Manifest the top card of your library", "Cloak the top two cards of your library" (CR 701.40a, 701.58a): one at a
   // time (CR 701.40e).
   if ((m = new RegExp(`^(?:(Its controller) (manifests|cloaks)|(Manifest|Cloak)) the top (card|${NUM} cards) of (?:your|their) library$`, "i").exec(s))) {
@@ -573,6 +576,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter }] : null;
+  }
+  // Moldgraf Monstrosity: "return two creature cards at random from your graveyard to the battlefield": that many
+  // different ones, chosen as it resolves, all of them if there are fewer; they enter at the same time.
+  if ((m = /^[Rr]eturn (two|three) (.+? creature cards) at random from your graveyard to the battlefield$/.exec(s)) || (m = /^[Rr]eturn (two|three) (creature cards) at random from your graveyard to the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[2]!.replace(/cards$/, "card"));
+    return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter, n: num(m[1]!) }] : null;
   }
   // Tariel, Reckoner of Souls: "Put a creature card chosen at random from target opponent's graveyard onto the battlefield
   // under your control": chosen as it resolves (rulings); the opponent is the only target.

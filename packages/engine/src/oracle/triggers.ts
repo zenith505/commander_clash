@@ -2636,6 +2636,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever you cast a spell, ${castInCombat[1]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "combat" } } : "fail";
   }
+  // The Blue Spirit: "Whenever a nontoken creature you control enters during combat, ...": only while the game is in a
+  // combat phase (CR 506.1) as it enters.
+  const entersInCombat = /^Whenever (an? [^,]+? you control) enters during combat, (.+)$/.exec(line);
+  if (entersInCombat) {
+    const t = parseTrigger(`Whenever ${entersInCombat[1]} enters, ${entersInCombat[2]}`);
+    return t && t !== "fail" && t.event === "permanentEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "combat" } } : "fail";
+  }
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
   if (lossOnYourTurn) {
     const t = parseTrigger(`Whenever an opponent loses life, ${lossOnYourTurn[1]}`);

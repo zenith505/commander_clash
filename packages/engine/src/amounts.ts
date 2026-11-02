@@ -731,6 +731,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         }).length;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "unlockedDoors":
+      // Promising Stairs: a Room has the names of its unlocked doors only (CR 709.5d, rulings), so count the names.
+      if (c.names)
+        return new Set(
+          s.battlefield.flatMap((id) => {
+            const o = s.objects[id]!;
+            const ch = o.unlocked?.length ? view(o) : undefined;
+            return ch && ch.controller === ctx.controller && ch.subtypes.includes("Room") ? ch.name.split(" // ").filter(Boolean) : [];
+          }),
+        ).size;
       return s.battlefield.reduce((n, id) => {
         const o = s.objects[id]!;
         // Read through the layers applied so far (a static ability counting this is applied in them).
@@ -1187,6 +1196,8 @@ function describeCount(c: Count): string {
       return "#cards returned to your hand";
     case "milledManaValue":
       return "the total mana value of the milled cards";
+    case "unlockedDoors":
+      return c.names ? "#different names among unlocked doors of your Rooms" : "#unlocked doors among your Rooms";
     case "exiledTopMatching":
       return `#${c.filter.text}s exiled`;
     case "exiledTopManaValue":
@@ -1404,8 +1415,6 @@ function describeCount(c: Count): string {
       return "#cards drawn this turn";
     case "discardedThisTurn":
       return "#cards discarded this turn";
-    case "unlockedDoors":
-      return "#unlocked doors among your Rooms";
     case "playersAttacked":
       return c.byYou ? "#opponents you're attacking" : "#players being attacked";
     case "treasureSpent":

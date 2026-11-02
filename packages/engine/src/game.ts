@@ -453,7 +453,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "suspend":
       requireNoPending(s);
-      suspendCard(s, p, action.objectId);
+      suspendCard(s, p, action.objectId, action.x);
       break;
     case "plot":
       requireNoPending(s);
@@ -11247,7 +11247,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
       if (face !== 0 && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !asFace(s, o, face, () => nameLandBan(s, pid, defOf(s, o)))) out.push({ type: "playLand", player: pid, objectId: id, face });
     for (const face of castableFaces(s, o))
       if (castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, { face }) === null && asFace(s, o, face, () => !spellTargets(s, id).length && !spellModes(s, id))) out.push({ type: "castSpell", player: pid, objectId: id, face });
-    if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
+    if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id, ...(compileCard(defOf(s, o)).suspend?.x ? { x: 1 } : {}) });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
     if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
   }
@@ -11275,7 +11275,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
  * action (CR 116.2f) they can take whenever they could begin to cast the card from their hand (CR 702.62a, c):
  * its card type's timing and anything stopping it from being cast count; targets and its mana cost don't (rulings).
  */
-export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId, x?: number): string | null {
   const o = s.objects[id];
   if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be suspended";
   const d = defOf(s, o);
@@ -11289,21 +11289,30 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   // Only if you could begin to cast it: not under Silence or Rule of Law (CR 702.62a, rulings on Silence).
   const limit = castLimitProblem(s, pid, d);
   if (limit) return limit;
-  if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other")) return `not enough mana to suspend ${d.name} (${sus.cost})`;
+  // "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): the X paid as generic mana, 1 or more (CR 107.3). Without an
+  // X given, whether X = 1 can be paid.
+  if (sus.x && x !== undefined && (!Number.isInteger(x) || x < 1)) return "X can't be 0";
+  const extra = sus.x ? (x ?? 1) : 0;
+  if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other", extra)) return `not enough mana to suspend ${d.name} (${sus.cost}${sus.x ? ` with X=${x ?? 1}` : ""})`;
   return null;
 }
 
 /** Suspend a card (CR 702.62a): pay its suspend cost and exile it with N time counters on it. It doesn't use the stack. */
-function suspendCard(s: GameState, p: Player, id: ObjectId) {
-  const problem = suspendProblem(s, p.id, id);
+function suspendCard(s: GameState, p: Player, id: ObjectId, x?: number) {
+  const o0 = s.objects[id];
+  const sus0 = o0 ? compileCard(defOf(s, o0)).suspend : undefined;
+  if (sus0?.x && x === undefined) throw new RulesError("choose X to suspend it (X can't be 0)");
+  const problem = suspendProblem(s, p.id, id, x);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const d = defOf(s, o);
   const sus = compileCard(d).suspend!;
-  spendFromPool(s, p.id, parseManaCost(sus.cost), "other");
+  // Suspend X: X time counters, the X paid (CR 702.62a).
+  const n = sus.x ? x! : sus.n;
+  spendFromPool(s, p.id, parseManaCost(sus.cost), "other", sus.x ? n : 0);
   moveObject(s, id, "exile");
-  o.counters.time = sus.n;
-  log(s, `${p.name} suspends ${d.name} with ${sus.n} time counter${sus.n === 1 ? "" : "s"} (${sus.cost}).`);
+  o.counters.time = n;
+  log(s, `${p.name} suspends ${d.name} with ${n} time counter${n === 1 ? "" : "s"} (${sus.cost}${sus.x ? ` with X=${n}` : ""}).`);
   s.passedInSuccession = [];
 }
 
@@ -11479,7 +11488,7 @@ export function unlockProblem(s: GameState, pid: PlayerId, id: ObjectId, door: n
   if (!o || cost === undefined) return "only a locked door of a Room on the battlefield can be unlocked";
   if (controllerOf(s, o) !== pid) return "only a Room you control can be unlocked";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only unlock a door during your main phase while the stack is empty";
-  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${roomOf(s, o)!.faces![door]!.name} (${cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(cost), { ability: o, unlock: true })) return `not enough mana to unlock ${roomOf(s, o)!.faces![door]!.name} (${cost})`;
   return null;
 }
 
@@ -11489,7 +11498,7 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const cost = unlockCost(s, o, door)!;
-  spendFromPool(s, p.id, parseManaCost(cost), "other");
+  spendFromPool(s, p.id, parseManaCost(cost), { ability: o, unlock: true });
   log(s, `${p.name} unlocks ${roomOf(s, o)!.faces![door]!.name} (${cost}).`);
   setUnlocked(s, o, [...o.unlocked!, door]);
   s.passedInSuccession = [];

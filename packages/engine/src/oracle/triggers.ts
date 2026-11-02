@@ -929,6 +929,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // symbols are of their colors, CR 107.4e-f); "create that many" is that number of them.
   const symM = !pw && !kwM && !xM ? / with one or more (white|blue|black|red|green) mana symbols in its mana cost$/.exec(what) : null;
   if (symM) what = what.slice(0, symM.index);
+  // Voracious Bibliophile: "a spell with one or more targets, draw that many cards": as many as it was cast with.
+  const tgtsM = !pw && !kwM && !xM && !symM && !tg ? / with one or more targets$/.exec(what) : null;
+  if (tgtsM) what = what.slice(0, tgtsM.index);
   const symColor = symM ? (({ white: "W", blue: "U", black: "B", red: "R", green: "G" }) as const)[symM[1] as "white"] : undefined;
   // Lullmage's Familiar: "Whenever you cast a kicked spell": its kicker cost was paid as it was cast (CR 702.33d).
   const kickedM = /^kicked(?: spell)?$/.exec(what);
@@ -977,6 +980,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
   const symMany = !!symColor && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
   if (symMany) text = text.replace(/\bthat many\b/g, "X");
+  const tgtsMany = !!tgtsM && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
+  if (tgtsMany) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
   const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
@@ -991,8 +996,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
+  if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -1377,13 +1383,18 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   // The Master, Mesmerist: "Whenever a creature with skulk deals combat damage to one of your opponents, put a +1/+1
   // counter on ~ and draw a card": with the keyword as it deals the damage.
-  const any = /^Whenever a creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
-  if (any) {
-    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[3]!)) return "fail";
-    const body = parseBody(any[3]!, { subjectIt: true, eventPlayer: true });
+  // The Rani: "Whenever a goaded creature deals combat damage to one of your opponents, investigate": anyone's creature
+  // goaded as it deals the damage (CR 701.15), once for each creature (unlike Puppet Master's "one or more").
+  const any = /^Whenever a (goaded )?creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
+  if (any && !(any[1] && any[2])) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[4]!)) return "fail";
+    const body = parseBody(any[4]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
-    const kw = any[2] ? { keywords: [any[2].replace(/^./, (c) => c.toUpperCase())] } : {};
-    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], ...kw, text: `creature${any[1] ?? ""}` }, anyone: true }, body, toOpponent: true };
+    const kw = any[3] ? { keywords: [any[3].replace(/^./, (c) => c.toUpperCase())] } : {};
+    const spec = any[1] ? parseTargetPhrase("goaded creature") : undefined;
+    if (any[1] && spec?.kind !== "object") return "fail";
+    const filter: TargetSpec = spec ? { ...spec, text: "goaded creature" } : { kind: "object", types: ["Creature"], ...kw, text: `creature${any[2] ?? ""}` };
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter, anyone: true }, body, toOpponent: true };
   }
   // The Clone Saga: "Whenever a creature with the chosen name deals combat damage to a player this turn, draw a card" (a
   // delayed trigger, see floatingTrigger in body.ts): anyone's creature with that name (CR 201.2), the name bound as the
@@ -2475,6 +2486,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Lifeline: "Whenever a creature dies, if another creature is on the battlefield, return the first card to the
+    // battlefield under its owner's control at the beginning of the next end step": another than the one that died, which
+    // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if
+    // it's still in the graveyard then, under its owner's control.
+    .replace(/^Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step\.$/, "Whenever a creature dies, if a creature is on the battlefield, return that card to the battlefield under its owner's control at the beginning of the next end step.")
     // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.

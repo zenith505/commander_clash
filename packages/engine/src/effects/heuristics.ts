@@ -68,6 +68,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // "Put it onto the battlefield attached to target creature" (Arachnus Spinner, the only one): Arachnus Web, which stops
     // that creature attacking or blocking, for an opponent's creature.
     if (e.type === "search" && e.dest.attachTo?.ref === "target") mark(e.dest.attachTo.index, e.dest.attachTo.n);
+    // An Aura token made attached to the target: The Rani's Mark of the Rani ("+2/+2 and is goaded") and Smoke Blessing (1
+    // damage to the enchanted creature's controller as it dies) are for an opponent's creature; Estrid's Mask for our own.
+    if (e.type === "createToken" && e.attachTo?.ref === "target" && e.token.subtypes.includes("Aura") && !e.token.subtypes.includes("Role") && auraTokenHarms(e.token.abilities ?? "")) mark(e.attachTo.index, e.attachTo.n);
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
@@ -105,6 +108,12 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
   body.targets.forEach((t, i) => t.kind === "player" && / to enchant$/.test(t.text) && !t.helpsEnchanted && mark(i));
   body.targets.forEach((t, i) => t.harmsEnchanted && mark(i));
   return harm;
+}
+
+/** An Aura token's abilities do what it's attached to (or its controller) harm. */
+function auraTokenHarms(text: string): boolean {
+  const c = compileGranted(text);
+  return c.statics.some((st) => st.affects.kind === "attached" && modsAreHarmful(st.mods)) || c.triggers.some((tr) => allEffects(tr.body.effects).some((e) => (e.type === "damage" && e.to.ref === "subjectController") || (e.type === "loseLife" && e.who.ref === "subjectController")));
 }
 
 /**

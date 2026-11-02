@@ -3038,6 +3038,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: "permanent spell" }))(spec), energy: n };
       continue;
     }
+    // Primal Prayers: "You may cast creature spells with mana value 3 or less by paying {E} rather than paying their mana
+    // costs. If you cast a spell this way, you may cast it as though it had flash.": an alternative cost of energy (CR
+    // 118.9, 107.14) matched by printed mana value with X at 0 (rulings), and only a spell cast this way has flash timing.
+    const prayers = new RegExp(`^You may cast creature spells with mana value (\\d+) or less by paying ((?:\\{E\\})+) rather than paying their mana costs\\. If you cast a spell this way, you may cast it as though it had flash\\.$`).exec(line);
+    if (prayers) {
+      const spec = parseTargetPhrase(`creature card with mana value ${prayers[1]} or less from a graveyard`);
+      if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `creature spell with mana value ${prayers[1]} or less` }))(spec), energy: prayers[2]!.length / 3, flash: true };
+      continue;
+    }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
     // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
     const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);
@@ -3765,6 +3775,14 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n: annCount, action: "sacrifice" }], text: `Annihilator X: defending player sacrifices X permanents, where X is ${annX![1]}.` } });
       continue;
     }
+    // Fumiko the Lowblood: "~ has bushido X, where X is the number of attacking creatures": bushido (CR 702.45a) with X
+    // counted each time it resolves (rulings).
+    const bushidoX = /^~ has bushido X, where X is (the number of attacking creatures)\.$/.exec(line);
+    const bushidoCount = bushidoX && parseCount(bushidoX[1]!, null);
+    if (bushidoCount) {
+      out.triggers.push({ event: "selfBlocksOrBecomesBlocked", body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: bushidoCount, toughness: bushidoCount }], duration: "endOfTurn" }], text: `Bushido X: ~ gets +X/+X until end of turn, where X is ${bushidoX![1]}.` } });
+      continue;
+    }
     // The Water Crystal, Bruvac the Grandiloquent: a replacement effect on milling (CR 614.1a, 701.17).
     const millMore = /^If an opponent would mill one or more cards, they mill (that many cards plus (\w+)|twice that many cards) instead\.$/.exec(line);
     if (millMore && !Number.isNaN(num(millMore[2] ?? "0"))) {
@@ -3775,6 +3793,14 @@ export function compile(d: CardDef): CompiledCard {
     // no priority in between (rulings, CR 504.1).
     if (line === "You draw a card during each opponent's draw step.") {
       out.drawsInOpponentsDrawStep = true;
+      continue;
+    }
+    // Pardic Firecat, Diligent Farmhand: "If ~ is in a graveyard, effects from spells named Flame Burst count it as a card
+    // named Flame Burst": only when such a spell counts cards by that name (Count cardsInGraveyard); it keeps its own name
+    // everywhere else.
+    const countsAs = /^If ~ is in a graveyard, effects from spells named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) count it as a card named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\.$/.exec(line);
+    if (countsAs && countsAs[1] === countsAs[2]) {
+      out.countsAsNamed = countsAs[1]!;
       continue;
     }
     if (line === "Skip your draw step.") {

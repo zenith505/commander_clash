@@ -2055,7 +2055,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
   lifeForMv: "life equal to its mana value instead of its mana cost, once during each of your turns (Demon of Fate's Design); X is 0",
   genericMv: "generic mana equal to its mana value instead of its mana cost (Kentaro, the Smiling Cat); X is 0",
-  energyForSpell: "energy instead of its mana cost (Nissa, Worldsoul Speaker); X is 0",
+  energyForSpell: "energy instead of its mana cost (Nissa, Worldsoul Speaker; Primal Prayers, which also lets you cast it any time you could cast an instant); X is 0",
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",

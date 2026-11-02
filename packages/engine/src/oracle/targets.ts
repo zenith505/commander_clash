@@ -408,6 +408,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
+  if (ctx.lastGathered && /^(?:each of )?those creatures$/i.test(x)) return { ref: "created" };
   // "Each creature you control named ~" (Gruff Triplets): with the source's name (CR 201.5), as it last existed if it's gone.
   // Genasi Enforcers: "Creatures you control named ~ get +1/+0 until end of turn".
   // Cylian Sunsinger: "~ and each other creature with the same name as it": every creature named ~ (CR 201.2), anyone's.

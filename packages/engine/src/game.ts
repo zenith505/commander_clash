@@ -4283,7 +4283,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // Possibility Technician: only while that player controls a Kavu.
   if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
-  if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
+  // March of Reckless Joy: "up to two of those cards", so not once two have been.
+  if (m.oneOf && (s.oneOfUsed ?? []).filter((g) => g === m.oneOf).length >= (m.oneOfMax ?? 1)) return false;
   // Chandra, Hope's Beacon: only a card with a face that is a spell of this kind.
   if (m.castFilter && !castFilterFits(s, o, m.castFilter)) return false;
   // "For each nonland card type, ... a spell of that type" (Aminatou's Augury): a type still free for it.
@@ -5391,7 +5392,11 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
       const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
-      const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
+      // Locket of Yesterdays: the cards in the caster's graveyard sharing a name with the spell (CR 201.2a), not the spell
+      // itself if it's cast from there (it's on the stack as its cost is determined, rulings).
+      const names = d.name.split(" // ");
+      const same = m.perSameNameInGraveyard ? s.players[pid]!.graveyard.filter((id) => id !== o.id && defOf(s, obj(s, id)).name.split(" // ").some((x) => names.includes(x))).length : undefined;
+      const n = same !== undefined ? m.n * same : shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: m.timesForCaster ? pid : c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }

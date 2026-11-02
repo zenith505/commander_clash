@@ -114,6 +114,8 @@ export interface Ctx {
   lastChosen?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** The last sentence was a gathering repeat (Valgavoth's Onslaught's "Manifest dread X times"): "each of those creatures" are what it put onto the battlefield. */
+  lastGathered?: boolean;
   /** The last sentence created one Equipment token: "Attach it to ~" (U.S.Agent, John Walker) means it. */
   lastCreatedEquipment?: boolean;
   /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
@@ -355,6 +357,11 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   if (gain) return floatingTrigger(`This turn, whenever you gain life, ${gain[1]!}`, after, ctx);
   // "Whenever you attack this turn, create two 1/1 red Warrior creature tokens that are tapped and attacking" (Dalkovan
   // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
+  // Basri Ket: "Whenever one or more nontoken creatures attack this turn, create that many ...": only the active player
+  // attacks (CR 506.2), so they're the creatures its controller controls on the turn it's activated (a sorcery-speed loyalty
+  // ability); counted as declared, those leaving combat later included (rulings).
+  const groupAttack = /^Whenever one or more (nontoken creatures) attack this turn, (.+)$/.exec(s);
+  if (groupAttack) return floatingTrigger(`This turn, whenever one or more ${groupAttack[1]!} you control attack, ${groupAttack[2]!}`, after, ctx);
   const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
   if (attack) return floatingTrigger(`This turn, whenever you attack, ${attack[1]!}`, after, ctx);
   // The Clone Saga: "Choose a card name. Whenever a creature with the chosen name deals combat damage to a player this
@@ -1417,7 +1424,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
-  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // Kamahl's Will: "Choose target creature you don't control. Each creature you control deals damage equal to its power to
+  // that creature": the same as "... to target creature you don't control" (the target chosen as it's cast, CR 601.2c).
+  text = text.replace(/(^|\. |• )Choose (target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control deals damage equal to its power) to that creature\./, "$1$3 to $2.");
+  // Motivated Pony: "attacking creatures get +1/+1 until end of turn. If a Food entered the battlefield under your control
+  // this turn, untap those creatures and they get an additional +2/+2 until end of turn": both under the condition (it
+  // can't change in between), about the creatures the first effect affected (CR 611.2c).
+  text = text.replace(/(^|\. )If ([^,.]+), untap those creatures and they get an additional ([+-]\d+\/[+-]\d+) until end of turn\./, "$1If $2, untap them. If $2, they get $3 until end of turn.");
+  // Kyoshi Island Plaza: "When ~ enters, search your library ..." the same in a triggered ability.
+  text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1$2earch your library for up to X $3, put them onto the battlefield$5, then shuffle, where X is $4.");
   // Green Slime: "counter target activated or triggered ability from an artifact or enchantment source. If a permanent's
   // ability is countered this way, destroy that permanent." Trickbind: "... activated abilities of that permanent can't be
   // activated this turn." One instruction each, about the countered ability's source (see sentences/spells.ts).
@@ -5529,6 +5544,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const playOne = exTop && exTop[1] && !exEqual && !impulseIf ? /^(Until your next end step|Until end of turn|Until the end of your next turn), you may play one of those cards$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
     if (playOne) {
       effects.push({ type: "impulse", n: amt(exTop![1]!), until: /next end step/.test(playOne[1]!) ? "yourNextEndStep" : /next turn/.test(playOne[1]!) ? "nextTurn" : "thisTurn", oneOf: true });
+      si++;
+      continue;
+    }
+    // March of Reckless Joy: "Exile the top X cards of your library. You may play up to two of those cards until the end of
+    // your next turn": two of the group, chosen as they're played (rulings), then no more.
+    const playTwo = exTop && exTop[1] && !exEqual && !impulseIf ? /^You may play up to (two|three) of those cards (this turn|until the end of your next turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (playTwo) {
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: playTwo[2] === "this turn" ? "thisTurn" : "nextTurn", oneOf: true, oneOfMax: playTwo[1] === "two" ? 2 : 3 });
       si++;
       continue;
     }
@@ -13044,6 +13067,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Umbris, Fear Manifest: "target opponent exiles cards from the top of their library until they exile a land card":
+    // that land card too; with none, the whole library (CR 701.13).
+    const exileUntilLand = /^(Each opponent|Target opponent|Target player) exiles cards from the top of their library until they exile a land card$/i.exec(s);
+    if (exileUntilLand) {
+      const who = parsePlayer(exileUntilLand[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealUntilLandToGraveyard", who, exile: true });
+      continue;
+    }
     // Trepanation Blade: "defending player reveals cards from the top of their library until they reveal a land card. The
     // creature gets +1/+0 until end of turn for each card revealed this way. That player puts the revealed cards into their
     // graveyard.": the land card counted too (all of the library with none); the bonus fixed as it resolves (CR 608.2h).
@@ -13855,6 +13887,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Desertion: "If an artifact or creature spell is countered this way, put that card onto the battlefield under your
+    // control instead of into its owner's graveyard" (a replacement: it never goes to the graveyard, rulings).
+    if (/^If an artifact or creature spell is countered this way, put that card onto the battlefield under your control instead of into its owner's graveyard$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "counterSpell" || last.bounce || last.exile || last.unless || last.cause || last.hand || last.top || last.n) return null;
+      last.battlefieldIf = { kind: "spell", types: ["Artifact", "Creature"], text: "artifact or creature spell" };
+      continue;
+    }
     // Hinder: "put that card on your choice of the top or bottom of its owner's library instead ...".
     const lapseThen = /^(If that spell is countered this way, exile it instead of putting it into its owner's graveyard), then you may cast it without paying its mana cost$/.exec(s);
     const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put (?:it|that card) (on top of its owner's library|into its owner's hand|on your choice of the top or bottom of its owner's library) instead of into that player's graveyard)$/i.exec(lapseThen?.[1] ?? s);
@@ -14561,6 +14601,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
     ctx.lastManifested = faceDown && last.count === 1;
+    // "Manifest dread X times, then put X +1/+1 counters on each of those creatures" (Valgavoth's Onslaught).
+    ctx.lastGathered = last?.type === "repeat" && !!last.gather;
     ctx.lastChosen = last?.type === "pick" && last.action === "choose" && last.n === 1 && last.who.ref === "you" && !last.among && !last.anyNumber;
     ctx.lastCreatedEquipment = last?.type === "createToken" && last.n === 1 && !!last.token.subtypes?.includes("Equipment") && !last.attachTo;
     ctx.lastCreatedCreature = last?.type === "createToken" && last.n === 1 && last.token.types.includes("Creature") && !last.attachTo;

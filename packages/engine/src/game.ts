@@ -942,6 +942,11 @@ export function moveObject(
   // Last known information, for leaves-the-battlefield triggers (CR 603.10a, 608.2h).
   const last = characteristics(s, o);
   const lastCounters = { ...o.counters };
+  // Skullbriar, Me, the Immortal: "Counters remain on ~ as it moves to any zone other than a player's hand or library",
+  // if it has that ability in the zone it's moving from (rulings: not on the battlefield under Humility; a copy of it
+  // does). They aren't put on it, so nothing that cares about putting counters applies (rulings).
+  const countersStay = Object.keys(lastCounters).length > 0 && to !== "hand" && to !== "library" && (fromZone === "battlefield" ? !o.faceDown && !!abilitiesOf(s, o).countersRemain : !!compileCard(defOf(s, o)).countersRemain);
+  const lastCounterTimes = countersStay ? o.counterTimestamps : undefined;
   const lastController = last.controller;
   // "If you sacrificed a Food this turn" (Elanor Gardner): as it last existed (CR 701.21a: its controller sacrifices it).
   if (opts.sacrificed && fromZone === "battlefield") ((s.turnLog ??= {}).sacrificed ??= []).push({ player: lastController, types: [...last.types], subtypes: [...last.subtypes], ...(o.isToken ? { token: true as const } : {}) });
@@ -1082,8 +1087,8 @@ export function moveObject(
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   if (to === "battlefield") o.lifePaidAsEntered = undefined; // and for "the life paid as it entered"
   if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
-  o.counters = {};
-  o.counterTimestamps = undefined;
+  o.counters = countersStay ? { ...lastCounters } : {};
+  o.counterTimestamps = lastCounterTimes;
   // "Instead exile it with a void counter on it" (Dauthi Voidwalker).
   if (yardExile?.counter && to === "exile") o.counters[yardExile.counter] = 1;
   o.controller = opts.controller ?? o.owner;
@@ -5059,6 +5064,8 @@ export function castProblem(
   }
   const pendTypes = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.types : undefined;
   if (pendTypes && (choices?.faceDown || !pendTypes.some((t) => isType(d, t)))) return `the spell must be ${pendTypes.map((t) => `${/^[AEIOU]/.test(t) ? "an" : "a"} ${t.toLowerCase()}`).join(" or ")} spell`;
+  const pendSuper = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.supertypes : undefined;
+  if (pendSuper && (choices?.faceDown || !pendSuper.every((t) => d.supertypes.includes(t)))) return `the spell must be ${pendSuper.join(" ").toLowerCase()}`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
@@ -5842,7 +5849,9 @@ const controlsPayWUBRG = (s: GameState, pid: PlayerId, what: "payWUBRG" | "castF
     return c.controller === pid && c.hasPrintedAbilities;
   }) ||
   // Tamiyo, Field Researcher's emblem (CR 114.4).
-  (what === "castFromHandFree" && liveEmblems(s).some((e) => e.controller === pid && compileCard(defOf(s, e)).castFromHandFree));
+  (what === "castFromHandFree" && liveEmblems(s).some((e) => e.controller === pid && compileCard(defOf(s, e)).castFromHandFree)) ||
+  // Chandra, Flame's Catalyst: until end of turn, which ends as the cleanup step begins (CR 514.2).
+  (what === "castFromHandFree" && turnRule(s, pid, "castFromHandFree") && s.step !== "cleanup");
 
 /**
  * Conspiracy Unraveler's "You may collect evidence 10 rather than pay the mana cost for spells you cast": the N, the

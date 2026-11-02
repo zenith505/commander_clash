@@ -21,7 +21,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you lose a coin flip, (.+)$/, "youLoseFlip"],
   [/^Whenever a player wins a coin flip, (.+)$/, "playerWinsFlip"],
   // The God-Eternals: "When ~ dies or is put into exile from the battlefield" (CR 700.4: "dies" is going to a graveyard).
-  [/^When(?:ever)? ~ dies or is put into exile from the battlefield, (.+)$/, "selfDiesOrExiled"],
+  // Kaya the Inexorable's granted "When this creature dies or is put into exile": the same, an ability that works only on
+  // the battlefield (CR 113.6, 603.6c).
+  [/^When(?:ever)? ~ dies or is put into exile(?: from the battlefield)?, (.+)$/, "selfDiesOrExiled"],
   // Exiled as a craft material (CR 702.167a). The rulings' other case, exiled by a mana ability activated while paying
   // for the craft ability, can't happen here: mana abilities are activated before the craft ability is.
   [/^When ~ is exiled from the battlefield while you're activating a craft ability, (.+)$/, "selfExiledCrafting"],

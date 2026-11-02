@@ -389,8 +389,8 @@ export function normalizeSelf(d: CardDef): string {
   const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:and the|of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
   // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated; "Niv-Mizzet" for
-  // "Niv-Mizzet Reborn": the first one too.
-  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+(?:-[A-Z][a-z]+)?) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
+  // "Niv-Mizzet Reborn": the first one too. "Dáin" for "Dáin Ironfoot": letters with accents count (\p{L}).
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^(\p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)?) \p{Lu}\p{Ll}+(?:-\p{Lu}\p{Ll}+)?$/u.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
@@ -3060,6 +3060,12 @@ export function compile(d: CardDef): CompiledCard {
     const again = triggersAgainLine(line);
     if (again) {
       (out.triggersAgain ??= []).push(again);
+      continue;
+    }
+    // Skullbriar, the Walking Grave; Me, the Immortal: its counters stay with it as it changes zones, but to a hand or a
+    // library (moveObject).
+    if (line === "Counters remain on ~ as it moves to any zone other than a player's hand or library.") {
+      out.countersRemain = true;
       continue;
     }
     // Omniscience: an alternative cost of nothing for spells cast from your hand (CR 118.9).

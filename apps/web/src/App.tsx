@@ -2092,7 +2092,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   miracle: "",
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
-  omniscience: "from your hand, for nothing (Omniscience); X is 0",
+  omniscience: "from your hand, for nothing (Omniscience, Chandra, Flame's Catalyst); X is 0",
   linkedFree: "a card exiled with Court of Locthwain, for nothing; X is 0",
   payZero: "{0} instead of its mana cost (As Foretold, Rooftop Storm); X is 0",
 };

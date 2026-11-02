@@ -3573,6 +3573,68 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3fae28e6-2ffc-460e-9dd3-e321e8a53ba9",
+  "name": "Chandra Ablaze",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "+1: Discard a card. If a red card is discarded this way, Chandra deals 4 damage to any target.\n−2: Each player discards their hand, then draws three cards.\n−7: Cast any number of red instant and/or sorcery cards from your graveyard without paying their mana costs.",
+  "loyalty": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7721e800-fba6-4ae7-855e-631b2ecc8d6b",
+  "name": "Chandra, Flame's Catalyst",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "+1: Chandra deals 3 damage to each opponent.\n−2: You may cast target red instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile it instead.\n−8: Discard your hand, then draw seven cards. Until end of turn, you may cast spells from your hand without paying their mana costs.",
+  "loyalty": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m21",
+  "releasedAt": "2020-07-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "53231b31-fb3c-4b30-bfe9-0ee8e754247b",
   "name": "Chandra, Hope's Beacon",
   "manaCost": "{4}{R}{R}",
@@ -7339,6 +7401,32 @@
   ]
  },
  {
+  "oracleId": "7d309b18-8dc5-41ee-888c-e275761029e7",
+  "name": "Fishing Gear",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Whenever equipped creature deals combat damage to a player, exile the top card of that player's library. If it's a permanent card, you may put it onto the battlefield under your control. If you don't, create a 1/1 blue Fish creature token.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-12-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6fd5e591-fae8-4128-a4d3-a848c8a8ffda",
   "name": "Fist of Suns",
   "manaCost": "{3}",
@@ -10976,6 +11064,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "13a4f88b-6832-43a1-b4fa-c1ee60560bad",
+  "name": "Kaya the Inexorable",
+  "manaCost": "{3}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Kaya",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kaya"
+  ],
+  "oracleText": "+1: Put a ghostform counter on up to one target nontoken creature. It gains \"When this creature dies or is put into exile, return it to its owner's hand and create a 1/1 white Spirit creature token with flying.\"\n−3: Exile target nonland permanent.\n−7: You get an emblem with \"At the beginning of your upkeep, you may cast a legendary spell from your hand, from your graveyard, or from among cards you own in exile without paying its mana cost.\"",
+  "loyalty": "5",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2ac1c95c-2a9d-40bc-9cad-9cadfa3f19f7",
   "name": "Kazandu Mammoth // Kazandu Valley",
   "manaCost": "{1}{G}{G}",
@@ -11847,6 +11968,34 @@
   "set": "mul",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2837888c-bfa8-4955-9334-0605ad409f7e",
+  "name": "Lava Spike",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery — Arcane",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Lava Spike deals 3 damage to target player or planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uma",
+  "releasedAt": "2018-12-07",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

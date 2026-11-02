@@ -4,7 +4,7 @@ import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness }
 import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -962,6 +962,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }
+        : // "Protection from that player" after "target opponent takes an extra turn" (Eon Frolicker): that target player.
+          m.kind === "addKeywords" && m.keywords.includes(TARGET_PLAYER_PROTECTION)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== TARGET_PLAYER_PROTECTION ? [k] : ((t) => (t?.kind === "player" ? [protectionFromPlayer(t.id)] : []))(ctx.targets.find((t) => t.kind === "player")))) }
         : // "Gains your choice of menace or lifelink", "loses your choice of flying, first strike, or trample" (Walking
           // Sponge): the keyword chosen as it resolved.
           (m.kind === "addKeywords" || m.kind === "removeKeywords") && m.keywords.includes(CHOSEN_KEYWORD)

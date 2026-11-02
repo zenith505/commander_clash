@@ -204,6 +204,8 @@ export const CHOSEN_PLAYER_PROTECTION = "Protection from the chosen player";
 export const protectionFromPlayer = (pid: number) => `Protection from player #${pid}`;
 /** "For each opponent who does, you gain protection from that player" (Noble Heritage): filled in with that player. */
 export const THAT_PLAYER_PROTECTION = "Protection from that player";
+/** "Target opponent takes an extra turn ... you and planeswalkers you control gain protection from that player" (Eon Frolicker): filled in with that target player as it resolves. */
+export const TARGET_PLAYER_PROTECTION = "Protection from the target player";
 const PLAYER_PROTECTION = /^Protection from player #(\d+)$/;
 /** A keyword as shown to people: "Protection from player #2" names that player. */
 export const keywordLabel = (k: string, name: (pid: number) => string) => k.replace(PLAYER_PROTECTION, (_, n: string) => `Protection from ${name(Number(n))}`);

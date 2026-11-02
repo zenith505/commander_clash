@@ -2,7 +2,7 @@ import { parseFromTop } from "./compile";
 import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseChanges, parseDig, parseSentence } from "./sentence";
@@ -3922,6 +3922,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, fromHand: true });
       continue;
     }
+    // Kaya the Inexorable's emblem: "you may cast a legendary spell from your hand, from your graveyard, or from among cards
+    // you own in exile without paying its mana cost": one, as this resolves, ignoring timing (CR 608.2g); legendary as the
+    // spell it's cast as; a face-down card in exile only if you may look at it (rulings); X is 0 (rulings).
+    if (/^[Yy]ou may cast a legendary spell from your hand, from your graveyard, or from among cards you own in exile without paying its mana cost$/.test(s)) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, handAndYard: true, andExile: true, max: 1, filter: { kind: "card", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary card" } });
+      continue;
+    }
+    // Chandra Ablaze: "Cast any number of red instant and/or sorcery cards from your graveyard without paying their mana
+    // costs.": chosen and cast one after another as it resolves, in any order, ignoring the sorceries' timing but not other
+    // restrictions (rulings, CR 608.2g); X is 0 (CR 107.3b). "Any number" may be none.
+    const yardAny = /^Cast any number of (red|blue|black|white|green) instant and\/or sorcery cards from your graveyard without paying their mana costs$/.exec(s);
+    if (yardAny) {
+      const filter = parseSearchFilter(`${yardAny[1]} instant or sorcery card`);
+      if (filter?.kind !== "card" || filter.colors?.length !== 1) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, yourYard: true, filter });
+      continue;
+    }
     // Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards without paying its mana
     // cost"; Mindclaw Shaman: "target opponent reveals their hand. You may cast an instant or sorcery spell from among
     // those cards ...": cast from that hand as this resolves (CR 608.2g), the spell controlled by you (rulings).
@@ -5841,6 +5858,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(capital(theirCastElse[1]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "exileTop", who: { ref: "eventPlayer" }, n: 1 }, { type: "castNow", what: { ref: "exiledTop" } }, { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      si += 2;
+      continue;
+    }
+    // Fishing Gear: "exile the top card of that player's library. If it's a permanent card, you may put it onto the
+    // battlefield under your control. If you don't, create a 1/1 blue Fish creature token." Your choice as it resolves; a
+    // card left in exile, a nonpermanent one included, makes the token (rulings). An Aura's host is chosen as it enters
+    // (CR 303.4f, rulings).
+    const theirPutElse = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If it's a permanent card, you may put it onto the battlefield under your control" ? /^If you don't, (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
+    if (theirPutElse) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(theirPutElse[1]!), ctx);
+      const filter = parseSearchFilter("permanent card");
+      if (!inner || !filter || ctx.targets.length !== before) return null;
+      effects.push({ type: "exileTop", who: { ref: "eventPlayer" }, n: 1 }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "exiledTop" } }], otherwise: inner, text: "put the exiled card onto the battlefield under your control" }], otherwise: inner });
       si += 2;
       continue;
     }
@@ -12309,6 +12340,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "drawnThisWay" } }, min: prev.n as number }, effects: [{ type: "reflexive", body: reflexive }] });
         continue;
       }
+      // Dáin Ironfoot: "create a colorless Equipment artifact token named Axe ... When you do, attach it to target creature
+      // you control": that token, attached to the target as the reflexive ability resolves (CR 603.12, 701.3a).
+      const attachIt = created && prev.type === "createToken" && prev.n === 1 && prev.token.subtypes?.includes("Equipment") && /^attach it to /i.test(whenText) && reflexive.effects.length === 1 && reflexive.effects[0]!.type === "attach" && !reflexive.effects[0]!.source ? reflexive.effects[0]! : undefined;
+      if (attachIt?.type === "attach") {
+        reflexive.effects = [{ ...attachIt, source: { ref: "subject" } }];
+        effects.push({ type: "reflexive", body: reflexive, about: "created" });
+        continue;
+      }
       if (created || always) {
         effects.push({ type: "reflexive", body: reflexive, ...perToken });
         continue;
@@ -14584,6 +14623,39 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!mods) return null;
       landSearch.rememberAll = true;
       effects.push({ type: "continuous", what: { ref: "created" }, mods, duration: "game" });
+      continue;
+    }
+    // Eon Frolicker: "target opponent takes an extra turn after this one. Until your next turn, you and planeswalkers you
+    // control gain protection from that player.": protection from everything that player controls (CR 702.16k, rulings),
+    // for you and for each planeswalker you control as it resolves (CR 611.2c), until your next turn begins.
+    const fromThat = /^(?:Until your next turn, you and planeswalkers you control gain protection from that player|You and planeswalkers you control gain protection from that player until your next turn)$/.test(s);
+    const extra = effects[effects.length - 1];
+    if (fromThat && extra?.type === "extraTurn" && extra.who.ref === "target" && ctx.targets.length === 1 && ctx.targets[extra.who.index]?.kind === "player") {
+      effects.push({ type: "playerGains", keywords: [TARGET_PLAYER_PROTECTION], untilYourNextTurn: true }, { type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], controller: "you", text: "planeswalkers you control" } }, mods: [{ kind: "addKeywords", keywords: [TARGET_PLAYER_PROTECTION] }], duration: "yourNextTurn" });
+      continue;
+    }
+    // Garruk, Savage Herald: "Until end of turn, creatures you control gain "You may have this creature assign its combat
+    // damage as though it weren't blocked."": each creature you control as it resolves, not ones you control later
+    // (rulings, CR 611.2c); for each one the choice is made as it assigns its damage (CR 510.1c). The leading "Until end
+    // of turn" is moved to the end before this.
+    if (/^Creatures you control gain "You may have ~ assign its combat damage as though it weren't blocked\.?" until end of turn$/.test(s)) {
+      effects.push({ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" } }, mods: [{ kind: "unblockedDamage" }], duration: "endOfTurn" });
+      continue;
+    }
+    // Emergent Sequence: "Search your library for a basic land card, put it onto the battlefield tapped, then shuffle. That
+    // land becomes a 0/0 green and blue Fractal creature that's still a land. Put a +1/+1 counter on it for each land you
+    // had enter the battlefield under your control this turn.": the land found, for as long as it stays there (no duration,
+    // CR 611.2a), with the counters counted after it entered, so it counts itself (rulings). It wasn't a creature as it
+    // entered (rulings).
+    const thatLand = /^That land (becomes an? \d+\/\d+ [a-z ]*?[A-Z][a-z]+ creature that's still a land)$/.exec(s);
+    const oneLand = effects[effects.length - 1];
+    if (thatLand && oneLand?.type === "search" && oneLand.dest.zone === "battlefield" && oneLand.n === 1 && !oneLand.upTo && !oneLand.others && !oneLand.who && !oneLand.library && !oneLand.split && !oneLand.condDest && !oneLand.landTo && !oneLand.cardTo && !oneLand.mayInstead && !oneLand.payDiff && !oneLand.withHeld && oneLand.filter?.types?.join() === "Land") {
+      const mods = parseChanges(thatLand[1]!);
+      const onIt = /^Put a \+1\/\+1 counter on it for each (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const n = onIt ? parseCount(onIt[1]!, ctx, true) : null;
+      if (!mods || !onIt || !n) return null;
+      effects.push({ type: "continuous", what: { ref: "created" }, mods, duration: "game" }, { type: "counters", what: { ref: "created" }, counter: "+1/+1", n });
+      si++;
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).

@@ -1,6 +1,6 @@
 import { isRealKicker, type AbilityBody, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
@@ -560,7 +560,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(spell || item?.fromSpell ? { fromSpell: true as const } : {}),
           // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
           // trigger (its source may be gone by the time it triggers).
-          trigger: ctx.chosen?.name !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
+          // Zombie Boa: "a creature of that color", the color chosen as this resolved, likewise.
+          trigger: ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -765,7 +766,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return e.anyOne ? changeATargetToSelf(s, ctx, t.id, src) : changeTarget(s, ctx, t.id, src, e.unless, e.toSelf);
+      return e.anyOne ? changeATargetToSelf(s, ctx, t.id, src) : changeTarget(s, ctx, t.id, src, e.unless, e.toSelf, e.all, e.mustBe);
     }
     case "controlSpell": {
       const t = ctx.targets[e.index];
@@ -1198,7 +1199,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
  * stack, CR 608.2n; the spell itself isn't, CR 115.5). With none, the target stays as it is, legal or not. Its new
  * target becomes a target of it ("becomes the target" triggers, ward).
  */
-function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays, toSelf?: true): "paused" | void {
+function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays, toSelf?: true, all?: true, mustBe?: "player" | "creature"): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -1211,8 +1212,16 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
     if (paid) return;
   }
   const sc = (s.resolving!.scratch ??= {});
-  const spec = (item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []))[j];
+  const specs = item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []);
+  const spec = specs[j];
   if (!spec) return;
+  // Torchling: every target naming that one thing (TargetSpec.targetsOnly), all to one new target that meets each of their
+  // conditions; "The new target must be a player / a creature" (Rebound, Silver Wyvern).
+  const slots = all ? (item.targets ?? []).flatMap((x, k) => (sameTarget(x, current) ? [k] : [])) : [j];
+  const fits = (t: TargetChoice) =>
+    slots.every((k) => !!specs[k] && changeTargetOptions(s, item, specs[k]!, current).some((x) => sameTarget(x, t))) &&
+    (mustBe !== "player" || t.kind === "player") &&
+    (mustBe !== "creature" || (t.kind === "object" && !!s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature")));
   if (toSelf) {
     // To this ability's source, still on the battlefield as the same object, and only if it's a legal target for it.
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1225,7 +1234,7 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
     sc.newTarget = to;
   }
   if (!sc.newTarget) {
-    const options = changeTargetOptions(s, item, spec, current);
+    const options = changeTargetOptions(s, item, spec, current).filter(fits);
     if (!options.length) {
       log(s, `${item.description} has no other legal target, so its target stays the same.`);
       return;
@@ -1240,7 +1249,7 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
   const amount = current.kind === "object" || current.kind === "player" ? current.amount : undefined;
   const t = sc.newTarget;
   const next = amount !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount } : t;
-  item.targets = item.targets!.map((x, i) => (i === j ? stampTargets(s, [next])![0]! : x));
+  item.targets = item.targets!.map((x, i) => (slots.includes(i) ? stampTargets(s, [next])![0]! : x));
   log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
   fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [] });
 }
@@ -1349,14 +1358,14 @@ export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
 }
 
-/** A copy of `t` with every "with the chosen name" filter in it bound to `chosen`'s name (CR 201.4). */
+/** A copy of `t` with every "with the chosen name" (CR 201.4) or "of the chosen color" filter in it bound to what `chosen` holds. */
 function bindChosenName<T>(t: T, chosen: Chosen): T {
   const walk = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(walk);
     if (!v || typeof v !== "object") return v;
     const o = v as Record<string, unknown>;
     const out = Object.fromEntries(Object.entries(o).map(([k, x]) => [k, walk(x)]));
-    return o.chosen === "name" && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
+    return ((o.chosen === "name" && chosen.name !== undefined) || (o.chosen === "color" && chosen.color !== undefined)) && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
   };
   return walk(t) as T;
 }

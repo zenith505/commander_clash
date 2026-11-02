@@ -238,15 +238,23 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage"]);
-const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group"]);
+const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage", "dealsDamageToYou"]);
+const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group", "damagesYou"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
  * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
  * isn't one, null when it can't be compiled.
  */
-function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boolean): Effect | null | undefined {
+function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boolean, colorChosen?: boolean): Effect | null | undefined {
+  // Zombie Boa: "Choose a color. Whenever ~ becomes blocked by a creature of that color this turn, destroy that creature.":
+  // a delayed trigger about ~ (CR 603.7b), the color bound as it's made (run-spells floatingTrigger).
+  const boa = colorChosen && ctx?.activated && !after.length ? /^Whenever ~ becomes blocked by a creature of that color this turn, (destroy that creature)$/.exec(s) : null;
+  if (boa) {
+    const trigger = parseTrigger(`Whenever ~ becomes blocked by a creature, ${boa[1]!}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfBlockedByCreature" || trigger.subjectFilter || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger: { ...trigger, subjectFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "color", text: "creature of the chosen color" } }, until: "endOfTurn" };
+  }
   // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
   // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
   // Stensian Sanguinist: "Whenever you attack, target creature gains deathtouch until end of turn. Whenever that creature
@@ -3408,6 +3416,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacMany[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, xSacrificed: true }] });
       si++;
+      continue;
+    }
+    // Rebound, Silver Wyvern: "The new target must be a player / a creature." after "change the target of ...".
+    const mustBe = last?.type === "changeTarget" && last.all && !last.mustBe ? /^The new target must be a (player|creature)$/.exec(s) : null;
+    if (mustBe && last?.type === "changeTarget") {
+      last.mustBe = mustBe[1] as "player" | "creature";
+      continue;
+    }
+    // Soul of Emancipation: "destroy up to three other target nonland permanents. For each of those permanents, its controller
+    // creates a 3/3 ... token": one token for each of them still a legal target as this resolves, destroyed or not (rulings),
+    // made by its controller (as it last existed, CR 608.2h).
+    const perTarget = last?.type === "destroy" && last.what.ref === "target" && (last.what.n ?? 1) > 1 ? /^For each of those permanents, its controller creates (an? .+ token(?: with [^.]+)?)$/.exec(s) : null;
+    if (perTarget && last?.type === "destroy" && last.what.ref === "target") {
+      const made = parseOne(`You create ${perTarget[1]!}`, ctx);
+      if (made?.length !== 1 || made[0]!.type !== "createToken" || made[0]!.n !== 1 || (made[0]!.who && made[0]!.who.ref !== "you")) return null;
+      const first = last.what.index;
+      for (let i = 0; i < (last.what.n ?? 1); i++) effects.push({ ...structuredClone(made[0]!), who: { ref: "targetController", index: first + i } });
       continue;
     }
     // Vault 21: House Gambit: "For each of those cards that has the same mana value as another card revealed this way,
@@ -13517,7 +13542,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
     const prevE = effects[effects.length - 1];
-    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx, prevE?.type === "choose" && prevE.choice === "cardName");
+    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx, prevE?.type === "choose" && prevE.choice === "cardName", prevE?.type === "choose" && prevE.choice === "color");
     if (floating !== undefined) {
       if (!floating) return null;
       effects.push(floating);

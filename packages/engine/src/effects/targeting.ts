@@ -622,7 +622,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.castNth !== undefined && item.castNth !== spec.castNth) return false; // A copy that wasn't cast has no castNth (CR 707.10).
     if (spec.hasTargets && !(item.targets ?? []).some((x) => x.kind !== "none")) return false;
     // "Target triggered ability you control" (Strionic Resonator).
-    const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));
+    const aims = !spec.targetsWhat || (spec.targetsOnly ? targetsOnlyMatch(s, item.targets ?? [], spec.targetsWhat, controller) : targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller)));
     if (item.kind === "ability") return aims && !!spec.stackAbilities && (!spec.loyaltyOnly || !!item.loyalty) && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller) && (!spec.abilityFrom || abilitySourceIs(s, item, spec.abilityFrom));
     if (spec.noSpells || !item.objectId) return false;
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
@@ -705,6 +705,17 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
     const o = s.objects[t.id];
     return !!o && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, what, o, controller, false);
   });
+}
+
+/**
+ * "That targets only a player / only ~" (TargetSpec.targetsOnly): it has at least one target, and every one names the same
+ * player or object, which matches (rulings on Torchling).
+ */
+export function targetsOnlyMatch(s: GameState, targets: TargetChoice[], what: TargetSpec | "you", controller: PlayerId): boolean {
+  const chosen = targets.filter((t) => t.kind !== "none");
+  const first = chosen[0];
+  if (!first || chosen.some((t) => t.kind !== first.kind || (t as { id: string }).id !== (first as { id: string }).id)) return false;
+  return targetsMatch(s, [first], what, controller);
 }
 
 /**
@@ -990,6 +1001,9 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   const cardTypes = (x: GameObject) => characteristics(s, x).types.filter((ty) => CARD_TYPES.has(ty));
   // Legerdemain: "that shares one of those types with it", only artifact or creature (rulings: checked again as it resolves).
   if (others(spec.sharesCardTypeWith).some((x) => !cardTypes(x).some((ty) => cardTypes(o).includes(ty) && (!spec.sharesCardTypeAmong || spec.sharesCardTypeAmong.includes(ty))))) return false;
+  // Spawnbroker: power at most each of those targets' power, as they are now (a creature that has left: as it last existed).
+  const powerOf = (x: GameObject) => (x.zone === "battlefield" ? power(s, x) : (s.lastKnown?.[x.id]?.power ?? 0));
+  if (others(spec.powerAtMostOf).some((x) => o.zone !== "battlefield" || power(s, o) > powerOf(x))) return false;
   // Rivals' Duel: no creature type in common, as they are now.
   if (others(spec.sharesNoCreatureTypeWith).some((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));

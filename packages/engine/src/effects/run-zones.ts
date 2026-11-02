@@ -2067,8 +2067,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard as an Adventure until the end of their next turn.`);
           continue;
         }
-        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}) };
-        log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from ${e.inExile ? "exile" : "their graveyard"} this turn.`);
+        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
+        log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from ${e.inExile ? "exile" : "their graveyard"} this turn${e.free ? " without paying its mana cost" : ""}.`);
       }
       return;
     }
@@ -2590,8 +2590,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
-      for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
+      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : e.dest === "libraryBottom" ? `${p.name} puts ${names} from their graveyard on the bottom of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
+      for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : e.dest === "libraryBottom" ? moveObject(s, id, "library") : moveObject(s, id, e.dest ?? "hand"));
       // Conspiracy Theorist: the card in exile (a new object, CR 400.7) may be cast this turn by the player who exiled it.
       if (e.castExiledThisTurn)
         for (const id of found) {
@@ -2860,7 +2860,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} exiles ${p.name}'s hand (${n} card${n === 1 ? "" : "s"}).`);
         }
         const flashback = (id: ObjectId) => graveyardWays(s, obj(s, id)).some((w) => w.kind === "flashback" || w.kind === "grantedFlashback");
-        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!e.withFlashback || flashback(id)));
+        // Cry of the Carnarium: "that were put there from the battlefield this turn" (GameObject.fromBattlefieldTurn).
+        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!e.filter?.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!e.withFlashback || flashback(id)));
         const n = cards.length;
         for (const id of cards) {
           // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).

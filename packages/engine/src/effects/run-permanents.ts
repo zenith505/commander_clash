@@ -239,6 +239,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "tap":
     case "untap": {
       let tapped = 0;
+      if (e.type === "tap" && e.swap) {
+        const all = objects(s, e.what, ctx);
+        const wasTapped = all.filter((o) => o.tapped);
+        const wasUntapped = all.filter((o) => !o.tapped);
+        for (const o of wasTapped) untapPermanent(s, o);
+        for (const o of wasUntapped) tapPermanent(s, o);
+        log(s, `${wasTapped.length} tapped creature${wasTapped.length === 1 ? "" : "s"} untap and ${wasUntapped.length} untapped creature${wasUntapped.length === 1 ? "" : "s"} tap.`);
+        return;
+      }
       for (const o of objects(s, e.what, ctx)) {
         if (e.type === "untap") untapPermanent(s, o);
         else if (!o.tapped) {

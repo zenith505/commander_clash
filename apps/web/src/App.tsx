@@ -3998,6 +3998,8 @@ function LibrarySearch({
                   ? `${pending.source}: choose ${pending.what} in your graveyard; you may cast it this turn`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
+                  : pending.fromGraveyard === "libraryBottom"
+                  ? `${pending.source}: put ${pending.what} from your graveyard on the bottom of your library`
                   : pending.fromGraveyard
                   ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
                   : zones

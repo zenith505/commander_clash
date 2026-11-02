@@ -4437,6 +4437,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Unnatural Hunger: not the enchanted creature); "Whenever that creature deals combat damage this turn, if this spell
   was kicked" (Vigorous Charge); "power less than 0" (Wasp, Shrinking Savior). +18 (29,120 of 31,936 with rounds 240
   to 242).
+- Round B81 (one-line templates from the bottom of the list): "If an instant or sorcery card is milled this way,
+  transform ~" (Aberrant Researcher); target player reveals the top four, "You choose two of those cards and put them
+  into their graveyard. Put the rest on top of their library in any order" (Bamboozle); "If an instant card or a card
+  with flash is exiled this way, they lose 1 life. Otherwise, you lose 1 life" after exiling a card from their hand
+  (Check for Traps); "Simultaneously untap all tapped creatures and tap all untapped creatures" (Breaking Wave); "Exile
+  all creature cards in all graveyards that were put there from the battlefield this turn" (Cry of the Carnarium); a
+  graveyard trigger with a "sacrifice a Swamp" cost (Akuta, Born of Ash); "sacrifice ~ unless you put a card from your
+  graveyard on the bottom of your library" (Anurid Scavenger: new graveyard pick; browser test); "The controller of
+  target artifact sacrifices it, then reveals ... until an artifact card" (Shape Anew); reveal until "a creature card of
+  the chosen type" onto the battlefield, the rest shuffled (Riptide Shapeshifter); "you may reveal ... until a land. If
+  you do, put" (Avenging Druid); "Whenever an enchanted creature you control becomes blocked" (Beastmaster's
+  Magemark); "each Aura attached to a creature deals 2 damage to the creature it's attached to" (Aura Barbs); "you may
+  cast target instant or sorcery card from your graveyard without paying its mana cost" this turn (Sins of the Past: X
+  is 0, no alternative costs, CR 118.9, 107.3b); "Tap enchanted creature and remove it from combat" and "As long as
+  enchanted creature isn't legendary, it doesn't untap" (Stunning Strike); "Exile it until ~ leaves the battlefield"
+  (Hixus, Prison Warden); "If a source would deal 4 or more damage to a permanent or player, that source deals 3 damage
+  to that permanent or player instead" (Divine Presence). Rules bug fixed: a static "As long as enchanted/equipped
+  creature ..., it ..." applied "it" to the Aura or Equipment itself instead of the creature (no other card's
+  compilation changed). +16 (29,136 of 31,936 with rounds 240 to 242).
+- Out after round B81 (looked at, not done): Kaervek's Spite (an additional cost of sacrificing all permanents and
+  discarding your hand), Ignorant Bliss, Turn the Tables, Angry Mob, Time to Reflect (not attempted this round).
 - Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a
   prevention with a follow-up action), Marvel Boy, Noh-Varr ("whenever you activate a power-up ability"), Ms. Marvel,
   Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered

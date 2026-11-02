@@ -1,6 +1,6 @@
 # Roadmap
 
-29,241 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,277 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,394 of
 9,979 (94%).
 
@@ -1654,7 +1654,7 @@ line blocks.
    combat" (Ride Down: blockHistory thisCombat); "... named Humble Merchant" (Honest Work); "Exile all other spells and
    counter all abilities" (Summary Dismissal: Effect dismissStack; bots only cast it when none of the stack is theirs);
    "When a player other than this creature's owner controls it, that player sacrifices it" (Bronze Bombshell, a state
-   trigger, CR 603.8). +18 (29,227 of 31,936 with B82).
+   trigger, CR 603.8). +18 (29,227 of 31,936 with B82; 29,244 with B83).
    Round 248 (the top of the list and earlier skip lists): "Whenever you tap an untapped creature an opponent controls"
    (Hylda of the Icy Crown, Solitary Sanctuary, Icewrought Sentry; Sharae of Numbing Depths' "one or more ... This ability
    triggers only once each turn"): TriggeredAbility.tappedByYou, only a tap a spell or ability had its controller do
@@ -1668,7 +1668,7 @@ line blocks.
    be done fully) and "Whenever you forage" (Corpseberry Cultivator: event youForage, from forage costs too); "Whenever a
    creature you control deals combat damage to a player or planeswalker this turn" (Flitterwing Nuisance); "Then you may
    pay one or more {E}. If you do, put that many +1/+1 counters on ~" (Rampaging Aetherhood); "... and isn't a Human"
-   (Werewolf Pack Leader: loseTypes of a creature type). +14 (29,241 of 31,936).
+   (Werewolf Pack Leader: loseTypes of a creature type). +14 (29,241 of 31,936; 29,277 with B83 and B84).
    Out after round 248 (looked at, not done): Unidentified Hovership ("the exiled card's owner manifests dread": each
    owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver
    ("Return ~ to the battlefield under that player's control at the beginning of their next upkeep": no instruction yet
@@ -4559,6 +4559,48 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enchanted creature this turn dies" (Vampiric Embrace); "destroy ~ and it deals damage to you equal to the number of
   pin counters on it" and "X is the number of pin counters on ~" (Voodoo Doll). +15 (29,177 of 31,936 with rounds 243
   and 244; 29,191 with round 245).
+- Round B83 (one-line templates from the bottom of the list): "Whenever a legendary permanent other than ~ is put into a
+  graveyard from the battlefield" (Yomiji, Who Bars the Way: it sees a legendary permanent that dies with it); "At the
+  beginning of your upkeep, if ~ is on the battlefield, each player returns all cards named ~ from their graveyard to
+  the battlefield" (Myr Servitor); "This ability triggers only once" (Acrobatic Cheerleader, kept on the object, CR
+  603.2h); "Tap another untapped creature you control with flying" as a cost (Radiant, Serra Archangel); exchanging
+  control with "target artifact or creature you don't control" (Shrewd Negotiation); "target creature with power less
+  than or equal to that creature's power an opponent controls", checked again as it resolves (Spawnbroker); "For each
+  of those permanents, its controller creates ..." after destroying up to three targets (Soul of Emancipation);
+  "Change the target of target spell (or ability) that targets only a player / ~. The new target must be a
+  player/creature", every target that names it changing (Rebound, Torchling, Silver Wyvern; bots use Torchling's and
+  Silver Wyvern's against an opponent's harmful spell); "Prevent all combat damage that would be dealt this turn by
+  creatures other than enchanted creatures and enchantment creatures" (Inspire Awe); a delayed "Whenever a creature
+  attacking you deals combat damage to you this turn" (Harsh Justice); "Prevent all combat damage a creature of your
+  choice would deal this turn", offering only permanents (Ajani's Aid); a delayed "Whenever ~ becomes blocked by a
+  creature of that color this turn, destroy that creature" (Zombie Boa); "Whenever one or more cards are put into
+  exile during your turn" (Stonebinder's Familiar); "Each creature you control is no longer goaded" (Serene Sleuth);
+  "X is the number of times this ability has resolved this turn" (Bronze Cudgels). +17 (29,208 of 31,936; 29,226 with round 246).
+- Round B84 (one-line templates from the bottom of the list): "as long as they haven't dealt combat damage yet"
+  (Ruric Thar, Magecrusher; reset when it changes zones); "Whenever a creature / spell deals damage to ~, ~ deals that
+  much damage to that creature / that spell's controller" (Tephraderm); Animate Artifact (enchanted noncreature
+  artifact becomes a creature with P/T equal to its mana value); "deals that much damage" from a spell's mana value
+  (Imminent Doom); Chaos Lord (an opponent gains control of it if the number of permanents is even; haste unless it
+  entered this turn); Mirror Golem (protection from each of the exiled card's card types, read from the linked exile);
+  "Each other player may put a creature card from their hand onto the battlefield" (Charmed Griffin); "the damage
+  dealt to you so far this turn by artifacts" (Reverse Polarity); "Whenever a source of the chosen color deals damage
+  to you" (Circle of Affliction); "Pay 3 life for each velocity counter on ~" as a cost (Tornado); damage equal to
+  the cards drawn this way (Malignant Growth); exile the top four and repeat while two share a name (Scalpelexis);
+  exile the top three and repeat until a land (Rally the Horde); "Any number of target players may each search"
+  (Turtle Tracks); look at the top eight, exile four at random (Orcish Librarian); "Whenever a creature card leaves an
+  opponent's graveyard" from the graveyard (Erebos's Titan); "That opponent may put ... from their hand onto the
+  battlefield" (Metamorphose); protection from each color whose basic land type you control (Dominaria's Judgment);
+  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,263 of 31,936 with B83 and rounds 246
+  and 247).
+- Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
+  choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
+  check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
+  a creature type" tap cost), Psychic Theft, Last Rites, Thought Dissector, Mimeofacture, Hakim,
+  Guard Dogs, Carry Away, Jandor's Ring.
+- Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes
+  (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
+  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder
+  (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
   revealed card), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice

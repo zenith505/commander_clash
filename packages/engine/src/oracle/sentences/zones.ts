@@ -881,6 +881,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", named: "~", text: "card named ~" } }];
   }
+  // Myr Servitor: "each player returns all cards named ~ from their graveyard to the battlefield": every card with the
+  // source's name (CR 201.5) from all graveyards, each under its owner's control.
+  if (/^[Ee]ach player returns all cards named ~ from their graveyard to the battlefield$/.test(s)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" }, owners: true }];
+  }
   // "Return each Aura card from your graveyard to the battlefield" (Retether): its controller chooses what each enchants as
   // it enters (CR 303.4f); one with nothing to enchant stays in the graveyard (303.4g).
   if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {
@@ -969,7 +974,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Tell), "each opponent may put a legendary creature card ..." (Iwamori), "any number of ... cards" (Tempting Wurm):
   // chosen in turn order without revealing them, then put there at the same time (see the putFromHand effect). "Then
   // each opponent who didn't draws a card" (Kynaios and Tiro): those who put none.
-  if ((m = /^[Ee]ach (player|opponent) may put (a|an|any number of) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+  // Charmed Griffin: "each other player may put an artifact or enchantment card onto the battlefield from their hand": the
+  // same, in the other order ("each other player" is "each opponent" by now, CR 102.3).
+  if ((m = /^[Ee]ach (player|opponent) may put (a|an|any number of) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s) ?? /^[Ee]ach (player|opponent) may put (a|an) (.+?) onto the battlefield from their hand()$/.exec(s))) {
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (filter === null) return null;
     const put: Effect = { type: "putFromHand", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true, ...(m[2] === "any number of" ? { any: true } : {}) };
@@ -980,11 +987,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
   // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
-  if ((m = /^(~'s owner|[Tt]hat player|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+  if ((m = /^(~'s owner|[Tt]hat player|That opponent|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
     // Divine Gambit: "Exile target artifact, creature, or enchantment an opponent controls. That player may put ...": the
-    // target's controller, as it last existed (CR 608.2h).
+    // target's controller, as it last existed (CR 608.2h). Metamorphose: "Put target permanent an opponent controls on top
+    // of its owner's library. That opponent may put ...": the same.
     const lastTarget = ctx.lastObjectTarget !== undefined ? ctx.targets[ctx.lastObjectTarget] : undefined;
-    const theirs = /^That player$/.test(m[1]!) && ctx.spell && ctx.targets.length === 1 && lastTarget?.kind === "object" && lastTarget.controller === "opponent" && !lastTarget.many;
+    const theirs = /^That (?:player|opponent)$/.test(m[1]!) && ctx.spell && ctx.targets.length === 1 && lastTarget?.kind === "object" && lastTarget.controller === "opponent" && !lastTarget.many;
+    if (m[1] === "That opponent" && !theirs) return null;
     const who = theirs ? { ref: "targetController" as const, index: ctx.lastObjectTarget! } : parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;

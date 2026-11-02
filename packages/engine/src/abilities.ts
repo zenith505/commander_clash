@@ -336,13 +336,18 @@ export type Count =
   /** "The damage dealt to your opponents this turn" (Notorious Throng): by all sources, combat or not (rulings). */
   | { kind: "opponentsDamage" }
   /** "The damage dealt to target opponent this turn" (Knollspine Dragon). */
-  | { kind: "playerDamageThisTurn"; who: PlayerRef }
+  | { kind: "playerDamageThisTurn"; who: PlayerRef; /** "By artifacts" (Reverse Polarity): only damage dealt by artifact sources (TurnLog.artifactDamage). */ byArtifacts?: true }
   /** "The life they lost this turn" (Wound Reflection): each one's own, however they lost it (rulings). */
   | { kind: "lifeLostThisTurn"; who: PlayerRef }
   /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
   | { kind: "unspentMana"; color?: Color }
   /** "The amount of life you gained this turn", "for each 1 life you gained this turn" (CR 119.3, 119.9): its total, whatever was lost. */
   | { kind: "lifeGainedThisTurn" }
+  /**
+   * "The number of times this ability has resolved this turn" (Bronze Cudgels): this time included, for this ability of
+   * this object (a copy of it counts, a countered one doesn't, rulings); see ResolvingState.nth.
+   */
+  | { kind: "resolvedThisTurn" }
   /** "For each {E} you've paid or lost this turn" (Blaster Hulk): energy counters you've paid or lost in total (CR 107.14, 122.1). */
   | { kind: "energyLostThisTurn" }
   /** "The number of times you descended this turn" (The Mycotyrant): permanent cards put into your graveyard this turn (CR 700.11, rulings). */
@@ -879,6 +884,11 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesCardTypeWith?: number[];
+  /**
+   * "Target creature with power less than or equal to that creature's power" (Spawnbroker): its power is at most each of
+   * these targets' power, as they're chosen and again as it resolves (rulings).
+   */
+  powerAtMostOf?: number[];
   /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
   sharesCardTypeAmong?: string[];
   /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
@@ -1012,6 +1022,12 @@ export interface TargetSpec {
   creatureTokens?: true;
   /** That very object (see `targetsSource`). */
   objectId?: string;
+  /**
+   * "Target spell that targets only a player" (Rebound), "... only ~" (Torchling, Silver Wyvern): with `targetsWhat` (or
+   * `targetsSource`), every target it has is that one player or object (rulings on Torchling: several targets all naming
+   * it count; one with other targets doesn't, even if those have become illegal).
+   */
+  targetsOnly?: true;
   /** "That targets you or a creature you control" (Siren Stormtamer): with `targetsWhat`, a spell that targets you counts too. */
   targetsYouToo?: true;
   /**
@@ -1430,7 +1446,7 @@ export interface DamageRuleSpec {
   /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
   to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
   /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
-  by?: { filter?: TargetSpec; choose?: TargetSpec; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number };
+  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number };
   /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
   n?: Amount;
   /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
@@ -1917,7 +1933,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "As long as they haven't dealt combat damage yet" (Ruric Thar, Magecrusher) is its `not`. */ "hasDealtCombatDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -3137,6 +3153,12 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
+  /**
+   * "Each creature you control is no longer goaded" (Serene Sleuth): the goad effects from resolved spells and abilities
+   * (CR 701.15) stop applying to them; a static ability that goads goes on applying, as does an "attacks each combat as
+   * though it were goaded" (not goaded, Kardur).
+   */
+  | { type: "ungoad"; what: ObjRef }
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
@@ -3285,7 +3307,7 @@ export type Effect =
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
   | { type: "suspendExiledTop"; filter: TargetSpec }
-  | { type: "exileTop"; who: PlayerRef; n: Amount; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -3612,7 +3634,12 @@ export type Effect =
    * `anyOne` with `toSelf`: "change a target of target spell or ability to ~" (Spellskite): any one of its targets, chosen
    * as this resolves among those ~ could become without making another of its targets illegal (rulings).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true }
+  /**
+   * `all`: "change the target of target spell that targets only ~" (Torchling): every target naming that one thing changes
+   * to the same new target, one that meets each of those targets' conditions (rulings). `mustBe`: "The new target must be a
+   * player / a creature" (Rebound, Silver Wyvern).
+   */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature" }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -4460,6 +4487,8 @@ export type TriggerEvent =
   | "creatureDealsDamageToAttached" // "Whenever a creature deals damage to enchanted planeswalker" (Liliana's Talent): once for each creature dealing damage, combat or not (rulings), to the permanent this is attached to; "that creature" is it
   /** "Whenever a Sliver deals damage, its controller gains that much life" (Essence Sliver): anyone's permanent matching TriggeredAbility.dealer, once for all the damage it deals at the same time, combat or not; it's the subject, "that much" the amount. */
   | "permanentDealsDamage"
+  | "creatureDealsDamageToSelf" // "Whenever a creature deals damage to ~" (Tephraderm): once for each creature dealing it damage, combat or not; "that creature" is it
+  | "spellDealsDamageToSelf" // "Whenever a spell deals damage to ~" (Tephraderm): once for each spell dealing it damage; "that player" is that spell's controller
   | "creatureDealsCombatDamageToSelf" // "Whenever a creature deals combat damage to ~" (Vraska the Unseen): once for each creature dealing it combat damage, which "that creature" means
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
@@ -4857,6 +4886,8 @@ export interface TriggeredAbility {
   onYourTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
+  /** "This ability triggers only once." (Acrobatic Cheerleader): once ever for this object (rulings; a new object starts over, CR 400.7). See GameObject.triggeredEver. */
+  onceEver?: true;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */
   grant?: number;
   /** Eminence: it also works while ~ is a commander in the command zone (CR 903.3, 113.6). */
@@ -4996,7 +5027,7 @@ export interface TriggeredAbility {
    * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its
    * controller); `combat`: only combat damage.
    */
-  damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
+  damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true; /** "Whenever a source of the chosen color deals damage to you" (Circle of Affliction): a source of the color chosen as this permanent entered, spells too. */ chosenColor?: true };
   /**
    * For "groupDealsDamageToPlayers": the permanents you control dealing it (`filter`), all damage dealt at the same time
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
@@ -5239,7 +5270,8 @@ export interface BatchTrigger {
   /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
   /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
   /** `exiledFromGraveyardsOrBattlefield`: "cards are put into exile from graveyards and/or the battlefield" (Ketramose): anyone's. */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "created";
+  /** `exiled`: "Whenever one or more cards are put into exile" (Stonebinder's Familiar): cards from anywhere, anyone's, for any reason. */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "exiled" | "created";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";
@@ -5364,6 +5396,8 @@ export interface ActivatedAbility {
   lifeCost?: number;
   /** "Pay life equal to the number of colors in your commanders' color identity" (War Room), on top of `lifeCost`. */
   lifeCostIdentity?: true;
+  /** "Pay 3 life for each velocity counter on ~" (Tornado): `n` for each such counter on it as it's activated, on top of `lifeCost`. */
+  lifeCostPerCounter?: { n: number; counter: CounterKind };
   /** "{X}{B}, {T}, Pay X life" (Krumar Initiate): X life, the X announced for its mana cost, on top of `lifeCost`. */
   lifeCostX?: true;
   /**

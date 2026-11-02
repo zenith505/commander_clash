@@ -540,6 +540,13 @@ function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null 
   }
   const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
   if (!m) return null;
+  // Circle of Affliction: "Whenever a source of the chosen color deals damage to you, ...": once for each source of the
+  // color chosen as it entered, a spell too (rulings), its colors as it dealt the damage.
+  if (m[2] === "source of the chosen color") {
+    if (/\b(it|its|that source|that creature|that player|that much|that many)\b/.test(m[4]!)) return "fail";
+    const body = parseBody(m[4]!);
+    return body ? { event: "dealsDamageToYou", body, damagesYou: { chosenColor: true, ...(m[3] ? { combat: true as const } : {}) } } : "fail";
+  }
   const who = /^source(?: (an opponent|you) controls?)?$/.exec(m[2]!);
   let text = m[4]!;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
@@ -1223,7 +1230,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
   // Last Laugh: "Whenever a permanent other than ~ is put into a graveyard from the battlefield" is "another permanent".
-  line = line.replace(/^Whenever a permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another permanent is put into a graveyard from the battlefield, ");
+  // Yomiji, Who Bars the Way: "Whenever a legendary permanent other than ~ ..." likewise "another legendary permanent".
+  line = line.replace(/^Whenever an? ((?:legendary |nontoken )?)permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another $1permanent is put into a graveyard from the battlefield, ");
   // Stormfront Riders: "Whenever ~ or another creature is returned to your hand from the battlefield": one you own goes to
   // its owner's hand (CR 404.2), a token too before it ceases to exist (rulings). Justice, Vance Astrovik: "Whenever another
   // nonland permanent you control is returned to its owner's hand": from the battlefield, the only place a permanent is.
@@ -2034,6 +2042,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "exiledFromGraveyardsOrBattlefield" };
     yourTurn = !!m[1];
     rest = m[2]!;
+  } else if ((m = /^Whenever one or more cards are put into exile( during your turn)?, (.+)$/.exec(line))) {
+    // Stonebinder's Familiar: cards (not tokens, CR 111.1) from anywhere, anyone's, in one event (rulings).
+    batch = { what: "exiled" };
+    yourTurn = !!m[1];
+    rest = m[2]!;
   } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
     // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
     batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
@@ -2081,7 +2094,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves (?:your|an opponent's) graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
     // Measure of Wickedness: "Whenever another card is put into your graveyard from anywhere": not this permanent's own card.
     const another = !!m[1];
     m.splice(1, 1);
@@ -2090,7 +2103,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // during your turn".
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
-    const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
+    // Erebos's Titan: "Whenever a creature card leaves an opponent's graveyard": a card an opponent owns (CR 404.1).
+    const whose = /an opponent's/.test(m[2]!) ? ("opponent" as const) : /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : undefined;
     // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
     // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
     // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
@@ -2907,6 +2921,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
+  // Acrobatic Cheerleader: "This ability triggers only once.": never again for this object, even if it's countered
+  // (rulings).
+  const onceEver = /^(.+?) This ability triggers only once\.$/.exec(line);
+  if (onceEver) {
+    const t = parseTrigger(onceEver[1]!);
+    return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, onceEver: true } : "fail";
+  }
   // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only
   // while you're the active player.
   const leavesYours = /^(Whenever (?:another|an?) [^,]+? leaves the battlefield) during your turn, (.+)$/.exec(line);
@@ -3176,7 +3197,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Centaur Vinecrasher: "Whenever a land card is put into a graveyard from anywhere": also watched from graveyards, even
     // by a card put there in the same event (rulings).
     // Afterburner Expert: an exhaust ability activated is watched from graveyards too (see the activated event).
-    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "abilityActivated" && t.activates?.exhaust && t.activates.by === "you") && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose)) && t.batch.each)) || t.host) return "fail";
+    // Erebos's Titan: "Whenever a creature card leaves an opponent's graveyard" from its owner's graveyard (rulings: only
+    // there); not one that leaves with the player who leaves the game (their cards don't move, CR 800.4a).
+    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "abilityActivated" && t.activates?.exhaust && t.activates.by === "you") && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose) || (t.batch?.what === "leavesGraveyard" && t.batch.whose === "opponent")) && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
     // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
     const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);
@@ -3722,6 +3745,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damagesHost) {
     const body = parseBody(damagesHost[1]!, { subjectIt: true });
     return body ? { event: "creatureDealsDamageToAttached", host: "attached", body } : "fail";
+  }
+  // Tephraderm: "Whenever a creature deals damage to ~, ~ deals that much damage to that creature": once for each creature
+  // dealing it damage, combat damage or not, that creature the subject; "Whenever a spell deals damage to ~, ~ deals that
+  // much damage to that spell's controller": once for each spell, that player the spell's controller (CR 112.1). Both
+  // trigger even if the damage is lethal (rulings): it's still on the battlefield as the damage is dealt.
+  const damagedByAny = /^Whenever a (creature|spell) deals damage to ~, (.+)$/.exec(line);
+  if (damagedByAny) {
+    const spell = damagedByAny[1] === "spell";
+    const text = damagedByAny[2]!;
+    if (/\bX\b/.test(text)) return "fail";
+    const body = parseBody((spell ? text.replace(/\bthat spell's controller\b/g, "that player") : text).replace(/\bthat (?:much|many)\b/g, "X"), spell ? { eventPlayer: true } : { subjectIt: true });
+    return body ? { event: spell ? "spellDealsDamageToSelf" : "creatureDealsDamageToSelf", body: { ...replaceX(body, { count: { kind: "eventAmount" } }), text } } : "fail";
   }
   const damagedBy = /^Whenever a creature deals combat damage to ~, (.+)$/.exec(line);
   if (damagedBy) {

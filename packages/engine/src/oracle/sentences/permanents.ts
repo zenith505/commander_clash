@@ -1583,9 +1583,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Volatile Stormdrake: "Exchange control of ~ and target creature an opponent controls": ~ as it is (rulings: it must
   // still be on the battlefield).
   // Gilded Drake: "Exchange control of ~ and up to one target creature an opponent controls" (with none chosen, no exchange).
-  if ((m = /^[Ee]xchange control of (~|target .+? you control) and ((?:up to one )?target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+  // Shrewd Negotiation: "... and target artifact or creature you don't control": the same (no teammates here).
+  if ((m = /^[Ee]xchange control of (~|target .+? you control) and ((?:up to one )?target .+? (?:an opponent controls|you don't control)(?: with .+)?)$/.exec(s))) {
     if (m[2]!.startsWith("up to") && m[1] !== "~") return null;
     const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
+    // Spawnbroker: "... and target creature with power less than or equal to that creature's power an opponent controls":
+    // the first target's power, as they're chosen and as it resolves (TargetSpec.powerAtMostOf).
+    if (a?.ref === "target" && !a.n && /^target creature with power less than or equal to that creature's power an opponent controls$/.test(m[2]!) && ctx.targets[a.index]?.kind === "object" && ctx.targets[a.index]!.types?.includes("Creature")) {
+      const b = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "opponent", powerAtMostOf: [a.index], text: m[2]! });
+      return [{ type: "exchangeControl", a, b: { ref: "target", index: b } }];
+    }
     const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
   }
@@ -1734,6 +1741,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "The tokens are goaded for the rest of the game" (Life of the Party, Balefang, Rendmaw): goaded by you (CR 701.15),
   // with no end; still goaded after you leave the game (rulings, CR 800.4a ends only control effects).
+  // Serene Sleuth: "Then each creature you control is no longer goaded" (see the ungoad effect).
+  if (/^(?:Then )?[Ee]ach creature you control is no longer goaded$/.test(s)) {
+    const what = parseObject("each creature you control", ctx);
+    return what ? [{ type: "ungoad", what }] : null;
+  }
   if ((m = /^The (tokens are|token is) goaded for the rest of the game$/.exec(s)) && (ctx.lastCreatedAny || ctx.lastCreated)) return [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "goad" }], duration: "game" }];
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures

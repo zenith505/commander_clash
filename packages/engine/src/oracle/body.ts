@@ -238,15 +238,23 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage"]);
-const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group"]);
+const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage", "dealsDamageToYou"]);
+const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group", "damagesYou"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
  * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
  * isn't one, null when it can't be compiled.
  */
-function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boolean): Effect | null | undefined {
+function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boolean, colorChosen?: boolean): Effect | null | undefined {
+  // Zombie Boa: "Choose a color. Whenever ~ becomes blocked by a creature of that color this turn, destroy that creature.":
+  // a delayed trigger about ~ (CR 603.7b), the color bound as it's made (run-spells floatingTrigger).
+  const boa = colorChosen && ctx?.activated && !after.length ? /^Whenever ~ becomes blocked by a creature of that color this turn, (destroy that creature)$/.exec(s) : null;
+  if (boa) {
+    const trigger = parseTrigger(`Whenever ~ becomes blocked by a creature, ${boa[1]!}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfBlockedByCreature" || trigger.subjectFilter || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger: { ...trigger, subjectFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "color", text: "creature of the chosen color" } }, until: "endOfTurn" };
+  }
   // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
   // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
   // Stensian Sanguinist: "Whenever you attack, target creature gains deathtouch until end of turn. Whenever that creature
@@ -2801,6 +2809,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Swarm Surge: "Creatures you control get +2/+0 until end of turn. Colorless creatures you control also gain first strike
   // until end of turn.": a second effect of its own.
   text = text.replace(/(\. )((?:[A-Z][a-z]+ )?creatures you control) also (gain|get) /, "$1$2 $3 ");
+  // Dominaria's Judgment: "Until end of turn, creatures you control gain protection from white if you control a Plains,
+  // from blue if you control an Island, ...": each protection only if you control that land type as it resolves, all of
+  // them for the creatures you control then (CR 611.2c).
+  text = text.replace(/^Until end of turn, creatures you control gain (protection from (?:white|blue|black|red|green) if you control an? (?:Plains|Island|Swamp|Mountain|Forest)(?:, (?:and )?from (?:white|blue|black|red|green) if you control an? (?:Plains|Island|Swamp|Mountain|Forest))+)\.$/, (_, list: string) =>
+    list.replace(/^protection /, "").split(/, (?:and )?/).map((part) => {
+      const [, color, land] = /^from (\w+) if you control (an? \w+)$/.exec(part)!;
+      return `If you control ${land}, creatures you control gain protection from ${color} until end of turn.`;
+    }).join(" "));
   // Roar of Challenge's "That creature gains indestructible until end of turn if ..." too.
   text = text.replace(/(^|\. )That creature (?:also )?gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
   // "Sacrifice another creature. You gain X life and draw X cards, where X is that creature's power." (Disciple of Bolas):
@@ -3378,6 +3394,36 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random, then put the rest on top
+    // of your library in any order.": four of the eight at random; the rest are still the top cards, which you order
+    // (rulings: you see them first).
+    const librarian = /^Look at the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
+    // (The splitter has made "then put the rest ..." a sentence of its own.)
+    const libRest = librarian && /^Exile (one|two|three|four|five|six|seven|eight|nine) of them at random$/.exec(sentences[si + 1] ?? "");
+    if (librarian && libRest && /^Put the rest on top of your library in any order\.?$/.test(sentences[si + 2] ?? "") && num(libRest[1]!) < num(librarian[1]!)) {
+      const look = num(librarian[1]!);
+      const n = num(libRest[1]!);
+      effects.push({ type: "exileTop", who: { ref: "you" }, n, randomOf: look }, { type: "orderTop", who: { ref: "you" }, n: look - n });
+      si += 2;
+      continue;
+    }
+    // Rally the Horde: "Exile the top card of your library." three times, then "If the last card exiled isn't a land card,
+    // repeat this process.": three at a time, again while the third isn't a land card (Effect exileTop repeatUnlessLastLand).
+    if (s === "Exile the top card of your library" && sentences.slice(si + 1, si + 4).map((x) => x.replace(/\.$/, "")).join("|") === "Exile the top card of your library|Exile the top card of your library|If the last card exiled isn't a land card, repeat this process") {
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 3, repeatUnlessLastLand: true });
+      si += 3;
+      continue;
+    }
+    // Scalpelexis: "that player exiles the top four cards of their library. If two or more of those cards have the same
+    // name, repeat this process."
+    if (sentences[si + 1]?.replace(/\.$/, "") === "If two or more of those cards have the same name, repeat this process") {
+      const ex = parseSentence(capital(s), ctx);
+      const e0 = ex?.length === 1 ? ex[0] : undefined;
+      if (e0?.type !== "exileTop" || e0.linked || e0.putAll || typeof e0.n !== "number" || e0.n < 2) return null;
+      effects.push({ ...e0, repeatSameName: true });
+      si++;
+      continue;
+    }
     // Grindstone: "Target player mills two cards. If two cards that share a color were milled this way, repeat this
     // process.": again and again in this resolution while the two milled share a color (rulings: both colorless don't).
     if (sentences[si + 1]?.replace(/\.$/, "") === "If two cards that share a color were milled this way, repeat this process") {
@@ -3408,6 +3454,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacMany[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, xSacrificed: true }] });
       si++;
+      continue;
+    }
+    // Rebound, Silver Wyvern: "The new target must be a player / a creature." after "change the target of ...".
+    const mustBe = last?.type === "changeTarget" && last.all && !last.mustBe ? /^The new target must be a (player|creature)$/.exec(s) : null;
+    if (mustBe && last?.type === "changeTarget") {
+      last.mustBe = mustBe[1] as "player" | "creature";
+      continue;
+    }
+    // Soul of Emancipation: "destroy up to three other target nonland permanents. For each of those permanents, its controller
+    // creates a 3/3 ... token": one token for each of them still a legal target as this resolves, destroyed or not (rulings),
+    // made by its controller (as it last existed, CR 608.2h).
+    const perTarget = last?.type === "destroy" && last.what.ref === "target" && (last.what.n ?? 1) > 1 ? /^For each of those permanents, its controller creates (an? .+ token(?: with [^.]+)?)$/.exec(s) : null;
+    if (perTarget && last?.type === "destroy" && last.what.ref === "target") {
+      const made = parseOne(`You create ${perTarget[1]!}`, ctx);
+      if (made?.length !== 1 || made[0]!.type !== "createToken" || made[0]!.n !== 1 || (made[0]!.who && made[0]!.who.ref !== "you")) return null;
+      const first = last.what.index;
+      for (let i = 0; i < (last.what.n ?? 1); i++) effects.push({ ...structuredClone(made[0]!), who: { ref: "targetController", index: first + i } });
       continue;
     }
     // Vault 21: House Gambit: "For each of those cards that has the same mana value as another card revealed this way,
@@ -10026,7 +10089,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Barrin's Unmaking: "Return target permanent to its owner's hand if that permanent shares a color with the most common
     // color among all permanents or a color tied for most common": as it resolves.
-    const mostCommon = /^(.+) if that (permanent|creature) shares a color with the most common color among all permanents or a color tied for most common$/.exec(s);
+    const mostCommon = /^(.+) if (?:that (?:permanent|creature)|it) shares a color with the most common color among all permanents or a color tied for most common$/.exec(s);
     if (mostCommon) {
       const fx = parseOne(mostCommon[1]!, ctx);
       const i = ctx.targets.length - 1;
@@ -13532,7 +13595,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
     const prevE = effects[effects.length - 1];
-    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx, prevE?.type === "choose" && prevE.choice === "cardName");
+    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx, prevE?.type === "choose" && prevE.choice === "cardName", prevE?.type === "choose" && prevE.choice === "color");
     if (floating !== undefined) {
       if (!floating) return null;
       effects.push(floating);

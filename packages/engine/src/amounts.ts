@@ -590,6 +590,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "lifeGainedThisTurn":
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
+    case "resolvedThisTurn":
+      return s.resolving?.nth ?? 0;
     case "energyLostThisTurn":
       return s.turnLog?.energyLost?.[ctx.controller] ?? 0;
     case "descendedThisTurn":
@@ -603,7 +605,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "opponentsDamage":
       return Object.entries(s.damageThisTurn ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "playerDamageThisTurn":
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.damageThisTurn?.[pid] ?? 0), 0);
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + ((c.byArtifacts ? s.turnLog?.artifactDamage : s.damageThisTurn)?.[pid] ?? 0), 0);
     case "opponentsNoncombatDamage":
       return Object.entries(s.turnLog?.noncombatDamage ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":

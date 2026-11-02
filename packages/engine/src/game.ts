@@ -1037,6 +1037,7 @@ export function moveObject(
   o.wasDealtDamage = undefined;
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
+  o.hasDealtCombatDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -1161,7 +1162,8 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
-  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (fromZone === "library" && to === "exile"))
+  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere.
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile"))
     (s.zoneBatch ??= []).push({
       id,
       zc: o.zoneChanges,
@@ -4742,7 +4744,7 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
 export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {

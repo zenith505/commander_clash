@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -750,6 +750,12 @@ export function compile(d: CardDef): CompiledCard {
     // Adaptive Training Post: "Whenever you cast ..., if ~ has fewer than three charge counters on it, put a charge counter
     // on it": "it" is ~ both times, not the spell.
     line = line.replace(/^(Whenever you cast [^,]+, if ~ has [^,]+ counters on it, put an? [^ ,]+ counter on) it\.$/, "$1 ~.");
+    // Imminent Doom: "Whenever you cast a spell with mana value equal to the number of doom counters on ~, ~ deals that much
+    // damage to any target": the number of counters as it triggered (rulings), which is that spell's mana value.
+    line = line.replace(/^(Whenever you cast a spell with mana value equal to the number of [a-z]+ counters on ~, ~ deals) that much damage (to any target\.)/, "$1 damage equal to that spell's mana value $2");
+    // Malignant Growth: "that player draws an additional card for each growth counter on ~, then ~ deals damage to the player
+    // equal to the number of cards they drew this way": the draw, then damage for the cards that draw really drew.
+    line = line.replace(/^(At the beginning of each opponent's draw step, that player draws an additional card for each [a-z]+ counter on ~), then ~ deals damage to the player equal to the number of cards they drew this way\.$/, "$1. ~ deals damage to that player equal to the number of cards drawn this way.");
     // Narcolepsy: "At the beginning of each upkeep, if enchanted creature is untapped, tap it": "it" is that creature.
     line = line.replace(/^(At the beginning of [^,]+, if enchanted creature is (?:un)?tapped, (?:un)?tap) it\.$/, "$1 enchanted creature.");
     // Stature, Size Shifter: "~ can't be blocked if ~'s power is 1 or less"; Illvoi Infiltrator: "... if you've cast two or
@@ -3723,6 +3729,16 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Myr Servitor: "At the beginning of your upkeep, if ~ is on the battlefield, ...": an intervening "if" (CR 603.4) that's
+    // true as it triggers, so what counts is that ~ is still on the battlefield as it resolves (rulings).
+    const stillHere = /^(At the beginning of your upkeep), if ~ is on the battlefield, (.+)$/.exec(line);
+    if (stillHere) {
+      const t = parseTrigger(`${stillHere[1]}, ${stillHere[2]}`);
+      if (t && t !== "fail" && t.event === "yourUpkeep" && !t.body.targets.length && Object.keys(t).every((k) => k === "event" || k === "body")) {
+        out.triggers.push({ ...t, body: { ...t.body, effects: [{ type: "if", cond: { kind: "selfHere" }, effects: t.body.effects }], text: line.replace(/^At the beginning of your upkeep, /, "") } });
+        continue;
+      }
+    }
     // Pharika's Spawn: "~ escapes with two +1/+1 counters on it. When it enters this way, each opponent sacrifices ...": the
     // counters (CR 702.138c) and a trigger only when it escaped.
     const escThisWay = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\. When it enters this way, (.+)$`).exec(line);
@@ -5627,6 +5643,14 @@ function linkExile(out: CompiledCard) {
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
     if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
     else for (const e of yards) e.linked = true;
+  }
+  // Mirror Golem: "the exiled card" its protection reads is the one its imprint ability exiled as it entered, its only
+  // exile (CR 607.2a).
+  if (out.statics.some((st) => st.mods.some((m) => m.kind === "addKeywords" && m.keywords.includes(LINKED_TYPES_PROTECTION)))) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its protection can't be linked to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));

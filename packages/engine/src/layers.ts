@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1295,6 +1295,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
       if (cond.is === "dealtDamageThisTurn") return src.zone === "battlefield" && !!src.wasDealtDamage;
       if (cond.is === "hasDealtDamage") return !!src.hasDealtDamage;
+      if (cond.is === "hasDealtCombatDamage") return !!src.hasDealtCombatDamage;
       // Whirling Dervish: "if ~ dealt damage to an opponent this turn": this object (CR 400.7), to any opponent (CR 102.3).
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
@@ -1417,6 +1418,15 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
 /** Two objects' creature types share one ("all": changeling, CR 702.73a). */
 const shareKinds = (a: Set<string> | "all", b: Set<string> | "all") => (a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((x) => b.has(x)));
 
+/** Mirror Golem: protection from each card type of the cards exiled with this object that are still in exile (CR 607.2a). */
+function linkedCardTypesProtection(s: GameState, sourceId: ObjectId | undefined): string[] {
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  if (!src) return [];
+  const linked = s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? [];
+  const types = linked.flatMap((l) => { const o = s.objects[l.id]; return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc && !o.faceDown ? defOf(s, o).types : []; });
+  return protectionFromCardTypes(types);
+}
+
 /** Duplicant: the last creature card exiled with this object that's still in exile (CR 607.2a). */
 function lastLinkedCreatureCard(s: GameState, sourceId: ObjectId | undefined): GameObject | undefined {
   const src = sourceId ? s.objects[sourceId] : undefined;
@@ -1525,7 +1535,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

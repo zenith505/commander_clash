@@ -7236,6 +7236,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
       continue;
     }
+    // Scriv, the Obligator's Contract: "Whenever enchanted creature attacks, it gets +2/+0 until end of turn if it's
+    // attacking one of your opponents. Otherwise, its controller loses 2 life.": the attacking creature as it resolves,
+    // attacking a player who is an opponent of this ability's controller (not a planeswalker, CR 506.3, 508.1b).
+    const ifAttackingOpp = ctx.subject ? /^(.+) if it's attacking one of your opponents$/.exec(s) : null;
+    const otherwiseOpp = ifAttackingOpp ? /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (ifAttackingOpp && otherwiseOpp) {
+      const yes = attempt(ctx, () => parseOne(capital(ifAttackingOpp[1]!), ctx));
+      const no = attempt(ctx, () => parseOne(capital(otherwiseOpp[1]!), ctx));
+      if (!yes || !no || [...yes, ...no].some((e) => pauses(e))) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], combat: "attackingOpponent", text: "creature attacking one of your opponents" };
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     // Oran-Rief Hydra: "Put a +1/+1 counter on ~. If that land is a Forest, put two +1/+1 counters on ~ instead."; Akoum
     // Hellkite: "~ deals 1 damage to any target. If that land is a Mountain, ~ deals 2 damage instead." The land that
     // entered as this resolves, or as it last existed (CR 608.2h); the same instruction with the other number.

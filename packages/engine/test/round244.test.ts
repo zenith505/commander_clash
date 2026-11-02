@@ -66,6 +66,8 @@ const grimoire = (): CardDef => ({"oracleId":"d4453b3e-733e-4038-81da-135a6a0307
 const destiny = (): CardDef => ({"oracleId":"ecb81888-589b-4486-a444-e0c26384854e","name":"Avatar Destiny","manaCost":"{2}{G}{G}","cmc":4,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature you control\nEnchanted creature gets +1/+1 for each creature card in your graveyard and is an Avatar in addition to its other types.\nWhen enchanted creature dies, mill cards equal to its power. Return this card to its owner's hand and up to one creature card milled this way to the battlefield under your control.","colors":["G"],"colorIdentity":["G"],"keywords":["Enchant","Mill"],"imageUrl":"https://cards.scryfall.io/normal/front/4/d/4d74da72-8443-4fce-9d64-d2041f6a3292.jpg?1783904948","artUrl":"https://cards.scryfall.io/art_crop/front/4/d/4d74da72-8443-4fce-9d64-d2041f6a3292.jpg?1783904948","commanderLegal":"legal","set":"tla","releasedAt":"2025-11-21","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const lifeline = (): CardDef => ({"oracleId":"f475b636-eb7f-4dd7-bc87-a1af07064ffe","name":"Lifeline","manaCost":"{5}","cmc":5,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step.","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/0/40cee82f-36b2-48a9-930a-8e23cb2742fc.jpg?1783946304","artUrl":"https://cards.scryfall.io/art_crop/front/4/0/40cee82f-36b2-48a9-930a-8e23cb2742fc.jpg?1783946304","commanderLegal":"legal","set":"usg","releasedAt":"1998-10-12","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
+const scriv = (): CardDef => ({"oracleId":"64c986f0-e786-419c-9b51-8c316c8fae0e","name":"Scriv, the Obligator","manaCost":"{2}{W}{B}","cmc":4,"typeLine":"Legendary Creature — Inkling Bird","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Inkling","Bird"],"oracleText":"Flying, deathtouch\nWhenever Scriv enters or attacks, create a white Aura enchantment token named Contract attached to target creature an opponent controls. The token has enchant creature and \"Whenever enchanted creature attacks, it gets +2/+0 until end of turn if it's attacking one of your opponents. Otherwise, its controller loses 2 life.\"","power":"2","toughness":"3","colors":["B","W"],"colorIdentity":["B","W"],"keywords":["Deathtouch","Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/c/1/c133a860-7b8d-485d-b9a2-bf8ae3a68f47.jpg?1783903867","artUrl":"https://cards.scryfall.io/art_crop/front/c/1/c133a860-7b8d-485d-b9a2-bf8ae3a68f47.jpg?1783903867","commanderLegal":"legal","set":"soc","releasedAt":"2026-04-24","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+
 const enchantmentCard = card("Test Monument", "Enchantment", "{2}", { oracleText: "" });
 const auraOnEnchantment = card("Test Ward", "Enchantment — Aura", "{1}", { oracleText: "Enchant enchantment" });
 const legend = (extra: Partial<CardDef> = {}) => card(extra.name ?? "Test Elf Lord", "Legendary Creature — Elf Warrior", "{G}", { power: "2", toughness: "2", colors: ["G"], ...extra });
@@ -78,7 +80,7 @@ const walker = (s: GameState, pid: PlayerId, def: CardDef, loyalty: number) => {
 
 describe("round 244", () => {
   it("every card of the round compiles fully", () => {
-    supported(estrid(), rani(), preston(), smoke(), firecat(), farmhand(), banner());
+    supported(estrid(), rani(), preston(), smoke(), firecat(), farmhand(), banner(), prayers(), grimoire(), destiny(), lifeline(), scriv());
   });
 
   it("Estrid −1: a white Mask Aura token on another target permanent, with umbra armor saving it from destruction", () => {
@@ -329,5 +331,29 @@ describe("round 244", () => {
     t = passUntil(t, "end", ap2);
     t = settle(t);
     expect(t.battlefield.some((id) => characteristics(t, t.objects[id]!).types.includes("Creature"))).toBe(false);
+  });
+
+  it("Scriv, the Obligator: a Contract on an opponent's creature; attacking another of your opponents it gets +2/+0, attacking you its controller loses 2 life", () => {
+    for (const atMe of [false, true]) {
+      const { s: s0, ap, opp, ids } = setup([scriv()]);
+      const third = s0.turnOrder[(s0.turnOrder.indexOf(opp) + 1) % 4]!;
+      const ox = putOnBattlefield(s0, opp, bear({ name: "Test Ox" }));
+      let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+      expect(s.pending?.kind).toBe("chooseTargets");
+      s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(ox)] }));
+      const [contract] = attachedTo(s, ox);
+      expect(characteristics(s, s.objects[contract!]!)).toMatchObject({ name: "Contract", colors: ["W"] });
+      s = passUntil(s, "declareAttackers", opp);
+      s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: ox, defender: atMe ? ap : third }] });
+      const life = s.players[opp]!.life;
+      s = settle(s);
+      if (atMe) {
+        expect(s.players[opp]!.life).toBe(life - 2);
+        expect(pt(s, ox)).toBe("2/2");
+      } else {
+        expect(s.players[opp]!.life).toBe(life);
+        expect(pt(s, ox)).toBe("4/2");
+      }
+    }
   });
 });

@@ -849,12 +849,16 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Among permanents of that type only (rulings on Padeem); an {X} in a permanent's mana cost is 0 (CR 202.3e).
       let mine = -Infinity;
       let all = -Infinity;
+      let theirs = -Infinity;
       for (const [id, c] of chars) {
         if (!c.types.includes(cond.type)) continue;
         const n = cond.stat === "power" ? c.power : cond.stat === "toughness" ? c.toughness : defMv(defOf(s, s.objects[id]!));
         all = Math.max(all, n);
         if (c.controller === you) mine = Math.max(mine, n);
+        else theirs = Math.max(theirs, n);
       }
+      // Might Makes Right: no other player's creature has it too.
+      if (cond.each) return mine > -Infinity && mine > theirs;
       return mine > -Infinity && mine >= all;
     }
     case "attackedPlayerPoisoned":
@@ -1244,6 +1248,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.activePlayer === you && (s.players[you]?.turnsTaken ?? 0) <= cond.n;
     case "opponentLostLifeLastTurn":
       return (s.lastTurn?.lostLife ?? []).some((p) => p !== you);
+    case "opponentNoncombatDamagedLastTurn":
+      return (s.lastTurn?.noncombatDamaged ?? []).some((p) => p !== you && !s.players[p]?.lost);
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "dayNight":
@@ -1395,6 +1401,8 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   const out: ObjectId[] = [];
   // "Creatures you control of the chosen type": the choice made as the source entered.
   const spec = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
+  // Favor of the Mighty: the greatest mana value among creatures now (an {X} counts 0, CR 202.3e).
+  const topMv = a.greatestManaValue ? Math.max(-Infinity, ...[...chars.values()].filter((c) => c.types.includes("Creature")).map((c) => c.manaValue ?? 0)) : undefined;
   for (const [id, c] of chars) {
     if (a.other && id === e.sourceId) continue;
     if (a.otherThanAttached && id === s.objects[e.sourceId!]?.attachedTo) continue;
@@ -1408,6 +1416,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
     if (a.lesserPowerThanSource && !(c.power < (chars.get(e.sourceId!)?.power ?? -Infinity))) continue;
+    if (topMv !== undefined && (c.manaValue ?? 0) !== topMv) continue;
     if (a.sharesWithAttached) {
       const hostId = s.objects[e.sourceId!]?.attachedTo;
       const host = hostId ? chars.get(hostId) : undefined;

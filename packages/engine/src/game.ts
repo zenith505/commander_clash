@@ -1038,6 +1038,8 @@ export function moveObject(
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
   o.hasDealtCombatDamage = undefined;
+  o.damagedPlayers = undefined;
+  o.damagedWalkers = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -2157,7 +2159,13 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0);
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileCounter && !e.affected.length));
+  // Rootwater Matriarch: "for as long as that creature is enchanted", the same once it has no Aura attached.
+  for (const e of s.effects) {
+    if (!e.whileEnchanted) continue;
+    const kept = e.affected.filter((id) => isEnchanted(s, id));
+    if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
+  }
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || ((e.whileCounter || e.whileEnchanted) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;
@@ -2165,6 +2173,12 @@ export function endWhileTapped(s: GameState): boolean {
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
+}
+
+/** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
+export function isEnchanted(s: GameState, id: ObjectId): boolean {
+  const o = s.objects[id];
+  return o?.zone === "battlefield" && s.battlefield.some((a) => s.objects[a]!.attachedTo === id && characteristics(s, obj(s, a)).subtypes.includes("Aura"));
 }
 
 export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
@@ -3329,7 +3343,9 @@ function creaturesEnteredOf(s: GameState): { creaturesEntered?: { controller: Pl
 function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
-  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...creaturesEnteredOf(s) };
+  // Command the Stage: the players dealt noncombat damage during it.
+  const noncombat = Object.entries(s.turnLog?.noncombatDamage ?? {}).filter(([, n]) => n > 0).map(([p]) => Number(p) as PlayerId);
+  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...(noncombat.length ? { noncombatDamaged: noncombat } : {}), ...creaturesEnteredOf(s) };
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
   const controlled = s.controlledTurn;
@@ -4732,7 +4748,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; flashbackFromGraveyard?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -10208,6 +10224,12 @@ function finishAttacks(s: GameState) {
   for (const id of attacks) fireEvent(s, { type: "attacks", id }); // CR 508.3a
   if (attacks.length) fireEvent(s, { type: "groupAttack", controller: s.activePlayer, ids: attacks });
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]! }); // CR 506.5
+  // "Attacks a player alone": the only creature declared as an attacker attacking that player, not one of their
+  // planeswalkers or battles (Yuriko, Blade of the Mighty rulings).
+  for (const p of new Set(attacks.map((id) => s.objects[id]!.attacking))) {
+    const direct = attacks.filter((id) => s.objects[id]!.attacking === p && !s.objects[id]!.attackingPermanent);
+    if (p !== undefined && direct.length === 1) fireEvent(s, { type: "attacksPlayerAlone", id: direct[0]! });
+  }
   for (const [at, enlisted] of d.enlisted) fireEvent(s, { type: "enlists", id: at, enlisted });
   for (const id of d.exerted ?? []) fireEvent(s, { type: "exerted", id, attacking: true });
 }

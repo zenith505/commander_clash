@@ -251,6 +251,7 @@ export type TriggerSourceEvent =
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
+  | { type: "attacksPlayerAlone"; id: ObjectId }
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
@@ -1686,6 +1687,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || (t.subjectOrSelf && id === attacker.id) || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+    causedBy = null;
+  } else if (ev.type === "attacksPlayerAlone") {
+    // "Whenever a creature you control attacks a player alone": the only creature attacking that player itself (rulings).
+    const attacker = obj(s, ev.id);
+    const you = controllerOf(s, attacker);
+    const that = attacker.attacking !== undefined ? { player: attacker.attacking } : undefined;
+    causedBy = { event: "attacks", objs: [{ o: attacker, controller: you }] };
+    for (const id of s.battlefield)
+      if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksPlayerAlone" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
     causedBy = null;
   } else if (ev.type === "dealtDamage") {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.

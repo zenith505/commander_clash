@@ -4296,6 +4296,12 @@ export function compile(d: CardDef): CompiledCard {
       out.combatNoInstantsOrAbilities = true;
       continue;
     }
+    // Yuriko, Blade of the Mighty: Hand to Hand's rule for every spell, not only instants (CR 506.1: the combat phase).
+    if (line === "During combat, players can't cast spells or activate abilities that aren't mana abilities.") {
+      out.combatNoInstantsOrAbilities = true;
+      out.opponentsCantCastDuringCombat = "all";
+      continue;
+    }
     // Basandra, Battle Seraph: every player, its controller too.
     if (line === "Players can't cast spells during combat.") {
       out.opponentsCantCastDuringCombat = "all";

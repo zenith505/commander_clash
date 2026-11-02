@@ -770,9 +770,18 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   // You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your
   // library in a random order.": cast from the library as this resolves; not cast, it goes to the bottom with the rest
   // (rulings), all of them if none was found.
-  const keeper = new RegExp(`^[Rr]eveal cards from the top of your library until you reveal a nonland card with mana value (${NUM}) or less$`).exec(sentences[at]!);
-  if (keeper && sentences[at + 1] === "You may cast that card without paying its mana cost" && /^Put all revealed cards not cast this way on the bottom of your library in a random order\.?$/.test(sentences[at + 2] ?? ""))
-    return { effect: { type: "exileUntilNonland", reveal: true, inPlace: true, untilMv: num(keeper[1]!), then: "castFree" }, next: at + 3 };
+  // Plargg, Dean of Chaos: "until you reveal a nonlegendary, nonland card with mana value 3 or less": the same, a
+  // legendary card doesn't stop it.
+  // Neera, Wild Mage: "... until you reveal a nonland card. You may cast that card without paying its mana cost. Then put
+  // all revealed cards not cast this way on the bottom of your library in a random order.": any nonland card, the same way.
+  const keeper = new RegExp(`^[Rr]eveal cards from the top of your library until you reveal a (nonlegendary, )?nonland card(?: with mana value (${NUM}) or less)?$`).exec(sentences[at]!);
+  if (keeper && sentences[at + 1] === "You may cast that card without paying its mana cost" && /^(?:Then put|Put) all revealed cards not cast this way on the bottom of your library in a random order\.?$/.test(sentences[at + 2] ?? ""))
+    return { effect: { type: "exileUntilNonland", reveal: true, inPlace: true, ...(keeper[2] ? { untilMv: num(keeper[2]) } : {}), ...(keeper[1] ? { untilNonlegendary: true as const } : {}), then: "castFree" }, next: at + 3 };
+  // Illuna, Apex of Wishes: "exile cards from the top of your library until you exile a nonland permanent card. Put that
+  // card onto the battlefield or into your hand.": an artifact, creature, enchantment, planeswalker or battle card (rulings:
+  // not a land, an instant or a sorcery), chosen after seeing it; the other cards stay exiled (rulings).
+  if (/^[Ee]xile cards from the top of your library until you exile a nonland permanent card$/.test(sentences[at]!) && /^Put that card onto the battlefield or into your hand\.?$/.test(sentences[at + 1] ?? ""))
+    return { effect: { type: "exileUntilNonland", untilTypes: ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"], untilNonlandType: true, then: "battlefieldOrHand" }, next: at + 2 };
   // Sibylline Soothsayer: "reveal cards from the top of your library until you reveal a nonland card with mana value 3 or
   // greater. Exile that card with three time counters on it. If it doesn't have suspend, it gains suspend. Put the rest of
   // the revealed cards on the bottom of your library in a random order." (CR 702.62): suspended the way Kang Prime's is.
@@ -1165,6 +1174,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(sacrifices a creature) of their choice (that dealt combat damage to you this turn)\b/, "$1 $2");
   // Clip Wings: "sacrifices a creature of their choice with flying": a creature with flying, of their choice.
   text = text.replace(/\b(sacrifices a creature) of their choice (with [a-z]+)(?=\.)/, "$1 $2");
+  // Living Laser: "for each card you've discarded this turn, create a token that's a copy of ~, except the token isn't
+  // legendary. The tokens enter tapped and attacking. Exile the tokens ...": that many copies at once (CR 508.4).
+  text = text.replace(/^for each card you've discarded this turn, create a token that's a copy of ~, except the token isn't legendary\. The tokens enter tapped and attacking\. (Exile the tokens )/, "create X tapped and attacking tokens that are copies of ~, except the tokens aren't legendary, where X is the number of cards you've discarded this turn. $1");
   // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
   // attacking." (CR 508.4).
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
@@ -1905,6 +1917,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Make Your Own Luck: "You may exile a nonland card from among them. If you do, it becomes plotted. Put the rest into your
   // hand.": the look's exile, plotted as it's exiled (CR 702.170c), then the rest.
   text = text.replace(/(^|\. )(You may exile an? [a-z]+ card from among them)\. If you do, it becomes plotted\. (Put the rest into your hand)\./, "$1$2. $3. The card exiled this way becomes plotted.");
+  // Frodo, Sauron's Bane's Rogue: "that player loses the game if the Ring has tempted you four or more times this game.
+  // Otherwise, the Ring tempts you.": checked as it resolves (CR 701.54c), the same as "If ..., ... Otherwise, ...".
+  text = text.replace(/^that player loses the game if (the Ring has tempted you \w+ or more times this game)\. Otherwise, /, "If $1, that player loses the game. Otherwise, ");
   // Force Away: "If you control a creature with power 4 or greater, you may draw a card. If you do, discard a card.": the
   // discard only after the draw you chose (CR 608.2c), the creature checked as this part resolves.
   text = text.replace(/(^|\. )(If you control a creature with power \d+ or greater, you may draw a card)\. If you do, discard a card\.$/, "$1$2, then discard a card.");
@@ -4983,6 +4998,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = faceDown.next - 1;
       continue;
     }
+    // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do, reveal cards ... until you reveal
+    // a nonland card. You may cast that card ... Then put all revealed cards ...": the whole reveal only if it was done.
+    const mayBefore = effects[effects.length - 1];
+    if (/^If you do, reveal cards from the top of your library until /.test(s) && mayBefore?.type === "may" && !mayBefore.otherwise) {
+      const after = parseUntilNonland([...sentences.slice(0, si), s.replace(/^If you do, r/, "R"), ...sentences.slice(si + 1)], si, ctx);
+      if (after === "fail") return null;
+      if (after) {
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [after.effect] });
+        si = after.next - 1;
+        continue;
+      }
+    }
     const untilNonland = parseUntilNonland(sentences, si, ctx);
     if (untilNonland === "fail") return null;
     if (untilNonland) {
@@ -6619,6 +6646,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const x = parseCount(sunbird[1]!, ctx);
       if (!x) return null;
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: x, reveal: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
+      continue;
+    }
+    // Sanwell, Avenger Ace: "exile the top six cards of your library. You may cast a Vehicle or artifact creature spell from
+    // among them. Then put the rest on the bottom of your library in a random order.": cast as this resolves, paying its
+    // costs (rulings); the card not cast goes to the bottom with the rest (rulings).
+    const paidAmong = castAmongHead && (!castAmongHead[2] || castAmongHead[2] === "your") && !castAmongHead[3] && castAmongHead[1] ? /^You may cast an? ([A-Za-z ]+?) or ([a-z ]+?) spell from among them$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (paidAmong && /^Then put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 2] ?? "")) {
+      const filter = parseSearchFilter(`${paidAmong[1]} card or ${paidAmong[2]} card`);
+      if (!filter) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: amt(castAmongHead![1]!), filter, max: 1, paid: true, rest: { dest: "bottomRandom" } });
       si += 2;
       continue;
     }
@@ -11876,7 +11914,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Perfected Mind): counted after the mill before it.
       // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
       // Oko, the Ringleader: "If you've committed a crime this turn, discard a card. Otherwise, discard two cards" (CR 700.13).
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "handAtLeast" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || prev.cond.cond.kind === "committedCrime" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "handAtLeast" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || prev.cond.cond.kind === "monarch" || prev.cond.cond.kind === "yourTurn" || prev.cond.cond.kind === "committedCrime" || prev.cond.cond.kind === "ringTempted" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;

@@ -1283,6 +1283,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ripple":
     case "counterUnlessPays":
     case "counterCause":
+    case "causeToBottom":
     case "counterSpell":
     case "spellUncounterable":
     case "spellEntersWith":

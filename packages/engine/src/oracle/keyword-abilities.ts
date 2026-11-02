@@ -61,6 +61,9 @@ export function parseGraveyardKeyword(
   if (/^You may cast (?:~|this card) from your graveyard using its warp ability\.?$/.test(line)) return /^Warp—/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "warp" } } : "fail";
   // "You may cast this card from your graveyard using its blitz ability" (Tenacious Underdog): the same, for its blitz cost
   // (CR 702.152a); a blitzed creature is sacrificed at the next end step, so it may be cast this way again.
+  // "You may cast this card from your graveyard using its mutate ability" (Brokkos, Apex of Forever): only for its mutate
+  // cost (rulings), at its normal timing, merging with a target non-Human creature you own (CR 702.140a).
+  if (/^You may cast (?:~|this card) from your graveyard using its mutate ability\.?$/.test(line)) return /^Mutate \{/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "mutate" } } : "fail";
   if (/^You may cast (?:~|this card) from your graveyard using its blitz ability\.?$/.test(line)) return /^Blitz[— ]/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "blitz" } } : "fail";
   // Undead Sprinter: "You may cast ~ from your graveyard if a non-Zombie creature died this turn. If you do, ~ enters with a
   // +1/+1 counter on it.": the spell cast with this permission, not another way (rulings on Worldheart Phoenix), enters

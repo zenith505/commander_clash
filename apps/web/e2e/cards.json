@@ -15517,6 +15517,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8d087fe0-d554-4d7c-ba22-32db2cf71887",
+  "name": "Primal Prayers",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, you get {E}{E} (two energy counters).\nYou may cast creature spells with mana value 3 or less by paying {E} rather than paying their mana costs. If you cast a spell this way, you may cast it as though it had flash.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44b12ccc-81cb-4ec1-891e-4bf706e53aa4",
   "name": "Primal Surge",
   "manaCost": "{8}{G}{G}",

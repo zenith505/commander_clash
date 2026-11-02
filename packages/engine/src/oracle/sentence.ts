@@ -213,6 +213,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   // Summary Dismissal: "Exile all other spells and counter all abilities" (see Effect "dismissStack").
   if (ctx.spell && /^Exile all other spells and counter all abilities$/.test(s)) return [{ type: "dismissStack" }];
+  if (ctx.spell && /^Counter all spells your opponents control and all abilities your opponents control$/.test(s)) return [{ type: "counterOpponentsStack" }];
   // An ability an Equipment gives that names it: "Blazing Torch deals 2 damage to any target" (Blazing Torch, Ninja's
   // Kunai): the Equipment is the source, as it last existed if the cost sacrificed it (CR 608.2h; the creature isn't).
   const sourceDeals = /^\u27easource\u27eb (deals \d+ damage to (?:any target|target [a-z ]+))$/.exec(s);
@@ -537,6 +538,10 @@ export function parseChanges(text: string): Modification[] | null {
   // "Becomes black, gets +1/-1, and gains "..."" (Defiling Tears), "becomes an Angel, gets +3/+3, and gains flying and
   // lifelink" (Paragon of the Amesha): a list of changes. Dance of the Skywise: "becomes a blue Dragon Illusion with base
   // power and toughness 4/4, loses all abilities, and gains flying": in that order, so it has flying (rulings).
+  // Werewolf Pack Leader: "... gains trample, and isn't a Human": that creature type goes (layer 4), its other types stay.
+  const notType = /^(.+?),? and isn't an? ([A-Z][a-z]+)$/.exec(text);
+  const lostSubtype = notType && CREATURE_TYPES.has(notType[2]!) ? notType[2]! : undefined;
+  if (lostSubtype) text = notType![1]!;
   const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) |isn't an artifact$)|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
   const out: Modification[] = [];
   for (const part of parts) {
@@ -607,6 +612,7 @@ export function parseChanges(text: string): Modification[] | null {
       out.push(...b);
     } else return null;
   }
+  if (lostSubtype && out.length) out.push({ kind: "loseTypes", types: [], subtypes: [lostSubtype] });
   return out.length ? out : null;
 }
 

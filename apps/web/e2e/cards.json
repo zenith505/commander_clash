@@ -1545,6 +1545,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1389c9fa-fec2-4212-a7aa-6dfb318dc202",
+  "name": "Bagel and Schmear",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Food",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Food"
+  ],
+  "oracleText": "Share — {W}, {T}, Sacrifice this artifact: Put a +1/+1 counter on up to one target creature. Draw a card. Activate only as a sorcery.\nNosh — {2}, {T}, Sacrifice this artifact: You gain 3 life and draw a card.",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Nosh",
+   "Share"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "14493624-fdc7-4630-9b1e-f35668651108",
   "name": "Baldin, Century Herdmaster",
   "manaCost": "{4}{W}{W}",
@@ -12247,6 +12276,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "416608a1-89a4-44ce-8fd0-fab6b023d3d4",
+  "name": "Malik, Grim Manipulator",
+  "manaCost": "{2}{R}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "When Malik, Grim Manipulator enters, you and target opponent each secretly choose a creature that player controls. Then those choices are revealed, and that player sacrifices those creatures.\nWhenever an opponent sacrifices a creature, you create a Treasure token.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -14409,6 +14477,40 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "06d60b71-a9f9-4a7f-ad69-15d760b6e5c3",
+  "name": "Ormos, Archive Keeper",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Sphinx",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nIf you would draw a card while your library has no cards in it, instead put five +1/+1 counters on Ormos.\n{1}{U}{U}, Discard three cards with different names: Draw five cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "jmp",
+  "releasedAt": "2020-07-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21475,6 +21577,40 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5bf5739a-6322-4e6e-b41e-e7bdbb11b1ce",
+  "name": "Treetop Sentries",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Squirrel Archer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Squirrel",
+   "Archer"
+  ],
+  "oracleText": "Reach\nWhen this creature enters, you may forage. If you do, draw a card. (To forage, exile three cards from your graveyard or sacrifice a Food.)",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Forage",
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

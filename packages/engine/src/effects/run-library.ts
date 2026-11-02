@@ -1160,7 +1160,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Wave of Vitriol: those it sacrificed, by their card types as they last existed.
       const lost = (pid: PlayerId) => (e.perSacrificed ? (r.sacrificedThisWay ?? []).filter((k) => k.controller === pid && (e.perDestroyed!.types ?? []).some((t) => k.types?.includes(t))).length : (r.destroyed ?? []).filter((x) => x.controller === pid && objectMatches(s, e.perDestroyed!, x.o, pid, false, undefined, x.ch)).length);
       const who = e.perDestroyed ? apnap(s, s.turnOrder).filter((pid) => lost(pid) > 0) : e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || e.who.ref === "choseWord" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
-      const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
+      // Scholarship Sponsor: each one's own number; a player with none to find doesn't search at all (rulings).
+      const ownN = (pid: PlayerId) => amountNow(s, e.n, { ...ctx, eachOne: pid });
+      const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost && (!e.perPlayerN || ownN(pid) > 0)));
       const searchedBy = (sc.searchedBy ??= []);
       // "Search target opponent's library" (Bribery): you search it (CR 701.23a), and it's theirs that's shuffled.
       const theirs = e.library ? players(s, e.library, ctx)[0] : undefined;
@@ -1171,6 +1173,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.found = undefined;
         sc.may = undefined;
         sc.searchExileFor = undefined;
+        sc.perN = undefined;
       }
       // "Each player may search": a player who declines doesn't search, or shuffle (rulings on Veteran Explorer).
       // Ashiok, Dream Render: a player its controller can't make search their own library doesn't; "you may search ... If
@@ -1185,7 +1188,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           continue;
         }
         const kind = (filter?.text ?? "card").replace(/~/g, src);
-        const askN = e.perDestroyed ? lost(queue[0]!) : amountNow(s, e.n, ctx);
+        const askN = e.perDestroyed ? lost(queue[0]!) : e.perPlayerN ? ownN(queue[0]!) : amountNow(s, e.n, ctx);
         s.pending = { kind: "chooseMay", player: queue[0]!, source: src, prompt: `search your library for ${e.upTo ? "up to " : ""}${askN === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${askN} ${kind.replace(/\bcard\b/, "cards")}`}` };
         return "paused";
       }
@@ -1198,7 +1201,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (queue.length) {
         const p = player(s, queue[0]!);
-        const n = e.perDestroyed ? lost(p.id) : (sc.n ??= perName ? perName.length : amountNow(s, e.n, ctx));
+        const n = e.perDestroyed ? lost(p.id) : e.perPlayerN ? (sc.perN ??= ownN(p.id)) : (sc.n ??= perName ? perName.length : amountNow(s, e.n, ctx));
         // "Search your library and/or graveyard": the library too, or not (then no shuffle), chosen before looking. Only
         // asked when the graveyard has a card that fits; otherwise both are searched.
         const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));

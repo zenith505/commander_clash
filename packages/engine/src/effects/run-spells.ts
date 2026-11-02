@@ -201,6 +201,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
         return;
       }
+      if (e.each === "attachedThisWay") {
+        for (const t of s.resolving?.attachedThisWay ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? [])
           if (s.objects[t]?.zone === "battlefield") {
@@ -627,13 +631,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
         // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
-        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv);
+        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) && (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast);
         const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;
@@ -800,6 +804,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (item.id === s.resolving?.item.id) continue;
         if (item.kind === "spell") counterOnStack(s, ctx, item.id, src, undefined, "exile", true);
         else counterOnStack(s, ctx, item.id, src);
+      }
+      return;
+    }
+    case "counterOpponentsStack": {
+      // Glen Elendra's Answer: each spell and ability an opponent controls, from the top down; one that can't be countered
+      // stays and isn't counted (CR 101.2), and only those really countered count for its tokens.
+      for (const item of [...s.stack].reverse()) {
+        if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
+        counterOnStack(s, ctx, item.id, src);
       }
       return;
     }
@@ -1101,6 +1114,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (gone && gone.zone === "exile" && !gone.spellCopy && item.kind === "spell" && s.resolving) s.resolving.counteredExiled = { id: gone.id, zc: gone.zoneChanges ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "battlefield" ? ` and puts it onto the battlefield under ${player(s, ctx.controller).name}'s control` : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
+  if (s.resolving) s.resolving.stackCountered = (s.resolving.stackCountered ?? 0) + 1;
   if (item.kind === "spell" && s.resolving) {
     s.resolving.spellCountered = true;
     s.resolving.spellsCountered = (s.resolving.spellsCountered ?? 0) + 1;

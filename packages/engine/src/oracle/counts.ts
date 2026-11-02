@@ -191,6 +191,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the number of unlocked doors among Rooms you control$/.test(p)) return { count: { kind: "unlockedDoors" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
+  if (each && /^spell and ability countered this way$/.test(p)) return { count: { kind: "stackCounteredThisWay" } };
   if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
   if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };
@@ -611,6 +612,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // battlefield under their control this turn".
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
+  // Azula, Ruthless Firebender: "for each player who discarded a card this turn": players still in the game who discarded
+  // one or more cards this turn (a discard as a cost too), counted as it resolves.
+  if (each && /^player who discarded a card this turn$/i.test(p)) return count({ kind: "players", discardedThisTurn: true });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
   // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".

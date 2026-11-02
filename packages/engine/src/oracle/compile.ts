@@ -2785,6 +2785,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsAttackAll = true;
       continue;
     }
+    if (line === "If you would draw a card while your library has no cards in it, instead put five +1/+1 counters on ~.") {
+      out.drawEmptyCounters = 5;
+      continue;
+    }
     if (line === "If you would draw a card while your library has no cards in it, you win the game instead.") {
       out.drawEmptyWins = true;
       continue;

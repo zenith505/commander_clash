@@ -486,6 +486,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
+    // Malik, Grim Manipulator: their best creature goes; of our own, the least useful one (the other choice is hidden).
+    if (pend.kind === "pickPermanents" && pend.secret) {
+      const sorted = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+      return [{ type: "pickPermanents", player: pid, ids: [pend.secret === "theirs" ? sorted[sorted.length - 1]! : sorted[0]!] }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
     if (pend.kind === "pickPermanents" && pend.action === "ringBearer") return [{ type: "pickPermanents", player: pid, ids: [chooseRingBearer(s, pid, pend.options)] }];
@@ -1074,6 +1079,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
       if (endsTurnOnly(body)) return theirs;
+      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell.
+      if (countersTheirStack(body)) return true;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
       if (c?.type === "counterSpell" && c.ifKicked && !top.kicked?.length) return false;
@@ -1095,7 +1102,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (free && free[free.length - 1]!.type === "castSpell") return free;
       }
       const plan = planCast(s, pid, id, targets, undefined, "auto", x);
-      if (plan && plan[plan.length - 1]!.type === "castSpell" && ((plan[plan.length - 1] as { targets?: unknown }).targets || endsTurnOnly(body))) return plan;
+      if (plan && plan[plan.length - 1]!.type === "castSpell" && ((plan[plan.length - 1] as { targets?: unknown }).targets || endsTurnOnly(body) || countersTheirStack(body))) return plan;
       // Its alternative cost when the mana isn't there: Force of Will's blue card, Daze's Island (CR 118.9).
       if (targets && altCost(d, "alternative") && !cost.hasX) {
         const extra = chooseExtraCosts(s, pid, id, targets, undefined, "alternative");
@@ -1246,6 +1253,11 @@ function endsTurnOnly(body: AbilityBody): boolean {
   return !body.targets.length && !body.modal && body.effects.length > 0 && (body.effects.every((e) => e.type === "endTurn") || body.effects.every((e) => e.type === "dismissStack"));
 }
 
+/** "Counter all spells your opponents control and all abilities your opponents control" (Glen Elendra's Answer). */
+function countersTheirStack(body: AbilityBody): boolean {
+  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack");
+}
+
 /**
  * What one option of a villainous choice we face would cost us, roughly, in life points: what we'd lose (life, cards,
  * permanents) plus what its controller would gain (cards, tokens, a free spell). "eventPlayer" in it is us.
@@ -1382,7 +1394,8 @@ function faceUpCosts(s: GameState, pid: PlayerId, o: GameObject, costs: Addition
       if (fits.length < c.n) return null;
       out.reveal = fits.slice(0, c.n);
     } else if (c.kind === "discard" && !c.random) {
-      const fits = chooseDiscards(s, pid, hand.length).filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
+      const fits0 = chooseDiscards(s, pid, hand.length).filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
+      const fits = c.differentNames ? differentlyNamed(s, fits0) : fits0;
       if (fits.length < c.n || hand.length < c.n + 1) return null;
       out.discard = fits.slice(0, c.n);
     } else if (c.kind === "sacrifice" || c.kind === "returnToHand") {
@@ -2225,7 +2238,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack")) return null;
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack")) return null;
   // Aggressive Mining: "You can't play lands" only once we have enough of them.
   if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.
@@ -3083,6 +3096,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     } else if (c.kind === "discard" && c.random) {
       // At random: worth it only with cards to spare.
       if (player(s, pid).hand.filter((x) => x !== id).length < c.n + 2) return null;
+    } else if (c.kind === "discard" && c.differentNames) {
+      // Ormos, Archive Keeper: the cards we'd discard first, one of each name.
+      const picks = differentlyNamed(s, chooseDiscards(s, pid, player(s, pid).hand.length, id)).slice(0, c.n);
+      if (picks.length < c.n) return null;
+      out.discard = picks;
     } else if (c.kind === "discard") {
       const others = player(s, pid).hand.filter((x) => x !== id);
       if (others.length < c.n) return null;
@@ -4987,7 +5005,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else if (c.kind === "discard") {
       const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
       if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;
-      const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
+      const sorted = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x));
+      // Ormos, Archive Keeper: one of each name.
+      const picks = (c.differentNames ? differentlyNamed(s, sorted) : sorted).slice(0, c.n);
       if (picks.length < c.n) return null;
       out.discard = picks;
     } else if (c.kind === "exileFromGraveyard" && c.process) {

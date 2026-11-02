@@ -1872,12 +1872,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // anyone chooses (rulings on Fraying Omnipotence, CR 107.1a).
   // Legate Lanius: "each opponent sacrifices a tenth of the creatures they control of their choice, rounded up": one for
   // one to ten creatures, two for eleven to twenty (rulings).
-  if ((m = /^(?:(.+?) )?[Ss]acrifices? (half|a tenth of) the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
+  // Pox: "then sacrifices a third of the creatures they control of their choice, ... Round up each time." (CR 107.1a).
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? (half|a tenth of|a third of) the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : ({ ref: "you" } as const);
     const filter = pickFilter(m[3]!);
-    const half = m[2] === "half" ? roundOf(m[5], ctx) : (m[5] as "up" | "down" | undefined);
+    const half = m[2] === "a tenth of" ? (m[5] as "up" | "down" | undefined) : roundOf(m[5], ctx);
     if (!who || !filter || filter.kind !== "object" || !half || (who.ref === "you") !== (m[4] === "you")) return null;
-    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half, ...(m[2] === "half" ? {} : { tenth: true as const }) }, action: "sacrifice" }];
+    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half, ...(m[2] === "half" ? {} : m[2] === "a third of" ? { third: true as const } : { tenth: true as const }) }, action: "sacrifice" }];
   }
   // "Choose target player. Return half the creatures they control to their owner's hand, rounded up" (Split the Party):
   // half of that player's, which you choose as it resolves (rulings, CR 107.1a).
@@ -1887,6 +1888,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[3], ctx);
     if (among?.ref !== "target" || !filter || filter.kind !== "object" || !half) return null;
     return [{ type: "pick", who: { ref: "you" }, among, filter, n: { count: { kind: "permanents", filter, whose: among }, half }, action: "bounce" }];
+  }
+  // Neyam Shai Murad (as parseBody joins it): the trigger's player chooses the card in your graveyard, for you (as
+  // O-Kagachi Made Manifest's `chooser`); it enters under your control.
+  if (ctx.eventPlayer && /^[Tt]hat player chooses a permanent card in your graveyard for you to put onto the battlefield under your control$/.test(s)) {
+    const filter = parseSearchFilter("permanent card");
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, chooser: { ref: "eventPlayer" } }] : null;
+  }
+  // Malik, Grim Manipulator (as parseBody joins it): the two secret choices, then that player sacrifices the one or two
+  // creatures chosen (CR 701.21a).
+  if (/^You and target opponent each secretly choose a creature that player controls for that player to sacrifice$/.test(s)) {
+    const who = parsePlayer("target opponent", ctx);
+    const filter = pickFilter("creature");
+    return who && filter?.kind === "object" ? [{ type: "secretChoose", who, filter: { ...filter, text: "creature" } }, { type: "sacrifice", what: { ref: "created" }, byController: true }] : null;
   }
   // Gut, True Soul Zealot: "you may sacrifice another creature or an artifact": an artifact or a creature other than the
   // source, and the source too while it's an artifact (rulings).

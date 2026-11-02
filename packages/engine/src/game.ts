@@ -2104,13 +2104,23 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
  * Tap a permanent (CR 701.26a). Only an untapped one can be: then it "becomes tapped", which triggers abilities
  * (rulings: tapping a tapped permanent, or one entering tapped, doesn't).
  */
-export function tapPermanent(s: GameState, o: GameObject, /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true) {
+export function tapPermanent(
+  s: GameState,
+  o: GameObject,
+  /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true,
+  /**
+   * The player an effect instructed to tap it: the controller of the resolving spell or ability that says "tap", or the
+   * player it tells to ("that player taps ..."). Read by "Whenever you tap an untapped creature an opponent controls"
+   * (Hylda of the Icy Crown; rulings: not when your ability has an opponent tap their own creature).
+   */
+  by?: PlayerId,
+) {
   if (o.tapped) return;
   o.tapped = true;
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
   o.tapsThisTurn = { turn: s.turn, zc, n: before + 1 };
-  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}) });
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}) });
 }
 
 /**
@@ -2683,6 +2693,14 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
     if (maniac) {
       winGame(s, pid, nameOf(s, maniac));
       return false;
+    }
+    // Ormos, Archive Keeper: "instead put five +1/+1 counters on ~" (CR 614.1a): replaced, so nothing was drawn from an
+    // empty library (CR 704.5b), and the draws after this go on. Taken before Out of the Tombs.
+    const ormos = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyCounters);
+    if (ormos) {
+      const n = withPutter(pid, () => putCounters(s, obj(s, ormos), "+1/+1", abilitiesOf(s, obj(s, ormos)).drawEmptyCounters!));
+      log(s, `${p.name} would draw from an empty library: ${nameOf(s, ormos)} gets ${n} +1/+1 counter${n === 1 ? "" : "s"} instead.`);
+      return true;
     }
     // Out of the Tombs: a creature card from the graveyard instead, chosen by its player; with none, they lose (CR
     // 614.1a). Either way nothing was drawn from an empty library (CR 704.5b), and the draws after this go on.
@@ -7132,12 +7150,12 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       // Untapping: also what can be tapped for mana first (Halo Fountain).
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
-      if (c.kind === "sacrifice" && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full} to ${doing}`;
+      if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
-    if (c.kind === "sacrifice" && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full} to ${verb}`;
+    if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
   }
   return null;
 }
@@ -7345,6 +7363,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         for (const id of ids) moveObject(s, id, "exile");
       }
       closeZoneBatch(s);
+      fireEvent(s, { type: "foraged", player: p.id });
       continue;
     }
     if (c.kind === "returnToHand") {

@@ -4401,7 +4401,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by enchanted creature" (Armament of Nyx); a search of that player's library that shuffles it once (Rootwater Thief);
   "until your next upkeep" (Xenic Poltergeist); "You may play that card for as long as you control ~" (Victor Mancha,
   Runaway); "counters equal to half that card's mana value, rounded up" of a card exiled from your graveyard (Torrent
-  Sculptor). No new prompt. +16 (29,048 of 31,936).
+  Sculptor). No new prompt. +16 (29,085 of 31,936 with rounds 240 to 242).
 - Round B79 (one-line templates from the bottom of the list): an equip cost "{1} if it targets a colorless creature"
   (Ghostfire Blade); "You can't choose an untapped permanent as ~'s target as you cast it" (Dream Leash, Enthralling
   Hold; the bot picks tapped targets too); "{N} less to cast if it targets a creature whose controller has eight or more

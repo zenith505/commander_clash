@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runFlipClashEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -381,6 +381,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
     if (ref.sharesColor && out[0]) out.push(...sharingAColor(s, out[0], ref.sharesColor, ctx.controller));
+    if (ref.sameMv && out[0]) out.push(...sameManaValued(s, out[0], ref.sameMv, ctx.controller));
     if (ref.attachedToo) {
       const hosts = new Set(out.map((o) => o.id));
       const attached = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo !== undefined && hosts.has(o.attachedTo) && objectMatches(s, ref.attachedToo!.filter, o, ctx.controller, false));
@@ -493,7 +494,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const at = blockHistoryAt(s, ref, ctx);
     if (!at) return [];
     const key = `${at.id}@${at.zc}`;
-    const with_ = new Set((s.turnLog?.blocks ?? []).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
+    const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
     return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`));
   }
   if (ref.ref === "blockingIt") {
@@ -1282,6 +1283,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "spellEntersWith":
     case "spellGains":
     case "counterEach":
+    case "dismissStack":
     case "changeTarget":
     case "newTargets":
     case "controlSpell":

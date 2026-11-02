@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -475,6 +475,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.dig?.payLife) {
       const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid);
       return [{ type: "searchLibrary", player: pid, found: player(s, pid).life - pend.dig.payLife >= 10 ? theirs.slice(0, pend.max) : [] }];
+    }
+    // Puresight Merrow: "Look at the top card of your library. You may exile that card.": exile it only to skip a land it
+    // doesn't need (five or more lands already).
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "into exile" && pend.min === 0 && pend.cards.every((id) => obj(s, id).owner === pid)) {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      return [{ type: "searchLibrary", player: pid, found: lands >= 5 ? pend.cards.filter((id) => defOf(s, obj(s, id)).types.includes("Land")).slice(0, pend.max) : [] }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
@@ -1225,9 +1231,12 @@ function endCombatWorth(s: GameState, pid: PlayerId): boolean {
   return coming >= Math.min(4, player(s, pid).life);
 }
 
-/** "End the turn" and nothing more (Time Stop, Discontinuity, Sundial of the Infinite). */
+/**
+ * "End the turn" and nothing more (Time Stop, Discontinuity, Sundial of the Infinite), or "exile all other spells and
+ * counter all abilities" (Summary Dismissal): it stops everything on the stack, so it's worth it only when none of it is ours.
+ */
 function endsTurnOnly(body: AbilityBody): boolean {
-  return !body.targets.length && !body.modal && body.effects.length > 0 && body.effects.every((e) => e.type === "endTurn");
+  return !body.targets.length && !body.modal && body.effects.length > 0 && (body.effects.every((e) => e.type === "endTurn") || body.effects.every((e) => e.type === "dismissStack"));
 }
 
 /**
@@ -2194,6 +2203,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
+  // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack")) return null;
   // Aggressive Mining: "You can't play lands" only once we have enough of them.
   if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.
@@ -4124,14 +4135,16 @@ function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolea
   return [...pool].sort((a, b) => targetWorth(s, pid, b, harmful, damage) - targetWorth(s, pid, a, harmful, damage))[0]!;
 }
 
-type SameNameGroup = NonNullable<Extract<ObjRef, { ref: "target" }>["sameName"]>;
+/** With `mv`: the group is the others with the same mana value (Mists of Lórien), not the same name. */
+type SameNameGroup = NonNullable<Extract<ObjRef, { ref: "target" }>["sameName"]> & { mv?: true };
 
-/** The "and all other ... with the same name" group an effect gives target `i`, if any (Maelstrom Pulse). */
+/** The "and all other ... with the same name" (or mana value) group an effect gives target `i`, if any (Maelstrom Pulse). */
 function sameNameGroup(body: AbilityBody, i: number): SameNameGroup | undefined {
   const walk = (v: unknown): SameNameGroup | undefined => {
     if (!v || typeof v !== "object") return undefined;
-    const r = v as { ref?: string; index?: number; sameName?: SameNameGroup };
+    const r = v as { ref?: string; index?: number; sameName?: SameNameGroup; sameMv?: { filter: TargetSpec } };
     if (r.ref === "target" && r.index === i && r.sameName) return r.sameName;
+    if (r.ref === "target" && r.index === i && r.sameMv) return { ...r.sameMv, mv: true };
     for (const x of Object.values(v)) {
       const g = walk(x);
       if (g) return g;
@@ -4148,7 +4161,7 @@ function sameNameGroup(body: AbilityBody, i: number): SameNameGroup | undefined 
 function bestGroupTarget(s: GameState, pid: PlayerId, pool: ChosenTarget[], group: SameNameGroup, damage: number, forced: boolean): ChosenTarget | undefined {
   const value = (t: ChosenTarget) => {
     if (t.kind !== "object") return targetWorth(s, pid, t, true, damage);
-    const hit = [obj(s, t.id), ...sameNamed(s, obj(s, t.id), group, pid)];
+    const hit = [obj(s, t.id), ...(group.mv ? sameManaValued(s, obj(s, t.id), group, pid) : sameNamed(s, obj(s, t.id), group, pid))];
     // Damage that doesn't kill one of ours costs us nothing; one of theirs it doesn't kill gains us nothing.
     return hit.reduce((n, o) => {
       const w = Math.max(0, targetWorth(s, pid, { kind: "object", id: o.id }, true, damage));

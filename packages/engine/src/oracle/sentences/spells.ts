@@ -33,6 +33,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Lingering Death: "that player sacrifices enchanted creature" ("that creature", the enchanted creature, in a trigger at
   // the beginning of a step of its controller's): that player, if they still control it (CR 701.21a).
   if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }];
+  // Reality Acid: "When this Aura leaves the battlefield, enchanted permanent's controller sacrifices it": the permanent it
+  // was attached to as it left, sacrificed by whoever controls it then (CR 701.21a); nothing if that one left too.
+  if (/^[Ee]nchanted (?:permanent|creature)'s controller sacrifices it$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byController: true }];
   // Soul Tithe: "that player sacrifices it unless they pay {X}, where X is its mana value" (rewritten in compile.ts): that
   // player decides as it resolves (CR 608.2d); its mana value then, a token's 0 unless it copies a mana cost, an {X} in it
   // 0 (rulings).

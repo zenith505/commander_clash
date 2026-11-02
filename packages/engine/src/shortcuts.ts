@@ -398,6 +398,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     toGraveyard: capped(t.toGraveyard ?? {}),
     toGraveyardFromHandOrLibrary: capped(t.toGraveyardFromHandOrLibrary ?? {}),
     landPlayedNotFromHand: t.landPlayedNotFromHand,
+    permanentToHand: t.permanentToHand,
     descended: capped(t.descended ?? {}),
     creaturesExiled: capped(t.creaturesExiled ?? {}),
     // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.

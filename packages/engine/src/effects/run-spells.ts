@@ -183,6 +183,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      // Phytotitan: the card in the graveyard now (CR 400.7), at its owner's next upkeep.
+      if (e.when === "ownersNextUpkeep") {
+        if (e.each === "selfCard") for (const card of objects(s, { ref: "selfCard" }, ctx)) addDelayed(s, "playersNextUpkeep", ctx.controller, card, body, undefined, card.owner);
+        return;
+      }
       if (e.of && e.each !== "selfCard") {
         // About each of those permanents as it is now (CR 603.7c, 400.7).
         for (const o of objects(s, e.of, ctx))
@@ -772,6 +777,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const item of [...s.stack]) {
         if (item.kind !== "spell" || item.id === s.resolving?.item.id || !isLegalTarget(s, e.filter, { kind: "stack", id: item.id }, ctx.controller)) continue;
         counterOnStack(s, ctx, item.id, src);
+      }
+      return;
+    }
+    case "dismissStack": {
+      // Summary Dismissal: from the top down, all at once as far as anyone can tell (nothing can happen in between).
+      for (const item of [...s.stack].reverse()) {
+        if (item.id === s.resolving?.item.id) continue;
+        if (item.kind === "spell") counterOnStack(s, ctx, item.id, src, undefined, "exile", true);
+        else counterOnStack(s, ctx, item.id, src);
       }
       return;
     }

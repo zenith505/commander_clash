@@ -992,6 +992,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   const item = s.stack[i];
   if (!item) return; // it already left the stack
   const what = item.kind === "spell" ? item.description : `${item.description.split(":")[0]}'s ability`;
+  if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.targetedAbilitySource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   if (bounce) {
     // Subtlety: its owner chooses the top or the bottom as this resolves (CR 608.2d); a copy just ceases to exist.
     let position: "top" | "bottom" | undefined;

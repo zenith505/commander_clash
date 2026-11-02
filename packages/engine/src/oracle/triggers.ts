@@ -636,14 +636,31 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(crews[1]!.replace(/\bthat Vehicle\b/g, "it"), { subjectIt: true });
     return body ? { event: "selfCrewsVehicle", body: { ...body, text: crews[1]! } } : "fail";
   }
+  // Catacomb Dragon: "a nonartifact, non-Dragon creature" is one that's neither (the comma joins two "non-" words).
+  const blockLine = line.replace(/^(Whenever ~ becomes blocked by an? non[-a-z]+), (non-?[A-Za-z]+ creature, )/, "$1 $2");
   for (const [re, event] of BLOCK_TRIGGERS) {
-    const m = re.exec(line);
+    const m = re.exec(blockLine);
     if (!m) continue;
     const what = m[1]!.replace(/^an? /, "");
     const filter = what === "creature" ? undefined : parseTargetPhrase(what);
     if (filter === null || (filter && filter.kind !== "object")) return "fail";
     // Battering Ram: "Whenever ~ becomes blocked by a Wall, destroy that Wall at end of combat": "that Wall" is that creature.
-    const named = CREATURE_TYPES.has(what) ? m[2]!.replace(new RegExp(`\\bthat ${what}\\b`, "g"), "that creature") : m[2]!;
+    // Order of the Alabaster Host: "the blocking creature gets -1/-1" is that creature, the blocker. Catacomb Dragon:
+    // "where X is half the creature's power, rounded down": that creature's, as the ability resolves (CR 608.2h).
+    const blockedBy = event === "selfBlockedByCreature";
+    const named = (CREATURE_TYPES.has(what) ? m[2]!.replace(new RegExp(`\\bthat ${what}\\b`, "g"), "that creature") : m[2]!)
+      .replace(blockedBy ? /^the blocking creature (?=gets )/ : /$^/, "that creature ")
+      .replace(blockedBy ? /(, where X is half) the creature's power(, rounded (?:down|up)\.)$/ : /$^/, "$1 that creature's power$2");
+    // Basalt Golem: "that creature's controller sacrifices it at end of combat. If the player does, they create a 0/2 ...
+    // token": a delayed trigger for that creature (CR 603.7), whose controller then sacrifices it, and gets the token only if
+    // it was sacrificed as that delayed trigger resolved (rulings), that player as it last existed.
+    const sacThen = blockedBy ? /^that creature's controller sacrifices it at end of combat\. If the player does, they (create .+)\.$/.exec(named) : null;
+    if (sacThen) {
+      const then = parseBody(`That creature's controller ${sacThen[1]!.replace(/^create/, "creates")}.`, { subject: true });
+      if (!then || then.targets.length || then.effects.length !== 1 || then.effects[0]!.type !== "createToken") return "fail";
+      const effects: Effect[] = [{ type: "sacrifice", what: { ref: "subject" }, byController: true }, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: then.effects }];
+      return { event, body: { targets: [], effects: [{ type: "delayed", when: "endOfCombat", each: "subject", effects, text: named.replace(/ at end of combat\./, ".") }], text: named }, ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) };
+    }
     const body = parseBody(named.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { subject: true });
     if (!body) return "fail";
     return { event, body, ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) };
@@ -1314,6 +1331,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // whenever that damage was dealt (rulings).
   const damaged = / dealt damage by (~|equipped creature) this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
+  // Baneclaw Marauder: "Whenever a creature blocking ~ dies": one that was blocking it as it last existed (CR 603.10a,
+  // 509.1g), ~ dying at the same time too.
+  const blockingSelf = !damaged && / blocking ~$/.exec(phrase);
+  if (blockingSelf) phrase = phrase.slice(0, blockingSelf.index);
+  if (blockingSelf && (m![1]!.toLowerCase() !== "a" || leaves || hadKw || wasPT || wasAttached || hadCounter)) return "fail";
   // "A creature of the chosen type" (Species Specialist): the type chosen as the watcher entered.
   const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, / of the chosen type$/.test(phrase) ? { chosen: true } : undefined);
   if (!filter || filter.kind !== "object") return "fail";
@@ -1330,6 +1352,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
+      ...(blockingSelf ? { blockingSelf: true as const } : {}),
       ...(leaves ? { leaves: true as const } : {}),
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
@@ -2491,6 +2514,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Clockwork Beast: "At end of combat, if ~ attacked or blocked this combat, remove a +1/+0 counter from it": the
     // intervening if (CR 603.4) is about ~, and so is "it".
     .replace(/^(At end of combat, if ~ attacked or blocked this combat, remove an? \S+ counter from) it\.$/, "$1 ~.")
+    // Beastmaster's Magemark: "Whenever a creature you control that's enchanted becomes blocked": the same as "an enchanted
+    // creature you control" (enchanted by any Aura, anyone's).
+    .replace(/^Whenever a creature you control that's enchanted becomes blocked, /, "Whenever an enchanted creature you control becomes blocked, ")
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
@@ -3099,7 +3125,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
   // Gate Colossus: "you may put ~ from your graveyard on top of your library", the same.
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards))\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
+  // Akuta, Born of Ash: "you may sacrifice a Swamp. If you do, return ~ from your graveyard to the battlefield".
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {

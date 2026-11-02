@@ -301,7 +301,13 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   if ((m = /^(.+?) as long as (.+)$/.exec(text)) && !/^During your turn, /.test(text)) [statement, cond] = [m[1], m[2]];
   // Hobble: "Enchanted creature can't block if it's black": while it's black, by its colors as the layers so far left them.
   else if ((m = /^(Enchanted creature can't block) if (it's (?:white|blue|black|red|green))$/.exec(text))) [statement, cond] = [m[1], m[2]];
-  else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
+  else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) {
+    [cond, statement] = [m[1], m[2]];
+    // Stunning Strike: "As long as enchanted creature isn't legendary, it doesn't untap during its controller's untap step":
+    // "it" is that creature, not the Aura.
+    const host = /^(enchanted|equipped) creature\b/.exec(cond!);
+    if (host && /^it (?!'s)/.test(statement!)) statement = statement!.replace(/^it /, `${capital(host[1]!)} creature `);
+  }
   // Cloud, Planet's Champion: "During your turn, as long as ~ is equipped, it has double strike and indestructible": both.
   else if ((m = /^During your turn, as long as ([^,]+), (.+)$/.exec(text))) [cond, statement, alsoYourTurn] = [m[1], m[2], true];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
@@ -989,7 +995,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
   // in your graveyard"; Vengeful Firebrand: "... a Warrior card ...": one or more.
-  if ((m = /^(?:there(?:'s| is) an? (\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
+  // Grizzled Angler: "if there is a colorless creature card in your graveyard".
+  if ((m = /^(?:there(?:'s| is) an? (colorless \w+|\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
     const amount = parseCount(`the number of ${m[1] ?? m[2]} cards in your graveyard`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
   }
@@ -1626,6 +1633,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const kinds = [m[1]!, m[2]].filter((x): x is string => !!x);
     return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(kinds.length > 1 ? { anyOf: kinds.map((k): TargetSpec => ({ kind: "object", subtypes: [k], text: k })) } : { subtypes: kinds }), text: `${kinds.join(" or ")} creature` } };
   }
+  // Stunning Strike: "As long as enchanted creature isn't legendary": the creature it's attached to, as it is now.
+  if ((m = /^enchanted creature (is|isn't) legendary$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(m[1] === "is" ? { supertypes: ["Legendary"] } : { notSupertypes: ["Legendary"] }), text: `${m[1] === "is" ? "" : "non"}legendary creature` } };
   // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).
   if ((m = /^enchanted land is a basic (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], subtypes: [m[1]!], text: `basic ${m[1]}` } };
   // Faerie Miscreant: "if you control another creature named ~": one other than it with its name (CR 201.2), as it is now.

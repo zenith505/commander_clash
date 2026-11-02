@@ -3519,7 +3519,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
     if (controllerOf(s, o) !== ap) {
       // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
       // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
-      if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
+      if (characteristics(s, o).untapsDuringOthers && !characteristics(s, o).types.some((t) => player(s, ap).noUntapNow?.includes(t))) untapPermanent(s, o);
       continue;
     }
     if (o.skipNextUntap) {
@@ -3532,6 +3532,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
   }
   // "Whenever you untap one or more permanents during your untap step" (The Millennium Calendar): put on the stack once
   // the upkeep starts (rulings, CR 503.1a).
+  player(s, ap).noUntapNow = undefined;
   if (untapped) fireEvent(s, { type: "untapStepUntapped", player: ap, amount: untapped });
   return advanceStep(s);
 }
@@ -3576,7 +3577,13 @@ function beginStep(s: GameState, step: Step): void {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       dayNightUntapCheck(s); // CR 502.2
       // "Lands you control don't untap during your next untap step": this is that step, for whatever they control now.
-      const noUntap = player(s, ap).noUntapNext;
+      // Blinding Beam: every one of those types, the active player's and any other that would untap during this step.
+      const all = player(s, ap).noUntapNextAll;
+      if (all) {
+        player(s, ap).noUntapNextAll = undefined;
+        player(s, ap).noUntapNow = all;
+      }
+      const noUntap = player(s, ap).noUntapNext || all ? [...(player(s, ap).noUntapNext ?? []), ...(all ?? [])] : undefined;
       if (noUntap) {
         player(s, ap).noUntapNext = undefined;
         for (const id of s.battlefield) {
@@ -4852,6 +4859,7 @@ export function castProblem(
   if (via?.face !== undefined && o.face !== via.face && layoutOf(s, o) === "adventure") return `${d.name} can be cast from your graveyard only as an Adventure`;
   if (!free && via && (o.zone !== "graveyard" || (o.owner !== pid && !via.anyOwner))) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
+  if (via?.free && (choices?.alt || choices?.faceDown)) return `${d.name} is cast without paying its mana cost this way: no alternative cost can be paid`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
   // Lurrus: "with mana value 2 or less", the X chosen counted (CR 202.3e).
@@ -6372,9 +6380,11 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   const m = o.mayPlay;
   // Mosswood Dreadknight: "as an Adventure until the end of your next turn" (cleanup ends it), only as that face.
   const lasts = m && ((m.until === "thisTurn" && m.turn === s.turn) || (m.until === "nextTurn" && m.face !== undefined));
-  if (m && lasts && (m.face === undefined || m.face === o.face) && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
+  if (m && lasts && (m.face === undefined || m.face === o.face) && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && (d.manaCost || m.free) && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
     // Vohar, Vodalian Desecrator: "If that spell would be put into your graveyard, exile it instead".
-    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}) });
+    // Sins of the Past: "without paying its mana cost" (CR 118.9): a {0} cost, so X is 0 (CR 107.3b) and no alternative
+    // cost can be paid (rulings).
+    out.push({ kind: "permission", mana: m.free ? "{0}" : d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}), ...(m.free ? { free: true as const } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
   for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     if (controllerOf(s, p) !== o.owner) continue;

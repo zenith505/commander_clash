@@ -1333,6 +1333,13 @@ export function parseTargetPhrase(
     p = p.slice(0, loch.index);
     phrase = phrase.trim().slice(0, loch.index);
   }
+  // Corrosion: "each artifact with mana value less than or equal to the number of rust counters on it": each one's own.
+  const ownCounters = /^(.+) with mana value less than or equal to the number of ([a-z]+) counters on it$/i.exec(p);
+  if (ownCounters && !opts.target) {
+    extra.mvAtMostCounters = counterKind(ownCounters[2]!);
+    p = ownCounters[1]!;
+    phrase = phrase.trim().slice(0, ownCounters[1]!.length);
+  }
   // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
   // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
   // Wishing Well: "with mana value equal to the number of coin counters on ~".
@@ -1746,6 +1753,11 @@ export function parseTargetPhrase(
   if ((m = / with power or toughness (\d+) or (greater|less)$/.exec(p)) && !extra.anyOf) {
     const r = m[2] === "greater" ? { min: Number(m[1]) } : { max: Number(m[1]) };
     extra.anyOf = (["power", "toughness"] as const).map((key) => ({ kind: "object" as const, types: [], notTypes: [], notColors: [], [key]: r, text: `${key} ${m![1]} or ${m![2]}` }));
+    p = p.slice(0, m.index);
+  } else if ((m = / with (power|toughness) less than (\d+)$/.exec(p))) {
+    // Wasp, Shrinking Savior: "each creature with power less than 0": strictly less, so one less at most (CR 107.1; power
+    // can be negative, CR 107.1b).
+    extra[m[1] as "power" | "toughness"] = { max: Number(m[2]) - 1 };
     p = p.slice(0, m.index);
   } else if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");

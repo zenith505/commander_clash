@@ -193,6 +193,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
   if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
+  // Heretic's Punishment: "the greatest mana value among the milled cards", after "mill three cards".
+  if (ctx?.afterMill && /^the greatest mana value among the milled cards$/i.test(p)) return { count: { kind: "milledManaValue", greatest: true } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
   if (/^the total mana value of those exiled cards$/i.test(p)) return { count: { kind: "exiledTopManaValue" } };

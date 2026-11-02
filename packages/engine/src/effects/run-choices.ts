@@ -812,6 +812,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((src, index) => index !== undefined && !!src && (src.zoneChanges ?? 0) === s.resolving!.item.sourceZc && (src.activatedThisTurn ?? []).filter((n) => n === index).length >= (e.cond as { n: number }).n)(s.objects[s.resolving!.item.sourceId ?? ""], s.resolving!.item.activatedIndex)
             : e.cond.kind === "costExiledIs"
             ? ((f) => (s.resolving!.item.costExiled ?? []).some((c) => !!s.objects[c.id] && printedMatches(f, defOf(s, s.objects[c.id]!))))(e.cond.filter)
+            : e.cond.kind === "exiledFromHandIs"
+            ? ((f) => (s.resolving!.exiledFromHandCards ?? []).some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc && printedMatches(f, defOf(s, s.objects[c.id]!))))(e.cond.filter)
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"
@@ -1042,7 +1044,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || (me.transforms ?? 0) !== (ctx.sourceTransforms ?? 0) || (me.isToken ? !defOf(s, me).tokenBack || me.tokenBackUp : !canTransform(s, me))) return false;
     }
-    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
     // (CR 609.3).
     if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !e.upTo && !e.nAmount && e.n > 1 && player(s, ctx.controller).graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))).length < e.n) return false;

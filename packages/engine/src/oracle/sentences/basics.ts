@@ -585,6 +585,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "damage", amount: amt(m[1]!), to: { ref: "punished" } }] }];
   }
+  // Unnatural Hunger: "~ deals damage equal to enchanted creature's power to that player unless they sacrifice another
+  // creature of their choice": its power as this resolves (or as it last existed, CR 608.2h), "another" being any creature
+  // but the enchanted one (the source is an Aura).
+  if (/^~ deals damage equal to enchanted creature's power to that player unless they sacrifice another creature of their choice$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    const filter = pickFilter("creature");
+    if (!who || who.ref === "you" || filter?.kind !== "object") return null;
+    return [{ type: "punisher", who, options: [{ sacrifice: { ...filter, notSourceHost: true, text: "creature other than the enchanted one" } }], effects: [{ type: "damage", amount: { count: { kind: "power", of: { ref: "attached" } } }, to: { ref: "punished" } }] }];
+  }
   // "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Mindmoil), "that
   // player puts the cards in their hand ... then draws that many cards" (Teferi's Puzzle Box).
   if ((m = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order, then draws? that many cards$/.exec(s))) {
@@ -981,6 +990,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1, ...(m[2] ? { random: true } : {}) };
     return [{ type: "may", effects: [discard], otherwise: [sacrificeSelf], keep: true, text: `Discard a card${m[2] ?? ""} to keep ~` }];
   }
+  // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
+  // chosen as it resolves; with an empty graveyard it can't be done (see canDoNow), so it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you put a card from your graveyard on the bottom of your library$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))
+    return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, dest: "libraryBottom" }], otherwise: [sacrificeSelf], keep: true, text: "Put a card from your graveyard on the bottom of your library to keep ~" }];
   // Deep Spawn: "sacrifice ~ unless you mill two cards": with fewer cards in the library, milling two can't be chosen
   // (CR 701.13b), so it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you mill (a|two|three) cards?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
@@ -1444,8 +1457,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const recipient = what && isGroup(what) ? parseDamageRecipient(m[2]!, ctx) : null;
     return recipient?.ref === "target" && !recipient.n ? [{ type: "eachDealsDamage", what: what!, amount: num(m[1]!), recipient }] : null;
   }
-  // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
-  if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
+  // Aura Barbs: "then each Aura attached to a creature deals 2 damage to the creature it's attached to": each Aura its own
+  // source (rulings), all at once.
+  if ((m = new RegExp(`^(?:[Tt]hen )?each Aura attached to a creature deals ${NUM} damage to the creature it's attached to$`, "i").exec(s)))
+    return [{ type: "eachDealsDamage", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura" } }, amount: num(m[1]!), toHost: true }];
+  // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it. Aura Barbs: "Each enchantment".
+  if ((m = new RegExp(`^(each (?:[a-z]+ )?(?:creature|enchantment)(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
     const what = parseObject(m[1]!.toLowerCase(), ctx);
     return what && isGroup(what) ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), toController: true }] : null;
   }

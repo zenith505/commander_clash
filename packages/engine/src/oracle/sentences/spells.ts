@@ -636,11 +636,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Tap X untapped artifacts you control" (CR 107.3a, TargetSpec.xRange).
   // Myojin of Cryptic Dreams: "Copy target permanent spell you control three times" (each copy becomes a token, CR 608.3f).
   // Errant, Street Artist: "Copy target spell you control that wasn't cast" (a copy, CR 707.10).
+  // Mirror Sheen: "Copy target instant or sorcery spell that targets you": one with you among its targets, whoever
+  // controls it (rulings).
+  const targetsYou = /^(Copy target (?:instant or sorcery |instant |sorcery )?spell) that targets you$/i.exec(s);
+  if (targetsYou) s = targetsYou[1]!;
   // Fork: "Copy target instant or sorcery spell, except that the copy is red": its copiable color is red, whatever its mana
   // cost says (CR 707.9b, rulings), the mana cost the same.
   if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary|, except that the copy is (white|blue|black|red|green))?( twice| three times)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
-    const spec = parseTargetPhrase(m[1]!, { x: true });
+    const parsed = parseTargetPhrase(m[1]!, { x: true });
+    const spec = targetsYou && parsed?.kind === "spell" ? { ...parsed, targetsWhat: "you" as const, text: `${parsed.text} that targets you` } : parsed;
     const n = m[4] === " twice" ? 2 : m[4] ? 3 : 1;
     const except = m[3] ? { colors: [COLOR_WORDS[m[3].toLowerCase()]!] } : m[2] ? { notLegendary: true } : undefined;
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(except ? { except } : {}) }] : null;
@@ -728,10 +733,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // opponent's). Green Slime: "... from an artifact or enchantment source" (its source as it is, or as it last existed).
   // Then "If a permanent's ability is countered this way, destroy that permanent" (Green Slime), "... activated abilities
   // of that permanent can't be activated this turn" (Trickbind), joined to it by body.ts.
-  if ((m = /^Counter target (activated or triggered ability|activated ability|triggered ability)(?: (you don't control)| from an? (artifact|enchantment|creature|land)(?: or (artifact|enchantment|creature|land))? source)?(?:, and if a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn))?$/i.exec(s)) && (m[2] || m[3] || m[5])) {
+  if ((m = /^Counter target (activated or triggered ability|activated ability|triggered ability)(?: (you don't control)| from an? (artifact|enchantment|creature|land)(?: or (artifact|enchantment|creature|land))? source)?(?:, and if a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn))?(?: unless its controller pays (.+))?$/i.exec(s)) && (m[2] || m[3] || m[5])) {
+    // Ayesha Tanaka: "... from an artifact source unless that ability's controller pays {W}" (body.ts made it "its").
+    const unless = m[6] === undefined ? undefined : parseUnlessPays(m[6], ctx);
+    if (unless === null || (unless && m[5])) return null;
     const from = [m[3], m[4]].filter((x): x is string => !!x).map((x) => x[0]!.toUpperCase() + x.slice(1));
     const spec: TargetSpec = { ...stackSpec(m[1]!), ...(m[2] ? { controller: "opponent" as const } : {}), ...(from.length ? { abilityFrom: { types: from } } : {}), text: `target ${m[1]!.toLowerCase()}${m[2] ? " you don't control" : from.length ? ` from an ${from.join(" or ").toLowerCase()} source` : ""}` };
-    return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(m[5] ? { thenSource: m[5] === "destroy that permanent" ? ("destroy" as const) : ("cantActivate" as const) } : {}) }];
+    return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(m[5] ? { thenSource: m[5] === "destroy that permanent" ? ("destroy" as const) : ("cantActivate" as const) } : {}), ...(unless ? { unless } : {}) }];
   }
   // Verdant Command: "Counter target loyalty ability of a planeswalker": an activated ability with a loyalty symbol in
   // its cost (CR 606.3), on the stack.

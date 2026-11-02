@@ -239,6 +239,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "tap":
     case "untap": {
       let tapped = 0;
+      if (e.type === "tap" && e.swap) {
+        const all = objects(s, e.what, ctx);
+        const wasTapped = all.filter((o) => o.tapped);
+        const wasUntapped = all.filter((o) => !o.tapped);
+        for (const o of wasTapped) untapPermanent(s, o);
+        for (const o of wasUntapped) tapPermanent(s, o);
+        log(s, `${wasTapped.length} tapped creature${wasTapped.length === 1 ? "" : "s"} untap and ${wasUntapped.length} untapped creature${wasUntapped.length === 1 ? "" : "s"} tap.`);
+        return;
+      }
       for (const o of objects(s, e.what, ctx)) {
         if (e.type === "untap") untapPermanent(s, o);
         else if (!o.tapped) {
@@ -704,6 +713,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "noUntapNext":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        if (e.all) {
+          p.noUntapNextAll = [...new Set([...(p.noUntapNextAll ?? []), ...e.types])];
+          log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} won't untap during ${p.name}'s next untap step.`.replace(/^./, (c) => c.toUpperCase()));
+          continue;
+        }
         p.noUntapNext = [...new Set([...(p.noUntapNext ?? []), ...e.types])];
         log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} ${p.name} controls won't untap during their next untap step.`.replace(/^./, (c) => c.toUpperCase()));
       }

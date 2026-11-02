@@ -1087,6 +1087,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "meld":
     case "sacrificeEach":
     case "sacrificeRandom":
+    case "secretChoose":
     case "randomCounterKind":
     case "destroyRandom":
     case "keepRest":

@@ -568,6 +568,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.n;
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
+    case "behindMost": {
+      // Scholarship Sponsor: the most any player in the game controls, less this player's (0 when they're the most).
+      const held = (pid: PlayerId) => s.battlefield.filter((id) => { const ch = view(s.objects[id]!); return !!ch && ch.controller === pid && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view); }).length;
+      const who = refPlayers(s, c.who, ctx)[0];
+      if (who === undefined) return 0;
+      const most = Math.max(0, ...s.turnOrder.filter((pid) => !s.players[pid]!.lost).map(held));
+      return Math.max(0, most - held(who));
+    }
     case "absDifference":
       return Math.abs(evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx));
     case "greaterOf":
@@ -740,6 +748,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.poisonAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && (s.players[pid]!.poison ?? 0) >= c.poisonAtLeast!).length;
       if (c.handAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length >= c.handAtLeast!).length;
       if (c.handAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length <= c.handAtMost!).length;
+      if (c.discardedThisTurn) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && (s.turnLog?.discards ?? []).some((d) => d.player === pid && d.cards.length > 0)).length;
       // Smuggler's Share: players still in the game, by what they did this turn.
       if (c.drewAtLeast !== undefined || c.landsEnteredAtLeast !== undefined)
         return s.turnOrder.filter((pid) => {
@@ -1307,7 +1316,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.choseThisWay ? " who chose to" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.discardedFewerNonland ? ` who didn't discard ${c.discardedFewerNonland} nonland cards` : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.choseThisWay ? " who chose to" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.discardedFewerNonland ? ` who didn't discard ${c.discardedFewerNonland} nonland cards` : ""}${c.discardedThisTurn ? " who discarded this turn" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":
@@ -1341,6 +1350,8 @@ function describeCount(c: Count): string {
       return `the greater of ${describeCount(c.of[0])} and ${describeCount(c.of[1])}`;
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
+    case "behindMost":
+      return `the most ${c.filter.text}s a player controls - their ${c.filter.text}s`;
     case "absDifference":
       return `|${describeCount(c.of[0])} - ${describeCount(c.of[1])}|`;
     case "greaterOf":

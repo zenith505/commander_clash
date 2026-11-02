@@ -765,6 +765,13 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   const keeper = new RegExp(`^[Rr]eveal cards from the top of your library until you reveal a nonland card with mana value (${NUM}) or less$`).exec(sentences[at]!);
   if (keeper && sentences[at + 1] === "You may cast that card without paying its mana cost" && /^Put all revealed cards not cast this way on the bottom of your library in a random order\.?$/.test(sentences[at + 2] ?? ""))
     return { effect: { type: "exileUntilNonland", reveal: true, inPlace: true, untilMv: num(keeper[1]!), then: "castFree" }, next: at + 3 };
+  // Sibylline Soothsayer: "reveal cards from the top of your library until you reveal a nonland card with mana value 3 or
+  // greater. Exile that card with three time counters on it. If it doesn't have suspend, it gains suspend. Put the rest of
+  // the revealed cards on the bottom of your library in a random order." (CR 702.62): suspended the way Kang Prime's is.
+  const foresight = new RegExp(`^[Rr]eveal cards from the top of your library until you reveal a nonland card with mana value (${NUM}) or greater$`).exec(sentences[at]!);
+  const foresightN = foresight ? new RegExp(`^Exile that card with (${NUM}) time counters on it$`).exec(sentences[at + 1] ?? "") : null;
+  if (foresight && foresightN && sentences[at + 2] === "If it doesn't have suspend, it gains suspend" && /^Put the rest of the revealed cards on the bottom of your library in a random order\.?$/.test(sentences[at + 3] ?? ""))
+    return { effect: { type: "exileUntilNonland", reveal: true, untilMvAtLeast: num(foresight[1]!), then: "suspend", suspend: num(foresightN[1]!) }, next: at + 4 };
   // Jodah, the Unifier: cascade that only stops at a legendary card, measured against the spell that triggered it.
   if (
     /^[Ee]xile cards from the top of your library until you exile a legendary nonland card with lesser mana value$/.test(sentences[at]!) &&
@@ -1291,6 +1298,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^(Return|Destroy|Exile) all ([a-z]+) of the color of your choice\b/, "Choose a color. $1 all $2 of the chosen color");
   // Prismatic Strands: "Prevent all damage that sources of the color of your choice would deal this turn": the same.
   text = text.replace(/^Prevent all damage that sources of the color of your choice would deal this turn\./, "Choose a color. Prevent all damage that sources of the chosen color would deal this turn.");
+  // Unexpected Request: "You may attach an Equipment you control to that creature. If you do, unattach it at the beginning
+  // of the next end step.": one instruction, the Equipment attached this way remembered for the delayed trigger.
+  text = text.replace(/(^|\. )You may attach an Equipment you control to that creature\. If you do, unattach it at the beginning of the next end step\./, "$1You may attach an Equipment you control to that creature until the next end step.");
+  // Malik, Grim Manipulator: "you and target opponent each secretly choose a creature that player controls. Then those
+  // choices are revealed, and that player sacrifices those creatures." One instruction (Effect secretChoose).
+  text = text.replace(/(^|\. )[Yy]ou and target opponent each secretly choose a creature that player controls\. Then those choices are revealed, and that player sacrifices those creatures\./, "$1You and target opponent each secretly choose a creature that player controls for that player to sacrifice.");
+  // Neyam Shai Murad: "you may have that player return target permanent card from their graveyard to their hand. If you
+  // do, that player chooses a permanent card in your graveyard, then you put it onto the battlefield under your control.":
+  // the return is a graveyard card to its owner's hand (whoever does it), then that player's choice as it resolves
+  // (rulings), one instruction.
+  text = text.replace(/^[Yy]ou may have that player return target permanent card from their graveyard to their hand\. If you do, that player chooses a permanent card in your graveyard, then you put it onto the battlefield under your control\.$/, "You may return target permanent card from that player's graveyard to its owner's hand. If you do, that player chooses a permanent card in your graveyard for you to put onto the battlefield under your control.");
   // Greven, Predator Captain: "If you do, you draw cards equal to that creature's power and you lose life equal to that
   // creature's toughness": one instruction after the other, both about the sacrificed creature as it last existed.
   text = text.replace(/\bIf you do, you draw cards equal to that creature's power and (you lose life equal to that creature's toughness)\./, "If you do, you draw cards equal to that creature's power, then $1.");
@@ -1961,6 +1979,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Choose (up to (?:one|two|three|four|five)|any number of) target cards in graveyards\. The owners of those cards shuffle them into their libraries\./, "$1Shuffle $2 target cards from graveyards into their owners' libraries.");
   // Carnival of Souls: "you lose 1 life and add {B}": two instructions, in order.
   text = text.replace(/(^|\. )[Yy]ou lose (\d+) life and add ((?:\{[WUBRGC]\})+)\./, "$1You lose $2 life. Add $3.");
+  // Azula, Ruthless Firebender: "Until end of turn, ~ gets +1/+1 for each experience counter you have and gains menace":
+  // both until end of turn, the same way.
+  text = text.replace(/(^|\. )[Uu]ntil end of turn, ~ gets ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gains ([a-z]+)\./, "$1~ gets $2 until end of turn for each $3. ~ gains $4 until end of turn.");
   // Gran Pulse Ochu: "Until end of turn, ~ gets +1/+1 for each permanent card in your graveyard": the usual order.
   text = text.replace(/(^|\. )Until end of turn, ~ gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1~ gets $2 until end of turn for each $3.");
   // Ent's Fury: "Then that creature gets +1/+1 until end of turn and fights target creature you don't control": two
@@ -9595,8 +9616,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (nthSeen.length && !nthIf && !nthAfter && !nthOtherwise) return null;
     // Nissa, Resurgent Animist: "Then if this is the second time this ability has resolved this turn, reveal cards from
     // the top of your library until you reveal an Elf or Elemental card. Put that card into your hand and the rest on the
-    // bottom of your library in a random order." The second sentence finishes the first, under the same condition.
-    const nthUntil = nthIf && nthIf[1] && !nthSeen.length && /^reveal cards from the top of your library until you reveal /.test(nthIf[5]!) && /^Put that card into your hand and the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length;
+    // bottom of your library in a random order." The second sentence finishes the first, under the same condition. Nissa,
+    // Leyline Tamer: "... until you reveal a creature card. Put that card onto the battlefield and the rest ...", the same.
+    const nthUntil = nthIf && nthIf[1] && !nthSeen.length && /^reveal cards from the top of your library until you reveal /.test(nthIf[5]!) && /^Put that card (?:into your hand|onto the battlefield) and the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length;
     if (nthUntil) {
       const sub = parseBody(`R${nthIf[5]!.slice(1)}. ${sentences[si + 1]!.replace(/\.$/, "")}.`);
       if (!sub || sub.targets.length || sub.effects.length !== 1 || sub.effects[0]!.type !== "revealUntil") return null;
@@ -13027,7 +13049,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

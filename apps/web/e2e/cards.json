@@ -12243,6 +12243,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "416608a1-89a4-44ce-8fd0-fab6b023d3d4",
+  "name": "Malik, Grim Manipulator",
+  "manaCost": "{2}{R}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "When Malik, Grim Manipulator enters, you and target opponent each secretly choose a creature that player controls. Then those choices are revealed, and that player sacrifices those creatures.\nWhenever an opponent sacrifices a creature, you create a Treasure token.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -14405,6 +14444,40 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "06d60b71-a9f9-4a7f-ad69-15d760b6e5c3",
+  "name": "Ormos, Archive Keeper",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Sphinx",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nIf you would draw a card while your library has no cards in it, instead put five +1/+1 counters on Ormos.\n{1}{U}{U}, Discard three cards with different names: Draw five cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "jmp",
+  "releasedAt": "2020-07-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

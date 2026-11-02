@@ -303,11 +303,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Target opponent discards half the cards in their hand, rounded down" (Lord Xander), "each player ... discards half the
   // cards in their hand. Round up each time." (Fraying Omnipotence): each player half their own hand, worked out before
   // anyone discards (rulings on Fraying Omnipotence, CR 107.1a).
-  if ((m = /^(.+?) discards? half the cards in (your|their|his or her) hand(?:, rounded (up|down))?$/i.exec(s))) {
+  // Pox: "then discards a third of the cards in their hand. Round up each time.": a third, the same way (rulings: worked
+  // out when that part is done).
+  if ((m = /^(.+?) discards? (half|a third of) the cards in (your|their|his or her) hand(?:, rounded (up|down))?$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    const half = roundOf(m[3], ctx);
-    if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
-    return [{ type: "discard", who, n: { count: { kind: "cardsInHand", who: { ref: "eachOne" } }, half } }];
+    const half = roundOf(m[4], ctx);
+    if (!who || !half || (who.ref === "you") !== (m[3]!.toLowerCase() === "your")) return null;
+    return [{ type: "discard", who, n: { count: { kind: "cardsInHand", who: { ref: "eachOne" } }, half, ...(m[2] === "half" ? {} : { third: true as const }) } }];
   }
   // "Target opponent exiles a card from their hand" (Skullcap Snail): they choose it (rulings on Parallax Nexus).
   if ((m = /^(.+?) exiles (a|two|three) cards? from their hand$/i.exec(s))) {

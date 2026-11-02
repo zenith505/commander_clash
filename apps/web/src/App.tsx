@@ -440,6 +440,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   setsX?: true;
   /** Foil: one of the cards picked must be this. */
   oneOf?: TargetSpec;
+  /** Ormos, Archive Keeper: no two of the cards picked may share a name. */
+  differentNames?: true;
   /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
   untap?: true;
   /** Offering when it can't be cast now without it: no skipping. */
@@ -851,8 +853,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
-      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}`;
-      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}) });
+      // Ormos, Archive Keeper: "Discard three cards with different names".
+      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : ""}`;
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}) });
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}) };
     dispatch(
@@ -1074,7 +1077,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setCostPick({ draft: d, kind: "discard", label: card.name, what: `discard ${/^[aeiou]/i.test(c.oneOf.text) ? "an" : "a"} ${c.oneOf.text} and another card`, n: c.n, candidates: me.hand.filter((id) => id !== d.objectId), chosen: [], oneOf: c.oneOf });
       const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
       const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile from your graveyard";
-      return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}) });
+      // Ormos, Archive Keeper: "Discard three cards with different names".
+      const named = c.kind === "discard" && c.differentNames ? " with different names" : "";
+      return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}${named}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}) });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
     if (d.casualty === undefined && compiled.casualty !== undefined) {
@@ -1949,7 +1954,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               chosen={costPick.chosen}
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
-              valid={!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })

@@ -150,6 +150,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
     return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
   }
+  // Scholarship Sponsor: "each player who controls fewer lands than the player who controls the most lands searches their
+  // library for a number of basic land cards less than or equal to the difference, puts those cards onto the battlefield
+  // tapped, then shuffles": each player behind the most, up to their own difference; a player with none behind doesn't
+  // search at all (rulings), the others in APNAP order (CR 101.4).
+  if (/^[Ee]ach player who controls fewer lands than the player who controls the most lands searches their library for a number of basic land cards less than or equal to the difference, puts those cards onto the battlefield tapped, then shuffles$/.test(s)) {
+    const filter = parseSearchFilter("basic land card");
+    const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
+    return filter ? [{ type: "search", who: { ref: "eachPlayer" }, filter, n: { count: { kind: "behindMost", filter: land, who: { ref: "eachOne" } } }, perPlayerN: true, upTo: true, reveal: false, dest: { zone: "battlefield", tapped: true } }] : null;
+  }
   // An opponent choosing among the cards found or revealed (Gifts Ungiven, Murmurs from Beyond), as parseBody rewrites them.
   const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
   const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);
@@ -1658,9 +1667,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
   }
   // Dire Fleet Ravager: "Each player loses a third of their life, rounded up" (CR 107.1a): each their own life total.
-  if ((m = /^(Each player|Each opponent) loses a third of their life, rounded up$/i.exec(s))) {
+  // Pox: "Each player loses a third of their life, ... Round up each time." (CR 107.1a): the same, rounded as that says.
+  if ((m = /^(Each player|Each opponent) loses a third of their life(?:, rounded (up|down))?$/i.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
-    return who ? [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: "up", third: true } }] : null;
+    const round = roundOf(m[2], ctx);
+    return who && round ? [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: round, third: true } }] : null;
   }
   // "Each opponent loses life equal to the life they lost this turn" (Wound Reflection): each their own, counted as the
   // ability resolves, so a second one counts the first one's loss too (rulings).

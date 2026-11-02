@@ -1766,6 +1766,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
         const me = sc.attachWhich === "none" ? undefined : options.find((o) => o.id === sc.attachWhich);
         if (me) attachTo(s, me, host);
+        // "If you do, unattach it ..." (Unexpected Request): the Equipment attached this way.
+        if (me && me.attachedTo === host.id) (s.resolving!.attachedThisWay ??= []).push(me.id);
       }
       return;
     }

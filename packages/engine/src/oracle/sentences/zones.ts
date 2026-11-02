@@ -137,6 +137,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };
     return [{ type: "counterSpell", index: addTarget(ctx, spec), exileSpell: true }];
   }
+  // Smirking Spelljacker: "exile target spell an opponent controls": the same, a spell an opponent controls (CR 115.1).
+  if (/^[Ee]xile target spell an opponent controls$/.test(s)) {
+    const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], controller: "opponent", text: "target spell an opponent controls" };
+    return [{ type: "counterSpell", index: addTarget(ctx, spec), exileSpell: true }];
+  }
   // "Reveal any number of red cards in your hand" (Scent of Cinder), "Reveal any number of Dragon cards from your hand"
   // (Invasion of Tarkir): which ones is chosen as it resolves (Effect revealFromHand).
   if ((m = /^[Rr]eveal any number of (?:(.+?) )?cards (?:in|from) your hand$/.exec(s))) {
@@ -1011,16 +1016,22 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "You may put a land card from your hand or graveyard onto the battlefield" (Bonny Pall): one card, from either zone.
   // "... with a finality counter on it" (Kastral, the Windcrested): it enters with that counter (CR 122.6).
-  const finality = / with a finality counter on it$/.test(s);
+  // Nissa of Shadowed Boughs: "You may put a creature card with mana value less than or equal to the number of lands you
+  // control onto the battlefield from your hand or graveyard with two +1/+1 counters on it": the same, worded the other
+  // way round, entering with those counters (CR 122.6); the mana value checked where the card is (rulings).
+  const reordered = /^(You may )?([Pp])ut (a|an) (.+?) onto the battlefield from your hand( or graveyard)?( with (?:a|two|three) (?:finality|\+1\/\+1) counters? on it)?$/.exec(s);
+  const sx = reordered ? `${reordered[1] ?? ""}${reordered[2]}ut ${reordered[3]} ${reordered[4]} from your hand${reordered[5] ?? ""} onto the battlefield${reordered[6] ?? ""}` : s;
+  const withCounters = / with (a|two|three) (finality|\+1\/\+1) counters? on it$/.exec(sx);
+  const finality = !!withCounters;
   // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
   // Benalia's Hope): only to the source permanent (see Effect putFromHand's `attachToSelf`).
-  const toSelf = / attached to ~$/.test(s);
+  const toSelf = / attached to ~$/.test(sx);
   // Holy Avenger: "... onto the battlefield attached to it": the trigger's creature (Effect putFromHand's `attachToSubject`).
-  const toSubject = !toSelf && !!ctx.subjectIt && / attached to it$/.test(s);
+  const toSubject = !toSelf && !!ctx.subjectIt && / attached to it$/.test(sx);
   // "You may put a creature card from your hand onto the battlefield and attach ~ to it" (Deathrender): the Equipment to
   // the creature it became, if it can equip it (rulings).
-  const attachSelf = / and attach ~ to it$/.test(s);
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : toSubject ? s.replace(/ attached to it$/, "") : attachSelf ? s.replace(/ and attach ~ to it$/, "") : s))) {
+  const attachSelf = / and attach ~ to it$/.test(sx);
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? sx.replace(withCounters![0], "") : toSelf ? sx.replace(/ attached to ~$/, "") : toSubject ? sx.replace(/ attached to it$/, "") : attachSelf ? sx.replace(/ and attach ~ to it$/, "") : sx))) {
     const orYard = !!m[4];
     if (toSelf && (ctx.spell || m[2] === "any number of" || m[5] || m[6])) return null;
     if (toSubject && (ctx.spell || m[2] === "any number of" || m[4] || m[5] || m[6] || m[3] !== "Aura card")) return null;
@@ -1044,7 +1055,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
     const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}), ...(toSubject ? { attachToSubject: true as const } : {}), ...(attachSelf ? { attachSelf: true as const } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(withCounters ? { counters: { [withCounters[2]!]: withCounters[1] === "a" ? 1 : num(withCounters[1]!) } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}), ...(toSubject ? { attachToSubject: true as const } : {}), ...(attachSelf ? { attachSelf: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
@@ -1389,7 +1400,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Evercoat Ursine: "you may play one of them without paying its mana cost", the cards its two hideaways exiled: one
   // of them, chosen as this resolves (rulings).
   if (/^[Yy]ou may play one of the cards exiled with ~ without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "playLinked", one: true }];
-  if ((m = /^You may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
+  // Smirking Spelljacker: "you may cast the exiled card without paying its mana cost", the spell its enters ability exiled
+  // (linked in compile.ts), cast as this resolves or not at all (rulings); cast, so never played as a land.
+  if (/^[Yy]ou may cast the exiled card without paying its mana cost$/.test(s) && !ctx.spell && !ctx.activated) return [{ type: "playLinked", castOnly: true }];
+  if ((m = /^[Yy]ou may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
     if (!m[1]) return [{ type: "playLinked" }];
     const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });
     return cond ? [{ type: "if", cond: { kind: "state", cond }, effects: [{ type: "playLinked" }] }] : null;

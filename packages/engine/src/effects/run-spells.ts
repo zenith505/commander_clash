@@ -935,6 +935,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const item = s.stack.find((x) => x.id === t.id);
           const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
           counterOnStack(s, ctx, t.id, src, undefined, "exile", true);
+          // Smirking Spelljacker: the card, still that object in exile, linked to this permanent (CR 607.2a, 400.7); a copy
+          // of a spell ceases to exist (CR 707.10a), so nothing is.
+          if (e.linked && o && s.objects[o.id] === o && o.zone === "exile" && !o.isToken && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
           // It becomes plotted (CR 702.170c-d): its owner may cast it on a later turn, if it's still that card in exile.
           if (e.plot && o && s.objects[o.id] === o && o.zone === "exile") {
             o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };

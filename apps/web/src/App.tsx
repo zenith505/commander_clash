@@ -43,6 +43,7 @@ import {
   assistedRemaining,
   dungeonByName,
   commanderTax,
+  commanderTaxLife,
   abilitiesOf,
   controllerOf,
   describeTargets,
@@ -2804,7 +2805,7 @@ function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick:
   }
   const d = cardOf(s, pick.objectId);
   const o = s.objects[pick.objectId]!;
-  const tax = o.zone === "command" ? commanderTax(s.players[HUMAN]!, o) : 0;
+  const tax = o.zone === "command" ? commanderTax(s.players[HUMAN]!, o, d) : 0;
   const ok = canCastWithTaps(s, pick.objectId, pick.chosen);
   return (
     <div className="targeting">
@@ -3344,7 +3345,7 @@ function Seat({
               p.command.map((id) => (
                 <div key={id} className="zone-card">
                   <CardView o={s.objects[id]!} {...cardProps} playable={pid === HUMAN && canCastWithTaps(s, id)} />
-                  <span className="small muted">Tax {commanderTax(p, s.objects[id]!)}</span>
+                  <span className="small muted">Tax {commanderTaxLife(p, s.objects[id]!, cardOf(s, id)) ? `${commanderTaxLife(p, s.objects[id]!, cardOf(s, id))} life` : commanderTax(p, s.objects[id]!, cardOf(s, id))}</span>
                 </div>
               ))
             ) : (
@@ -4685,7 +4686,7 @@ function Controls({
             <>
               {/* Geode Golem: the commander tax is still paid (CR 903.8). */}
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from the command zone without paying its mana cost?
-              {commanderTax(s.players[HUMAN]!, o) ? <> You still pay the commander tax, <ManaCost cost={`{${commanderTax(s.players[HUMAN]!, o)}}`} size="sm" />.</> : null}
+              {commanderTax(s.players[HUMAN]!, o, d) ? <> You still pay the commander tax, <ManaCost cost={`{${commanderTax(s.players[HUMAN]!, o, d)}}`} size="sm" />.</> : commanderTaxLife(s.players[HUMAN]!, o, d) ? <> You still pay the commander tax, {commanderTaxLife(s.players[HUMAN]!, o, d)} life.</> : null}
             </>
           ) : (
             <>
@@ -4695,7 +4696,7 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
+            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o, d) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
             title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >

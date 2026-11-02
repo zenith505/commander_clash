@@ -1709,6 +1709,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const d = defOf(s, card);
       if (!sc.playLinked) {
         sc.playLinked = true;
+        // "Cast the exiled card" (Smirking Spelljacker): a land card can't be cast (CR 305.9).
+        if (isType(d, "Land") && e.castOnly) {
+          log(s, `${d.name} can't be cast.`);
+          return;
+        }
         if (isType(d, "Land")) {
           // A land is played only on your turn, with a land play left (CR 305.2b, 305.3).
           if (s.activePlayer !== p.id || p.landsPlayedThisTurn >= landsAllowed(s, p.id) || nameLandBan(s, p.id, d)) {

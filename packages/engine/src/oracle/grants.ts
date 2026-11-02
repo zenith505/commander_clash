@@ -4,6 +4,7 @@ import { QUOTED_SOURCE_NAME, compile } from "./compile";
 import { textKeywords, isKeywordLine } from "./keyword-abilities";
 import { parseKeywordList } from "./targets";
 import { layerOf } from "../layers";
+import { CREATURE_TYPES } from "../keywords";
 
 /**
  * A quoted ability inside a quoted ability is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's Saga;
@@ -59,7 +60,7 @@ export function compileGranted(text: string): CompiledCard {
     const own = innerQuotes(text);
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
     // a Vehicle (Swift Reconfiguration), read ahead to a Saga (Barbara Wright).
-    const subtypes = /^Equip (?:Knight )?\{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
+    const subtypes = /^Equip (?:[A-Z][a-z]+ )?\{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
@@ -190,8 +191,11 @@ const describeGrants = (kws: string[], mods: Modification[]) =>
  * What follows "has", "have" or "gains": keywords, quoted abilities, or both ('flying and "{T}: ..."').
  * Layer 6 either way.
  */
-export function parseGrants(text: string): Modification[] | null {
+export function parseGrants(text0: string): Modification[] | null {
   const out: Modification[] = [];
+  // Gemcutter Buccaneer: '"Equipped creature gets +2/+0," equip Pirate {1}, and equip {3}': the list's comma written
+  // inside the closing quote, before the next item; moved outside it so the items split.
+  const text = text0.replace(/,"(?=\s)/g, '",');
   // A comma that separates the list can sit inside the quotes: 'flying, deathtouch, "Ward—Pay 3 life," and "..."'.
   // A quoted ability ends with a period even where the sentence around it cuts it ('"{T}: Add {C}" and loses ...').
   const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!.replace(/,$/, "").replace(/([^.!?])$/, "$1."));
@@ -305,8 +309,9 @@ export function parseGrants(text: string): Modification[] | null {
     }
     // "Equipment you control have equip {0}" (Puresteel Paladin): another equip ability (CR 702.6a, 702.6e).
     // Syr Gwyn, Hero of Ashvale: "Equipment you control have equip Knight {0}": only onto a Knight you control (CR 702.6c).
-    const equip = /^equip (?:(Knight) )?(\{\d+\})$/i.exec(w);
-    if (equip) {
+    // Gemcutter Buccaneer: "equip Pirate {1}", onto a Pirate you control.
+    const equip = /^equip (?:([A-Z][a-z]+) )?(\{\d+\})$/.exec(w.replace(/^Equip /, "equip ")) ?? undefined;
+    if (equip && (!equip[1] || CREATURE_TYPES.has(equip[1]))) {
       out.push({ kind: "addAbility", text: `Equip ${equip[1] ? `${equip[1]} ` : ""}${equip[2]}` });
       continue;
     }
@@ -359,7 +364,8 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
  * Can an emblem have this ability (CR 114.3), with "this emblem" in it written "~"? A triggered ability for one of
  * EMBLEM_EVENTS, a static ability about the permanents its controller controls or others (applied by the layers),
  * "spells you cast cost less", "you have no maximum hand size", or "you may play lands and cast permanent spells from your
- * graveyard", or "you may cast spells from your hand without paying their mana costs" (Tamiyo, Field Researcher's). The emblem itself is no permanent, so nothing about
+ * graveyard" (or "... cards in your graveyard have retrace", Wrenn and Six's), or "you may cast spells from your hand
+ * without paying their mana costs" (Tamiyo, Field Researcher's). The emblem itself is no permanent, so nothing about
  * "~" being tapped, attacking or enchanting something can apply.
  */
 export function emblemAbilityOk(text: string): boolean {
@@ -376,7 +382,9 @@ export function emblemAbilityOk(text: string): boolean {
   if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its
   // owner's graveyard, read from emblems as well as permanents (game.ts).
-  if (graveyardGrants?.some((g) => g.way.kind !== "permission" || g.once || g.yourTurn || g.if)) return false;
+  // Wrenn and Six's "Instant and sorcery cards in your graveyard have retrace": the same way, retrace for its owner's cards
+  // (CR 702.81a), read from emblems too (game.ts grantedWays).
+  if (graveyardGrants?.some((g) => (g.way.kind !== "permission" && g.way.kind !== "grantedRetrace") || g.once || g.yourTurn || g.if)) return false;
   if (noMaxHandSize === "all") return false;
   if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && (!t.ifCond || t.ifCond.kind === "eventPlayerLifeLost") && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
   // A damage replacement about you and what you control (Ajani Steadfast's), not about the emblem itself.

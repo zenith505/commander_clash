@@ -969,11 +969,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
   // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
-  if ((m = /^(~'s owner|[Tt]hat player|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+  if ((m = /^(~'s owner|[Tt]hat player|That opponent|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
     // Divine Gambit: "Exile target artifact, creature, or enchantment an opponent controls. That player may put ...": the
-    // target's controller, as it last existed (CR 608.2h).
+    // target's controller, as it last existed (CR 608.2h). Metamorphose: "Put target permanent an opponent controls on top
+    // of its owner's library. That opponent may put ...": the same.
     const lastTarget = ctx.lastObjectTarget !== undefined ? ctx.targets[ctx.lastObjectTarget] : undefined;
-    const theirs = /^That player$/.test(m[1]!) && ctx.spell && ctx.targets.length === 1 && lastTarget?.kind === "object" && lastTarget.controller === "opponent" && !lastTarget.many;
+    const theirs = /^That (?:player|opponent)$/.test(m[1]!) && ctx.spell && ctx.targets.length === 1 && lastTarget?.kind === "object" && lastTarget.controller === "opponent" && !lastTarget.many;
+    if (m[1] === "That opponent" && !theirs) return null;
     const who = theirs ? { ref: "targetController" as const, index: ctx.lastObjectTarget! } : parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;

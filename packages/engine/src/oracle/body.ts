@@ -2809,6 +2809,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Swarm Surge: "Creatures you control get +2/+0 until end of turn. Colorless creatures you control also gain first strike
   // until end of turn.": a second effect of its own.
   text = text.replace(/(\. )((?:[A-Z][a-z]+ )?creatures you control) also (gain|get) /, "$1$2 $3 ");
+  // Dominaria's Judgment: "Until end of turn, creatures you control gain protection from white if you control a Plains,
+  // from blue if you control an Island, ...": each protection only if you control that land type as it resolves, all of
+  // them for the creatures you control then (CR 611.2c).
+  text = text.replace(/^Until end of turn, creatures you control gain (protection from (?:white|blue|black|red|green) if you control an? (?:Plains|Island|Swamp|Mountain|Forest)(?:, (?:and )?from (?:white|blue|black|red|green) if you control an? (?:Plains|Island|Swamp|Mountain|Forest))+)\.$/, (_, list: string) =>
+    list.replace(/^protection /, "").split(/, (?:and )?/).map((part) => {
+      const [, color, land] = /^from (\w+) if you control (an? \w+)$/.exec(part)!;
+      return `If you control ${land}, creatures you control gain protection from ${color} until end of turn.`;
+    }).join(" "));
   // Roar of Challenge's "That creature gains indestructible until end of turn if ..." too.
   text = text.replace(/(^|\. )That creature (?:also )?gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
   // "Sacrifice another creature. You gain X life and draw X cards, where X is that creature's power." (Disciple of Bolas):
@@ -10065,7 +10073,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Barrin's Unmaking: "Return target permanent to its owner's hand if that permanent shares a color with the most common
     // color among all permanents or a color tied for most common": as it resolves.
-    const mostCommon = /^(.+) if that (permanent|creature) shares a color with the most common color among all permanents or a color tied for most common$/.exec(s);
+    const mostCommon = /^(.+) if (?:that (?:permanent|creature)|it) shares a color with the most common color among all permanents or a color tied for most common$/.exec(s);
     if (mostCommon) {
       const fx = parseOne(mostCommon[1]!, ctx);
       const i = ctx.targets.length - 1;

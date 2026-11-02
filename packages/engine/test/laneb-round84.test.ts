@@ -3,7 +3,7 @@
 
 
 import { describe, expect, it } from "vitest";
-import { act, card, forest, putOnBattlefield, setup } from "./helpers";
+import { act, card, forest, plains, putOnBattlefield, setup } from "./helpers";
 import { runStateBasedActions, moveObject, abilitiesOf, abilityProblem, botActions, closeZoneBatch, manaAbilityProblem, castProblem, characteristics, controllerOf, destroyPermanent, dealDamage, invalidateCharacteristics, isFullySupported, objectSource, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -161,6 +161,9 @@ const rallyHorde = (): CardDef => ({"oracleId":"fd9aeda1-9e44-4bc6-aa0d-19d58918
 const turtleTracks = (): CardDef => ({"oracleId":"4921dac2-4adf-4ac4-b1f4-d53385afd802","name":"Turtle Tracks","manaCost":"{2}{G}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Any number of target players may each search their library for a basic land card, put it onto the battlefield under their control, then shuffle.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/b/7/b7e2ece7-8182-4ad8-a266-bffcb4be4522.jpg?1783904133","artUrl":"https://cards.scryfall.io/art_crop/front/b/7/b7e2ece7-8182-4ad8-a266-bffcb4be4522.jpg?1783904133","commanderLegal":"legal","set":"tmc","releasedAt":"2026-03-06","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 const orcishLibrarian = (): CardDef => ({"oracleId":"3a05904d-5439-446d-a2a1-1475c9c7371d","name":"Orcish Librarian","manaCost":"{1}{R}","cmc":2,"typeLine":"Creature — Orc","supertypes":[],"types":["Creature"],"subtypes":["Orc"],"oracleText":"{R}, {T}: Look at the top eight cards of your library. Exile four of them at random, then put the rest on top of your library in any order.","power":"1","toughness":"1","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/8/e/8ed908d6-6d06-4ccb-9577-37ef2d01c1a5.jpg?1783947484","artUrl":"https://cards.scryfall.io/art_crop/front/8/e/8ed908d6-6d06-4ccb-9577-37ef2d01c1a5.jpg?1783947484","commanderLegal":"legal","set":"ice","releasedAt":"1995-06-03","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const erebosTitan = (): CardDef => ({"oracleId":"1341b64e-1f8f-4613-abea-a337cd0169de","name":"Erebos's Titan","manaCost":"{1}{B}{B}{B}","cmc":4,"typeLine":"Creature — Giant","supertypes":[],"types":["Creature"],"subtypes":["Giant"],"oracleText":"As long as your opponents control no creatures, this creature has indestructible. (Damage and effects that say \"destroy\" don't destroy it.)\nWhenever a creature card leaves an opponent's graveyard, you may discard a card. If you do, return this card from your graveyard to your hand.","power":"5","toughness":"5","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/f/5/f5972911-2d41-4a0c-8a8f-b3d35a6594d8.jpg?1783938343","artUrl":"https://cards.scryfall.io/art_crop/front/f/5/f5972911-2d41-4a0c-8a8f-b3d35a6594d8.jpg?1783938343","commanderLegal":"legal","set":"ori","releasedAt":"2015-07-17","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const metamorphose = (): CardDef => ({"oracleId":"77d6c141-5670-4120-9346-dc2fdcb66e50","name":"Metamorphose","manaCost":"{1}{U}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Put target permanent an opponent controls on top of its owner's library. That opponent may put an artifact, creature, enchantment, or land card from their hand onto the battlefield.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/a/0/a0f0c20c-184e-4d27-ae8b-933abb6fee0c.jpg?1783944886","artUrl":"https://cards.scryfall.io/art_crop/front/a/0/a0f0c20c-184e-4d27-ae8b-933abb6fee0c.jpg?1783944886","commanderLegal":"legal","set":"scg","releasedAt":"2003-05-26","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const dominariaJudgment = (): CardDef => ({"oracleId":"41998d4d-ca01-4a9c-8bd6-399e4c3e25b1","name":"Dominaria's Judgment","manaCost":"{2}{W}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Until end of turn, creatures you control gain protection from white if you control a Plains, from blue if you control an Island, from black if you control a Swamp, from red if you control a Mountain, and from green if you control a Forest.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/9/7/9703d090-b415-48e2-8158-dd8fc57ecc50.jpg?1783945631","artUrl":"https://cards.scryfall.io/art_crop/front/9/7/9703d090-b415-48e2-8158-dd8fc57ecc50.jpg?1783945631","commanderLegal":"legal","set":"pls","releasedAt":"2001-02-05","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const tsaboAssassin = (): CardDef => ({"oracleId":"4d00c44b-8953-4b18-af73-2944321b6cd1","name":"Tsabo's Assassin","manaCost":"{2}{B}{B}","cmc":4,"typeLine":"Creature — Phyrexian Zombie Assassin","supertypes":[],"types":["Creature"],"subtypes":["Phyrexian","Zombie","Assassin"],"oracleText":"{T}: Destroy target creature if it shares a color with the most common color among all permanents or a color tied for most common. A creature destroyed this way can't be regenerated.","power":"1","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/0/0047302d-4e3d-4327-9bb2-ecd5b00b00e3.jpg?1783945689","artUrl":"https://cards.scryfall.io/art_crop/front/0/0/0047302d-4e3d-4327-9bb2-ecd5b00b00e3.jpg?1783945689","commanderLegal":"legal","set":"inv","releasedAt":"2000-10-02","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const third = (s: GameState, ap: PlayerId) => s.turnOrder[(s.turnOrder.indexOf(ap) + 2) % 4]!;
 const auraCard = (): CardDef => ({ oracleId: "b84-test-aura", name: "Test Aura", manaCost: "{W}", cmc: 1, typeLine: "Enchantment — Aura", supertypes: [], types: ["Enchantment"], subtypes: ["Aura"], oracleText: "Enchant creature", colors: ["W"], colorIdentity: ["W"], keywords: ["Enchant"], layout: "normal" }) as CardDef;
@@ -182,7 +185,7 @@ const botsPlay = (s: GameState, me: PlayerId) => {
 
 describe("Lane B round 84", () => {
   it("all of them are supported", () => {
-    supported(ruric(), tephraderm(), animateArtifact(), imminentDoom(), chaosLord(), mirrorGolem(), charmedGriffin(), reversePolarity(), circleAffliction(), tornado(), malignantGrowth(), scalpelexis(), rallyHorde(), turtleTracks(), orcishLibrarian(), erebosTitan());
+    supported(ruric(), tephraderm(), animateArtifact(), imminentDoom(), chaosLord(), mirrorGolem(), charmedGriffin(), reversePolarity(), circleAffliction(), tornado(), malignantGrowth(), scalpelexis(), rallyHorde(), turtleTracks(), orcishLibrarian(), erebosTitan(), metamorphose(), dominariaJudgment(), tsaboAssassin());
   });
 
   it("Ruric Thar, Magecrusher: hexproof until they've dealt combat damage, not other damage", () => {
@@ -300,6 +303,60 @@ describe("Lane B round 84", () => {
     let s = settle(s0, { may: true });
     expect(zone(s, titan)).toBe("hand");
     expect(zone(s, card1!)).toBe("graveyard");
+  });
+
+  it("Metamorphose: the target goes on top of its owner's library, then that opponent may put an artifact, creature, enchantment, or land card from their hand onto the battlefield", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const ring = putOnBattlefield(s0, opp, solRing());
+    const [bearCard, boltCard] = handOf(s0, opp, [bears(), bolt()]);
+    const [meta] = handOf(s0, ap, [metamorphose()]);
+    poolOnly(s0, ap, { U: 1, C: 3 });
+    let s = castNow(s0, ap, meta!, [tgt(ring)]);
+    s = settle(s, { me: [opp] });
+    expect(s.players[opp]!.library[0]).toBe(ring);
+    expect(s.pending?.player).toBe(opp);
+    s = settle(s);
+    expect(zone(s, bearCard!)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[bearCard!]!)).toBe(opp);
+    expect(zone(s, boltCard!)).toBe("hand");
+  });
+
+  it("Dominaria's Judgment: creatures you control gain protection from each color whose basic land type you control", () => {
+    const { s: s0, ap } = setup([]);
+    const bear = putOnBattlefield(s0, ap, bears());
+    const [dj] = handOf(s0, ap, [dominariaJudgment()]);
+    poolOnly(s0, ap, { W: 1, C: 2 });
+    putOnBattlefield(s0, ap, plains);
+    putOnBattlefield(s0, ap, card("Mountain", "Basic Land — Mountain"));
+    let s = castNow(s0, ap, dj!);
+    s = settle(s);
+    const kw = characteristics(s, s.objects[bear]!).keywords;
+    expect(kw).toEqual(expect.arrayContaining(["Protection from white", "Protection from red"]));
+    expect(kw).not.toContain("Protection from blue");
+    expect(kw).not.toContain("Protection from green");
+    // Until end of turn: a creature that enters later doesn't have it.
+    const late = putOnBattlefield(s, ap, hillGiant());
+    expect(characteristics(s, s.objects[late]!).keywords).not.toContain("Protection from white");
+  });
+
+  it("Tsabo's Assassin: destroys the target only if it shares a color with the most common color, and it can't be regenerated", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const tsabo = putOnBattlefield(s0, ap, tsaboAssassin());
+    const bear = putOnBattlefield(s0, opp, bears());
+    putOnBattlefield(s0, opp, bears());
+    putOnBattlefield(s0, opp, bears());
+    const merfolk = putOnBattlefield(s0, opp, card("Test Merfolk", "Creature — Merfolk", "{U}", { power: "1", toughness: "1" }));
+    // Green is the most common color (three Bears against one blue and one black creature).
+    s0.objects[bear]!.regenShields = 1;
+    const ab = abilitiesIndex(s0, tsabo, /Destroy target creature/);
+    let s = run(s0, planActivate(s0, ap, tsabo, ab, [tgt(bear)]));
+    s = settle(s);
+    expect(zone(s, bear)).toBe("graveyard");
+    // Two green Bears are still the most common; the blue Merfolk shares nothing with them.
+    s.objects[tsabo]!.tapped = false;
+    s = run(s, planActivate(s, ap, tsabo, ab, [tgt(merfolk)]));
+    s = settle(s);
+    expect(zone(s, merfolk)).toBe("battlefield");
   });
 
   it("Imminent Doom: a spell with mana value equal to its doom counters deals that much damage, then another counter", () => {

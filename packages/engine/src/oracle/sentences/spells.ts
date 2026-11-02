@@ -3,7 +3,7 @@
 import { parseBoundCount, parseCount, roundOf } from "../counts";
 import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
-import { NUM, NUMX, X, amt, isGroup, isSeveral, num } from "../words";
+import { COLOR_WORDS, NUM, NUMX, X, amt, isGroup, isSeveral, num } from "../words";
 import { parseUnlessPays, addTarget, parseBody, replaceX } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
@@ -640,12 +640,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // controls it (rulings).
   const targetsYou = /^(Copy target (?:instant or sorcery |instant |sorcery )?spell) that targets you$/i.exec(s);
   if (targetsYou) s = targetsYou[1]!;
-  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary)?( twice| three times)?$/i.exec(s))) {
+  // Fork: "Copy target instant or sorcery spell, except that the copy is red": its copiable color is red, whatever its mana
+  // cost says (CR 707.9b, rulings), the mana cost the same.
+  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary|, except that the copy is (white|blue|black|red|green))?( twice| three times)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
     const parsed = parseTargetPhrase(m[1]!, { x: true });
     const spec = targetsYou && parsed?.kind === "spell" ? { ...parsed, targetsWhat: "you" as const, text: `${parsed.text} that targets you` } : parsed;
-    const n = m[3] === " twice" ? 2 : m[3] ? 3 : 1;
-    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;
+    const n = m[4] === " twice" ? 2 : m[4] ? 3 : 1;
+    const except = m[3] ? { colors: [COLOR_WORDS[m[3].toLowerCase()]!] } : m[2] ? { notLegendary: true } : undefined;
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(except ? { except } : {}) }] : null;
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).

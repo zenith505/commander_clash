@@ -1237,6 +1237,11 @@ export function moveObject(
   }
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
   if (to === "graveyard" && o.zone === "graveyard" && fromZone !== "graveyard" && !o.isToken) (s.cardsToGraveyardThisTurn ??= {})[o.owner] = (s.cardsToGraveyardThisTurn?.[o.owner] ?? 0) + 1;
+  // Welcome the Dead: "cards that were put into your graveyard from your hand or library this turn".
+  if (to === "graveyard" && o.zone === "graveyard" && (fromZone === "hand" || fromZone === "library") && !o.isToken) {
+    const yards = ((s.turnLog ??= {}).toGraveyardFromHandOrLibrary ??= {});
+    yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+  }
   if (fromZone === "battlefield") {
     if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
     if (wasCreature) {
@@ -4526,6 +4531,8 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
+  // Spider-Man 2099: "if you've played a land ... this turn from anywhere other than your hand".
+  if (o.zone !== "hand" && !(s.turnLog?.landPlayedNotFromHand ?? []).includes(p.id)) ((s.turnLog ??= {}).landPlayedNotFromHand ??= []).push(p.id);
   if (untapped && choice?.kind === "payLife") {
     payLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
@@ -4969,7 +4976,7 @@ export function castProblem(
   // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
   // with that X announced (601.2b); before X is announced it counts as 0.
   const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -5592,8 +5599,9 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // Nissa, Worldsoul Speaker: that many {E} (CR 107.14); castProblem checks it covers this spell.
   if (alt === "energyForSpell") {
-    const by = s && pid !== undefined ? s.battlefield.map((id) => obj(s, id)).find((p) => controllerOf(s, p) === pid && compileCard(defOf(s, p)).payZero?.energy && characteristics(s, p).hasPrintedAbilities) : undefined;
-    const n = by ? compileCard(defOf(s!, by)).payZero!.energy! : 0;
+    // Primal Prayers and Nissa both: the fewest {E} of one whose spells this one is (`filter`).
+    const ns = s && pid !== undefined ? s.battlefield.map((id) => obj(s, id)).filter((p) => controllerOf(s, p) === pid && compileCard(defOf(s, p)).payZero?.energy && characteristics(s, p).hasPrintedAbilities && (!compileCard(defOf(s, p)).payZero!.filter || printedMatches(compileCard(defOf(s, p)).payZero!.filter!, d))).map((p) => compileCard(defOf(s, p)).payZero!.energy!) : [];
+    const n = ns.length ? Math.min(...ns) : 0;
     return n ? { kind: "energyForSpell", mana: "", costs: [{ kind: "payEnergy", n }], text: `pay ${n} energy` } : undefined;
   }
   if (alt === "evidence") {
@@ -5743,8 +5751,16 @@ function payZeroSources(s: GameState, pid: PlayerId, o: GameObject, life: boolea
   return ok;
 }
 
-/** Aluren: a "without paying their mana costs and as though they had flash" that covers this spell now (the flash only that way, rulings). */
-export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject) => payZeroSources(s, pid, o).some((p) => compileCard(defOf(s, p)).payZero!.flash);
+/**
+ * Aluren: a "without paying their mana costs and as though they had flash" that covers this spell now (the flash only that
+ * way, rulings). Primal Prayers (`energy`): the {E} one with the fewest {E}, which is the one paid (see altCost).
+ */
+export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject, life: false | "energy" = false) => {
+  const ok = payZeroSources(s, pid, o, life);
+  if (life !== "energy") return ok.some((p) => compileCard(defOf(s, p)).payZero!.flash);
+  const least = Math.min(...ok.map((p) => compileCard(defOf(s, p)).payZero!.energy!));
+  return ok.some((p) => compileCard(defOf(s, p)).payZero!.energy === least && compileCard(defOf(s, p)).payZero!.flash);
+};
 
 /** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
@@ -6242,7 +6258,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
+    if (c.player === pid && !(c.afterCasts !== undefined && (s.castThisTurn ?? []).filter((x) => x.player === pid).length < c.afterCasts) && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d))) return c.afterCasts !== undefined ? `${c.source}: you can't cast more spells this turn` : `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).

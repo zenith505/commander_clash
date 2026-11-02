@@ -3,7 +3,7 @@
 import type { Effect, TokenSpec } from "../../abilities";
 import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
-import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES, COLOR_WORDS } from "../words";
+import { NUMX, X, amt, num, singularWord, isGroup, isSeveral, BASIC_TYPES, COLOR_WORDS } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
 import { parseSearchFilter } from "../search";
 import { CARD_TOKENS, INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
@@ -347,6 +347,29 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return what && (isGroup(what) || those) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
     }
     const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
+  }
+  // Aura tokens of their own (CR 111.4, 303.7): "Create a red Aura enchantment token named Mark of the Rani attached to
+  // another target creature. That token has enchant creature and "Enchanted creature gets +2/+2 and is goaded."" (The
+  // Rani; the body joins the two sentences with "with"). Estrid's Mask: "The token has enchant permanent and umbra armor".
+  // Smoke Spirits' Aid: "For each of up to X target creatures, create ... attached to that creature. Those tokens have ...":
+  // one for each target. A token that can't be attached to that permanent isn't created at all (rulings), as with Roles.
+  if ((m = /^(?:[Ff]or each of (.+?), create|[Cc]reate) an? (white|blue|black|red|green|colorless) Aura enchantment token named ((?:[A-Z][\w'-]*)(?: (?:of the |of )?[A-Z][\w'-]*)*) attached to (.+?) with enchant (creature|land|permanent) and (.+)$/.exec(s))) {
+    const quoted = /^"(.+)"$/.exec(m[6]!);
+    const keywords = quoted ? [] : parseKeywordList(m[6]!);
+    if (!keywords || (!quoted && !keywords.length)) return null;
+    // A quote inside the quoted ability ("Enchanted land has '{T}: Add one mana of any color.'") is a double one in its text.
+    const text = quoted ? quoted[1]!.replace(/'([^']*\.)'/g, '"$1"') : "";
+    const abilities = `Enchant ${m[5]}${text ? `\n${text}` : ""}`;
+    if (!compileQuoted(abilities)) return null;
+    const color = COLOR_WORDS[m[2]!];
+    const token: TokenSpec = { name: m[3]!, named: true, colors: color ? [color] : [], types: ["Enchantment"], subtypes: ["Aura"], keywords, abilities };
+    if (m[1]) {
+      if (m[4] !== "that creature") return null;
+      const what = parseObject(m[1], ctx);
+      return what && (isGroup(what) || isSeveral(what)) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
+    }
+    const what = parseObject(m[4]!, ctx);
     return what && !isGroup(what) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"

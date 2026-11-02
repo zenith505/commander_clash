@@ -410,6 +410,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.sacrificedThisWay?.length ?? 0;
     case "spellsCounteredThisWay":
       return s.resolving?.spellsCountered ?? 0;
+    case "stackCounteredThisWay":
+      return s.resolving?.stackCountered ?? 0;
     case "poisonLostThisWay":
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
@@ -1184,6 +1186,8 @@ function describeCount(c: Count): string {
       return "#sacrificed";
     case "spellsCounteredThisWay":
       return "#spells countered";
+    case "stackCounteredThisWay":
+      return "#spells and abilities countered";
     case "poisonLostThisWay":
       return "#poison counters lost";
     case "surveilTopThisWay":

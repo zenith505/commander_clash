@@ -2100,13 +2100,23 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
  * Tap a permanent (CR 701.26a). Only an untapped one can be: then it "becomes tapped", which triggers abilities
  * (rulings: tapping a tapped permanent, or one entering tapped, doesn't).
  */
-export function tapPermanent(s: GameState, o: GameObject, /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true) {
+export function tapPermanent(
+  s: GameState,
+  o: GameObject,
+  /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true,
+  /**
+   * The player an effect instructed to tap it: the controller of the resolving spell or ability that says "tap", or the
+   * player it tells to ("that player taps ..."). Read by "Whenever you tap an untapped creature an opponent controls"
+   * (Hylda of the Icy Crown; rulings: not when your ability has an opponent tap their own creature).
+   */
+  by?: PlayerId,
+) {
   if (o.tapped) return;
   o.tapped = true;
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
   o.tapsThisTurn = { turn: s.turn, zc, n: before + 1 };
-  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}) });
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}) });
 }
 
 /**
@@ -7327,6 +7337,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         for (const id of ids) moveObject(s, id, "exile");
       }
       closeZoneBatch(s);
+      fireEvent(s, { type: "foraged", player: p.id });
       continue;
     }
     if (c.kind === "returnToHand") {

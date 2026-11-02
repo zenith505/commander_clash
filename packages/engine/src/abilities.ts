@@ -186,6 +186,8 @@ export type Count =
   | { kind: "sacrificedThisWayCount" }
   /** "Draw a card for each spell countered this way" (Swift Silence). */
   | { kind: "spellsCounteredThisWay" }
+  /** "For each spell and ability countered this way" (Glen Elendra's Answer). */
+  | { kind: "stackCounteredThisWay" }
   /** Leeches: "that much", the poison counters its loseAllCounters instruction removed. */
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
@@ -3409,7 +3411,7 @@ export type Effect =
    * resolves (CR 608.2d). `labels` name each for the choice.
    */
   /** `onlyDoable`: only the options that can be done now are offered (CR 608.2d), and none happens if neither can (Ghostly Dancers). */
-  | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true }
+  | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true; /** "Forage" as an instruction (CR 701.61a): exile three cards from your graveyard or sacrifice a Food; doing either is foraging ("whenever you forage"). */ forage?: true }
   /**
    * "Unlock a locked door of a Room you control" (Ghostly Dancers), with `what` "... of up to one target Room you control"
    * (Ghostly Keybearer): its controller chooses a locked door and the Room gets that unlocked designation (CR 709.5f).
@@ -3429,7 +3431,7 @@ export type Effect =
   | { type: "flipCoinEach"; filter: TargetSpec }
   /** Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails. Repeat this process until both players' coins come up heads on the same flip." (flips no one wins, rulings). */
   | { type: "flipClash"; with: PlayerRef; damage: number }
-  | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
+  | { type: "flipCoin"; /** "That player flips a coin" (Planar Chaos): the flipper, who wins or loses it (default: you). */ who?: PlayerRef; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
@@ -3541,6 +3543,8 @@ export type Effect =
    * activated and triggered ability on it is countered (CR 701.6b). Static abilities and later activations aren't affected.
    */
   | { type: "dismissStack" }
+  /** Glen Elendra's Answer: "Counter all spells your opponents control and all abilities your opponents control": each one already on the stack, from the top down (rulings; mana abilities never are, CR 605.3a). */
+  | { type: "counterOpponentsStack" }
   /** "Target spell can't be countered" (Vexing Shusher): that spell, a copy too, while it's on the stack (CR 101.2). */
   | { type: "spellUncounterable"; index: number }
   /**
@@ -4454,6 +4458,8 @@ export type TriggerEvent =
   | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
   | "creatureDealsDamageToAttached" // "Whenever a creature deals damage to enchanted planeswalker" (Liliana's Talent): once for each creature dealing damage, combat or not (rulings), to the permanent this is attached to; "that creature" is it
+  /** "Whenever a Sliver deals damage, its controller gains that much life" (Essence Sliver): anyone's permanent matching TriggeredAbility.dealer, once for all the damage it deals at the same time, combat or not; it's the subject, "that much" the amount. */
+  | "permanentDealsDamage"
   | "creatureDealsCombatDamageToSelf" // "Whenever a creature deals combat damage to ~" (Vraska the Unseen): once for each creature dealing it combat damage, which "that creature" means
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
@@ -4682,6 +4688,8 @@ export type TriggerEvent =
   | "youScryOrSurveil"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
+  /** "Whenever you forage" (Corpseberry Cultivator): each time you forage, as a cost or as an instruction (CR 701.61a). */
+  | "youForage"
   /** "Whenever you become the monarch": only when you weren't already (CR 725.3; rulings on Custodi Lich). */
   | "youBecomeMonarch"
   /** "Whenever an opponent becomes the monarch" (Knights of the Black Rose): "that player" is them. */
@@ -4872,6 +4880,12 @@ export interface TriggeredAbility {
   tappedFilter?: TargetSpec;
   /** "Whenever you turn a permanent face up" (Growing Dread): with "permanentTurnedFaceUp", only when this ability's controller turned it. */
   turnedByYou?: true;
+  /**
+   * "Whenever you tap an untapped creature an opponent controls" (Hylda of the Icy Crown, Solitary Sanctuary): with
+   * "permanentBecomesTapped", only one a spell or ability had this ability's controller tap (rulings: not one an opponent
+   * taps for Tangle Wire, and not a tap cost).
+   */
+  tappedByYou?: true;
   /** "Whenever you create a Blood token" (Voldaren Bloodcaster): event "youCreateToken" for a token matching this only. */
   createdFilter?: TargetSpec;
   /**

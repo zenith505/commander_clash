@@ -584,6 +584,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
     return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : m[1] === "Creatures" ? ["Creature"] : ["Creature", "Land"] }] : null;
   }
+  // Blinding Beam: "Creatures don't untap during target player's next untap step": every creature during that step,
+  // another player's too (one that would untap then, like with Seedborn Muse), also ones that entered since (rulings).
+  if ((m = /^Creatures don't untap during (target player's|target opponent's) next untap step$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return who ? [{ type: "noUntapNext", who, types: ["Creature"], all: true }] : null;
+  }
   // Imaginary Threats: "Creatures target opponent controls attack this turn if able. During that player's next untap step,
   // creatures they control don't untap.": the targeted player's, every creature they control then (rulings).
   if (/^During that player's next untap step, creatures they control don't untap$/.test(s) && ctx.lastPlayerTarget !== undefined) return [{ type: "noUntapNext", who: { ref: "target", index: ctx.lastPlayerTarget }, types: ["Creature"] }];

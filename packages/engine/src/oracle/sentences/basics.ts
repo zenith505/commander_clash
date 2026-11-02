@@ -585,6 +585,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "damage", amount: amt(m[1]!), to: { ref: "punished" } }] }];
   }
+  // Unnatural Hunger: "~ deals damage equal to enchanted creature's power to that player unless they sacrifice another
+  // creature of their choice": its power as this resolves (or as it last existed, CR 608.2h), "another" being any creature
+  // but the enchanted one (the source is an Aura).
+  if (/^~ deals damage equal to enchanted creature's power to that player unless they sacrifice another creature of their choice$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    const filter = pickFilter("creature");
+    if (!who || who.ref === "you" || filter?.kind !== "object") return null;
+    return [{ type: "punisher", who, options: [{ sacrifice: { ...filter, notSourceHost: true, text: "creature other than the enchanted one" } }], effects: [{ type: "damage", amount: { count: { kind: "power", of: { ref: "attached" } } }, to: { ref: "punished" } }] }];
+  }
   // "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Mindmoil), "that
   // player puts the cards in their hand ... then draws that many cards" (Teferi's Puzzle Box).
   if ((m = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order, then draws? that many cards$/.exec(s))) {

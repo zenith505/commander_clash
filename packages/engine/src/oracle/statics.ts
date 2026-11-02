@@ -985,7 +985,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
   // in your graveyard"; Vengeful Firebrand: "... a Warrior card ...": one or more.
-  if ((m = /^(?:there(?:'s| is) an? (\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
+  // Grizzled Angler: "if there is a colorless creature card in your graveyard".
+  if ((m = /^(?:there(?:'s| is) an? (colorless \w+|\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
     const amount = parseCount(`the number of ${m[1] ?? m[2]} cards in your graveyard`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
   }

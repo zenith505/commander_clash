@@ -7,7 +7,7 @@ import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, objectMatches, printedMatches } from "./targeting";
 import { attackChoices, chooseAuraHosts } from "./run-zones";
-import { cantSearch, searchBarred } from "./run-library";
+import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
 import { ResolveCtx, amountNow, players } from "./resolve";
@@ -91,6 +91,12 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (let i = 0; named && i < end; i++)
         if (matches(p.library[i]!) && hits.push(p.library[i]!) === want) end = i + 1;
       const seen = p.library.slice(0, end);
+      // Fathom Trawl: "the rest ... on the bottom of your library in any order": their owner orders them (CR 401.4), asked
+      // before anything moves, so resuming reveals the same cards.
+      if (e.rest === "bottomOrder" && e.found === "hand" && seen.filter((id) => !hits.includes(id)).length > 1 && !s.resolving!.scratch?.arranged) {
+        s.pending = { kind: "arrangeTop", player: p.id, how: "bottom", cards: seen.filter((id) => !hits.includes(id)), source: src };
+        return "paused";
+      }
       // Songbirds' Blessing: "You may put that card onto the battlefield. If you don't, put it into your hand." Asked first;
       // nothing has moved yet, so resuming reveals the same cards.
       const sc = (s.resolving!.scratch ??= {});
@@ -151,7 +157,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.mayElseHand && found === "hand") for (const id of hits) log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand.`);
       for (const id of declined) log(s, `${p.name} leaves ${defOf(s, obj(s, id)).name} in their library.`);
       const rest = seen.filter((id) => !hits.includes(id) && !stays.includes(id) && !toHand.includes(id));
-      if (e.rest === "bottom") {
+      if (e.rest === "bottomOrder") {
+        if (toBottom(s, p.id, rest, src, false) === "paused") return "paused";
+        sc.arranged = undefined;
+      } else if (e.rest === "bottom") {
         // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.
         const order = [...rest];
         shuffle(s, order);

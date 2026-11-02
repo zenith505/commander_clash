@@ -3514,7 +3514,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
     if (controllerOf(s, o) !== ap) {
       // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
       // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
-      if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
+      if (characteristics(s, o).untapsDuringOthers && !characteristics(s, o).types.some((t) => player(s, ap).noUntapNow?.includes(t))) untapPermanent(s, o);
       continue;
     }
     if (o.skipNextUntap) {
@@ -3527,6 +3527,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
   }
   // "Whenever you untap one or more permanents during your untap step" (The Millennium Calendar): put on the stack once
   // the upkeep starts (rulings, CR 503.1a).
+  player(s, ap).noUntapNow = undefined;
   if (untapped) fireEvent(s, { type: "untapStepUntapped", player: ap, amount: untapped });
   return advanceStep(s);
 }
@@ -3571,7 +3572,13 @@ function beginStep(s: GameState, step: Step): void {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       dayNightUntapCheck(s); // CR 502.2
       // "Lands you control don't untap during your next untap step": this is that step, for whatever they control now.
-      const noUntap = player(s, ap).noUntapNext;
+      // Blinding Beam: every one of those types, the active player's and any other that would untap during this step.
+      const all = player(s, ap).noUntapNextAll;
+      if (all) {
+        player(s, ap).noUntapNextAll = undefined;
+        player(s, ap).noUntapNow = all;
+      }
+      const noUntap = player(s, ap).noUntapNext || all ? [...(player(s, ap).noUntapNext ?? []), ...(all ?? [])] : undefined;
       if (noUntap) {
         player(s, ap).noUntapNext = undefined;
         for (const id of s.battlefield) {

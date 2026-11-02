@@ -341,6 +341,7 @@ function diesMatches(
   if (d.orAttached && attachedTo !== undefined && attachedTo === dying.o.id) return true;
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
+  if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
     if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;

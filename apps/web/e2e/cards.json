@@ -6908,6 +6908,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7b002cae-ee7d-400d-af9c-445eb10f1f0c",
+  "name": "Fathom Trawl",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal cards from the top of your library until you reveal three nonland cards. Put the nonland cards revealed this way into your hand, then put the rest of the revealed cards on the bottom of your library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a88dcb6-a391-408f-8bfc-7b5b2cc34267",
   "name": "Fatigue",
   "manaCost": "{1}{U}",

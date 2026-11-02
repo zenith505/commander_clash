@@ -440,6 +440,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
+      if (c.greatest) return Math.max(0, ...(s.resolving?.milled ?? []).map(({ id }) => defMv(defOf(s, s.objects[id]!))));
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopManaValue":
       return (s.resolving?.exiledTopCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
@@ -1199,7 +1200,7 @@ function describeCount(c: Count): string {
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":
-      return "the total mana value of the milled cards";
+      return c.greatest ? "the greatest mana value among the milled cards" : "the total mana value of the milled cards";
     case "unlockedDoors":
       return c.names ? "#different names among unlocked doors of your Rooms" : "#unlocked doors among your Rooms";
     case "exiledTopMatching":

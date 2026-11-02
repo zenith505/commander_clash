@@ -1084,6 +1084,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Target opponent chooses an artifact card in their graveyard\. Put that card onto the battlefield under your control\.$/, "Target opponent puts an artifact card of their choice from their graveyard onto the battlefield under your control.");
   // Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": one instruction.
   text = text.replace(/^(Target (?:player|opponent) reveals (?:two|three) cards at random from their hand), then (discards each [a-z]+ card revealed this way\.)$/, "$1 and $2");
+  // Estrid, the Masked: "Return all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for
+  // Aura cards": two returns, one after the other, so the Auras may enchant what the first put there (rulings).
+  text = text.replace(/\bReturn all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for Aura cards\./, "Return all non-Aura enchantment cards from your graveyard to the battlefield. Return all Aura cards from your graveyard to the battlefield.");
   // Dust: "Exile any number of target creatures that have -1/-1 counters on them": "with -1/-1 counters on them".
   text = text.replace(/^Exile any number of target creatures that have -1\/-1 counters on them\.$/, "Exile any number of target creatures with -1/-1 counters on them.");
   // Rise: "Return target creature card from a graveyard and target creature on the battlefield to their owners' hands": two
@@ -3107,6 +3110,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    // An Aura token and what it has, said in the next sentence ("... attached to another target creature. That token has
+    // enchant creature and "..."", The Rani): one instruction creating it (see parseTokensSentence). Without its enchant
+    // ability the line isn't understood.
+    if (/\bAura enchantment tokens? named [A-Z][^"]* attached to /.test(s)) {
+      const auraHas = /^(?:The token has|That token has|It has|Those tokens have|The tokens have) (enchant (?:creature|land|permanent) and .+)$/.exec(sentences[si + 1] ?? "");
+      if (!auraHas) return null;
+      s = `${s} with ${auraHas[1]!}`;
+      si++;
+    }
     const last = effects[effects.length - 1];
     // Unexpected Results: "Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without
     // paying its mana cost. If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand." Cast

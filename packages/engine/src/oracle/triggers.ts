@@ -1345,13 +1345,18 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   // The Master, Mesmerist: "Whenever a creature with skulk deals combat damage to one of your opponents, put a +1/+1
   // counter on ~ and draw a card": with the keyword as it deals the damage.
-  const any = /^Whenever a creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
-  if (any) {
-    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[3]!)) return "fail";
-    const body = parseBody(any[3]!, { subjectIt: true, eventPlayer: true });
+  // The Rani: "Whenever a goaded creature deals combat damage to one of your opponents, investigate": anyone's creature
+  // goaded as it deals the damage (CR 701.15), once for each creature (unlike Puppet Master's "one or more").
+  const any = /^Whenever a (goaded )?creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
+  if (any && !(any[1] && any[2])) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[4]!)) return "fail";
+    const body = parseBody(any[4]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
-    const kw = any[2] ? { keywords: [any[2].replace(/^./, (c) => c.toUpperCase())] } : {};
-    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], ...kw, text: `creature${any[1] ?? ""}` }, anyone: true }, body, toOpponent: true };
+    const kw = any[3] ? { keywords: [any[3].replace(/^./, (c) => c.toUpperCase())] } : {};
+    const spec = any[1] ? parseTargetPhrase("goaded creature") : undefined;
+    if (any[1] && spec?.kind !== "object") return "fail";
+    const filter: TargetSpec = spec ? { ...spec, text: "goaded creature" } : { kind: "object", types: ["Creature"], ...kw, text: `creature${any[2] ?? ""}` };
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter, anyone: true }, body, toOpponent: true };
   }
   // The Clone Saga: "Whenever a creature with the chosen name deals combat damage to a player this turn, draw a card" (a
   // delayed trigger, see floatingTrigger in body.ts): anyone's creature with that name (CR 201.2), the name bound as the

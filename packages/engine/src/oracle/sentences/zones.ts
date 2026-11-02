@@ -872,6 +872,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const words = withX ? kinds.slice(0, withX.index) : kinds;
     const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? ` with mana value ${withN ? withN[1] : "X"}${exactX ? "" : " or less"}` : ""} from a graveyard`, { chosen: true, x: !!withX && !withN });
     if (withN && spec?.kind === "card" && spec.manaValue?.max !== Number(withN[1])) return null;
+    // "Return all Aura cards" (Estrid): Aura is only an enchantment subtype (CR 303.4).
+    if (spec?.kind === "card" && !spec.types?.length && spec.subtypes?.length === 1 && spec.subtypes[0] === "Aura") spec.types = ["Enchantment"];
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     // Hourglass of the Lost: "{T}, Remove X time counters from ~ and exile it: Return each nonland permanent card with mana
     // value X ...": the X announced for the ability's cost (CR 107.3a, 602.2b), like a spell's.

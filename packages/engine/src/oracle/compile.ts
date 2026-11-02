@@ -3737,6 +3737,14 @@ export function compile(d: CardDef): CompiledCard {
       out.drawsInOpponentsDrawStep = true;
       continue;
     }
+    // Pardic Firecat, Diligent Farmhand: "If ~ is in a graveyard, effects from spells named Flame Burst count it as a card
+    // named Flame Burst": only when such a spell counts cards by that name (Count cardsInGraveyard); it keeps its own name
+    // everywhere else.
+    const countsAs = /^If ~ is in a graveyard, effects from spells named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) count it as a card named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\.$/.exec(line);
+    if (countsAs && countsAs[1] === countsAs[2]) {
+      out.countsAsNamed = countsAs[1]!;
+      continue;
+    }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
       continue;

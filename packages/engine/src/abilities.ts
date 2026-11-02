@@ -1785,6 +1785,8 @@ export type Affects =
        * after layer 7 (goad).
        */
       lesserPowerThanSource?: true;
+      /** Konda's Banner: "Creatures that share a color with equipped creature", "... a creature type ...": with what the source is attached to, as it is then; none while unattached. */
+      sharesWithAttached?: "color" | "creatureType";
     };
 
 /** A static ability that generates a continuous effect (CR 604.1, 611.3). */
@@ -6831,6 +6833,8 @@ export interface CompiledCard {
    * "... twice that many cards instead" (Bruvac): replacement effects on its controller's opponents' mills (CR 614.1a).
    */
   millMore?: ({ plus: number } | { twice: true })[];
+  /** "If ~ is in a graveyard, effects from spells named Flame Burst count it as a card named Flame Burst" (Pardic Firecat): that name, for a spell of that name counting cards in graveyards. */
+  countsAsNamed?: string;
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
   /** "Skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10): its controller's upkeep doesn't happen while their hand is empty. */

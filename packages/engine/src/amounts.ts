@@ -492,7 +492,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.greatestMv) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => defMv(defOf(s, s.objects[id]!)))));
       // Revivify: only those put there from the battlefield this turn.
       // Risen Executioner: "each other creature card": not the source.
-      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn) && !(filter?.notSource && id === ctx.sourceId)).length, 0);
+      // Pardic Firecat: counted as a card named Flame Burst by a resolving Flame Burst spell (a copy too, not an ability).
+      const spellName = filter?.named !== undefined && s.resolving?.item.kind === "spell" && ctx.sourceName !== undefined && sameName(ctx.sourceName, filter.named) ? filter.named : undefined;
+      const named = (id: ObjectId) => spellName !== undefined && compileCard(defOf(s, s.objects[id]!)).countsAsNamed === spellName && printedMatches({ ...filter!, named: undefined }, defOf(s, s.objects[id]!));
+      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!)) || named(id)) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn) && !(filter?.notSource && id === ctx.sourceId)).length, 0);
     }
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));

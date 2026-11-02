@@ -1454,8 +1454,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Underworld Sentinel: "When ~ dies, put all cards exiled with it onto the battlefield": under the control of the
     // ability's controller, who puts them there (its rulings).
     if (/^Put all cards exiled with (?:it|~) onto the battlefield$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "battlefield" }];
-    if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?$/i.exec(s)))
-      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}) }];
+    if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?( as face-down 2\/2 Cyberman artifact creatures)?$/i.exec(s)))
+      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}), ...(m[5] ? { faceDown: "cyberman" as const } : {}) }];
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];

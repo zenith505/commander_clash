@@ -303,7 +303,9 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };
   }
   // "A land card with a basic land type" (Boseiju, Who Endures): a Plains, Island, Swamp, Mountain or Forest card (CR 205.3i).
-  if (/^land card with a basic land type$/.test(p)) return { kind: "card", types: ["Land"], subtypes: [...BASIC_TYPES], text: "land card with a basic land type" };
+  // Slimefoot's Survey: "up to two land cards that each have a basic land type": the same for each card (rulings: a
+  // nonbasic one too, two of one type or of different ones).
+  if (/^land card (?:with a basic land type|that each have a basic land type)$/.test(p)) return { kind: "card", types: ["Land"], subtypes: [...BASIC_TYPES], text: "land card with a basic land type" };
   // "A card that's exactly two colors" (Guildpact Paragon, CR 105.2).
   const two = /^(.*?)card that(?:'s| is| (isn't|is not)) exactly two colors$/.exec(p);
   if (two) {

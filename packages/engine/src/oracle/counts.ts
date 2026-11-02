@@ -637,6 +637,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Gyome, Master Chef: "the number of nontoken creatures you had enter the battlefield under your control this turn":
   // every one that entered, wherever it is now and whatever it is now (rulings), as it entered.
   if (/^nontoken creatures you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Creature"], nontoken: true });
+  // Emergent Sequence: "for each land you had enter the battlefield under your control this turn": every land that
+  // entered under your control, the one it just put there included (rulings), as it entered.
+  if (each && /^land you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Land"] });
   // The Balrog, Durin's Bane: "for each permanent sacrificed this turn": by any player (rulings).
   if (each && /^permanent sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn", anyPlayer: true });
   // Korvold, Gleeful Glutton: "for each card type among permanents you've sacrificed this turn" (CR 205.2a), as each last

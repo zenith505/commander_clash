@@ -712,6 +712,13 @@ export interface Player {
    * stay tapped, also ones that came under their control later (Mana Vapors rulings).
    */
   noUntapNext?: string[];
+  /**
+   * Blinding Beam: "Creatures don't untap during target player's next untap step": during that step no permanent of these
+   * types untaps, also another player's that would untap then (Seedborn Muse, rulings). `noUntapNow` holds them while
+   * that untap step runs.
+   */
+  noUntapNextAll?: string[];
+  noUntapNow?: string[];
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
@@ -2215,6 +2222,8 @@ export interface Resolving {
   countered?: Record<ObjectId, { zc: number; x: number; /** The mana spent to cast it (Mana Sculpt). */ manaSpent?: number }>;
   /** The source of an activated or triggered ability its counter instructions countered (Tishana's Tidebinder). */
   counteredSource?: { id: ObjectId; zc: number };
+  /** The source of an ability this resolution set out to counter, whether or not it could be (Ouphe Vandals). */
+  targetedAbilitySource?: { id: ObjectId; zc: number };
   /** "If that spell is countered this way, exile it instead": the card it became in exile (Transcendent Dragon, Spelljack). */
   counteredExiled?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */

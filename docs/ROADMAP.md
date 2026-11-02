@@ -4434,6 +4434,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Ornate Kanzashi); "Remove an oil counter from ~: It becomes a 5/5" (Meldweb Strider); "Whenever you become the target
   of a spell" (Dormant Gomazoa). UI fix: a look at another player's library is headed "The top of Ana's library", not
   "your library". +17 (29,065 of 31,936; 29,102 with rounds 240 to 242).
+- Round B80 (one-line templates from the bottom of the list): "Whenever ~ becomes blocked by a creature, the blocking
+  creature gets -1/-1" (Order of the Alabaster Host); "becomes blocked by a nonartifact, non-Dragon creature, that
+  creature gets -X/-0, where X is half the creature's power" (Catacomb Dragon); "becomes blocked by a non-Wall creature,
+  that creature's controller sacrifices it at end of combat. If the player does, they create" (Basalt Golem); "Whenever
+  a creature blocking ~ dies" (Baneblade Scoundrel // Baneclaw Marauder, read from last known blocking); "Counter target
+  activated ability from an artifact source unless its controller pays {W}" (Ayesha Tanaka); "Counter target activated
+  ability from an artifact source and destroy that artifact if it's on the battlefield" (Ouphe Vandals: the source is
+  destroyed even if the ability can't be countered); "Creatures don't untap during target player's next untap step"
+  (Blinding Beam, all creatures that player's untap step would untap, Seedborn Muse too, per the ruling); exile the top
+  card and get +X/+X of its power and toughness (Bioplasm); draw, discard, "if a creature card is discarded this way,
+  transform ~" (Civilized Scholar); put a rust counter on each artifact target opponent controls, then destroy each
+  artifact with mana value at most its rust counters (Corrosion, read literally: a 0-mana-value artifact with no rust
+  counters is destroyed too); reveal until three nonland cards, those to hand and "the rest on the bottom of your library
+  in any order" (Fathom Trawl: new bottom-order pick after the reveal; browser test); "creature cards that were put into
+  your graveyard from the battlefield this turn" (Fell Shepherd); "if there is a colorless creature card in your
+  graveyard" (Grizzled Angler); "the greatest mana value among the milled cards" (Heretic's Punishment); "Copy target
+  instant or sorcery spell that targets you" (Mirror Sheen); "unless they sacrifice another creature of their choice"
+  (Unnatural Hunger: not the enchanted creature); "Whenever that creature deals combat damage this turn, if this spell
+  was kicked" (Vigorous Charge); "power less than 0" (Wasp, Shrinking Savior). +18 (29,120 of 31,936; 29,146 with rounds
+  243 and 244).
+- Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a
+  prevention with a follow-up action), Marvel Boy, Noh-Varr ("whenever you activate a power-up ability"), Ms. Marvel,
+  Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered
+  this turn attack a player": a batch attack trigger naming the player), Titania, Rugged Rumbler (an "or" additional
+  cost and an "or" ward cost).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,

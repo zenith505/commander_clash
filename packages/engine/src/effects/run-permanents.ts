@@ -704,6 +704,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "noUntapNext":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        if (e.all) {
+          p.noUntapNextAll = [...new Set([...(p.noUntapNextAll ?? []), ...e.types])];
+          log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} won't untap during ${p.name}'s next untap step.`.replace(/^./, (c) => c.toUpperCase()));
+          continue;
+        }
         p.noUntapNext = [...new Set([...(p.noUntapNext ?? []), ...e.types])];
         log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} ${p.name} controls won't untap during their next untap step.`.replace(/^./, (c) => c.toUpperCase()));
       }

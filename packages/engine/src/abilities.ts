@@ -167,7 +167,7 @@ export type Count =
   | { kind: "yardChosenMv" }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
-  | { kind: "milledManaValue" }
+  | { kind: "milledManaValue"; /** "The greatest mana value among the milled cards" (Heretic's Punishment): the greatest, 0 with none. */ greatest?: true }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue" }
   /** "Reveal the top card of your library. Draw cards equal to that card's mana value." (Interpret the Signs): the card "revealTop" revealed, while it's still that card. */
@@ -690,6 +690,8 @@ export interface TargetSpec {
    * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
    */
   mvAtMostControllersGraveyard?: true;
+  /** "With mana value less than or equal to the number of rust counters on it" (Corrosion): each one against its own counters. */
+  mvAtMostCounters?: CounterKind;
   /** "As long as that player controls three or fewer lands" (Sheltering Prayers): its controller controls at most this many lands. */
   controllersLandsAtMost?: number;
   /** "A creature whose controller has eight or more cards in their graveyard" (Lullmage's Domination). */
@@ -1214,7 +1216,7 @@ export type ObjRef =
   /** "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu), while it's still that card in exile (CR 400.7). */
   | { ref: "costExiled" }
   /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
-  | { ref: "counteredSource"; filter: TargetSpec }
+  | { ref: "counteredSource"; filter: TargetSpec; /** Ouphe Vandals: the source of the ability this resolution tried to counter, countered or not. */ targeted?: true }
   /** "A card exiled with ~" (Mimic Vat): the cards this object's linked exile took that are still there (CR 607.2a, 400.7); its controller picks one where one is needed. */
   | { ref: "linkedCard" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
@@ -2786,7 +2788,7 @@ export type Effect =
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef; /** "Its controller's next two untap steps" (Telekinesis). */ n?: number }
   /** "Lands you control don't untap during your next untap step": every one of these types they control then (Player.noUntapNext). */
-  | { type: "noUntapNext"; who: PlayerRef; types: string[] }
+  | { type: "noUntapNext"; who: PlayerRef; types: string[]; /** "Creatures don't untap during target player's next untap step" (Blinding Beam): any player's, not only theirs (Player.noUntapNextAll). */ all?: true }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
   | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true; /** "Until your next turn" (Enter the Infinite). */ untilYourNextTurn?: true }
   /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. `thisTurn`: "Lands you control enter tapped this turn" (Nahiri's Lithoforming). */
@@ -3025,7 +3027,8 @@ export type Effect =
       attacking?: true;
       /** "Shuffle": "then shuffles all other cards revealed this way into their library" (Polymorph), a shuffle of the library. */
       /** "Graveyard": "and all other cards revealed this way into your graveyard" (Hermit Druid): the whole library if none is found. */
-      rest: "exile" | "bottom" | "shuffle" | "graveyard";
+      /** "bottomOrder": "put the rest of the revealed cards on the bottom of your library in any order" (Fathom Trawl): their owner orders them (CR 401.4). */
+      rest: "exile" | "bottom" | "shuffle" | "graveyard" | "bottomOrder";
       lifePerRest?: true;
       /** "Until you reveal X land cards" (Open the Way): that many, all put there together. */
       n?: Amount;
@@ -5011,7 +5014,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").

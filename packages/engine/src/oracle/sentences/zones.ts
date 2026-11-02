@@ -630,6 +630,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
   }
+  // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
+  // chosen as it resolves (not targeted).
+  if (/^[Pp]ut a card from your graveyard on the bottom of your library$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryBottom" }];
   // Stillness in Motion: "put five cards from your graveyard on top of your library in any order": chosen as it resolves
   // (all of them with fewer), then put in the order you choose (CR 401.4).
   if ((m = /^(?:[Tt]hen )?[Pp]ut (two|three|four|five|six|seven) cards from your graveyard on top of your library in any order$/.exec(s))) {
@@ -1061,6 +1064,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter("card other than a basic land card");
     return who && filter ? [{ type: "exileGraveyard", who, filter }] : null;
   }
+  // Cry of the Carnarium: "Exile all creature cards in all graveyards that were put there from the battlefield this turn."
+  if ((m = /^Exile all ([a-z]+) cards in all graveyards that were put there from the battlefield this turn$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    return filter?.kind === "card" ? [{ type: "exileGraveyard", who: { ref: "eachPlayer" }, filter: { ...filter, fromBattlefieldThisTurn: true, text: `${m[1]} card that was put there from the battlefield this turn` } }] : null;
+  }
   const theirs = /^(Target player|Target opponent) exiles all (.+?) from their graveyard$/.exec(s);
   const all = theirs ? { what: theirs[2]!, whose: `${theirs[1]!.toLowerCase()}'s` } : (m = /^[Ee]xile all (.+?) from (target player's|target opponent's|each opponent's|your|all) graveyards?$/.exec(s)) && { what: m[1]!, whose: m[2]! };
   if (all) {
@@ -1355,8 +1363,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Grasping Giant: "Whenever ~ becomes blocked by a creature, exile that creature until ~ leaves the battlefield": the
   // blocking creature the trigger is about (CR 610.3).
-  if (/^Exile that creature until ~ leaves the battlefield$/i.test(s) && ctx.subject && !ctx.spell) {
-    const what = parseObject("that creature", ctx);
+  // Hixus, Prison Warden: "Whenever a creature deals combat damage to you, ..., exile that creature until ~ leaves the
+  // battlefield" ("it", the creature the trigger is about).
+  if (((/^Exile that creature until ~ leaves the battlefield$/i.test(s) && ctx.subject) || (/^Exile it until ~ leaves the battlefield$/i.test(s) && ctx.subjectIt)) && !ctx.spell) {
+    const what = parseObject(ctx.subject ? "that creature" : "it", ctx);
     return what?.ref === "subject" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
   // Calix, Destiny's Hand: "Exile target creature or enchantment you don't control until target enchantment you control

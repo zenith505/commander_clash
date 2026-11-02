@@ -224,9 +224,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const rec = e.recipient ? damageRecipients(s, e.recipient, ctx) : undefined;
       const recTo = rec ? (rec.objs[0] ? { object: rec.objs[0].id } : rec.pids[0] !== undefined ? { player: rec.pids[0] } : undefined) : undefined;
       if (e.recipient && !recTo) return;
+      const hostOf = (o: GameObject) => (o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, s.objects[o.attachedTo]!, "Creature") ? o.attachedTo : undefined);
       const events: DamageEvent[] = objects(s, e.what, ctx)
-        .filter((o) => o.zone === "battlefield")
-        .map((o) => ({ src: objectSource(s, o), to: recTo ?? (victim ? { object: victim.id } : { player: controllerOf(s, o) }), n: e.ownPower ? power(s, o) : n }));
+        .filter((o) => o.zone === "battlefield" && (!e.toHost || hostOf(o) !== undefined))
+        .map((o) => ({ src: objectSource(s, o), to: e.toHost ? { object: hostOf(o)! } : recTo ?? (victim ? { object: victim.id } : { player: controllerOf(s, o) }), n: e.ownPower ? power(s, o) : n }));
       const gains = new Map<PlayerId, { n: number }>();
       const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
       for (const [pid, g] of gains) gainLife(s, pid, g.n);

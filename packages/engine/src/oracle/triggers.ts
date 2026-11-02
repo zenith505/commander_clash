@@ -2514,6 +2514,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Clockwork Beast: "At end of combat, if ~ attacked or blocked this combat, remove a +1/+0 counter from it": the
     // intervening if (CR 603.4) is about ~, and so is "it".
     .replace(/^(At end of combat, if ~ attacked or blocked this combat, remove an? \S+ counter from) it\.$/, "$1 ~.")
+    // Beastmaster's Magemark: "Whenever a creature you control that's enchanted becomes blocked": the same as "an enchanted
+    // creature you control" (enchanted by any Aura, anyone's).
+    .replace(/^Whenever a creature you control that's enchanted becomes blocked, /, "Whenever an enchanted creature you control becomes blocked, ")
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
@@ -3115,7 +3118,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
   // Gate Colossus: "you may put ~ from your graveyard on top of your library", the same.
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards))\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
+  // Akuta, Born of Ash: "you may sacrifice a Swamp. If you do, return ~ from your graveyard to the battlefield".
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {

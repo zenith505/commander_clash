@@ -1545,6 +1545,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1389c9fa-fec2-4212-a7aa-6dfb318dc202",
+  "name": "Bagel and Schmear",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Food",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Food"
+  ],
+  "oracleText": "Share — {W}, {T}, Sacrifice this artifact: Put a +1/+1 counter on up to one target creature. Draw a card. Activate only as a sorcery.\nNosh — {2}, {T}, Sacrifice this artifact: You gain 3 life and draw a card.",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Nosh",
+   "Share"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "14493624-fdc7-4630-9b1e-f35668651108",
   "name": "Baldin, Century Herdmaster",
   "manaCost": "{4}{W}{W}",
@@ -21475,6 +21504,40 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5bf5739a-6322-4e6e-b41e-e7bdbb11b1ce",
+  "name": "Treetop Sentries",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Squirrel Archer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Squirrel",
+   "Archer"
+  ],
+  "oracleText": "Reach\nWhen this creature enters, you may forage. If you do, draw a card. (To forage, exile three cards from your graveyard or sacrifice a Food.)",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Forage",
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

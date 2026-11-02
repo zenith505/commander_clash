@@ -2295,6 +2295,8 @@ export interface Resolving {
   spellCountered?: true;
   /** How many spells it countered (Swift Silence). */
   spellsCountered?: number;
+  /** How many spells and abilities it countered (Glen Elendra's Answer). */
+  stackCountered?: number;
   /** How many poison counters its loseAllCounters instruction removed (Leeches). */
   poisonLost?: number;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */

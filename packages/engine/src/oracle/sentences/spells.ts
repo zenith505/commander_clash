@@ -335,8 +335,29 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[2]!);
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 1, random: true, filter }] : null;
   }
+  // "Forage" as an instruction ("you may forage. If you do, ...", Treetop Sentries): exile three cards from your graveyard
+  // or sacrifice a Food (CR 701.61a), the way chosen as it resolves; only a way that can be done fully can be chosen, and
+  // with neither there's no foraging (rulings).
+  if (/^[Ff]orage$/.test(s))
+    return [
+      {
+        type: "either",
+        options: [
+          [{ type: "chooseFromGraveyard", n: 3, dest: "exile" }],
+          [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], subtypes: ["Food"], text: "Food" }, n: 1, action: "sacrifice" }],
+        ],
+        labels: ["Exile three cards from your graveyard", "Sacrifice a Food"],
+        onlyDoable: true,
+        forage: true,
+      },
+    ];
   // Flipping a coin (CR 705): see "If you win the flip, ..." in body.ts.
   if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];
+  // Planar Chaos: "Whenever a player casts a spell, that player flips a coin. If they lose the flip, ...".
+  if (ctx.eventPlayer && /^[Tt]hat player flips a coin$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    return who ? [{ type: "flipCoin", who }] : null;
+  }
   if (/^[Ff]lip a coin until you lose a flip$/.test(s)) return [{ type: "flipCoin", untilLose: true }];
   // Goblin Traprunner: "flip three coins", then "for each flip you win" counts the wins (CR 705).
   if ((m = /^[Ff]lip (two|three|four|five) coins$/.exec(s))) return [{ type: "flipCoin", n: num(m[1]!), ...(ctx.uncalledFlips ? { uncalled: true as const } : {}) }];

@@ -171,6 +171,8 @@ export type TriggerSourceEvent =
   /** A card in exile became plotted (CR 702.170a, 702.170c). */
   | { type: "plotted"; id: ObjectId }
   | { type: "proliferated"; player: PlayerId }
+  /** A player foraged (CR 701.61a), as a cost or as an instruction. */
+  | { type: "foraged"; player: PlayerId }
   /** A player who wasn't the monarch became it (CR 725.3). */
   | { type: "becameMonarch"; player: PlayerId }
   /** Day became night or night became day (CR 731.1), not the first time it became either. */
@@ -199,7 +201,7 @@ export type TriggerSourceEvent =
   | { type: "coinFlipped"; player: PlayerId; won: boolean }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
-  | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true }
+  | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true; /** The player an effect had tap it (see tapPermanent). */ by?: PlayerId }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
@@ -1123,8 +1125,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Sunstreak Phoenix: "return this card from your graveyard to the battlefield": its owner's.
     fromGraveyards((o, owner) => add(o, owner, (e) => e === "dayNightChanges"));
-  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch") {
-    const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : "youCollectEvidence";
+  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch" || ev.type === "foraged") {
+    const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : ev.type === "foraged" ? "youForage" : "youCollectEvidence";
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
@@ -1239,11 +1241,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const firstTap = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === (o.zoneChanges ?? 0) && o.tapsThisTurn.n === 1;
     add(o, controllerOf(s, o), (e, t) => e === "selfBecomesTapped" && (!t.firstEachTurn || firstTap));
     addHosted(o, (e, t) => e === "selfBecomesTapped" && !t.firstEachTurn);
-    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    // "Whenever you tap an untapped creature an opponent controls" (Hylda of the Icy Crown): only one an effect had you tap.
+    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(tapWatch);
     // Don't Move: "Until your next turn, whenever a creature becomes tapped, destroy it" (a delayed trigger, CR 603.7b).
-    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), triggers, undefined, o));
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, t.tappedFilter, o, ctrl, false), triggers, undefined, o));
   } else if (ev.type === "untapped") {
     // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
     // you control becomes untapped" (the untapped permanent is the subject).
@@ -1693,6 +1696,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
       if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
       if (ev.toBlocker) add(o, controllerOf(s, o), (e) => e === "selfDealsCombatDamageToBlockers");
+      // Essence Sliver: "Whenever a Sliver deals damage": anyone's, the dealer the subject.
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        add(w, wc, (e, t) => e === "permanentDealsDamage" && !!t.dealer && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      }
       // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
       const dealerBy = controllerOf(s, o);
       if (ev.combat)
@@ -1867,6 +1876,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
+    // "Whenever a creature you control deals combat damage to a player or planeswalker (this turn)" (Flitterwing Nuisance).
+    const dealerBy = controllerOf(s, o);
+    const pwInfo = { amount: ev.amount };
+    const pwWatch = (w: GameObject, ctrl: PlayerId, triggers?: TriggeredAbility[]) =>
+      ctrl === dealerBy && add(w, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orPlaneswalker && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)), triggers, undefined, o, undefined, undefined, undefined, pwInfo);
+    for (const id of s.battlefield) pwWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromFloating((src, ctrl, triggers) => pwWatch(src, ctrl, triggers));
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }), o);
   } else if (ev.type === "combatDamageToPlayer" && ev.battle) {

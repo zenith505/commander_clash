@@ -191,6 +191,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the number of unlocked doors among Rooms you control$/.test(p)) return { count: { kind: "unlockedDoors" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
+  if (each && /^spell and ability countered this way$/.test(p)) return { count: { kind: "stackCounteredThisWay" } };
   if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
   if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };

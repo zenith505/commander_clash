@@ -803,6 +803,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "counterOpponentsStack": {
+      // Glen Elendra's Answer: each spell and ability an opponent controls, from the top down; one that can't be countered
+      // stays and isn't counted (CR 101.2), and only those really countered count for its tokens.
+      for (const item of [...s.stack].reverse()) {
+        if (item.id === s.resolving?.item.id || item.controller === ctx.controller || !s.stack.includes(item)) continue;
+        counterOnStack(s, ctx, item.id, src);
+      }
+      return;
+    }
     case "spellEntersWith": {
       // Only the spell that was cast (a copy isn't), while it's still that spell on the stack (CR 400.7).
       const item = s.stack.find((x) => x.id === ctx.cause);
@@ -1101,6 +1110,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (gone && gone.zone === "exile" && !gone.spellCopy && item.kind === "spell" && s.resolving) s.resolving.counteredExiled = { id: gone.id, zc: gone.zoneChanges ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "battlefield" ? ` and puts it onto the battlefield under ${player(s, ctx.controller).name}'s control` : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
+  if (s.resolving) s.resolving.stackCountered = (s.resolving.stackCountered ?? 0) + 1;
   if (item.kind === "spell" && s.resolving) {
     s.resolving.spellCountered = true;
     s.resolving.spellsCountered = (s.resolving.spellsCountered ?? 0) + 1;

@@ -984,6 +984,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "You may pay any amount of {E}" (Galvanic Discharge, Die Young): enough to kill the target if it's another
     // player's creature or planeswalker (all of it if that's not enough), nothing for one of ours.
+    // Master of Predicaments: most cards in a hand have mana value 4 or less, so we guess that; as the chooser, our
+    // costliest nonland card, the one a wrong guess pays off most for.
+    if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];
+    if (pend.kind === "chooseOption" && pend.what === "predicamentCard") {
+      const spells = pend.options.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
+      return [{ type: "chooseOption", player: pid, choice: spells[0] ?? pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "payEnergy") {
       const most = pend.numberRange?.max ?? 0;
       // Aether Spike: "Counter that spell unless its controller pays {1} for each {E} paid this way": more than its

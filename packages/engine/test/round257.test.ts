@@ -46,6 +46,7 @@ const wheel = (): CardDef => ({"oracleId":"95a7db5d-26f6-4192-9dc7-4342f7e0e9c5"
 const devils = (): CardDef => ({"oracleId":"b446b485-c10b-4175-bb49-16ac2f9e7718","name":"Wildfire Devils","manaCost":"{3}{R}","cmc":4,"typeLine":"Creature — Devil","supertypes":[],"types":["Creature"],"subtypes":["Devil"],"oracleText":"When this creature enters and at the beginning of your upkeep, choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy that card. You may cast the copy without paying its mana cost.","power":"4","toughness":"2","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/9/09eb879c-5caf-4d6d-b340-5b99ffeefc3a.jpg?1783932804","artUrl":"https://cards.scryfall.io/art_crop/front/0/9/09eb879c-5caf-4d6d-b340-5b99ffeefc3a.jpg?1783932804","commanderLegal":"legal","set":"c19","releasedAt":"2019-08-23","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const creativity = (): CardDef => ({"oracleId":"e2161ae2-e5d2-4a56-85d4-d2214c5b3e2e","name":"Indomitable Creativity","manaCost":"{X}{R}{R}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy X target artifacts and/or creatures. For each permanent destroyed this way, its controller reveals cards from the top of their library until an artifact or creature card is revealed and exiles that card. Those players put the exiled cards onto the battlefield, then shuffle.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","artUrl":"https://cards.scryfall.io/art_crop/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","commanderLegal":"legal","set":"aer","releasedAt":"2017-01-20","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 const passage = (): CardDef => ({"oracleId":"f4b30f6c-09ac-407e-9c72-da64d212ce93","name":"Guided Passage","manaCost":"{G}{U}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Reveal the cards in your library. An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.","colors":["G","R","U"],"colorIdentity":["G","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","artUrl":"https://cards.scryfall.io/art_crop/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","commanderLegal":"legal","set":"apc","releasedAt":"2001-06-04","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const predicaments = (): CardDef => ({"oracleId":"503447d9-2489-46d7-b5aa-a14bbb22dcc8","name":"Master of Predicaments","manaCost":"{3}{U}{U}","cmc":5,"typeLine":"Creature — Sphinx","supertypes":[],"types":["Creature"],"subtypes":["Sphinx"],"oracleText":"Flying\nWhenever this creature deals combat damage to a player, choose a card in your hand. That player guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without paying its mana cost.","power":"4","toughness":"4","colors":["U"],"colorIdentity":["U"],"keywords":["Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/f/0/f0b1720b-ab7a-4b52-a6d0-11c4fc573d17.jpg?1783939190","artUrl":"https://cards.scryfall.io/art_crop/front/f/0/f0b1720b-ab7a-4b52-a6d0-11c4fc573d17.jpg?1783939190","commanderLegal":"legal","set":"m15","releasedAt":"2014-07-18","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const redBolt = card("Test Bolt", "Instant", "{R}", { cmc: 1, colors: ["R"], oracleText: "Test Bolt deals 3 damage to any target." });
 const blueStudy = card("Test Study", "Sorcery", "{1}{U}", { cmc: 2, colors: ["U"], oracleText: "Draw two cards." });
@@ -71,7 +72,7 @@ const fight = (s: GameState, ap: PlayerId, attackers: ObjectId[], defender: Play
 
 describe("round 257", () => {
   it("every card of the round compiles fully", () => {
-    supported(talent(), scramble(), rip(), wheel(), devils(), creativity(), passage());
+    supported(talent(), scramble(), rip(), wheel(), devils(), creativity(), passage(), predicaments());
   });
 });
 
@@ -367,5 +368,42 @@ describe("Guided Passage", () => {
     s = settle(botActions(s, opp).reduce((x, a) => act(x, a), s));
     const got = s.players[ap]!.hand.slice(hand).map((id) => characteristics(s, s.objects[id]!).types[0]);
     expect(got.sort()).toEqual(["Creature", "Land"]);
+  });
+});
+
+describe("Master of Predicaments", () => {
+  const sphinx = () => {
+    const { s, ap, opp } = setup([]);
+    const m = putOnBattlefield(s, ap, predicaments());
+    s.players[ap]!.hand = [];
+    const big = into(s, ap, card("Test Colossus", "Creature — Giant", "{5}{G}", { cmc: 6, colors: ["G"], power: "7", toughness: "7" }), "hand");
+    const small = into(s, ap, ogre, "hand");
+    return { s, ap, opp, m, big, small };
+  };
+  it("deals combat damage: you choose a card in hand, that player guesses; wrong, you may cast it for free", () => {
+    const { s: s0, ap, opp, m, big } = sphinx();
+    let s = fight(s0, ap, [m], opp);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "predicamentCard", player: ap });
+    s = act(s, { type: "chooseOption", player: ap, choice: big });
+    // The guess: by the damaged player, without seeing the card.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "predicamentGuess", player: opp, options: ["over", "notOver"] });
+    expect(s.log.slice(-3).map((x) => x.text).join(" ")).not.toMatch(/Colossus/);
+    s = act(s, { type: "chooseOption", player: opp, choice: "notOver" });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: big });
+    s = settle(run(s, planCast(s, ap, big)));
+    expect(zone(s, big)).toBe("battlefield");
+  });
+  it("a right guess: nothing; a bot guesses 4 or less and, choosing, picks its costliest spell", () => {
+    const { s: s0, ap, opp, m, small } = sphinx();
+    let s = fight(s0, ap, [m], opp);
+    s = act(s, { type: "chooseOption", player: ap, choice: small });
+    s = settle(act(s, { type: "chooseOption", player: opp, choice: "notOver" }));
+    expect(s.pending).toBeNull();
+    expect(zone(s, small)).toBe("hand");
+    const { s: s1, ap: ap1, m: m1, big } = sphinx();
+    let t = fight(s1, ap1, [m1], opp);
+    expect(botActions(t, ap1)).toEqual([{ type: "chooseOption", player: ap1, choice: big }]);
+    t = act(t, { type: "chooseOption", player: ap1, choice: big });
+    expect(botActions(t, opp)).toEqual([{ type: "chooseOption", player: opp, choice: "notOver" }]);
   });
 });

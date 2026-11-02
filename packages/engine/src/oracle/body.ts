@@ -6324,6 +6324,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
+    // Master of Predicaments, after "Whenever ~ deals combat damage to a player": "choose a card in your hand. That player
+    // guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without
+    // paying its mana cost." (rulings: a land can't be cast; a split card's mana value is both halves').
+    const guessMv = ctx.eventPlayer && /^[Cc]hoose a card in your hand$/.test(s) ? new RegExp(`^That player guesses whether the card's mana value is greater than ${NUM}\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (guessMv && /^If the player guessed wrong, you may cast the card without paying its mana cost\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "predicament", who: { ref: "eventPlayer" }, over: num(guessMv[1]!) });
+      si += 2;
+      continue;
+    }
     // Guided Passage: "Reveal the cards in your library. An opponent chooses from among them a creature card, a land card,
     // and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.": an opponent you choose
     // picks one of each kind you have (none of a kind you have none of, rulings), seeing the whole library (rulings).

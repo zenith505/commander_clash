@@ -8947,6 +8947,20 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "predicamentCard" || pend.what === "predicamentGuess") {
+    // Master of Predicaments: the card stays secret (rulings); the guess is announced.
+    const st = r.scratch?.predicament;
+    if (!st) throw new RulesError("nothing to choose");
+    if (pend.what === "predicamentCard") {
+      st.card = { id: choice, zc: obj(s, choice).zoneChanges ?? 0 };
+      log(s, `${p.name} chooses a card in their hand (${pend.source}).`);
+    } else {
+      st.guess = choice as "over" | "notOver";
+      log(s, `${p.name} guesses ${pend.labels?.[pend.options.indexOf(choice)]?.toLowerCase() ?? choice} (${pend.source}).`);
+    }
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "castFromAmong") {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");

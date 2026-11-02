@@ -2099,6 +2099,36 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
+    case "predicament": {
+      // Master of Predicaments (rulings): the card chosen without revealing it; the guess made blind; nothing revealed
+      // unless it's cast.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      const guesser = players(s, e.who, ctx).find((pid) => !player(s, pid).lost);
+      if (guesser === undefined) return;
+      const st = (sc.predicament ??= {});
+      if (st.card === undefined) {
+        if (!you.hand.length) return log(s, `${you.name} has no card in hand to choose.`);
+        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "predicamentCard", options: [...you.hand], labels: you.hand.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a card in your hand: ${player(s, guesser).name} guesses whether its mana value is greater than ${e.over}; if they guess wrong, you may cast it without paying its mana cost` };
+        return "paused";
+      }
+      if (st.guess === undefined) {
+        s.pending = { kind: "chooseOption", player: guesser, source: src, what: "predicamentGuess", options: ["over", "notOver"], labels: [`Greater than ${e.over}`, `${e.over} or less`], prompt: `${you.name} chose a card in their hand. Guess whether its mana value is greater than ${e.over}: if you guess wrong, they may cast it without paying its mana cost` };
+        return "paused";
+      }
+      if (st.offered) return;
+      st.offered = true;
+      const o = s.objects[st.card.id];
+      if (!o || o.zone !== "hand" || (o.zoneChanges ?? 0) !== st.card.zc) return;
+      // A split card's mana value is that of both halves together (CR 709.4, rulings).
+      const right = (defMv(defOf(s, o)) > e.over) === (st.guess === "over");
+      if (right) return log(s, `${player(s, guesser).name} guessed right.`);
+      log(s, `${player(s, guesser).name} guessed wrong.`);
+      s.pending = { kind: "castFree", player: you.id, objectId: o.id, source: src };
+      if (!isType(defOf(s, o), "Land") && freeCastable(s, you.id, o.id)) return "paused";
+      s.pending = null;
+      return;
+    }
     case "castNow": {
       const sc = (s.resolving!.scratch ??= {});
       if (sc.castNow === undefined) {

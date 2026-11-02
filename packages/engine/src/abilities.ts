@@ -3097,6 +3097,13 @@ export type Effect =
    * each; each of those players shuffles.
    */
   | { type: "revealUntilPerDestroyed"; filter: TargetSpec }
+  /**
+   * Master of Predicaments: "choose a card in your hand. That player guesses whether the card's mana value is greater than
+   * 4. If the player guessed wrong, you may cast the card without paying its mana cost.": chosen secretly, the guess made
+   * without seeing it (rulings); a wrong guess lets you cast it as this resolves, timing ignored, X as 0 (CR 608.2g,
+   * 107.3b); a land can't be cast (rulings).
+   */
+  | { type: "predicament"; who: PlayerRef; over: number }
   | {
       type: "revealUntil";
       filter: TargetSpec;

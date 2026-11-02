@@ -1106,6 +1106,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "cardExiledThisTurn":
       return !!s.turnLog?.cardExiled;
+    case "playedFromExile":
+      return (s.turnLog?.playedFromExile ?? []).includes(you);
     case "playedOrCastNotFromHand":
       return (s.turnLog?.landPlayedNotFromHand ?? []).includes(you) || (s.castThisTurn ?? []).some((x) => x.player === you && x.from !== "hand");
     case "youPutCounterOnCreature":

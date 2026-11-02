@@ -398,6 +398,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     toGraveyard: capped(t.toGraveyard ?? {}),
     toGraveyardFromHandOrLibrary: capped(t.toGraveyardFromHandOrLibrary ?? {}),
     landPlayedNotFromHand: t.landPlayedNotFromHand,
+    playedFromExile: t.playedFromExile,
     permanentToHand: t.permanentToHand,
     descended: capped(t.descended ?? {}),
     creaturesExiled: capped(t.creaturesExiled ?? {}),

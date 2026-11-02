@@ -1,7 +1,7 @@
 # Roadmap
 
-29,303 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,395 of
+29,332 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,405 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -307,11 +307,10 @@ line blocks.
    Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
-   stun counter on one of them), Territorial Aetherkite, Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
-   the top card of your library any time"), Jinxed Choker, Fall of the Impostor (the greatest power among a
-   target opponent's creatures), Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
+   stun counter on one of them), Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
+   the top card of your library any time"), Jinxed Choker, Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
    counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
-   Vengeance, Shaile ("entered under your control this turn"), Tales of the Ancestors. Round 180
+   Vengeance, Shaile ("entered under your control this turn"). Round 180
    fixed "other" in Auras' and group statics (Bravado, Conclave's Blessing, Vampirism, Heroes' Podium, Sliver Legion:
    other than the permanent it affects; Daru Stinger and Kjeldoran Javelineer counted their target's counters) and went
    down from rank 11,250 to about rank 11,770 (Anoint with Affliction, Ceaseless Conflict, Desperate Measures, Egon,
@@ -469,7 +468,7 @@ line blocks.
    Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
    of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Mass
    Diminish, Display of Power, Jason Bright, Blood for Bones, Quakebringer,
-   Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
+   Lorthos, Zidane, Discerning Financier, Eight-and-a-Half-Tails.
    Round 190 went on from the top: "that many plus one of each of those kinds of counters" on any permanent you control
    (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist, with Pir), "as long as it was cast" on a static
    ability (The Tarrasque), a revealed creature put onto the battlefield tapped and attacking (Raph & Mikey), "until you
@@ -486,7 +485,7 @@ line blocks.
    Uneaten Feast, Raul, Trouble Shooter (cards milled this turn), Cait Sith, Scouring Swarm, Brigid's back face, Bring to
    Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
-   Appropriation, Ixhel, Cybership, Impulsivity, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
+   Appropriation, Ixhel, Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
    Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
@@ -604,7 +603,7 @@ line blocks.
    Gideon, Martial Paragon) and Equipment tokens named Stoneforged Blade / "Return it to your hand at the beginning of the
    next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
    Out after round 196 (looked at, not done): Tamiyo, the Moon Sage (emblem returns each card put into your graveyard),
-   Tamiyo, Compleated Sage (a token named after her short name), Proteus Staff ("the rest on the bottom in any order"),
+   Proteus Staff ("the rest on the bottom in any order"),
    Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
@@ -732,7 +731,7 @@ line blocks.
    Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
    untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
    Assassin Lord (attacked this turn by an Assassin you controlled), Kros, Defense Contractor (no record of who put
-   counters on a creature), Visions of Phyrexia (no record of playing a card from exile), Glorious Purpose (the sixth
+   counters on a creature), Glorious Purpose (the sixth
    plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
    counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
@@ -1686,6 +1685,31 @@ line blocks.
    discard cost differentNames, checked in the UI's cost picker); "that player chooses a permanent card in your graveyard,
    then you put it onto the battlefield under your control" (Neyam Shai Murad: chooseFromGraveyard `chooser`). +10
    (29,268 of 31,936 with B83; 29,303 with B84 and B85).
+   Round 250 (the top of the list and earlier skip lists): "You may cast it without paying its mana cost" for a card
+   cast from "a graveyard" with "If that spell would be put into a graveyard, exile it instead" only as the rider says
+   (Impulsivity); "Exile target card with mana value X from a graveyard" in a reflexive "When you do" after paying X
+   (Halo Forager); "target opponent chooses ... You return that card to the battlefield with an additional +1/+1 counter
+   on it. The creature is a Vampire in addition to its other types" (Drana, the Last Bloodchief: chooseFromGraveyard with
+   counters and alsoMods); "you may pay an amount of {E} equal to that card's mana value. If you do, return it" (Jolted
+   Awake); "a spell with equal or lesser mana value from your hand" (Reinterpret); "Create Tamiyo's Notebook, a legendary
+   colorless Book artifact token with ..." (Tamiyo, Compleated Sage: a token named with the card's own name stays a name);
+   "Each player may discard a card. Each player who doesn't loses N life" (The Death of Gwen Stacy); "if you didn't play
+   a card from exile this turn" (Visions of Phyrexia: StaticCondition playedFromExile, TurnLog.playedFromExile); damage
+   "equal to the number of counters on ~ to target player and that much damage to up to one target creature" (Dragonspark
+   Reactor); "you may have ~'s base power become equal to that creature's power" (Belligerent Yearling; the bot only does
+   it when that's bigger); "Each player with fewer cards in hand than the player with the most cards in hand draws cards
+   equal to the difference" (Tales of the Ancestors: Count behindMost hand, counted before anyone draws); "you may pay
+   one or more {E}. When you do, ~ deals that much damage to each other creature" (Territorial Aetherkite); "Exile a
+   creature with the greatest power among creatures target opponent controls" (Fall of the Impostor). +13
+   (29,281 of 31,936; 29,332 with B84 to B86).
+   Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a
+   look-at put "tapped and attacking that player"); Pact Weapon ("draw a card and reveal it", the X lost if the draw is
+   replaced, rulings); Long River Lurker (a floating "whenever that creature deals combat damage this turn" on the
+   target); Olivia, Crimson Bride (the returned creature gains a leaves condition on legendary Vampires, as before);
+   Horrid Shadowspinner (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (the X
+   from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (a
+   prevention that puts a counter for each creature's damage prevented); Professor Hojo (the first activated ability that
+   targets a creature you control).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
    and the rulings' loss of non-Alien subtypes); Stitcher Geralf ("exile up to two creature cards put into graveyards
    this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
@@ -1808,10 +1832,10 @@ line blocks.
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
-   Verminister; and from before round 172: Grindstone, Halo Forager, Moritte of the
+   Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
-   Jolted Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
+   Dream-Thief's Bandana, Chandra, Legacy of Fire, Theoretical Duplication,
    Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant,
    Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs, Chandra, Flameshaper,
    Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
@@ -2068,7 +2092,7 @@ line blocks.
    count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
    order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
    World; Webstrike Elite and Rampaging War Mammoth (an X from the cycling cost in their targets); the other "you may
-   pay {X}. When you do" cards (Halo Forager, Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
+   pay {X}. When you do" cards (Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
    Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother, Spider-Verse and Mirror
@@ -2407,8 +2431,7 @@ line blocks.
      cast is offered as the trigger resolves; Bonfire of the Damned and Terminus are out on their own lines.
    - Epic: Eternal Dominion, Neverending Torment, Undying Flames are out on their own lines. Bots cast an epic spell
      only as their last spell in hand.
-   - Free casts from hand still out: "mana value 1 or 2", "equal or lesser mana value" (Reinterpret, Press the
-     Enemy), "shares a card type" (Counterlash), "where X is ..." (Gandalf, Party Guest, Epistolary Librarian), "once
+   - Free casts from hand still out: "mana value 1 or 2", "shares a card type" (Counterlash), "where X is ..." (Gandalf, Party Guest, Epistolary Librarian), "once
      during each of your turns" (Zaffai, Vision), named filters (West Coast Expansion's Hero spell).
    - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
@@ -2542,7 +2565,7 @@ line blocks.
      (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
    Left from the reflexive triggers round ("When you do" after a payment, a sacrifice, a may, a mill, a roll, a count
    or a token, CR 603.12; named tokens; "that artifact gains haste" after putting it onto the battlefield):
-   - Reflexive triggers still out: "pay {X}. When you do" (Isareth, Halo Forager, Numa, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
+   - Reflexive triggers still out: "pay {X}. When you do" (Isareth, Numa, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
      Walker); "exile N cards from your graveyard. When you do" (Kroxa, Young Necromancer, Kishla Trawlers); Wick's
      Patrol ("the greatest mana value among cards in your graveyard");
      Red Hulk, Ziatora, Tiger-Tribe Hunter, Surtland Flinger, Bolg, Edgar's Awakening, Leyline Tyrant ("any
@@ -2615,7 +2638,7 @@ line blocks.
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Pollen Remedy (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
-     Rupture, Curse of Surveillance, The Death of Gwen Stacy; Will of the Abzan (below).
+     Rupture, Curse of Surveillance; Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
      lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
      tokens, Insidious Dreams, Recall, Nahiri's Wrath, Abandon Hope; X in an activated ability's non-mana cost (Gix,

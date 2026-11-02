@@ -4589,6 +4589,11 @@ export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, unta
   putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
 }
 
+/** Visions of Phyrexia: a card played from exile this turn, a land or a spell (TurnLog.playedFromExile). */
+function notePlayedFromExile(s: GameState, pid: PlayerId): void {
+  if (!(s.turnLog?.playedFromExile ?? []).includes(pid)) ((s.turnLog ??= {}).playedFromExile ??= []).push(pid);
+}
+
 function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
   const o = obj(s, id);
   const d = defOf(s, o);
@@ -4598,6 +4603,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   p.landsPlayedThisTurn++;
   // Spider-Man 2099: "if you've played a land ... this turn from anywhere other than your hand".
   if (o.zone !== "hand" && !(s.turnLog?.landPlayedNotFromHand ?? []).includes(p.id)) ((s.turnLog ??= {}).landPlayedNotFromHand ??= []).push(p.id);
+  if (o.zone === "exile") notePlayedFromExile(s, p.id);
   if (untapped && choice?.kind === "payLife") {
     payLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
@@ -6278,6 +6284,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
   if (p.id === s.activePlayer) p.actedTurn = s.turn; // Arboria: a spell cast during their own turn
+  if (castFrom === "exile" && !o.spellCopy) notePlayedFromExile(s, p.id);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).

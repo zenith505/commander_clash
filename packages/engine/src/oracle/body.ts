@@ -2594,6 +2594,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Volatile Rig: "When ~ dies, flip a coin. If you lose the flip, it deals 4 damage to each creature and each player": it
   // is ~, as it last existed (CR 608.2h).
   text = text.replace(/^([Ff]lip a coin\. If you lose the flip, )it (deals \d+ damage to each creature and each player\.)$/, "$1~ $2");
+  // Dragonspark Reactor: "It deals damage equal to the number of charge counters on it to target player and that much damage
+  // to up to one target creature": ~ (sacrificed as the cost, so as it last existed, CR 608.2h) deals that amount to each.
+  text = text.replace(/^~ deals damage equal to the number of ([a-z]+) counters on ~ to (target player) and that much damage to (up to one target creature)\.$/, "~ deals X damage to $2 and X damage to $3, where X is the number of $1 counters on ~.");
   // Ashling the Pilgrim: "remove all +1/+1 counters from ~, and it deals that much damage to each creature and each
   // player": "that much" is the number of counters removed (rulings), "it" ~.
   text = text.replace(/(remove all \+1\/\+1 counters from ~), and it deals that much damage to (each creature and each player)(\.?)$/, "$1, then ~ deals damage to $2 equal to the number of counters removed this way$3");
@@ -5284,7 +5287,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses ..." (Fandaniel):
     // each chooses in turn order, then the chosen ones are sacrificed (rulings); only one who has such a creature can.
     const sacAlone = offer && !does && /^sacrifice an? [a-z ]+?(?: of their choice)?$/.test(offer[2]!) && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) /.test(sentences[si + 1] ?? "");
-    const alone = offer && !does && (sacAlone || /^(?:scry \d+|surveil \d+|draw a card|investigate)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
+    // The Death of Gwen Stacy: "Each player may discard a card. Each player who doesn't loses 3 life.": each chooses in turn
+    // order, then the chosen ones discard; one with no cards in hand can't, so doesn't (CR 101.3).
+    const discardAlone = offer && !does && offer[2] === "discard a card" && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) loses \d+ life\.?$/.test(sentences[si + 1] ?? "");
+    const alone = offer && !does && (sacAlone || discardAlone || /^(?:scry \d+|surveil \d+|draw a card|investigate)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
     // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
     // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
     const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -5305,7 +5311,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (offer && alone) {
       const one = alone.length === 1 ? alone[0]! : undefined;
       if (sacAlone && (one?.type !== "pick" || one.action !== "sacrifice" || one.n !== 1)) return null;
-      const need = sacAlone && one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : undefined;
+      if (discardAlone && (one?.type !== "discard" || one.who.ref !== "you" || one.n !== 1 || one.filter || one.random)) return null;
+      const need = sacAlone && one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : discardAlone ? { zone: "hand" as const, filter: { kind: "card" as const, text: "card" } } : undefined;
       effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!.replace(/\btheir\b/g, "your"), each: true, ...(need ? { need } : {}) });
       ctx.eachChose = true;
       continue;
@@ -6598,18 +6605,36 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...fx[0]!, fromGraveyard: true, yardNoExile: true });
       continue;
     }
+    // Jolted Awake: "Choose up to one target artifact or creature card in your graveyard. You get {E}{E}. Then you may pay
+    // an amount of {E} equal to that card's mana value. If you do, return it from your graveyard to the battlefield.": the
+    // energy counted as it resolves (CR 608.2h), its X as 0 there (rulings); with no target chosen, only the energy.
+    const joltTarget = /^Choose up to one (target .+? card in your graveyard)$/.exec(s);
+    const joltGet = joltTarget ? /^You get ((?:\{E\})+)$/.exec(sentences[si + 1] ?? "") : null;
+    if (joltTarget && joltGet && /^Then you may pay an amount of \{E\} equal to that card's mana value$/.test(sentences[si + 2] ?? "") && /^If you do, return it from your graveyard to the battlefield\.?$/.test(sentences[si + 3] ?? "")) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(joltTarget[1]!.replace(/ in your graveyard$/, " from your graveyard"), ctx, "you");
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.some((x) => x !== "Artifact" && x !== "Creature")) return null;
+      ctx.targets[before] = { ...t, optional: true };
+      effects.push({ type: "getEnergy", who: { ref: "you" }, n: joltGet[1]!.length / 3 });
+      effects.push({ type: "may", effects: [{ type: "putOntoBattlefield", what }], pay: {}, payEnergy: { count: { kind: "manaValue", of: what } }, text: "pay an amount of {E} equal to that card's mana value. If you do, return it from your graveyard to the battlefield" });
+      si += 3;
+      continue;
+    }
     // Wrexial, the Risen Deep: "from that player's graveyard", the player it dealt combat damage to; "If that spell would be
     // put into a graveyard, exile it instead".
-    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's|that player's) graveyard) without paying its mana cost$/.exec(s);
+    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's|that player's|a) graveyard) without paying its mana cost$/.exec(s);
     if (castTarget && (castTarget[2] !== "that player's" || ctx.eventPlayer)) {
-      const theirs = castTarget[2] !== "your";
+      // Impulsivity: "from a graveyard", any player's, the spell going to its owner's graveyard after ("into a graveyard").
+      const anyYard = castTarget[2] === "a";
+      const theirs = castTarget[2] !== "your" && !anyYard;
       const rider = sentences[si + 1]?.replace(/\.$/, "");
-      const exileAfter = rider === `If that spell would be put into ${theirs ? "their" : "your"} graveyard, exile it instead` || (theirs && rider === "If that spell would be put into a graveyard, exile it instead") ? (true as const) : !theirs && rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
+      const exileAfter = anyYard ? (rider === "If that spell would be put into a graveyard, exile it instead" ? (true as const) : undefined) : rider === `If that spell would be put into ${theirs ? "their" : "your"} graveyard, exile it instead` || (theirs && rider === "If that spell would be put into a graveyard, exile it instead") ? (true as const) : !theirs && rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
       const before = ctx.targets.length;
-      const what = parseCardTarget(castTarget[1]!, ctx, theirs ? undefined : "you");
+      const what = parseCardTarget(castTarget[1]!, ctx, theirs || anyYard ? undefined : "you");
       const t = ctx.targets[before];
       // A land card can't be cast (CR 305.9).
-      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : t.owner !== (theirs ? "opponent" : "you")) || !t.types?.length || t.types.includes("Land")) return null;
+      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : anyYard ? t.owner || t.controller : t.owner !== (theirs ? "opponent" : "you")) || !t.types?.length || t.types.includes("Land")) return null;
       effects.push({ type: "castTargetFree", what, ...(exileAfter ? { exileAfter } : {}) });
       if (exileAfter) si++;
       continue;
@@ -8076,6 +8101,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "may", effects: fx, text: `have ~'s base power and toughness become ${basePTMay[1]} until end of turn` });
       continue;
     }
+    // Belligerent Yearling: "you may have ~'s base power become equal to that creature's power until end of turn": the
+    // entering creature's power as it resolves (as it last existed if it's gone, CR 608.2h), locked in then and set in
+    // layer 7b (CR 613.4b); modifiers and counters still apply on top, later setting effects win (rulings).
+    const basePowerMay = !ctx.spell ? /^[Yy]ou may have ~'s base power become equal to that creature's power until end of turn$/.exec(s) : null;
+    if (basePowerMay) {
+      const of = parseObject("that creature", ctx);
+      if (of?.ref !== "subject") return null;
+      effects.push({ type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: { count: { kind: "power", of } } }], duration: "endOfTurn" }], text: "have ~'s base power become equal to that creature's power until end of turn" });
+      continue;
+    }
     // Lagonna-Band Storyteller: "you may put target enchantment card from your graveyard on top of your library. If you do,
     // you gain life equal to its mana value.": that card's, X as 0 (rulings), wherever this put it (CR 400.7).
     const topThenLife = /^[Yy]ou may (put target [a-z]+ card from your graveyard on top of your library)$/.exec(s);
@@ -9366,8 +9401,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
         // Numa, Joraga Chieftain: "distribute X +1/+1 counters among any number of target Elves": the X paid, divided as
         // the reflexive ability is put on the stack (CR 603.12, 601.2d). Fire Lord Sozin: "put any number of target creature
-        // cards with total mana value X or less ...": the X paid bounds the targets chosen then.
-        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && (/^distribute X /.test(paidText) || / target .+? with total mana value X or less /.test(paidText)));
+        // cards with total mana value X or less ...": the X paid bounds the targets chosen then. Halo Forager: "you may cast
+        // target instant or sorcery card with mana value X from a graveyard": exactly the X paid (rulings: X can be 0).
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx, false, false, !!payFirst.payX && !payFirst.payX.color && (/^distribute X /.test(paidText) || / target .+? with total mana value X or less /.test(paidText) || / target .+? card with mana value X from a graveyard /.test(paidText)));
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -9608,6 +9644,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne("Put X +1/+1 counters on ~", ctx);
       if (inner?.length !== 1 || inner[0]!.type !== "counters") return null;
       effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true, atLeastOne: true }, text: "pay one or more {E}. If you do, put that many +1/+1 counters on ~" });
+      si++;
+      continue;
+    }
+    // Territorial Aetherkite: "Then you may pay one or more {E}. When you do, ~ deals that much damage to each other
+    // creature.": X energy, at least one to have paid (CR 107.14); paying triggers a reflexive ability (CR 603.12) whose
+    // "that much" is the X paid.
+    const oneOrMoreDamage = /^(?:Then )?[Yy]ou may pay one or more \{E\}$/.test(s) ? /^When you do, ~ deals that much damage to (each other creature)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (oneOrMoreDamage && si + 2 === sentences.length && !ctx.selfCard) {
+      const reflexive = reflexiveBody(`~ deals X damage to ${oneOrMoreDamage[1]!}`, ctx, false, false, true);
+      if (reflexive?.effects.length !== 1 || reflexive.effects[0]!.type !== "damage" || reflexive.targets.length) return null;
+      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: {}, payX: { energy: true, atLeastOne: true }, text: `pay one or more {E}. When you do, ~ deals that much damage to ${oneOrMoreDamage[1]!}` });
       si++;
       continue;
     }
@@ -11601,6 +11648,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // O-Kagachi Made Manifest: "defending player chooses a nonland card in your graveyard. Return that card to your hand.":
     // the defending player picks one as it resolves (not a target), if there is one, for you (CR 608.2c).
     const oppChooses = /^(defending player|target opponent|that player) chooses an? (.+? card) in your graveyard$/i.exec(s);
+    // Drana, the Last Bloodchief: "You return that card to the battlefield with an additional +1/+1 counter on it. The
+    // creature is a Vampire in addition to its other types.": under your control, a Vampire as it enters and from then on,
+    // even after Drana leaves (rulings).
+    const oppReturns = oppChooses && /^You return that card to the battlefield with an additional \+1\/\+1 counter on it$/.test(sentences[si + 1] ?? "") ? /^The creature is an? ([A-Z][a-z]+) in addition to its other types\.?$/.exec(sentences[si + 2] ?? "") : null;
+    if (oppChooses && oppReturns && CREATURE_TYPES.has(oppReturns[1]!)) {
+      const chooser = parsePlayer(oppChooses[1]!.toLowerCase(), ctx);
+      const filter = parseSearchFilter(oppChooses[2]!);
+      if (!chooser || !filter || !filter.types?.includes("Creature")) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, chooser, filter, dest: "battlefield", counters: { "+1/+1": 1 }, alsoMods: [{ kind: "addTypes", types: [], subtypes: [oppReturns[1]!] }] });
+      si += 2;
+      continue;
+    }
     if (oppChooses && /^(?:You r|R)eturn that card to your hand$/.test(sentences[si + 1] ?? "")) {
       const chooser = parsePlayer(oppChooses[1]!.toLowerCase(), ctx);
       const filter = parseSearchFilter(oppChooses[2]!);

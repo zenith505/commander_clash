@@ -1449,6 +1449,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
   if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if (/^you've played a land or cast a spell this turn from anywhere other than your hand$/.test(text)) return { kind: "playedOrCastNotFromHand" };
+  // Visions of Phyrexia: "if you didn't play a card from exile this turn".
+  if (/^you didn't play a card from exile this turn$/.test(text)) return { kind: "not", cond: { kind: "playedFromExile" } };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   // Sandstalker Moloch: "if an opponent cast a blue and/or black spell this turn", a spell of either color or both.

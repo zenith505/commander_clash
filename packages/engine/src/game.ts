@@ -4968,7 +4968,7 @@ export function castProblem(
   // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
   // with that X announced (601.2b); before X is announced it counts as 0.
   const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -5591,8 +5591,9 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // Nissa, Worldsoul Speaker: that many {E} (CR 107.14); castProblem checks it covers this spell.
   if (alt === "energyForSpell") {
-    const by = s && pid !== undefined ? s.battlefield.map((id) => obj(s, id)).find((p) => controllerOf(s, p) === pid && compileCard(defOf(s, p)).payZero?.energy && characteristics(s, p).hasPrintedAbilities) : undefined;
-    const n = by ? compileCard(defOf(s!, by)).payZero!.energy! : 0;
+    // Primal Prayers and Nissa both: the fewest {E} of one whose spells this one is (`filter`).
+    const ns = s && pid !== undefined ? s.battlefield.map((id) => obj(s, id)).filter((p) => controllerOf(s, p) === pid && compileCard(defOf(s, p)).payZero?.energy && characteristics(s, p).hasPrintedAbilities && (!compileCard(defOf(s, p)).payZero!.filter || printedMatches(compileCard(defOf(s, p)).payZero!.filter!, d))).map((p) => compileCard(defOf(s, p)).payZero!.energy!) : [];
+    const n = ns.length ? Math.min(...ns) : 0;
     return n ? { kind: "energyForSpell", mana: "", costs: [{ kind: "payEnergy", n }], text: `pay ${n} energy` } : undefined;
   }
   if (alt === "evidence") {
@@ -5742,8 +5743,16 @@ function payZeroSources(s: GameState, pid: PlayerId, o: GameObject, life: boolea
   return ok;
 }
 
-/** Aluren: a "without paying their mana costs and as though they had flash" that covers this spell now (the flash only that way, rulings). */
-export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject) => payZeroSources(s, pid, o).some((p) => compileCard(defOf(s, p)).payZero!.flash);
+/**
+ * Aluren: a "without paying their mana costs and as though they had flash" that covers this spell now (the flash only that
+ * way, rulings). Primal Prayers (`energy`): the {E} one with the fewest {E}, which is the one paid (see altCost).
+ */
+export const payZeroFlash = (s: GameState, pid: PlayerId, o: GameObject, life: false | "energy" = false) => {
+  const ok = payZeroSources(s, pid, o, life);
+  if (life !== "energy") return ok.some((p) => compileCard(defOf(s, p)).payZero!.flash);
+  const least = Math.min(...ok.map((p) => compileCard(defOf(s, p)).payZero!.energy!));
+  return ok.some((p) => compileCard(defOf(s, p)).payZero!.energy === least && compileCard(defOf(s, p)).payZero!.flash);
+};
 
 /** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {

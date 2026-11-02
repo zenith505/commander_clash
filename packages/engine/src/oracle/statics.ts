@@ -2416,6 +2416,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Konda's Banner: "Creatures that share a color with equipped creature get +1/+1", "... a creature type ...": anyone's
+  // creatures, the equipped creature too (it shares with itself, rulings), compared with its colors and creature types
+  // as layers 4 and 5 leave them (CR 613.1d-e) when the P/T change applies (layer 7c). Sharing two colors is still +1/+1.
+  const banner = /^Creatures that share a (color|creature type) with equipped creature get ([+-]\d+)\/([+-]\d+)\.$/.exec(line);
+  if (banner) return { affects: { kind: "filter", types: ["Creature"], sharesWithAttached: banner[1] === "color" ? "color" : "creatureType" }, mods: [{ kind: "modifyPT", power: Number(banner[2]), toughness: Number(banner[3]) }], text: line };
   const st = parseStaticLine(line) ?? parseTransform(line);
   if (st) return lookBackGrant(st);
 

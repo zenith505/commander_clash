@@ -1355,13 +1355,18 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   // The Master, Mesmerist: "Whenever a creature with skulk deals combat damage to one of your opponents, put a +1/+1
   // counter on ~ and draw a card": with the keyword as it deals the damage.
-  const any = /^Whenever a creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
-  if (any) {
-    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[3]!)) return "fail";
-    const body = parseBody(any[3]!, { subjectIt: true, eventPlayer: true });
+  // The Rani: "Whenever a goaded creature deals combat damage to one of your opponents, investigate": anyone's creature
+  // goaded as it deals the damage (CR 701.15), once for each creature (unlike Puppet Master's "one or more").
+  const any = /^Whenever a (goaded )?creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
+  if (any && !(any[1] && any[2])) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[4]!)) return "fail";
+    const body = parseBody(any[4]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
-    const kw = any[2] ? { keywords: [any[2].replace(/^./, (c) => c.toUpperCase())] } : {};
-    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], ...kw, text: `creature${any[1] ?? ""}` }, anyone: true }, body, toOpponent: true };
+    const kw = any[3] ? { keywords: [any[3].replace(/^./, (c) => c.toUpperCase())] } : {};
+    const spec = any[1] ? parseTargetPhrase("goaded creature") : undefined;
+    if (any[1] && spec?.kind !== "object") return "fail";
+    const filter: TargetSpec = spec ? { ...spec, text: "goaded creature" } : { kind: "object", types: ["Creature"], ...kw, text: `creature${any[2] ?? ""}` };
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter, anyone: true }, body, toOpponent: true };
   }
   // The Clone Saga: "Whenever a creature with the chosen name deals combat damage to a player this turn, draw a card" (a
   // delayed trigger, see floatingTrigger in body.ts): anyone's creature with that name (CR 201.2), the name bound as the
@@ -2449,6 +2454,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Lifeline: "Whenever a creature dies, if another creature is on the battlefield, return the first card to the
+    // battlefield under its owner's control at the beginning of the next end step": another than the one that died, which
+    // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if
+    // it's still in the graveyard then, under its owner's control.
+    .replace(/^Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step\.$/, "Whenever a creature dies, if a creature is on the battlefield, return that card to the battlefield under its owner's control at the beginning of the next end step.")
     // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.

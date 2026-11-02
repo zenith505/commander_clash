@@ -1084,6 +1084,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Target opponent chooses an artifact card in their graveyard\. Put that card onto the battlefield under your control\.$/, "Target opponent puts an artifact card of their choice from their graveyard onto the battlefield under your control.");
   // Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": one instruction.
   text = text.replace(/^(Target (?:player|opponent) reveals (?:two|three) cards at random from their hand), then (discards each [a-z]+ card revealed this way\.)$/, "$1 and $2");
+  // Avatar Destiny: "Return ~ to its owner's hand and up to one creature card milled this way to the battlefield under your
+  // control": both, as the ability resolves; the milled card is put first, right after the mill it's chosen from.
+  text = text.replace(/\bReturn ~ to its owner's hand and (up to one [a-z]+ card) milled this way to the battlefield under your control\./, "Put $1 from among the cards milled this way onto the battlefield under your control. Return ~ to its owner's hand.");
+  // Estrid, the Masked: "Return all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for
+  // Aura cards": two returns, one after the other, so the Auras may enchant what the first put there (rulings).
+  text = text.replace(/\bReturn all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for Aura cards\./, "Return all non-Aura enchantment cards from your graveyard to the battlefield. Return all Aura cards from your graveyard to the battlefield.");
   // Dust: "Exile any number of target creatures that have -1/-1 counters on them": "with -1/-1 counters on them".
   text = text.replace(/^Exile any number of target creatures that have -1\/-1 counters on them\.$/, "Exile any number of target creatures with -1/-1 counters on them.");
   // Rise: "Return target creature card from a graveyard and target creature on the battlefield to their owners' hands": two
@@ -3120,6 +3126,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    // An Aura token and what it has, said in the next sentence ("... attached to another target creature. That token has
+    // enchant creature and "..."", The Rani): one instruction creating it (see parseTokensSentence). Without its enchant
+    // ability the line isn't understood.
+    if (/\bAura enchantment tokens? named [A-Z][^"]* attached to /.test(s)) {
+      const auraHas = /^(?:The token has|That token has|It has|Those tokens have|The tokens have) (enchant (?:creature|land|permanent) and .+)$/.exec(sentences[si + 1] ?? "");
+      if (!auraHas) return null;
+      s = `${s} with ${auraHas[1]!}`;
+      si++;
+    }
     const last = effects[effects.length - 1];
     // Unexpected Results: "Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without
     // paying its mana cost. If it's a land card, you may put it onto the battlefield and return ~ to its owner's hand." Cast
@@ -3145,6 +3160,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (d?.type !== "delayed" || d.when !== "nextEndStep" || !d.of || d.effects.length !== 1 || d.effects[0]!.type !== "sacrifice" || d.effects[0]!.what.ref !== "subject") return null;
       effects.push({ ...d, effects: [...d.effects, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "toughness", of: { ref: "sacrificed" } } } }] }], text: "Sacrifice it. If you do, you gain life equal to its toughness" });
       si++;
+      continue;
+    }
+    // Summoner's Grimoire: "You may put a creature card from your hand onto the battlefield. If that card is an enchantment
+    // card, it enters tapped and attacking": only an enchantment creature card does, attacking a player or planeswalker
+    // its controller chooses during combat (CR 508.4); outside combat it's only tapped (CR 506.3d).
+    const ifCardThen = /^If that card is an? ([a-z]+) card, it enters tapped and attacking$/.exec(s);
+    if (ifCardThen && last?.type === "putFromHand" && !ctx.spell && !last.any && last.upTo === undefined && !last.who && !last.fromHandOf && !last.attachToSubject && !last.attachSelf && !last.equipToSelf && !last.orGraveyard && !last.attacking && !last.tapped && !last.manifest && !last.onlyIf) {
+      const spec = parseTargetPhrase(`${ifCardThen[1]} card from a graveyard`);
+      if (spec?.kind !== "card" || !spec.types?.length) return null;
+      last.tapped = true;
+      last.attacking = true;
+      last.onlyIf = (({ owner: _, ...rest }) => ({ ...rest, text: `${ifCardThen[1]} card` }))(spec);
       continue;
     }
     // The Invincible Iron Man: "You may put an artifact card from your hand onto the battlefield. If it's an Equipment,
@@ -7226,6 +7253,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
       continue;
     }
+    // Scriv, the Obligator's Contract: "Whenever enchanted creature attacks, it gets +2/+0 until end of turn if it's
+    // attacking one of your opponents. Otherwise, its controller loses 2 life.": the attacking creature as it resolves,
+    // attacking a player who is an opponent of this ability's controller (not a planeswalker, CR 506.3, 508.1b).
+    const ifAttackingOpp = ctx.subject ? /^(.+) if it's attacking one of your opponents$/.exec(s) : null;
+    const otherwiseOpp = ifAttackingOpp ? /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (ifAttackingOpp && otherwiseOpp) {
+      const yes = attempt(ctx, () => parseOne(capital(ifAttackingOpp[1]!), ctx));
+      const no = attempt(ctx, () => parseOne(capital(otherwiseOpp[1]!), ctx));
+      if (!yes || !no || [...yes, ...no].some((e) => pauses(e))) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], combat: "attackingOpponent", text: "creature attacking one of your opponents" };
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     // Oran-Rief Hydra: "Put a +1/+1 counter on ~. If that land is a Forest, put two +1/+1 counters on ~ instead."; Akoum
     // Hellkite: "~ deals 1 damage to any target. If that land is a Mountain, ~ deals 2 damage instead." The land that
     // entered as this resolves, or as it last existed (CR 608.2h); the same instruction with the other number.
@@ -11150,7 +11191,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     const fromMilled =
       // Nashi, Searcher in the Dark: "You may put any number of legendary and/or enchantment cards from among them into your hand".
-      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
       // Mole Module: "mill four cards. You may put a permanent card from among them onto the battlefield".
       /^[Yy]ou may put (an? .+? card) from among (?:them|the cards milled this way|the milled cards) (onto the battlefield)$/.exec(s) ??
       // Lluwen, Imperfect Naturalist: "you may put a creature or land card from among the milled cards on top of your library".

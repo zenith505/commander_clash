@@ -1399,10 +1399,21 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
     if (a.lesserPowerThanSource && !(c.power < (chars.get(e.sourceId!)?.power ?? -Infinity))) continue;
+    if (a.sharesWithAttached) {
+      const hostId = s.objects[e.sourceId!]?.attachedTo;
+      const host = hostId ? chars.get(hostId) : undefined;
+      if (!host) continue;
+      if (a.sharesWithAttached === "color" && !c.colors.some((col) => host.colors.includes(col))) continue;
+      const kinds = (x: Characteristics): Set<string> | "all" => (x.allCreatureTypes && x.types.includes("Creature") ? "all" : new Set(x.subtypes.filter((st) => CREATURE_TYPES.has(st))));
+      if (a.sharesWithAttached === "creatureType" && !shareKinds(kinds(c), kinds(host))) continue;
+    }
     out.push(id);
   }
   return out;
 }
+
+/** Two objects' creature types share one ("all": changeling, CR 702.73a). */
+const shareKinds = (a: Set<string> | "all", b: Set<string> | "all") => (a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((x) => b.has(x)));
 
 /** Duplicant: the last creature card exiled with this object that's still in exile (CR 607.2a). */
 function lastLinkedCreatureCard(s: GameState, sourceId: ObjectId | undefined): GameObject | undefined {

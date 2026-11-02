@@ -215,6 +215,12 @@ function thenSubject(first: string, next: string): string {
   const who = /^(Target player|Target opponent|target player|target opponent|That player or that planeswalker's controller|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
+  // Azula, Cunning Usurper: "target opponent exiles a nontoken creature they control, then they exile a nonland card from
+  // their graveyard": the same opponent.
+  if (who && /^[Tt]arget /.test(who[1]!) && /^they exile an? [a-z]+ card from their graveyard$/.test(next)) return `That player ${next.replace(/^they exile /, "exiles ")}`;
+  // Death in Heaven: "Target player mills two cards, then exiles their graveyard": that player's whole graveyard, the
+  // cards just milled included.
+  if (who && /^[Tt]arget /.test(who[1]!) && next === "exiles their graveyard") return "Exile that player's graveyard";
   // Grub's Command: "Target player mills five cards, then puts each Goblin card milled this way into their hand".
   if (who && /^[Tt]arget /.test(who[1]!) && /^puts each .+ milled this way into their hand$/.test(next)) return `That player ${next}`;
   // Strangling Grasp: "enchanted permanent's controller sacrifices a nonland permanent of their choice, then that player
@@ -2992,6 +2998,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
+  // Death in Heaven: "Put all creature cards exiled with ~ onto the battlefield face down under your control. They're 2/2
+  // Cyberman artifact creatures." One instruction: they enter that way (FaceDownKind "cyberman", rulings).
+  text = text.replace(/([Pp]ut all creature cards exiled with ~) onto the battlefield face down under your control\. They're 2\/2 Cyberman artifact creatures\./, "$1 onto the battlefield under your control as face-down 2/2 Cyberman artifact creatures.");
   // Emperor of Bones: "put a creature card exiled with ~ onto the battlefield under your control with a finality counter on
   // it. It gains haste. Sacrifice it at the beginning of the next end step." One instruction about that permanent.
   text = text.replace(/([Pp]ut a creature card exiled with ~ onto the battlefield under your control with a finality counter on it)\. It gains haste\. Sacrifice it at the beginning of the next end step\./, "$1, and it gains haste until it is sacrificed when the next end step begins.");
@@ -3367,6 +3376,41 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       s = `${s} that's tapped and attacking`;
     }
     if (!s) continue;
+    // Azula, Cunning Usurper: "target opponent exiles a nontoken creature they control, then they exile a nonland card from
+    // their graveyard." That player's own choice each time (not targeted), each card "exiled with ~" (CR 607.2a), the
+    // second whether or not they had a creature to exile.
+    if (/^[Tt]arget opponent exiles a nontoken creature they control$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "That player exiles a nonland card from their graveyard" && !ctx.spell) {
+      const who = parsePlayer("target opponent", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push(
+        { type: "pick", who, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], token: false, text: "nontoken creature" }, n: 1, action: "exile", linked: true },
+        { type: "chooseFromGraveyard", who, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, n: 1, dest: "exile", linked: true },
+      );
+      si++;
+      continue;
+    }
+    // Reno and Rude: "exile the top card of that player's library. Then you may sacrifice another creature or artifact. If
+    // you do, you may play the exiled card this turn, and mana of any type can be spent to cast it." That card, while it's
+    // still exiled (CR 400.7), with the usual timing and costs (rulings), any type of mana for a spell (CR 609.4b).
+    const renoSac = ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && sentences[si + 2]?.replace(/\.$/, "") === "If you do, you may play the exiled card this turn, and mana of any type can be spent to cast it" ? /^Then (you may sacrifice another [a-z]+ or [a-z]+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (renoSac) {
+      effects.push({ type: "exileTop", who: { ref: "eventPlayer" }, n: 1 });
+      ctx.exiledTop = true;
+      const sac = parseOne(capital(renoSac[1]!.replace(/^you may /, "")), ctx);
+      if (sac?.length !== 1 || sac[0]!.type !== "pick" || sac[0]!.action !== "sacrifice") return null;
+      effects.push({ type: "may", effects: sac, text: renoSac[1]!.replace(/^you may /, "") }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "mayCastFromGraveyard", what: { ref: "exiledTop" }, play: true, inExile: true, anyType: true }] });
+      si += 2;
+      continue;
+    }
+    // The Cyber-Controller: "each opponent mills X cards. Put all creature cards milled this way onto the battlefield face
+    // down under your control. They're 2/2 Cyberman artifact creatures." Every creature card that mill put into a
+    // graveyard and is still there (CR 400.7), all at once, as nameless, colorless 2/2 Cyberman artifact creatures
+    // (rulings, CR 708.2a).
+    if (ctx.afterAnyMill && s === "Put all creature cards milled this way onto the battlefield face down under your control" && sentences[si + 1]?.replace(/\.$/, "") === "They're 2/2 Cyberman artifact creatures") {
+      effects.push({ type: "putOntoBattlefield", what: { ref: "milled", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" } }, faceDown: "cyberman" });
+      si++;
+      continue;
+    }
     // The Parting of the Ways: "Exile the top five cards of your library. For each nonland card exiled this way, put a
     // number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (CR
     // 702.62): each such card, with no time counters for a mana value of 0, so not suspended (CR 702.62b).
@@ -5835,6 +5879,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Robber of the Rich: "exile the top card of their library. During any turn you attacked with a Rogue, you may cast that
+    // card and you may spend mana as though it were mana of any color to cast that spell." The defending player's card,
+    // face up; for as long as it stays exiled, in any turn its controller declared a Rogue as an attacker (rulings), with
+    // the usual timing, spells only (CR 609.4b for the mana).
+    if (ctx.defending && /^[Ee]xile the top card of (?:their|defending player's) library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a Rogue, you may cast that card and you may spend mana as though it were mana of any color to cast that spell") {
+      effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eventPlayer" }, castOnly: true, anyType: true, attackedWithType: "Rogue" });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
+    // Summon: Brynhildr: "Exile the top card of your library. During any turn you put a lore counter on this Saga, you may
+    // play that card." For as long as it stays exiled, in a turn you put a lore counter on that Saga (as that object, CR
+    // 400.7): the turn it entered, its later chapter turns, a proliferate; with the usual timing and costs (rulings).
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you put a lore counter on ~, you may play that card") {
+      effects.push({ type: "impulse", n: 1, until: "exiled", loreOnSource: true });
+      si++;
+      continue;
+    }
     // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
     // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
     if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a token, you may play that card") {
@@ -6222,6 +6284,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target") return null;
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index } });
       si++;
+      continue;
+    }
+    // Jacob Frye: "exile up to one target Assassin card or card with freerunning from your graveyard. If you do, copy it.
+    // You may cast the copy." A card that's either (CR 702.181 freerunning is a keyword on the card); the copy is made in
+    // exile and cast as this resolves or never, paying its costs (X chosen as usual), and one not cast ceases to exist
+    // (rulings, CR 608.2g, 707.12).
+    const frye = /^[Ee]xile up to one target Assassin card or card with freerunning from your graveyard$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If you do, copy it" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast the copy";
+    if (frye) {
+      const base = parseObject("up to one target Assassin card from your graveyard", ctx, true);
+      if (base?.ref !== "target") return null;
+      const spec = ctx.targets[base.index]!;
+      if (spec.kind !== "card" || !spec.subtypes?.includes("Assassin")) return null;
+      ctx.targets[base.index] = { ...spec, subtypes: undefined, anyOf: [{ kind: "card", subtypes: ["Assassin"], text: "Assassin card" }, { kind: "card", keywords: ["Freerunning"], text: "card with freerunning" }], text: "target Assassin card or card with freerunning from your graveyard" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: base.index }, paid: true });
+      si += 2;
       continue;
     }
     // Shiko, Paragon of the Way: "exile target nonland card with mana value 3 or less from your graveyard. Copy it, then you
@@ -12061,6 +12138,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^Exile all opponents' graveyards$/.test(s) && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards this turn, and mana of any type can be spent to cast them") {
       effects.push({ type: "impulse", n: 0, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, anyType: true, graveyards: true });
       si++;
+      continue;
+    }
+    // Author of Shadows: "exile all opponents' graveyards. Choose a nonland card exiled this way. You may cast that card for
+    // as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell." Every
+    // card exiled, then one nonland card among them chosen as this resolves (CR 608.2d); only that one may be cast, for
+    // as long as it stays exiled, with any type of mana (CR 609.4b).
+    if (/^[Ee]xile all opponents' graveyards$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Choose a nonland card exiled this way" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell") {
+      effects.push({ type: "impulse", n: 0, until: "exiled", who: { ref: "eachOpponent" }, castOnly: true, anyType: true, graveyards: true, choose: true, chooseAmong: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } });
+      si += 2;
       continue;
     }
     // Shadow of the Enemy: "Exile all creature cards from target player's graveyard. You may cast spells from among those

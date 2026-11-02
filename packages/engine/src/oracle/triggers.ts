@@ -3426,7 +3426,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const activeMore = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
   // "Whenever ~ attacks, if defending player controls more lands than you" (Aerial Surveyor): the player it attacks, or
   // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
-  const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  // Robber of the Rich: "if defending player has more cards in hand than you": the same, cards in hand.
+  const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player (?:controls more (lands|creatures)|has more cards in (hand)) than you$/.exec(intervening[2]!) : null;
   // Septic Rats: "Whenever ~ attacks, if defending player is poisoned": the player it attacks (or the planeswalker's
   // controller, CR 506.2), as it triggers and resolves.
   const poisonedCond: StaticCondition | null = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) && intervening[2] === "defending player is poisoned" ? { kind: "eventPlayerPoisoned" } : null;
@@ -3435,7 +3436,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // player's spells, as it triggers and resolves (CR 603.4).
   const activeCast = intervening && /^At the beginning of each (?:opponent|player)'s end step$/.test(intervening[1]!) ? /^that player didn't cast an? (creature )?spell this turn$/.exec(intervening[2]!) : null;
   const castCond: StaticCondition | null = activeCast ? { kind: "castCount", n: 1, filter: activeCast[1] ? parseSearchFilter("creature card")! : { kind: "card", text: "spell" }, not: true, activePlayer: true } : null;
-  const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
+  const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: (defMore[1] ?? defMore[2]) as "lands" | "creatures" | "hand", eventPlayer: true } : null;
   // Deathbringer Regent: "When ~ enters, if you cast it from your hand and there are five or more other creatures on the
   // battlefield": both, the first about how it entered (see ifCastFromHand).
   const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;

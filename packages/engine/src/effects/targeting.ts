@@ -94,7 +94,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.owner === "you" && o.owner !== controller) return false;
   if (spec.owner === "opponent" && o.owner === controller) return false;
   if (spec.anyOf && !spec.anyOf.some((a) => objectMatches(s, a, o, controller, false, src, chars, view))) return false;
-  if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
+  if (spec.subtypes?.length && !(spec.allSubtypes ? spec.subtypes.every(hasSubtype) : spec.subtypes.some(hasSubtype))) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   if (spec.attachedTo) {
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
@@ -424,7 +424,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.supertypes?.some((x) => !d.supertypes.includes(x))) return false;
   if (spec.notSupertypes?.some((x) => d.supertypes.includes(x))) return false;
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
-  if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
+  if (spec.subtypes?.length && !(spec.allSubtypes ? spec.subtypes.every(hasSubtype) : spec.subtypes.some(hasSubtype))) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.chosen === "landOrNonland" || spec.counter) return false;
   if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (d.types.includes("Creature") && /^-?\d+$/.test(d.power ?? "") ? Number(d.power) : undefined) : defMv(d), spec.parity)) return false;

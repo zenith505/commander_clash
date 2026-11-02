@@ -1624,7 +1624,7 @@ export function parseTargetPhrase(
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
   // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -2111,6 +2111,8 @@ export function parseTargetPhrase(
       else return null;
     }
   }
+  // "Eldrazi Spawn", "Sand Warrior", "Spider Hero card": one object with both creature types (CR 205.3), not either.
+  const allSubtypes = alts.length === 1 && !sharedSubtypes && (alts[0] ?? "").trim().split(/\s+/).filter((w) => CREATURE_TYPES.has(capital(w))).length > 1;
   if (outlaw && subtypes.length !== OUTLAW_TYPES.length) return null;
   // "red or green creature" means a creature that's red or green. Mixing colors with several
   // different type alternatives ("red creature or green artifact") isn't modeled.
@@ -2135,6 +2137,7 @@ export function parseTargetPhrase(
   const filters = {
     types: allTypes ? [] : types,
     ...(allTypes ? { allTypes } : {}),
+    ...(allSubtypes ? { allSubtypes: true as const } : {}),
     notTypes,
     notColors,
     ...(colors.length ? { colors } : {}),

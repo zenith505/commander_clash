@@ -1705,10 +1705,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
   // Autumn's Veil: "creatures you control can't be the targets of blue or black spells this turn": a rule about every
   // creature you control this turn, those that come later too (rulings; CR 611.2c is only for characteristics).
-  if ((m = /^(Creatures you control) can't be the targets of (.+) this turn$/i.exec(s))) {
-    const affects = parseAffected("Creatures you control");
+  // Display of Dominance: "Permanents you control can't be the targets of blue or black spells your opponents control this
+  // turn": the same for every permanent you control during the rest of the turn (rulings).
+  if ((m = /^(Creatures|Permanents) you control can't be the targets of (.+) this turn$/i.exec(s))) {
+    const affects = parseAffected(`${m[1]} you control`);
     const by = parseUntargetable(m[2]!);
-    return affects && by ? [{ type: "groupRules", affects, text: "creatures you control", mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
+    return affects && by ? [{ type: "groupRules", affects, text: `${m[1]!.toLowerCase()} you control`, mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
   }
   if ((m = /^(.+?) can't be the target of (.+) this turn$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);

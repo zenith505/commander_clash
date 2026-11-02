@@ -278,7 +278,7 @@ export type TriggerSourceEvent =
   /** Erestor of the Council: players finished a vote (CR 701.38), with the votes cast. */
   | { type: "votesDone"; votes: { voter: PlayerId; choice: string }[] }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
-  | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
+  | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean; /** Some of this combat damage went to a blocking creature (Arashin War Beast). */ toBlocker?: true }
   | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana; /** The permanents whose kept-apart mana was spent on it ("id#zoneChanges", ManaLot.source). */ manaSources?: string[] }
@@ -406,6 +406,12 @@ function eventPlayerFits(s: GameState, o: GameObject, t: TriggeredAbility, pid: 
   if (c.theirTurn && s.activePlayer !== pid) return false;
   const name = characteristics(s, o).name;
   return !c.controlsArtifactNamedSelf || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Artifact") && characteristics(s, obj(s, id)).name === name);
+}
+
+/** Canal Courier: it attacks a player, and another creature attacks another player (not a planeswalker or battle, rulings). */
+function attacksApart(s: GameState, o: GameObject): boolean {
+  if (o.attacking === undefined || o.attackingPermanent) return false;
+  return s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined && s.objects[id]!.attacking !== o.attacking && !s.objects[id]!.attackingPermanent && objIsType(s, s.objects[id]!, "Creature"));
 }
 
 function othersAttacking(s: GameState, o: GameObject, type?: string, tokens?: true): number {
@@ -1447,9 +1453,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return { player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid, opponent: opp && !a.attackingPermanent, opponentOrPlaneswalker: opp && a.attackingPermanent?.battleController === undefined };
     };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksMoreLife || (o.attacking !== undefined && !o.attackingPermanent && s.players[o.attacking]!.life > s.players[controllerOf(s, o)]!.life)) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksMoreLife || (o.attacking !== undefined && !o.attackingPermanent && s.players[o.attacking]!.life > s.players[controllerOf(s, o)]!.life)) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers) && (!t.othersAtAnotherPlayer || attacksApart(s, o)) && !t.oneOtherAttacker, undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // Creepy Puppeteer: exactly one other creature attacking with it, that creature the subject.
+    const others = s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature"));
+    if (others.length === 1) add(o, controllerOf(s, o), (e, t) => e === "selfAttacks" && !!t.oneOtherAttacker && t.host !== "orSelf", undefined, undefined, obj(s, others[0]!), undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever ~ or equipped creature attacks" (Tanuki Transplanter): about ~ itself here, the subject.
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksMoreLife || (o.attacking !== undefined && !o.attackingPermanent && s.players[o.attacking]!.life > s.players[controllerOf(s, o)]!.life)) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksMoreLife || (o.attacking !== undefined && !o.attackingPermanent && s.players[o.attacking]!.life > s.players[controllerOf(s, o)]!.life)) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers) && (!t.othersAtAnotherPlayer || attacksApart(s, o)), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
     addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksMonarch || (o.attacking !== undefined && o.attacking === s.monarch && !o.attackingPermanent)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Okoye: "Whenever that creature attacks the monarch this turn": a delayed trigger about this creature (CR 603.7c).
@@ -1683,6 +1692,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       addHosted(o, (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
       if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
+      if (ev.toBlocker) add(o, controllerOf(s, o), (e) => e === "selfDealsCombatDamageToBlockers");
       // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
       const dealerBy = controllerOf(s, o);
       if (ev.combat)
@@ -2099,7 +2109,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const ward = (tr: TriggeredAbility) => tr.body.effects.some((x) => x.type === "counterUnlessPays" && x.ward);
       add(o, you, (e, tr) => ((e === "becomesTargetOfOpponent" && you !== by) || (e === "selfBecomesTarget" && fits(tr, you))) && !(noWard && ward(tr)), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
       // Spectral Prison: "When enchanted creature becomes the target of a spell" (TriggeredAbility.targeted).
-      addHosted(o, (e, tr) => e === "selfBecomesTarget" && fits(tr, you), ev.stackId);
+      // Fractured Loyalty: "that spell or ability's controller" is the player who controls the item (`that`).
+      addHosted(o, (e, tr) => e === "selfBecomesTarget" && fits(tr, you), ev.stackId, o, that);
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);

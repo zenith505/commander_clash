@@ -1464,7 +1464,7 @@ export type PendingDecision =
    * "You may choose new targets for target spell or ability" (CR 115.7d): keep them all, or choose them again; any kept
    * may be illegal, any changed must be legal for that spell, whose controller is `controller`.
    */
-  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[] }
+  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[]; /** "Change the targets" (CR 115.7a): change every target or none. */ allOrNone?: true }
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */

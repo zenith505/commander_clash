@@ -530,6 +530,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = parseDamageRecipient(m[2]!, ctx);
     return to && "ref" in to && to.ref === "target" ? [{ type: "damage", amount: Number(m[1]), to, by: "attached" }] : null;
   }
+  // Compel Brutality: "Target planeswalker you control deals damage equal to its loyalty to target creature or
+  // planeswalker an opponent controls": from that planeswalker, its loyalty as this resolves (rulings); none if it's gone.
+  if ((m = /^(Target planeswalker you control) deals damage equal to its loyalty to (target creature or planeswalker an opponent controls)$/.exec(s))) {
+    const a = parseObject(m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a?.ref === "target" && !a.n && b?.ref === "target" && !b.n ? [{ type: "bite", a, b, loyalty: true }] : null;
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).
@@ -920,6 +927,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // it. You may choose new targets for the copy." (CR 707.10; the new targets in body.ts).
   const named = ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? ctx.lastObjectTarget : undefined;
   if (named !== undefined && !ctx.castSpell && !ctx.selfCastSpell && /^(?:[Tt]hen )?[Cc]opy it$/.test(s)) return [{ type: "copySpell", spell: { target: named }, n: 1, newTargets: false }];
+  // Goblin Flectomancer: "You may change the targets of target instant or sorcery spell" (CR 115.7a): all or none.
+  if ((m = /^You may change the targets of target (instant or sorcery spell)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "newTargets", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }), allOrNone: true }] : null;
+  }
   // Deflecting Swat, Redirect: "You may choose new targets for target spell or ability" (CR 115.7d).
   if ((m = /^You may choose new targets for target (spell or ability|(?:instant or sorcery )?spell)$/i.exec(s))) {
     const spec = m[1] === "spell or ability" ? { ...stackSpec("spell or ability"), text: "target spell or ability" } : parseTargetPhrase(m[1]!);

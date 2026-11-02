@@ -4902,6 +4902,20 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Burden of Proof: "Enchanted creature gets +2/+2 as long as it's a Detective you control. Otherwise, it has base power
+    // and toughness 1/1 and can't block Detectives.": one or the other by what the creature is and who controls it now,
+    // checked continuously (CR 611.3a); "you" is the Aura's controller.
+    const proof = /^Enchanted creature (gets [+-]\d+\/[+-]\d+) as long as it's an? ([A-Z][a-z]+) you control\. Otherwise, it (has base power and toughness \d+\/\d+ and can't block [A-Z][a-z]+s)\.$/.exec(line);
+    if (proof && CREATURE_TYPES.has(proof[2]!)) {
+      const [a, b] = [parseStatic(`Enchanted creature ${proof[1]}.`), parseStatic(`Enchanted creature ${proof[3]}.`)];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        const yes: TargetSpec = { kind: "object", types: ["Creature"], subtypes: [proof[2]!], controller: "you", text: `${proof[2]} you control` };
+        const notType: TargetSpec = { kind: "object", types: ["Creature"], notSubtypes: [proof[2]!], text: `non-${proof[2]} creature` };
+        const theirs: TargetSpec = { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "anyOf", conds: [{ kind: "attachedIs", filter: notType }, { kind: "attachedIs", filter: theirs }] }, text: line });
+        continue;
+      }
+    }
     // Mishra's Domination: "As long as you control enchanted creature, it gets +2/+2. Otherwise, it can't block.": who
     // controls it now, checked continuously (CR 611.3a); in a free-for-all game every other player is an opponent.
     const domination = /^As long as you control enchanted creature, it (gets [+-]\d+\/[+-]\d+)\. Otherwise, it (can't block|can't attack|can't attack or block)\.$/.exec(line);

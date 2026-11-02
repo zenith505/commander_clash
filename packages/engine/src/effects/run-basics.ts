@@ -854,7 +854,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "bite": {
       // CR 701.14b: if either creature is gone, isn't a creature, or is an illegal target, no damage is dealt.
       // "Each of those creatures deals damage equal to its power to ~": each target still legal and still a creature.
-      const as = objects(s, e.a, ctx).filter((a) => objIsType(s, a, "Creature"));
+      // Compel Brutality: a planeswalker dealing damage equal to its loyalty, the loyalty counters on it (CR 306.5b).
+      const as = objects(s, e.a, ctx).filter((a) => objIsType(s, a, e.type === "bite" && e.loyalty ? "Planeswalker" : "Creature"));
       const a = as[0];
       // "Deals damage equal to its power to each of two other target creatures": each one still a legal target, a
       // planeswalker too where it could be targeted (Bite Down). Only fighting needs both to be creatures (CR 701.14b).
@@ -869,7 +870,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const events: DamageEvent[] = as.flatMap((x) =>
           (e.self ? [x] : bs).flatMap((b): DamageEvent[] => {
             const src = objectSource(s, x);
-            const n = power(s, x) * (e.times ?? 1);
+            const n = (e.loyalty ? (x.counters.loyalty ?? 0) : power(s, x)) * (e.times ?? 1);
             // Ram Through: with trample, the damage beyond lethal goes to the creature's controller (CR 120.4a).
             const excess = e.excessIfTrample && objHasKeyword(s, x, "Trample") ? excessOver(lethalAmounts(s, src, b), n) : 0;
             return excess ? [{ src, to: { object: b.id }, n: n - excess }, { src, to: { player: controllerOf(s, b) }, n: excess }] : [{ src, to: { object: b.id }, n }];

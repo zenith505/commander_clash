@@ -634,6 +634,8 @@ export interface TargetSpec {
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
+  /** "Eldrazi Spawn", "Sand Warrior": every one of `subtypes`, not any of them (CR 205.3). */
+  allSubtypes?: true;
   /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
   orSubtypes?: string[];
   /** Or a card that has an Adventure instead of one of `types`: "instant cards, sorcery cards, and/or have an Adventure" (Frantic Firebolt; rulings: an adventurer card in any zone but the stack). */
@@ -1923,7 +1925,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "As long as they haven't dealt combat damage yet" (Ruric Thar, Magecrusher) is its `not`. */ "hasDealtCombatDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | /** "If it's an Aura" (Everflame Eidolon: a bestowed permanent, CR 702.103b). */ "aura" | "tapped" | "untapped" | "monstrous" | /** CR 702.112b. */ "renowned" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | /** "Unless it attacked or blocked this turn" (Lurker): declared as one this turn. */ "attackedOrBlockedThisTurn" | /** "If ~ attacked this combat" (Tolsimir, Midnight's Light): declared as an attacker in this combat. */ "attackedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | /** Rocket Launcher: "if you've controlled ~ continuously since the beginning of your most recent turn" (CR 302.6's test for its controller's most recent turn, whoever's turn it is). */ "controlledSinceYourTurnBegan" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "As long as they haven't dealt combat damage yet" (Ruric Thar, Magecrusher) is its `not`. */ "hasDealtCombatDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast" | /** "If her sneak cost was paid this turn" (Karai, Future of the Foot): this permanent's spell was cast for its sneak cost this turn (CR 702.190a). */ "sneakThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -3540,7 +3542,7 @@ export type Effect =
    * a deals damage equal to its power to b. `excessIfTrample`: "If the creature you control has trample, excess damage is
    * dealt to that creature's controller instead" (Ram Through; CR 120.4a).
    */
-  | { type: "bite"; a: ObjRef; b: ObjRef; excessIfTrample?: true; /** "Deals damage equal to twice its power" (Polliwallop): that multiple. */ times?: number; /** "Each creature deals damage to itself equal to its power" (Wave of Reckoning): each of `a` to itself, all at once (`b` is `a`). */ self?: true }
+  | { type: "bite"; a: ObjRef; b: ObjRef; excessIfTrample?: true; /** "Deals damage equal to twice its power" (Polliwallop): that multiple. */ times?: number; /** "Each creature deals damage to itself equal to its power" (Wave of Reckoning): each of `a` to itself, all at once (`b` is `a`). */ self?: true; /** Compel Brutality: "Target planeswalker you control deals damage equal to its loyalty to ...": `a` is a planeswalker, the amount its loyalty (CR 306.5b) as this resolves. */ loyalty?: true }
   /**
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
@@ -3624,7 +3626,15 @@ export type Effect =
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
    */
-  | { type: "newTargets"; index: number }
+  | {
+      type: "newTargets";
+      index: number;
+      /**
+       * Goblin Flectomancer: "You may change the targets of target instant or sorcery spell" (CR 115.7a): every target
+       * changes to another legal one, or none does; if one can't change, none can (rulings).
+       */
+      allOrNone?: true;
+    }
   /**
    * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
    * becomes a permanent under their control (CR 110.2b). An instant or sorcery still goes to its owner's graveyard.
@@ -4543,6 +4553,8 @@ export type TriggerEvent =
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
+  /** Arashin War Beast: "Whenever ~ deals combat damage to one or more blocking creatures": once per combat damage step (rulings). */
+  | "selfDealsCombatDamageToBlockers"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
   | "ventureRoom" // a dungeon's room abilities (CR 309.4c) and the initiative's (CR 726.2), fired by the game
   | "monarchDamaged"
@@ -5119,6 +5131,17 @@ export interface TriggeredAbility {
   firstDealtEachTurn?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
+  /**
+   * Canal Courier: "Whenever ~ and another creature attack different players": it attacks a player, and another creature
+   * declared as an attacker with it attacks another player; attacking a planeswalker isn't attacking a player (rulings).
+   */
+  othersAtAnotherPlayer?: true;
+  /**
+   * Creepy Puppeteer: "Whenever ~ attacks, if you attacked with exactly one other creature this combat": exactly one other
+   * creature was declared as an attacker with it, and "that creature" (the trigger's subject) is that one. Having attacked
+   * stays true, so the intervening if (CR 603.4) holds as it resolves.
+   */
+  oneOtherAttacker?: true;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
   withOthersType?: string;
   /** "Whenever this token and at least one other creature token attack": only tokens count among the others. */

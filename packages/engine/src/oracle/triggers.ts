@@ -34,6 +34,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:the|each|each player's) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
+  // Arashin War Beast: once per combat damage step, however many blocking creatures it dealt combat damage to (rulings).
+  [/^Whenever ~ deals combat damage to one or more blocking creatures, (.+)$/, "selfDealsCombatDamageToBlockers"],
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   // "Whenever ~ attacks an opponent" (Kaalia of the Vast): every player it can attack is an opponent (CR 506.2, 102.3).
   [/^Whenever ~ attacks (?:a player|an opponent), (.+)$/, "selfAttacks"],
@@ -169,7 +171,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -286,6 +288,13 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!filter || filter.kind !== "object" || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
     const body = parseBody(byMany[2]!, { subjectIt: true, defending: true });
     return body ? { event: "selfBecomesBlocked", body, host: "attached", blockFilter: { ...filter, text: byMany[1]! } } : "fail";
+  }
+  // Fractured Loyalty: "Whenever enchanted creature becomes the target of a spell or ability, that spell or ability's
+  // controller gains control of that creature": the player who controls that spell or ability as it targets (CR 115.10),
+  // for good (a control effect with no duration, CR 611.2a).
+  if (m[2] === "creature" && !m[1] && !yours && /^becomes the target of a spell or ability, that spell or ability's controller gains control of that creature\.?$/.test(m[3]!)) {
+    const body = parseBody("that player gains control of that creature.", { subject: true, eventPlayer: true });
+    return body ? { event: "selfBecomesTarget", targeted: {}, body, host: "attached" } : "fail";
   }
   const byOne = m[2] === "creature" && !m[1] && !yours ? /^becomes blocked by a creature, (.+)$/.exec(m[3]!) : null;
   if (byOne) {
@@ -893,8 +902,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
   // "A spell that targets only a single artifact or creature you control" (Vesuvan Duplimancy): every target it has is
   // that one permanent (rulings), which "that artifact or creature" is.
+  // Reflective Golem: "an instant or sorcery spell that targets only ~": every target it has is this permanent (rulings
+  // on Zada: several targets all naming it count).
+  const onlySelf = / that targets only ~$/.exec(what);
+  if (onlySelf) what = what.slice(0, onlySelf.index);
   const onlyM = / that targets only a single (.+)$/.exec(what);
-  let targetsOnly: TargetSpec | undefined;
+  let targetsOnly: TargetSpec | "self" | undefined = onlySelf ? "self" : undefined;
   if (onlyM) {
     what = what.slice(0, onlyM.index);
     const spec = parseTargetPhrase(onlyM[1]!);
@@ -990,7 +1003,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const tgtsMany = !!tgtsM && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
   if (tgtsMany) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
-  const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
+  const subjectRef = targetsOnly && onlyM && text.includes(`that ${onlyM[1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
     // Read as the subject, whatever it is now (rulings: as it last existed, if it left).
     text = text.replaceAll(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`, "that creature");
@@ -3003,6 +3016,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (type && !CREATURE_TYPES.has(type)) return "fail";
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
     return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
+  }
+  // Creepy Puppeteer (TriggeredAbility.oneOtherAttacker): "you may have that creature's base power and toughness become
+  // 4/3 until end of turn" is a may (CR 603.5), a P/T-setting effect in layer 7b until the cleanup step.
+  const puppet = /^Whenever ~ attacks, if you attacked with exactly one other creature this combat, you may have that creature's base power and toughness become (\d+)\/(\d+) until end of turn\.?$/.exec(line);
+  if (puppet) {
+    const inner = parseBody(`That creature has base power and toughness ${puppet[1]}/${puppet[2]} until end of turn.`, { subject: true });
+    if (!inner || inner.targets.length) return "fail";
+    const text = `you may have that creature's base power and toughness become ${puppet[1]}/${puppet[2]} until end of turn.`;
+    return { event: "selfAttacks", oneOtherAttacker: true, body: { targets: [], effects: [{ type: "may", effects: inner.effects, text }], text } };
+  }
+  // Canal Courier: "Whenever ~ and another creature attack different players" (TriggeredAbility.othersAtAnotherPlayer).
+  const apart = /^Whenever ~ and another creature attack different players, (.+)$/.exec(line);
+  if (apart) {
+    const t = parseTrigger(`Whenever ~ attacks, ${apart[1]}`);
+    return t && t !== "fail" && t.event === "selfAttacks" && !t.host ? { ...t, othersAtAnotherPlayer: true } : "fail";
   }
   // Glimmer Lens: "Whenever equipped creature and at least one other creature attack, draw a card": the equipped
   // creature attacking with others, as attackers are declared (CR 508.1, 508.3a).

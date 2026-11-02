@@ -1281,6 +1281,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
+      // Rocket Launcher: under its controller since before their most recent turn began (that one, if it's theirs); never
+      // before they've had a turn.
+      if (cond.is === "controlledSinceYourTurnBegan") {
+        const began = s.players.find((p) => p.id === you)?.turnBegan;
+        return src.zone === "battlefield" && began !== undefined && src.controlledSinceTurn < began;
+      }
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
       // CR 702.171b; Caustic Bronco gone before its ability resolves: saddled as it last existed (rulings, CR 608.2h).
       if (cond.is === "saddled") {

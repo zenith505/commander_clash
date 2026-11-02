@@ -1,7 +1,7 @@
 # Roadmap
 
-29,408 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,425 of
+29,417 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,434 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -110,7 +110,7 @@ line blocks.
    with mana of any type), Zurzoth, Chaos Rider ("one or more Devils attack one or more players", "those
    players"), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
-   anywhere other than your hand"), The Master, Transcendent ("milled this turn"), Everlasting Torment (all damage as
+   anywhere other than your hand"), Everlasting Torment (all damage as
    though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
    opponent at random, then that player or their planeswalker), Ragost, Deft Gastronaut (artifacts become Foods with a
    granted ability), Observed Stasis ("remove enchanted creature from combat"), Eshki, Temur's Roar ("that spell's
@@ -151,8 +151,7 @@ line blocks.
    spell targets a commander you control ... instead"), Killer Service (pay mana and sacrifice as one "may" cost),
    Sapling of Colfenor (gain toughness and lose power from the revealed card). Round 170 went down the list to Cloud,
    Planet's Champion (rank 7,020), skipping over the cards still listed by `npm run popular`.
-   Out after round 171, each needing a piece of its own: Haakon, Stromgald Scourge (cast only from the graveyard, and
-   Knight spells from the graveyard), Averna, the Chaos Bloom (a land among the cards cascade exiles), Anax, Hardened
+   Out after round 171, each needing a piece of its own: Averna, the Chaos Bloom (a land among the cards cascade exiles), Anax, Hardened
    in the Forge ("if the creature had power 4 or greater, create two ... instead"), Armory Automaton
    ("attach any number of target Equipment"),
    Chandra, Spark Hunter (+2: "sacrifice an artifact or discard a card. If you do"), Phyrexian Unlife and Lich's Tomb
@@ -392,7 +391,7 @@ line blocks.
    graveyard"), Strong (life from radiation), Energybending, Gran-Gran, granted "spells your opponents cast that target
    ~ cost more" (Jubilant Skybonder, Callaphe), Reverse the Polarity, Corrupted Crossroads (mana for devoid spells),
    Shadow, Mysterious Assassin.
-   Out after round 185 (looked at, not done): Liesa, Shroud of Dusk (commander tax paid as 2 life each time), Font of
+   Out after round 185 (looked at, not done): Font of
    Agonies (no event for paying life), Angel of Jubilation and Yasharn (which costs pay life or sacrifice, every cost
    path audited), Whirlwind Denial (one payment prompt per spell and ability), Crucible of the Spirit Dragon (X mana in
    any combination).
@@ -411,8 +410,7 @@ line blocks.
    after its instruction, checked in turn), Commodore Guff, Sigarda's Summons, Prismatic Undercurrents.
    Out after round 186 (looked at, not done): Interdimensional Web Watch (mana spendable only on spells cast from
    exile: a spell's ManaUse doesn't know its zone, as for Mm'menon), Barrow-Blade ("that creature loses all abilities" for a blocker or
-   blocked creature), Ironsoul Enforcer ("~ or a commander you control attacks alone"), Smirking Spelljacker (exile
-   target spell, cast it later), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
+   blocked creature), Ironsoul Enforcer ("~ or a commander you control attacks alone"), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
    Schemes ("an exiled card with flashback you own" as a target), Archon of Coronation (damage that doesn't cause life loss).
    Round 187 went on from the top: "the greatest mana value of a commander you own on the battlefield or in the command
    zone" (the Visions cycle's flashback costs {X} less, Cloudkill, Majestic Genesis, Imposing Grandeur with each
@@ -444,7 +442,7 @@ line blocks.
    Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
    came back on every other player's turn.
    Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
-   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"),
+   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Earthshape, Sigarda's Splendor ("note your life total"),
    Ochre Jelly, Green Sun's Twilight, Industrial Advancement, Froghemoth.
    Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
    Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
@@ -476,7 +474,7 @@ line blocks.
    card").
    Out after round 190 (looked at, not done): Sewer Nemesis (done in Lane B's round B21, left to it), Aether Refinery
    ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park, Case of the
-   Uneaten Feast, Raul, Trouble Shooter (cards milled this turn), Cait Sith, Scouring Swarm, Brigid's back face, Bring to
+   Uneaten Feast, Cait Sith, Scouring Swarm, Brigid's back face, Bring to
    Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
    Appropriation, Ixhel, Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
@@ -1742,6 +1740,21 @@ line blocks.
    turn, create a token that's a copy of ~, except the token isn't legendary" (Living Laser); "For each mana from a Desert
    spent to cast this spell" (Cataclysmic Prospecting: mana from a Desert is tracked like mana from a Treasure). +9 (29,359
    of 31,936 with B84 to B86).
+   Round 254 (the top of the list and earlier skip lists): "During your turn, you may cast a spell from among cards in
+   your graveyard that were milled this turn. Do this only once each turn" (Raul, Trouble Shooter: a card put there
+   without a mill doesn't count, rulings); "put target creature card in a graveyard that was milled this turn onto the
+   battlefield under your control. It's a green Mutant with base power and toughness 3/3" (The Master, Transcendent);
+   "rather than pay {2} for each previous time you've cast it from the command zone this game, pay 2 life that many
+   times" (Liesa, Shroud of Dusk: the command zone and the cast prompt show the tax in life, with a browser test; CR
+   903.8); "Choose one of them. You may play that card this turn" (Chandra, Flameshaper's +2); "put a creature card
+   with mana value less than or equal to the number of lands you control onto the battlefield from your hand or
+   graveyard with two +1/+1 counters on it" (Nissa of Shadowed Boughs); "Instant and sorcery cards in your graveyard
+   have retrace" as an emblem (Wrenn and Six); "Treasures you control are Equipment in addition to their other types
+   and have 'Equipped creature gets +2/+0,' 'Equip Pirate {1},' and 'Equip {3}'" (Gemcutter Buccaneer: equip with a
+   creature type, with a browser test); "You may cast ~ from your graveyard, but not from anywhere else" and Knight
+   spells from your graveyard (Haakon, Stromgald Scourge: not from the command zone either, rulings); "exile target
+   spell an opponent controls ... you may cast the exiled card without paying its mana cost" (Smirking Spelljacker:
+   the exiled card is linked to the enters ability, CR 607.2a). +9 (29,407 of 31,936 with B84 to B89).
    Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
    a memory counter); Arna Kennerüd, Skycaptain (token copies of the Auras and Equipment attached to a creature, entering
    attached to it); Imodane, the Pyrohammer ("an instant or sorcery spell you control that targets only a single creature
@@ -1892,8 +1905,8 @@ line blocks.
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
    Dream-Thief's Bandana, Chandra, Legacy of Fire, Theoretical Duplication,
-   Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant,
-   Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs, Chandra, Flameshaper,
+   Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Crystalline Giant,
+   Kaervek, the Punisher, Obsessive Pursuit,
    Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
    Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of
@@ -2382,7 +2395,7 @@ line blocks.
    Left from the batch triggers, channel and graveyard round:
    - "That many basic land cards" (Settle the Wreckage) is still out.
    - "You may cast this card from your graveyard" works with a condition or extra costs; still out: "or from exile"
-     (Squee, the Immortal), "but not from anywhere else" (Haakon), "if a creature not named ~ died this turn"
+     (Squee, the Immortal), "if a creature not named ~ died this turn"
      (Ebondeath), "and/or" in its cost (Demilich), "rather than paying its mana cost" (Worldheart Phoenix, Scourge of
      Nel Toth), "using its blitz / bestow / mutate / warp ability".
    - Exiling from a graveyard: one player's choice works; "each player exiles a card from their graveyard" (Augusta),
@@ -4788,7 +4801,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   chosen type until the end of that turn" (Giant Slug); "When you cast this spell from your hand, copy it if you control
   an artifact, then copy it if you control an enchantment" (Banish into Fable); "You may cast spells with mana value less
   than or equal to the number of creatures you control from your hand without paying their mana costs" (Omnipresence).
-  +10 (29,368 of 31,936 with B86 to B89 and rounds 248 and 249; 29,408 with rounds 250 to 253).
+  +10 (29,368 of 31,936 with B86 to B89 and rounds 248 and 249; 29,417 with rounds 250 to 254).
 - Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (targeting any card in exile), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
@@ -4924,8 +4937,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 
 - Layer 3 (text-changing effects).
 - "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing X counters
-  and "then" riders (Biogenic Upgrade), divided prevention (Remedy), on a
-  planeswalker (Chandra, Flameshaper); "up to X target" with an X that isn't the spell's own (Rats' Feast, Martyr of
+  and "then" riders (Biogenic Upgrade), divided prevention (Remedy); "up to X target" with an X that isn't the spell's own (Rats' Feast, Martyr of
   Bones' "up to X target cards from a single graveyard").
 - "Costs {1} less for each target", reductions of colored mana, "the first face-down / kicked spell you cast each
   turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".

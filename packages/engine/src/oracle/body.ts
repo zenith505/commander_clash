@@ -5542,7 +5542,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // of your next turn, you may play that card, and you may spend mana as though it were mana of any color to cast it."
     // The same from that library, a spell cast with mana of any type (CR 609.4b); the rest stay exiled (rulings).
     const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top ${NUMX} cards of (your|target opponent's) library$`).exec(s);
-    const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))(, and you may spend mana as though it were mana of any color to cast it)?\.?$/.exec(sentences[si + 2] ?? "") : null;
+    // Chandra, Flameshaper: "Exile the top three cards of your library. Choose one. You may play that card this turn.": the
+    // same, "one" being one of the exiled cards (rulings: costs paid and timing followed as usual).
+    const playChosen = exChoose2 && /^Choose one(?: of them)?\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))(, and you may spend mana as though it were mana of any color to cast it)?\.?$/.exec(sentences[si + 2] ?? "") : null;
     if (exChoose2 && playChosen) {
       const who = exChoose2[2] === "your" ? undefined : parsePlayer("target opponent", ctx);
       if (who === null) return null;
@@ -6742,10 +6744,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // The Key to the Vault, after "You may exile a nonland card from among them. Put the rest on the bottom ...": cast as
     // this resolves, or it stays exiled (rulings).
-    if (/^You may cast the exiled card without paying its mana cost$/.test(s)) {
-      const last = effects[effects.length - 1];
-      if (last?.type !== "dig" || last.into !== "exile" || last.count !== 1 || last.play || last.castFree || last.each || !last.filter?.notTypes?.includes("Land")) return null;
-      last.castFree = true;
+    // Otherwise (Smirking Spelljacker's, with nothing before it) it's the card a linked exile took (sentences/zones.ts).
+    const keyLast = effects[effects.length - 1];
+    if (/^You may cast the exiled card without paying its mana cost$/.test(s) && (effects.length || ctx.spell)) {
+      if (keyLast?.type !== "dig" || keyLast.into !== "exile" || keyLast.count !== 1 || keyLast.play || keyLast.castFree || keyLast.each || !keyLast.filter?.notTypes?.includes("Land")) return null;
+      keyLast.castFree = true;
       continue;
     }
     // Diluvian Primordial, after its "for each opponent, you may cast ...": the spells cast this way.
@@ -12639,6 +12642,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [noAbilities[1]!] }, { kind: "loseAllAbilities" }];
       continue;
     }
+    // The Master, Transcendent: "Put target creature card ... onto the battlefield under your control. It's a green Mutant
+    // with base power and toughness 3/3. (It loses its other colors and creature types.)": the permanent it became, from
+    // then on (CR 611.2c), its color (layer 5), creature types (layer 4, CR 205.1a) and base power and toughness (layer 7b,
+    // over a characteristic-defining ability's, rulings) set as it enters.
+    const itsColorType = /^It's an? (white|blue|black|red|green) ([A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)$/.exec(s);
+    if (itsColorType) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(`a ${itsColorType[1]} ${itsColorType[2]} with base power and toughness ${itsColorType[3]}/${itsColorType[4]}`);
+      if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n || prev.alsoMods || !mods || !CREATURE_TYPES.has(itsColorType[2]!)) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
     // Hellcat, Undying Vigilante: "When ~ dies, return it to the battlefield ... with a +1/+1 counter on it. It loses all
     // abilities and gains haste": the permanent the card became, from then on (CR 611.2c, 400.7), in that order in layer 6
     // (CR 613.7), so it keeps haste.
@@ -13467,7 +13482,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
-    // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
+    // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect); "you may
+    // cast the exiled card ..." (Smirking Spelljacker) too.
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
     // "You may put a permanent card from your hand onto the battlefield for each free vote" (Selvala's Stampede): up to
@@ -13482,7 +13498,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

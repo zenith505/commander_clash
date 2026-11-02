@@ -983,6 +983,16 @@ export function compile(d: CardDef): CompiledCard {
       out.mayhemLand = true;
       continue;
     }
+    // Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else": a permission to cast it
+    // from there, paying its costs at its normal timing, and no other zone, whatever else lets you (rulings; castProblem).
+    if (line === "You may cast ~ from your graveyard, but not from anywhere else.") {
+      (out.fromGraveyard ??= []).push({ kind: "permission", costs: [], exile: false });
+      out.castOnlyFromGraveyard = true;
+      continue;
+    }
+    // Haakon: "As long as ~ is on the battlefield, you may cast Knight spells from your graveyard": a static ability works
+    // only on the battlefield anyway (CR 113.6), so the same as the line without it.
+    if (/^As long as ~ is on the battlefield, you may cast [A-Z][a-z]+ spells from your graveyard\.$/.test(line)) line = line.replace(/^As long as ~ is on the battlefield, you/, "You");
     const yard = parseGraveyardKeyword(line, d);
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);
@@ -2363,6 +2373,24 @@ export function compile(d: CardDef): CompiledCard {
           out.landFromGraveyardOnce = "shared";
           out.landFromGraveyardArrived = "fromLibrary";
         }
+      }
+      continue;
+    }
+    // Liesa, Shroud of Dusk: the commander tax (CR 903.8) paid as life, never with mana (rulings; game.ts commanderTaxLife).
+    if (line === "Rather than pay {2} for each previous time you've cast ~ from the command zone this game, pay 2 life that many times.") {
+      out.commanderTaxAsLife = true;
+      continue;
+    }
+    // Raul, Trouble Shooter: "Once during each of your turns, you may cast a spell from among cards in your graveyard that
+    // were milled this turn": one use each turn, any spell (a land card can't be cast, CR 305.9), only a card a mill put
+    // there this turn (rulings: not one put there from the library without the word "mill"); costs paid and timing
+    // followed as usual, and another permission doesn't use this one up.
+    if (line === "Once during each of your turns, you may cast a spell from among cards in your graveyard that were milled this turn.") {
+      const filter = parseTargetPhrase("nonland card from a graveyard");
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: "cards milled this turn" }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], arrived: "milled" });
       }
       continue;
     }
@@ -5731,6 +5759,13 @@ function linkExile(out: CompiledCard) {
     const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown");
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
     else imprints[0]!.linked = true;
+  }
+  // Smirking Spelljacker: "you may cast the exiled card" is the spell its enters ability exiled (CR 607.2a), its only exile.
+  if ([...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "playLinked" && e.castOnly))) {
+    const spells = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "counterSpell" }> => e.type === "counterSpell" && !!e.exileSpell && !e.cause && !e.plot && !e.ownerMayCost && !e.n);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "exileTop" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "counterSpell");
+    if (spells.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(casts an exiled card it can't link to one exile ability)");
+    else spells[0]!.linked = true;
   }
   // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its
   // imprint ability exiled (CR 607.2a), its only exile.

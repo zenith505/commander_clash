@@ -4432,10 +4432,13 @@ function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): bool
 
 /**
  * A card put into its graveyard this turn from a library (Kagha, Shadow Archdruid), or from anywhere other than the
- * battlefield (Banon, the Returners' Leader). Any later zone change makes it a new object that wasn't (CR 400.7).
+ * battlefield (Banon, the Returners' Leader), or milled this turn (Raul, Trouble Shooter). Any later zone change makes it a new object that wasn't (CR 400.7).
  */
-function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notFromBattlefield"): boolean {
+function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notFromBattlefield" | "milled"): boolean {
   if (o.zone !== "graveyard" || o.toGraveyardTurn !== s.turn) return false;
+  // Raul, Trouble Shooter: "milled this turn", only a card put there by a mill (CR 701.13a), not one put there from the
+  // library some other way (rulings).
+  if (how === "milled") return o.milledTurn === s.turn;
   return how === "fromLibrary" ? o.fromLibraryTurn === s.turn : o.fromBattlefieldTurn !== s.turn;
 }
 
@@ -4800,8 +4803,19 @@ export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbil
   return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
-export function commanderTax(p: Player, o: GameObject) {
+export function commanderTax(p: Player, o: GameObject, d?: CardDef) {
+  // Liesa, Shroud of Dusk: paid as life instead (commanderTaxLife), never with mana (rulings).
+  if (d && compileCard(d).commanderTaxAsLife) return 0;
   return 2 * (p.commanderCasts[o.id] ?? 0); // CR 903.8
+}
+
+/**
+ * Liesa, Shroud of Dusk: "Rather than pay {2} for each previous time you've cast ~ from the command zone this game, pay 2
+ * life that many times": the commander tax (CR 903.8) as a life payment, an additional cost (CR 118.8, 601.2f-h). It
+ * isn't optional, and other additional costs are still paid as usual (rulings).
+ */
+export function commanderTaxLife(p: Player, o: GameObject, d: CardDef): number {
+  return compileCard(d).commanderTaxAsLife ? 2 * (p.commanderCasts[o.id] ?? 0) : 0;
 }
 
 /**
@@ -4865,6 +4879,9 @@ export function castProblem(
   if (choices?.alt === "convert" && (choices.face ?? o.face) !== 1) return `${defOf(s, o).name} is cast converted with its back face up`;
   // A defeated Siege is cast transformed, or not at all (CR 310.12b).
   if (siegeCastTransformed(s, pid, o) && (choices?.face ?? o.face) !== 1) return `${defOf(s, o).name} can only be cast transformed`;
+  // Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else", even with another effect's
+  // permission (rulings: not from the hand or the command zone). A face-down spell has no such ability (CR 708.2).
+  if (!choices?.faceDown && !o.faceDown && o.zone !== "graveyard" && o.zone !== "stack" && compileCard(defOf(s, o)).castOnlyFromGraveyard) return `${defOf(s, o).name} can be cast only from your graveyard`;
   if (choices?.face !== undefined && o.face !== choices.face) {
     // A split card's half, a modal double-faced card's face, an Adventure: only that face is looked at (CR 709.3a,
     // 712.11c, 715.3a).
@@ -5112,7 +5129,7 @@ export function castProblem(
     const tp = targets ? targetProblem(s, specs, targets, pid, sq) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
-  const tax = fromCommand ? commanderTax(p, o) : 0;
+  const tax = fromCommand ? commanderTax(p, o, d) : 0;
   // "Pay X life", "discard X cards": X can be in an additional cost, or the flashback cost paid, too (CR 107.3a).
   const manaX = parseManaCost(d.manaCost).hasX;
   const costX = costsHaveX(d, choices);
@@ -5341,10 +5358,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const kicked = anyType(lessColored(parseManaCost(kickCost + moreMana)));
     const kx = x * xCount(kicked);
     // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
-    const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
+    const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
     return costAtLeast(s, { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) });
   }
-  const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
+  const tax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
@@ -6044,7 +6061,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Spliced cards' text, after the spell's own (CR 702.47c); the cards stay in your hand, revealed.
   if (body && choices.splice?.length) body = withSplices(body, splicedBodies(s, choices.splice));
   const fromCommand = o.zone === "command";
-  const tax = fromCommand ? commanderTax(p, o) : 0;
+  const tax = fromCommand ? commanderTax(p, o, d) : 0;
+  const taxLife = fromCommand ? commanderTaxLife(p, o, d) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
@@ -6227,7 +6245,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -6238,7 +6256,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const returned: LastKnown = {};
   const discarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge"));
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}), taxLife }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge"));
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
@@ -6944,7 +6962,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -6965,7 +6983,10 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // resolves (CR 702.35a).
   const madnessPend = s?.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.player === pid ? s.pending : undefined;
   const madnessLife = madnessPend && s!.objects[madnessPend.objectId] && defOf(s!, s!.objects[madnessPend.objectId]!).name === d.name ? (compileCard(d).madnessLife ?? 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  // Liesa, Shroud of Dusk: the commander tax as life, cast from the command zone (commanderTaxLife).
+  const taxObj = s && choices?.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+  const taxLife = choices?.taxLife ?? (s && pid !== undefined && taxObj?.zone === "command" ? commanderTaxLife(player(s, pid), taxObj, d) : 0);
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).

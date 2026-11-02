@@ -1390,6 +1390,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
   if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
+  if (/^you've played a land or cast a spell this turn from anywhere other than your hand$/.test(text)) return { kind: "playedOrCastNotFromHand" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   // Sandstalker Moloch: "if an opponent cast a blue and/or black spell this turn", a spell of either color or both.
@@ -1810,6 +1811,11 @@ export function parseAffected(subject: string): Affects | null {
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
   }
+  // Verdeloth the Ancient: "Saproling creatures and other Treefolk creatures": anyone's creatures of either type, a Saproling
+  // Treefolk once; the source itself only while it's a Saproling (rulings).
+  const andOther = /^([A-Z][a-z]+) creatures and other ([A-Z][a-z]+) creatures$/.exec(x);
+  if (andOther && CREATURE_TYPES.has(andOther[1]!) && CREATURE_TYPES.has(andOther[2]!))
+    return { kind: "filter", types: ["Creature"], subtypes: [andOther[1]!, andOther[2]!], selfOnlyAs: [andOther[1]!] };
   // Caterwauling Boggart: "Goblins you control and Elementals you control": creatures of either type, a Goblin Elemental once.
   const twoGroups = /^([A-Z][a-z]+) you control and ([A-Z][a-z]+) you control$/.exec(x);
   if (twoGroups) {

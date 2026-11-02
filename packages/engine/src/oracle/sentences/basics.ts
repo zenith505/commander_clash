@@ -1352,6 +1352,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Innocuous Researcher: "If you do, you can't cast spells until your next turn": until this effect's controller's next
   // turn begins (CR 611.2b), as "Until your next turn, you can't cast spells".
+  // Irencrag Feat: "You can cast only one more spell this turn" (rulings: however many were cast before it).
+  if (/^[Yy]ou can cast only one more spell this turn$/.test(s)) return [{ type: "cantCast", who: { ref: "you" }, oneMore: true }];
   if (/^[Yy]ou can't cast spells until your next turn$/.test(s)) return [{ type: "cantCast", who: { ref: "you" }, untilYourNextTurn: true }];
   // Hope of Ghirapur: "Until your next turn, target player ... can't cast noncreature spells": until this effect's
   // controller's next turn begins (CR 611.2b).

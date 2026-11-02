@@ -201,9 +201,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const ch = o && view(o);
       if (!o || !ch) return 0;
-      const printed = ch.hasPrintedAbilities ? compileCard(defOf(s, o)).triggers.map((tr) => /^Bushido (\d+):/.exec(tr.body.text)) : [];
+      const printed = ch.hasPrintedAbilities ? compileCard(defOf(s, o)).triggers.map((tr) => /^Bushido (\d+|X):/.exec(tr.body.text)) : [];
       const granted = ch.grantedAbilities.map((g) => /^Bushido (\d+)$/i.exec(g));
-      return [...printed, ...granted].reduce((n, x) => n + (x ? Number(x[1]) : 0), 0);
+      // Fumiko the Lowblood's bushido X: the number of attacking creatures now (an attacking permanent is a creature, CR 506.4).
+      const attacking = () => s.battlefield.filter((id) => s.objects[id]?.attacking !== undefined).length;
+      return [...printed, ...granted].reduce((n, x) => n + (x ? (x[1] === "X" ? attacking() : Number(x[1])) : 0), 0);
     }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
@@ -410,6 +412,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "surveilTopThisWay":
+      return s.resolving?.surveilTop ?? 0;
     case "bouncedThisWayPower":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).reduce((n, b) => n + Math.max(0, b.power ?? 0), 0);
     case "preventedByRule":
@@ -561,7 +565,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greaterOf":
       return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
-      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
+      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + ((c.fromHandOrLibrary ? s.turnLog?.toGraveyardFromHandOrLibrary : s.cardsToGraveyardThisTurn)?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
       return s.resolving?.commanderMv ?? 0;
     case "commandersMv": {
@@ -635,6 +639,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
       return o ? manaSymbolsOf(defOf(s, o).manaCost, [c.color]) : 0;
+    }
+    case "castSpellTargets": {
+      // Each target it was cast with (CR 115.1), an "up to" slot left empty not counting; fixed once it's cast.
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return (item?.targets ?? []).filter((t) => t.kind !== "none").length;
     }
     case "castSpellCommanderCasts": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
@@ -1169,6 +1178,8 @@ function describeCount(c: Count): string {
       return "#spells countered";
     case "poisonLostThisWay":
       return "#poison counters lost";
+    case "surveilTopThisWay":
+      return "#cards put on top";
     case "bouncedThisWayCount":
       return "#returned";
     case "bouncedThisWayPower":
@@ -1321,7 +1332,7 @@ function describeCount(c: Count): string {
     case "greaterOf":
       return `max(${describeCount(c.of[0])}, ${describeCount(c.of[1])})`;
     case "cardsToGraveyardThisTurn":
-      return "#cards put into that graveyard this turn";
+      return c.fromHandOrLibrary ? "#cards put into that graveyard from hand or library this turn" : "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "chosenCommanderMv":
@@ -1395,6 +1406,8 @@ function describeCount(c: Count): string {
       return "that spell's colors";
     case "castSpellManaSymbols":
       return `that spell's ${c.color} mana symbols`;
+    case "castSpellTargets":
+      return "that spell's targets";
     case "colorsOf":
       return "its colors";
     case "castSpellCommanderCasts":

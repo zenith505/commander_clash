@@ -180,8 +180,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const alsoN = e.alsoAmount !== undefined ? amountNow(s, e.alsoAmount, ctx) : undefined;
       const all = [...parts(e.to), ...(e.also ?? []).flatMap((to) => parts(to).map((x) => (alsoN === undefined ? x : { ...x, n: alsoN })))];
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
-      const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : [];
-      const by = typeof e.by === "object" && "ref" in e.by ? grantSourceSource(s, e.by) : e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target, e.by.lastKnown) : ctxSource(s, ctx);
+      const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : e.by === "amassed" ? objects(s, { ref: "amassed" }, ctx) : [];
+      const by = typeof e.by === "object" && "ref" in e.by ? grantSourceSource(s, e.by) : e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" || e.by === "amassed" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target, e.by.lastKnown) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable || (e.unpreventableX !== undefined && (ctx.x ?? 0) >= e.unpreventableX) || (e.unpreventableIf && staticConditionNow(s, e.unpreventableIf, ctx.sourceId ?? "", ctx.controller, undefined, undefined, ctx.sourceZc)) ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -276,6 +276,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "cantCast":
       for (const pid of players(s, e.who, ctx)) {
+        if (e.oneMore) {
+          // Irencrag Feat: one more spell this turn, counted from now (rulings); it doesn't lift any other ban.
+          const cast = (s.castThisTurn ?? []).filter((c) => c.player === pid).length;
+          (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, source: src, afterCasts: cast + 1 });
+          log(s, `${player(s, pid).name} can cast only one more spell this turn.`);
+          continue;
+        }
         (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), source: src, ...(e.untilYourNextTurnEnds ? { untilEndOfTurnOf: ctx.controller } : {}), ...(e.untilYourNextTurn ? { untilTurnOf: ctx.controller } : {}), ...(e.duringTheirNextTurn ? { untilEndOfTurnOf: pid, duringTheirNextTurn: true as const } : {}) });
         log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells ${e.duringTheirNextTurn ? "during their next turn" : e.untilYourNextTurnEnds ? `until the end of ${player(s, ctx.controller).name}'s next turn` : e.untilYourNextTurn ? `until ${player(s, ctx.controller).name}'s next turn` : "this turn"}.`);
       }

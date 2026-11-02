@@ -902,6 +902,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // symbols are of their colors, CR 107.4e-f); "create that many" is that number of them.
   const symM = !pw && !kwM && !xM ? / with one or more (white|blue|black|red|green) mana symbols in its mana cost$/.exec(what) : null;
   if (symM) what = what.slice(0, symM.index);
+  // Voracious Bibliophile: "a spell with one or more targets, draw that many cards": as many as it was cast with.
+  const tgtsM = !pw && !kwM && !xM && !symM && !tg ? / with one or more targets$/.exec(what) : null;
+  if (tgtsM) what = what.slice(0, tgtsM.index);
   const symColor = symM ? (({ white: "W", blue: "U", black: "B", red: "R", green: "G" }) as const)[symM[1] as "white"] : undefined;
   // Lullmage's Familiar: "Whenever you cast a kicked spell": its kicker cost was paid as it was cast (CR 702.33d).
   const kickedM = /^kicked(?: spell)?$/.exec(what);
@@ -950,6 +953,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
   const symMany = !!symColor && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
   if (symMany) text = text.replace(/\bthat many\b/g, "X");
+  const tgtsMany = !!tgtsM && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
+  if (tgtsMany) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
   const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
@@ -964,8 +969,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
+  if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

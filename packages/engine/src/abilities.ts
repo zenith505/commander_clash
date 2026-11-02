@@ -163,6 +163,8 @@ export type Count =
   | { kind: "revealedSharedMv" }
   /** Augusta, Order Returned: "when one or more nonland cards are exiled this way, put that many ...": the cards the chooseFromGraveyard before moved (ResolvingState.yardChosen), only those like `filter`. */
   | { kind: "yardChosenThisWay"; filter?: TargetSpec }
+  /** "Equal to half that card's mana value" after "exile an instant or sorcery card from your graveyard" (Torrent Sculptor): the mana values of the cards this resolution chose from a graveyard and exiled, added up. */
+  | { kind: "yardChosenMv" }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
@@ -2337,7 +2339,7 @@ export type Effect =
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
-      youMay?: { anyType?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
+      youMay?: { anyType?: true; /** "You may play it for as long as you control ~" (Victor Mancha, Runaway): while the source stays this object under your control (GameObject.mayPlay "whileControlled"). */ whileControlled?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
       /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */
@@ -4687,6 +4689,8 @@ export type TriggerEvent =
    * (CR 701.14) one of yours is in, and once when blockers are declared if one or more of yours became blocked (rulings).
    */
   | "yourCreaturesFightOrBlocked"
+  /** "Whenever one or more creatures you control become blocked" (Hezrou): once when blockers are declared if one or more of yours became blocked (CR 509.3c). */
+  | "yourCreaturesBecomeBlocked"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
   /** "When you discard ~" (Titanbones, Towering Heart): the card's ability, wherever it went (as with cycling). */
@@ -5007,6 +5011,8 @@ export interface TriggeredAbility {
   /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
   ifDamagedThisTurn?: number;
   /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
+  /** "When ~ dies, if it's not a Spirit, ..." (Otherworldly Escort): an intervening if (CR 603.4) on its subtypes as it last existed (CR 603.10a). */
+  ifNotSubtype?: string;
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
@@ -5070,6 +5076,8 @@ export interface TriggeredAbility {
   ifCasualty?: boolean;
   /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
   ifBargained?: boolean;
+  /** "When it enters this way" after "~ escapes with ..." (Pharika's Spawn): only when it escaped (CR 702.138c). */
+  ifEscaped?: true;
   /** "When ~ enters, if evidence was collected, ..." (CR 701.59c, an intervening if). */
   ifEvidence?: boolean;
   /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */

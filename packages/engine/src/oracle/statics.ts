@@ -993,6 +993,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const b = parseStaticCondition("there is a Desert card in your graveyard", st);
     return a && b ? { kind: "anyOf", conds: [a, b] } : null;
   }
+  // Earth Rumble Wrestlers: "as long as you control a land creature or a land entered the battlefield under your control
+  // this turn": either one.
+  if (/^you control a land creature or a land entered the battlefield under your control this turn$/.test(text)) {
+    const a = parseStaticCondition("you control a land creature", st);
+    const b = parseStaticCondition("a land entered the battlefield under your control this turn", st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
+  }
   // Swimmer in Nightmares: "as long as there are ten or more cards in a single graveyard": any player's.
   if ((m = new RegExp(`^there are ${NUM} or more cards in a single graveyard$`).exec(text))) return parseStaticCondition(`a graveyard has ${m[1]} or more cards in it`, st);
   // Avatar of Woe: "If there are ten or more creature cards total in all graveyards": every player's together.

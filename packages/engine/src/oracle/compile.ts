@@ -3671,6 +3671,17 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Pharika's Spawn: "~ escapes with two +1/+1 counters on it. When it enters this way, each opponent sacrifices ...": the
+    // counters (CR 702.138c) and a trigger only when it escaped.
+    const escThisWay = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\. When it enters this way, (.+)$`).exec(line);
+    if (escThisWay) {
+      const t = parseTrigger(`When ~ enters, if it escaped, ${escThisWay[2]}`);
+      if (t && t !== "fail" && !out.escapesWith) {
+        out.escapesWith = num(escThisWay[1]!);
+        out.triggers.push(t);
+        continue;
+      }
+    }
     // Heaped Harvest: "When ~ enters and when you sacrifice it, ...": two triggers doing the same.
     const andSac = /^When ~ enters and when you sacrifice it, (.+)$/.exec(line);
     if (andSac) {
@@ -4752,6 +4763,19 @@ export function compile(d: CardDef): CompiledCard {
       const who = /^Equipped /.test(boonLine) ? "Equipped" : "Enchanted";
       const [a, b] = [parseStatic(`${who} creature gets ${boon[1]}.`), parseStatic(`${who} creature ${boon[3]}.`)];
       if (yes && no && a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
+        continue;
+      }
+    }
+    // Armament of Nyx: "Enchanted creature has double strike as long as it's an enchantment. Otherwise, prevent all damage
+    // that would be dealt by enchanted creature.": one or the other by whether it's an enchantment now, checked
+    // continuously (rulings, CR 611.3a).
+    const nyx = /^Enchanted creature has ([a-z ]+) as long as it's an enchantment\. Otherwise, prevent all damage that would be dealt by enchanted creature\.$/.exec(line);
+    if (nyx) {
+      const [a, b] = [parseStatic(`Enchanted creature has ${nyx[1]}.`), parseStatic("Prevent all damage that would be dealt by enchanted creature.")];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition && a.mods.every((m) => m.kind === "addKeywords")) {
+        const yes: TargetSpec = { kind: "object", types: ["Creature"], allTypes: ["Enchantment"], text: "enchantment creature" };
+        const no: TargetSpec = { kind: "object", types: ["Creature"], notTypes: ["Enchantment"], text: "nonenchantment creature" };
         out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
         continue;
       }

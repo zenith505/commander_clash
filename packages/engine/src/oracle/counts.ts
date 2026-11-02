@@ -65,6 +65,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Umbris, Fear Manifest: "for each card your opponents own in exile": face down or not (like Cosmogoyf), however they
+  // got there (rulings).
+  if (each && /^card your opponents own in exile$/.test(p)) return { count: { kind: "cardsInExile", who: { ref: "eachOpponent" } } };
+  // Huskburster Swarm: "for each creature card you own in exile and in your graveyard": face-up ones in exile (a face-down
+  // card has no characteristics, CR 406.3, 708.2).
+  if (each && /^creature card you own in exile and in your graveyard$/.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, graveyardToo: true } };
   // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named
   // ~": face-up ones only (rulings), either kind counted once.
   if (!each && (m = /^the total number of cards you own in exile and in your graveyard that are ([A-Z][a-z]+)s or are named ~$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) {
@@ -282,6 +288,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const b = parseCount(`the greatest toughness among ${m[1]}`, ctx);
     if (!a || !b || a.times || a.plus || a.half || a.negate || b.times || b.plus || b.half || b.negate) return null;
     return { count: { kind: "greater", of: [a.count, b.count] } };
+  }
+  // Alena, Kessig Trapper: "the greatest power among creatures you control that entered this turn": the ones on the
+  // battlefield now that came onto it this turn, whoever controlled them then and whatever they were (rulings).
+  if (!each && /^the greatest power among creatures you control that entered this turn$/.test(p)) {
+    const c = parseCount("the greatest power among creatures you control", ctx);
+    return c && "count" in c && c.count.kind === "greatestPower" ? { count: { ...c.count, filter: { ...c.count.filter, enteredThisTurn: true, text: "creatures you control that entered this turn" } } } : null;
   }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).

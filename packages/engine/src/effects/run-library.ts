@@ -99,6 +99,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const ids = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         if (!ids.length) continue;
         s.resolving!.revealedUntilCount += ids.length;
+        if (e.exile) {
+          // Umbris: exiled one at a time until a land card is (CR 701.13a), all of them face up.
+          log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+          for (const id of ids) moveObject(s, id, "exile");
+          continue;
+        }
         log(s, `${p.name} reveals ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} and puts ${ids.length === 1 ? "it" : "them"} into their graveyard.`);
         for (const id of ids) moveObject(s, id, "graveyard");
       }

@@ -531,6 +531,11 @@ export function compile(d: CardDef): CompiledCard {
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
+      // Outlaws' Merriment: "choose one at random. Create a red and white creature token with those characteristics. • 3/1
+      // Human Warrior with trample and haste. ...": each mode is creating that token (the mode chosen as the trigger is put
+      // on the stack, rulings).
+      .replace(/^(At the beginning of your upkeep, choose one at random)\. Create an? ([a-z]+(?: and [a-z]+)?) creature token with those characteristics\.((?:\n• \d+\/\d+ [A-Z][a-z]+(?: [A-Z][a-z]+)* with [^\n]+)+)$/m, (_, head: string, colors: string, modes: string) =>
+        `${head} —${modes.replace(/\n• (\d+\/\d+) ([A-Z][a-z]+(?: [A-Z][a-z]+)*) with ([^\n]+)/g, (_m: string, pt: string, types: string, rest: string) => `\n• Create a ${pt} ${colors} ${types} creature token with ${rest}`)}`)
       // Gargantuan Leech: "~ costs {1} less to cast for each Cave you control and each Cave card in your graveyard": the two
       // reductions together (CR 601.2f).
       .replace(/^(~ costs \{\d+\} less to cast for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
@@ -4657,6 +4662,14 @@ export function compile(d: CardDef): CompiledCard {
     // it had flash": both for the same spell, the first such one you cast this turn, counting those cast before it was on
     // the battlefield (rulings). The flash is checked as you'd begin casting it (CR 601.3), the reduction as its cost is
     // determined (CR 601.2f): its generic part only.
+    // The Blue Spirit: "You may cast the first creature spell you cast each turn as though it had flash": the flash alone.
+    const firstFlashOnly = /^You may cast the first (creature |artifact |noncreature )?spell you cast each turn as though it had flash\.$/.exec(line);
+    if (firstFlashOnly) {
+      const spec = firstFlashOnly[1] ? parseTargetPhrase(`${firstFlashOnly[1]}spell`) : { kind: "spell" as const, text: "spell" };
+      if (spec?.kind !== "spell" || spec.controller) out.unsupported.push(raw);
+      else (out.flashForFirst ??= []).push({ ...spec, text: `${firstFlashOnly[1] ?? ""}spells` });
+      continue;
+    }
     const firstFlash = /^(The first (.*?)spell you cast each turn) (costs \{\d+\} less to cast) and can be cast as though it had flash\.$/.exec(line);
     if (firstFlash) {
       const c = parseCostChange(`${firstFlash[1]} ${firstFlash[3]}.`);

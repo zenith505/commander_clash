@@ -223,8 +223,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (st.step ??= 0; st.step < e.effects.length; st.step++) if (runEffect(s, e.effects[st.step]!, ctx) === "paused") return "paused";
         for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (k !== "repeat" && !st.keep.includes(k)) delete sc[k];
         st.step = undefined;
+        // Valgavoth's Onslaught: each pass's face-down creature, kept for "each of those creatures" afterwards.
+        if (e.gather) st.gathered = [...(st.gathered ?? []), ...(s.resolving!.created ?? [])];
         if (--st.left > 0) log(s, `${src} repeats the process.`);
       }
+      if (e.gather) s.resolving!.created = (st.gathered ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
       sc.repeat = undefined;
       return;
     }

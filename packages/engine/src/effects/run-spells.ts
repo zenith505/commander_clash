@@ -913,7 +913,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         return !!o && characteristics(s, o).types.some((ty) => PERMANENT_TYPES.includes(ty));
       })());
-      const done = counterOnStack(s, ctx, t.id, src, e.unless, exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      // Desertion: an artifact or creature spell by its types on the stack; a copy ceases to exist as usual (CR 707.10a).
+      const toField = !!e.battlefieldIf && (() => {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        return !!o && !o.spellCopy && !item!.copy && characteristics(s, o).types.some((ty) => e.battlefieldIf!.types!.includes(ty));
+      })();
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, toField ? "battlefield" : exileIt ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
       // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
       const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;
@@ -981,7 +987,7 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
   return o && !o.faceDown ? defOf(s, o).name : undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice", bounce?: true): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
@@ -1055,14 +1061,16 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   }
   s.stack.splice(i, 1);
   const spent = item.objectId ? s.objects[item.objectId]?.manaSpent : undefined;
-  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" || (instead === "libraryChoice" && !bottom) ? { top: true } : {});
+  // Desertion: onto the battlefield under the countering spell's controller's control, never cast (rulings).
+  if (item.objectId && instead === "battlefield") moveObject(s, item.objectId, "battlefield", { controller: ctx.controller });
+  else if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" || (instead === "libraryChoice" && !bottom) ? { top: true } : {});
   // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
   const gone = item.objectId && s.objects[item.objectId];
   // "The amount of mana spent to cast that spell" (Mana Sculpt): as it was on the stack.
   if (gone && (item.x || spent) && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x ?? 0, ...(spent ? { manaSpent: spent } : {}) };
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   if (gone && gone.zone === "exile" && !gone.spellCopy && item.kind === "spell" && s.resolving) s.resolving.counteredExiled = { id: gone.id, zc: gone.zoneChanges ?? 0 };
-  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
+  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "battlefield" ? ` and puts it onto the battlefield under ${player(s, ctx.controller).name}'s control` : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
   if (item.kind === "spell" && s.resolving) {
     s.resolving.spellCountered = true;

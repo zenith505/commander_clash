@@ -1,7 +1,7 @@
 # Roadmap
 
-29,128 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,348 of
+29,142 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,362 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -158,18 +158,16 @@ line blocks.
    Knight spells from the graveyard), Averna, the Chaos Bloom (a land among the cards cascade exiles), Anax, Hardened
    in the Forge ("if the creature had power 4 or greater, create two ... instead"), Armory Automaton
    ("attach any number of target Equipment"), Glen Elendra's Answer
-   (counter all spells and abilities opponents control), Desertion (a countered card put onto the battlefield instead),
+   (counter all spells and abilities opponents control),
    Chandra, Spark Hunter (+2: "sacrifice an artifact or discard a card. If you do"), Phyrexian Unlife and Lich's Tomb
    and Transcendence (life at 0 or less with damage as infect, a sacrifice per life lost, life gained per life lost),
    Cult
    Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
    doesn't remove Auras", done in round B71), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
    each of its colors), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
-   Bones (a battlefield return then "another" to the hand), Locket of Yesterdays (cards with the same name as the spell), Huskburster Swarm (creature cards you own in
-   exile and in your graveyard), Urdnan, Dromoka Warrior (double strike
+   Bones (a battlefield return then "another" to the hand), Urdnan, Dromoka Warrior (double strike
    "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (a Pirate returned with
-   base power and toughness 4/4), Alena, Kessig Trapper (the
-   greatest power among creatures that entered this turn), Kyoshi Island Plaza (Shrines you control). Round 171 went down the list to Hunter's Blowgun (rank
+   base power and toughness 4/4). Round 171 went down the list to Hunter's Blowgun (rank
    7,721), skipping over the cards still listed by `npm run popular`.
    Out after round 172: Primal Growth ("Kicker—Sacrifice a creature": a kicker that isn't mana needs its own cast
    choice and prompt), Plague Reaver ("return it to the battlefield under that player's control at the
@@ -181,8 +179,7 @@ line blocks.
    Out after round 173: Godsend (exiling one of the creatures blocking or blocked by the equipped creature, and
    "can't cast spells with the same name as a card exiled with ~"), The Red Terror (a damage trigger for any red
    source you control), Amped Raptor (casting a card by paying energy instead of its mana cost), Repeated
-   Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Outlaws' Merriment (a mode chosen
-   at random), Moldgraf Monstrosity (two creature cards at random from a graveyard), Hidetsugu and Kairi (life loss
+   Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Hidetsugu and Kairi (life loss
    between the exile and the free cast), Scuttlemutt ("the color or colors of your choice" needs a multi-color
    picker), Role Reversal, Shifting Loyalties, Daring Thief and The Trickster-God's Heist (two targets that "share a
    card type" or "permanent type": no target rule between two targets yet), Conjured Currency ("target permanent you
@@ -200,10 +197,9 @@ line blocks.
    Boone, Novac Guard (a reflexive damage trigger with "unless that creature's controller"), Spelltwine (casting copies
    of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
    Searchlight (another player adds the mana), Rat King, Verminister ("all other cards with the same name"),
-   Valgavoth's Onslaught (manifest dread X times), Motivated Pony ("untap those creatures" after a Food entered),
    Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse ("from anywhere other than your
    hand"), Captain America, First Avenger (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
-   March of Reckless Joy ("up to two of those cards"), Círdan the Shipwright (secret council for players), Dragonlord
+   Círdan the Shipwright (secret council for players), Dragonlord
    Kolaghan, Back for Seconds (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
    cost), Kamiz, Obscura Oculus, Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery, Thunderwave,
    Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Enchanted Evening, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
@@ -466,7 +462,7 @@ line blocks.
    Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
    came back on every other player's turn.
    Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
-   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"), Basri Ket's -2,
+   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"),
    Ochre Jelly, Kamahl's Druidic Vow, Green Sun's Twilight, Industrial Advancement, Froghemoth.
    Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
    Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
@@ -538,7 +534,7 @@ line blocks.
    Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts),
    Oath of Nissa, Sharae of Numbing Depths and Hylda ("becomes tapped by you"), Sigurd, Dog Umbra, Call for Aid, Narset
    of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
-   miracle), Coram, Brimaz, Mindleech Mass, The Blue Spirit, Requiem Monolith, Behemoth of
+   miracle), Coram, Brimaz, Mindleech Mass, Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
    graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
@@ -620,7 +616,7 @@ line blocks.
    next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
    Out after round 196 (looked at, not done): Tamiyo, the Moon Sage (emblem returns each card put into your graveyard),
    Tamiyo, Compleated Sage (a token named after her short name), Proteus Staff ("the rest on the bottom in any order"),
-   Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Umbris, Fear Manifest, Unidentified
+   Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
    Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
@@ -1621,6 +1617,31 @@ line blocks.
    Grimoire ("If that card is an enchantment card, it enters tapped and attacking": putFromHand onlyIf); Avatar Destiny
    (the Aura back to hand and up to one milled creature card); Lifeline (another creature on the battlefield, the card
    back at the next end step). +12 (29,128 of 31,936 with B78+B79).
+   Round 245 (top of the list, now done): "When ~ enters, search your library for up to X basic land cards, where X is
+   the number of Shrines you control" (Kyoshi Island Plaza: the Traverse the Outlands rewrite in a triggered ability);
+   "~ costs {1} less to cast for each creature card you own in exile and in your graveyard" (Huskburster Swarm: face-up
+   ones in exile); "Spells you cast cost {1} less to cast for each card with the same name as that spell in your
+   graveyard" (Locket of Yesterdays: CostMod perSameNameInGraveyard, the spell not counting itself, rulings); "return two
+   creature cards at random from your graveyard to the battlefield" (Moldgraf Monstrosity: together); "choose one at
+   random. Create a red and white creature token with those characteristics. • 3/1 Human Warrior ..." (Outlaws'
+   Merriment: each mode creates that token); "Manifest dread X times, then put X +1/+1 counters on each of those
+   creatures" (Valgavoth's Onslaught: repeat `gather`); "untap those creatures and they get an additional +2/+2" (Motivated
+   Pony); "You may play up to two of those cards until the end of your next turn" (March of Reckless Joy: impulse
+   oneOfMax); "the greatest power among creatures you control that entered this turn" (Alena, Kessig Trapper); "You may
+   cast the first creature spell you cast each turn as though it had flash" and "Whenever a nontoken creature you control
+   enters during combat" (The Blue Spirit); "for each card your opponents own in exile" and "target opponent exiles cards
+   from the top of their library until they exile a land card" (Umbris, Fear Manifest); "Whenever one or more nontoken
+   creatures attack this turn, create that many ... tapped and attacking" (Basri Ket's −2); "If an artifact or creature
+   spell is countered this way, put that card onto the battlefield under your control instead" (Desertion); "Choose
+   target creature you don't control. Each creature you control deals damage equal to its power to that creature"
+   (Kamahl's Will). +14 (29,142 of 31,936 with B78+B79).
+   Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
+   battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
+   creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
+   toughness); Jace, Architect of Thought (+1 needs an "until your next turn" attack trigger for opponents' creatures,
+   −8 a search of every library and casting the cards); Rat King, Verminister ("and all other cards with the same name as
+   that card"); Noctis, Heir Apparent (its "enters during combat" line now compiles; Warp-Strike's return at that player's
+   next declare attackers step doesn't).
    Out after round 244 (looked at, not done): Reed Richards, Smartest Man ("the first time you would draw a card each
    turn except the first in your draw step, draw four instead": needs a place among the draw replacements the player
    orders, CR 616.1); The First Tyrannic War I ("if its mana cost contains {X}": a copy's cost counts, rulings, and the
@@ -1711,7 +1732,7 @@ line blocks.
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
-   Verminister, Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the
+   Verminister; and from before round 172: Grindstone, Halo Forager, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
    Jolted Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
@@ -2248,7 +2269,7 @@ line blocks.
      turn".
    - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works, also for each player
      (Exhume, Crypt Champion); still out: Infernal Offering (its other part), "at random"
-     (Moldgraf Monstrosity, Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
+     (Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
      spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron).
    Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,
    Balancing Act, exhaust and boast):
@@ -2477,7 +2498,6 @@ line blocks.
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
-     Random modes still out: Outlaws' Merriment.
    Left from the round after Seasons (lists of targets, Vivid, Gates/Deserts/Caves, counts):
    - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
      to the battlefield (they enter at the same time; Thwart the Grave also has commas inside one target), and "it" or
@@ -2533,8 +2553,7 @@ line blocks.
      verse counters, monstrosity, kicker count); target counts with a group condition ("with total mana value 8 or
      less", "with different controllers", "that each have a different mana value", "with equal toughness"); "for each
      creature destroyed/exiled this way, its controller creates" (Descent of the Dragons, Hour of Need); "Shuffle any
-     number of target cards from your graveyard into your library"; "Choose target creature you don't control. Each
-     creature you control deals damage equal to its power to that creature" (Kamahl's Will).
+     number of target cards from your graveyard into your library".
    - "Activate only if" mana abilities still out: "~ is a creature" (Flywheel Racer), "three or more lands with the
      same name", counters on ~ (Pyramid of the Pantheon, Tablet of Compleation).
    - An activated mana ability whose body isn't a plain "Add ..." (Leafkin Druid's "add {G}{G} instead") can't be

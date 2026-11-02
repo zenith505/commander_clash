@@ -2411,6 +2411,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of picked) moveObject(s, id, "hand");
         return;
       }
+      // Moldgraf Monstrosity: "two creature cards at random ... to the battlefield": put there at the same time.
+      if (count > 1 && e.dest === "battlefield") {
+        const left = [...pool];
+        const picked: string[] = [];
+        while (left.length && picked.length < count) picked.push(left.splice(Math.floor(nextRandom(s) * left.length), 1)[0]!);
+        log(s, `${src}: ${picked.map((id) => defOf(s, obj(s, id)).name).join(" and ")}, chosen at random, ${picked.length > 1 ? "are" : "is"} put onto the battlefield from ${p.name}'s graveyard${p.id === ctx.controller ? "" : ` under ${player(s, ctx.controller).name}'s control`}.`);
+        enterTogether(s, () => {
+          for (const id of picked) moveObject(s, id, "battlefield", { controller: ctx.controller }); // CR 110.2a
+        });
+        return;
+      }
       const o = obj(s, pool[Math.floor(nextRandom(s) * pool.length)]!);
       const d = defOf(s, o);
       if (e.dest === "hand") {
@@ -3340,13 +3351,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
         // Nahiri: free only if it's an Equipment card.
         const free = e.free && (!e.freeFor || printedMatches(e.freeFor, defOf(s, o)));
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.life ? { life: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.attackedWithCommander ? { attackedWithCommander: true as const } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(oneOf && e.oneOfMax ? { oneOfMax: e.oneOfMax } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.life ? { life: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}), ...(e.attackedWithCommander ? { attackedWithCommander: true as const } : {}), ...(e.ifControl ? { ifControl: e.ifControl } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.spellFilter && e.oneOf ? `${/^[aeiou]/i.test(e.spellFilter.text) ? "an" : "a"} ${e.spellFilter.text.replace(/ card$/, "")} spell from among them` : e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.freeFor ? `, ${e.freeFor.text.replace(/ card$/, "")} spells with or without paying their mana costs` : e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextTurn" ? " until their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : e.until === "yourNextUpkeep" ? " until their next upkeep" : e.until === "duringNextTurn" ? " during their next turn" : e.until === "whileControlled" ? ` for as long as they control ${ctx.sourceId ? defOf(s, obj(s, ctx.sourceId)).name : "it"}` : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}${e.attackedWithCommander ? " during any turn they attacked with a commander" : ""}${e.ifControl ? ` while they control ${/^[AEIOU]/.test(e.ifControl.text) ? "an" : "a"} ${e.ifControl.text}` : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.oneOfMax ? `up to ${e.oneOfMax} of them` : e.spellFilter && e.oneOf ? `${/^[aeiou]/i.test(e.spellFilter.text) ? "an" : "a"} ${e.spellFilter.text.replace(/ card$/, "")} spell from among them` : e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.freeFor ? `, ${e.freeFor.text.replace(/ card$/, "")} spells with or without paying their mana costs` : e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextTurn" ? " until their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : e.until === "yourNextUpkeep" ? " until their next upkeep" : e.until === "duringNextTurn" ? " during their next turn" : e.until === "whileControlled" ? ` for as long as they control ${ctx.sourceId ? defOf(s, obj(s, ctx.sourceId)).name : "it"}` : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}${e.attackedWithCommander ? " during any turn they attacked with a commander" : ""}${e.ifControl ? ` while they control ${/^[AEIOU]/.test(e.ifControl.text) ? "an" : "a"} ${e.ifControl.text}` : ""}.`);
       return;
     }
   }

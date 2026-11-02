@@ -540,6 +540,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // (linked in compile.ts).
   if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card type they share with cards exiled with ~$/.exec(text)))
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells" }, n: -Number(m[1]), perTypeSharedWithLinked: true, text: line } };
+  // Locket of Yesterdays: "Spells you cast cost {1} less to cast for each card with the same name as that spell in your
+  // graveyard" (a name in common is the same name, CR 201.2a; the spell on the stack doesn't count itself, rulings).
+  if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card with the same name as that spell in your graveyard$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", text: "spells" }, n: -Number(m[1]), perSameNameInGraveyard: true, text: line } };
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).

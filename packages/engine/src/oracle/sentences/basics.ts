@@ -1297,6 +1297,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
   // Terraformer: "Choose a basic land type. Each land you control becomes that type until end of turn."
   if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
+  // Illusionary Presence, Barbarian Guides: "Choose a land type." as it resolves: any land type (CR 205.3i), for "landwalk
+  // of the chosen type" after it.
+  if (/^[Cc]hoose a land type$/.test(s)) return [{ type: "choose", choice: "landType" }];
   // "Choose odd or even." (Extinction Event): as it resolves; "of the chosen quality" after it (zero is even).
   if (/^Choose odd or even$/i.test(s)) return [{ type: "choose", choice: "parity" }];
   // Abundant Harvest: "Choose land or nonland." as it resolves; "a card of the chosen kind" after it.

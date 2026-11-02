@@ -4987,7 +4987,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "splitTargets") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -5229,6 +5229,20 @@ function Controls({
         {pending.options.map((o) => (
           <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             <ManaCost cost={`{${({ Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" } as Record<string, string>)[o] ?? "C"}}`} size="sm" /> {o}
+          </button>
+        ))}
+      </div>
+    );
+  // "Choose a land type" (Traveler's Cloak, Illusionary Presence, Barbarian Guides): any land type, basic or not.
+  if (pending?.kind === "chooseOption" && pending.what === "landType" && pending.player === HUMAN)
+    return (
+      <div className="controls color-pick">
+        <span>
+          <strong>{pending.source}:</strong> choose a land type
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
           </button>
         ))}
       </div>

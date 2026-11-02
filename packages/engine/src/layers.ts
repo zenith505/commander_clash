@@ -1563,7 +1563,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors)) {
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {

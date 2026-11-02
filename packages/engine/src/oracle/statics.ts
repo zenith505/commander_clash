@@ -1679,6 +1679,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const kinds = [m[1]!, m[2]].filter((x): x is string => !!x);
     return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(kinds.length > 1 ? { anyOf: kinds.map((k): TargetSpec => ({ kind: "object", subtypes: [k], text: k })) } : { subtypes: kinds }), text: `${kinds.join(" or ")} creature` } };
   }
+  // Insubordination: "unless that creature attacked this turn" (read as "if enchanted creature didn't attack this turn"):
+  // the creature it's attached to as the ability resolves, not declared as an attacker this turn (CR 508.1a).
+  if (text === "enchanted creature didn't attack this turn") return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "didntAttackThisTurn", text: "creature that didn't attack this turn" } };
   // Stunning Strike: "As long as enchanted creature isn't legendary": the creature it's attached to, as it is now.
   if ((m = /^enchanted creature (is|isn't) legendary$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(m[1] === "is" ? { supertypes: ["Legendary"] } : { notSupertypes: ["Legendary"] }), text: `${m[1] === "is" ? "" : "non"}legendary creature` } };
   // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).

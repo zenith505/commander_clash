@@ -904,6 +904,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const v = (o: string) => groupValue(s, pid, { targets: [], effects: either.options[Number(o)]!, text: "" }) ?? 0;
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
     }
+    // Retribution, Cannibalize: the picked target is the one hit hardest, so our own least worthy creature, or an
+    // opponent's most worthy one.
+    if (pend.kind === "chooseOption" && pend.what === "splitTargets" && s.resolving) {
+      const targets = s.resolving.item.targets ?? [];
+      const v = (o: string) => {
+        const t = targets[Number(o)];
+        const c = t?.kind === "object" ? s.objects[t.id] : undefined;
+        return !c ? 0 : (controllerOf(s, c) === pid ? -1 : 1) * worth(s, pid, c);
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -3889,7 +3900,10 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
-  if (what === "basicLandType") return chooseLandType(s, pid, options);
+  // Illusionary Presence, Barbarian Guides, Traveler's Cloak, Giant Slug: landwalk of the chosen type, so the type most
+  // opponents control a land of (a snow one for snow landwalk).
+  if ((what === "landType" || what === "basicLandType") && /landwalk of the chosen type/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, /snow landwalk of the chosen type/.test(card?.oracleText ?? ""));
+  if (what === "basicLandType" || what === "landType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   // "The color or colors of your choice": one color is enough, the one it would choose alone.
   if (what === "colors") return chooseOption(s, pid, "color", card, options);
@@ -6103,6 +6117,16 @@ const LAND_COLOR: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B"
  * "Target land becomes the basic land type of your choice" (Reef Shaman): our own land makes the color our hand and
  * commander need most; an opponent's makes a color their commander can't use.
  */
+/** The land type the most opponents control a land of (a snow land for snow landwalk), the first one on a tie. */
+function chooseLandwalkType(s: GameState, pid: PlayerId, options: string[], snow: boolean): string {
+  const score = (t: string) => s.players.filter((p) => p.id !== pid && !p.lost).filter(({ id: op }) => s.battlefield.some((id) => {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    return controllerOf(s, o) === op && c.types.includes("Land") && c.subtypes.includes(t) && (!snow || c.supertypes.includes("Snow"));
+  })).length;
+  return options.reduce((best, t) => (score(t) > score(best) ? t : best), options[0]!);
+}
+
 function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string {
   const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
   const owner = t?.kind === "object" && s.objects[t.id] ? controllerOf(s, obj(s, t.id)) : pid;

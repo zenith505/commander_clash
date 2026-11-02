@@ -3196,6 +3196,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf044267-92b9-4983-964f-2bc4ecf76bce",
+  "name": "Cannibalize",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose two target creatures controlled by the same player. Exile one of those creatures and put two +1/+1 counters on the other.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c411f4e-a091-447c-9450-d895b10b4985",
   "name": "Carnage Tyrant",
   "manaCost": "{4}{G}{G}",
@@ -5290,6 +5316,33 @@
   "set": "cmm",
   "releasedAt": "2023-08-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "195107ad-879d-4b02-a44a-a3ba70fedf88",
+  "name": "Desert",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Desert",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Desert"
+  ],
+  "oracleText": "{T}: Add {C}.\n{T}: This land deals 1 damage to target attacking creature. Activate only during the end of combat step.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21875,6 +21928,36 @@
   "commanderLegal": "legal",
   "set": "mom",
   "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5241182d-e2ca-4b31-809f-fbff2822dbf6",
+  "name": "Traveler's Cloak",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAs this Aura enters, choose a land type.\nWhen this Aura enters, draw a card.\nEnchanted creature has landwalk of the chosen type. (It can't be blocked as long as defending player controls a land of that type.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

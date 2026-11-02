@@ -2071,6 +2071,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
+        // Rage Extractor: "a spell with {H} in its mana cost": a Phyrexian mana symbol of any color, hybrid ones too (CR 107.4f).
+        if (t.cast.phyrexianInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).symbols.some((x) => x.kind === "phyrexian" || (x.kind === "hybrid" && x.phyrexian)))) return false;
         // "With one or more blue mana symbols in its mana cost" (Namor): the same mana cost.
         if (t.cast.manaSymbol && !(spell && manaSymbolsOf(defOf(s, spell).manaCost, [t.cast.manaSymbol]) > 0)) return false;
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).

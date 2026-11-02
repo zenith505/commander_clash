@@ -135,6 +135,10 @@ export function canonicalKeyword(text: string): string | undefined {
   const k = SUPPORTED_LOWER.get(p);
   if (k) return k;
   if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
+  // Traveler's Cloak, Illusionary Presence: "landwalk of the chosen type"; Barbarian Guides: "snow landwalk of the chosen
+  // type" (CR 702.14a, c): bound to the land type chosen as it entered or resolved.
+  if (p === "landwalk of the chosen type") return CHOSEN_LANDWALK;
+  if (p === "snow landwalk of the chosen type") return CHOSEN_SNOW_LANDWALK;
   // "Hexproof from blue" (CR 702.11d): from a color, or from all of them, one or more than one.
   // "Hexproof from activated and triggered abilities" (Volatile Stormdrake): from abilities, not spells.
   // "Hexproof from planeswalkers" (Eradicator Valkyrie): from sources of a card type.
@@ -182,6 +186,11 @@ export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
 export const CHOSEN_KEYWORD = "(the chosen keyword)";
 /** "Gains landwalk of the chosen type" (Giant Slug): filled in with the landwalk of the basic land type chosen as it resolved (CR 702.14a). */
 export const CHOSEN_LANDWALK = "(landwalk of the chosen type)";
+/** "Gains snow landwalk of the chosen type" (Barbarian Guides): a snow land of the land type chosen as it resolved (CR 702.14c). */
+export const CHOSEN_SNOW_LANDWALK = "(snow landwalk of the chosen type)";
+/** The landwalk keyword of a chosen land type ("Swampwalk", "Gatewalk"), or its snow form ("Snow swampwalk", CR 702.14c). */
+export const chosenLandwalk = (k: string, landType: string | undefined): string[] =>
+  !landType ? [] : k === CHOSEN_SNOW_LANDWALK ? [`Snow ${landType.toLowerCase()}walk`] : [`${landType}walk`];
 /** "Have each of the chosen abilities" (Greymond, Avacyn's Stalwart): the keywords chosen as the source entered (Chosen.keywords). */
 export const CHOSEN_KEYWORDS = "(the chosen keywords)";
 /** "Protection from each of your opponents" (CR 702.16i, 702.16k): from each player who is an opponent of its controller. */
@@ -241,7 +250,7 @@ export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts",
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[]) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string, chosenKeywords?: readonly string[], ownColors?: readonly string[], landType?: string) =>
   keywords.flatMap((k) =>
     k === OWN_COLORS_HEXPROOF
       ? (ownColors ?? []).filter((c) => COLOR_WORD[c]).map((c) => `Hexproof from ${COLOR_WORD[c]}`)
@@ -253,6 +262,8 @@ export const bindChosenKeywords = (keywords: readonly string[], color: string | 
       ? cardType && CARD_TYPE_PLURAL[cardType] ? [`Protection from ${CARD_TYPE_PLURAL[cardType]}`] : []
       : k === CHOSEN_PROTECTION || k === CHOSEN_HEXPROOF
       ? color && COLOR_WORD[color] ? [`${k === CHOSEN_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[color]}`] : []
+      : k === CHOSEN_LANDWALK || k === CHOSEN_SNOW_LANDWALK
+      ? chosenLandwalk(k, landType)
       : k === IDENTITY_PROTECTION
         ? identity ? Object.keys(COLOR_WORD).filter((c) => !identity.includes(c)).map((c) => `Protection from ${COLOR_WORD[c]}`) : []
         : [k],
@@ -422,7 +433,10 @@ export function subtypeSet(st: string): "Creature" | "Land" | "Artifact" | "Ench
   return null;
 }
 
-const WALK_TYPES: Record<string, string> = { plains: "Plains", island: "Island", swamp: "Swamp", mountain: "Mountain", forest: "Forest", desert: "Desert" };
+/** Every land type (CR 205.3i), the basic ones first: "choose a land type" (Traveler's Cloak) offers these. */
+export const LAND_TYPE_LIST: readonly string[] = [...LAND_TYPES];
+// Landwalk of any land type (CR 702.14a): "islandwalk", "desertwalk", or one chosen ("Gatewalk", Traveler's Cloak).
+const WALK_TYPES: Record<string, string> = Object.fromEntries([...LAND_TYPES].map((t) => [t.toLowerCase(), t]));
 const WALK_SUPERTYPES: Record<string, { supertype: string; non?: true }> = { snow: { supertype: "Snow" }, legendary: { supertype: "Legendary" }, nonbasic: { supertype: "Basic", non: true } };
 
 /**
@@ -431,8 +445,8 @@ const WALK_SUPERTYPES: Record<string, { supertype: string; non?: true }> = { sno
  */
 export function landwalkLand(keyword: string): ((land: { types: string[]; subtypes: string[]; supertypes: string[] }) => boolean) | null {
   if (/^artifact landwalk$/i.test(keyword)) return (l) => l.types.includes("Land") && l.types.includes("Artifact");
-  const m = /^(?:(snow|legendary|nonbasic) )?(plains|island|swamp|mountain|forest|desert|land)walk$/i.exec(keyword);
-  if (!m || (!m[1] && m[2]!.toLowerCase() === "land")) return null;
+  const m = /^(?:(snow|legendary|nonbasic) )?([a-z'-]+)walk$/i.exec(keyword);
+  if (!m || (!m[1] && m[2]!.toLowerCase() === "land") || (m[2]!.toLowerCase() !== "land" && !WALK_TYPES[m[2]!.toLowerCase()])) return null;
   const sup = m[1] ? WALK_SUPERTYPES[m[1].toLowerCase()]! : undefined;
   const sub = WALK_TYPES[m[2]!.toLowerCase()];
   return (l) => l.types.includes("Land") && (!sup || l.supertypes.includes(sup.supertype) !== !!sup.non) && (!sub || l.subtypes.includes(sub));

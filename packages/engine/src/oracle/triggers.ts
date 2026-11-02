@@ -963,6 +963,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // symbols are of their colors, CR 107.4e-f); "create that many" is that number of them.
   const symM = !pw && !kwM && !xM ? / with one or more (white|blue|black|red|green) mana symbols in its mana cost$/.exec(what) : null;
   if (symM) what = what.slice(0, symM.index);
+  // Rage Extractor: "a spell with {H} in its mana cost" (Scryfall's {H} is the Phyrexian mana symbol): any Phyrexian mana
+  // symbol of any color, hybrid ones too, however it was paid (CR 107.4f, rulings).
+  const phyM = !pw && !kwM && !xM && !symM ? / with \{[HP]\} in its mana cost$/.exec(what) : null;
+  if (phyM) what = what.slice(0, phyM.index);
   // Voracious Bibliophile: "a spell with one or more targets, draw that many cards": as many as it was cast with.
   const tgtsM = !pw && !kwM && !xM && !symM && !tg ? / with one or more targets$/.exec(what) : null;
   if (tgtsM) what = what.slice(0, tgtsM.index);
@@ -1032,7 +1036,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -1826,6 +1830,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever one or more Halflings you control attack a player" (Meriadoc Brandybuck, Attuma, Crimson Cowl): likewise
   // once for each player those creatures attack, not a planeswalker or battle (rulings on Meriadoc Brandybuck).
+  // Whirlwind, Killer Cyclone: "one or more creatures you control that entered this turn attack a player": attackers that
+  // entered this turn, read as "creatures that entered this turn".
+  line = line.replace(/^Whenever one or more creatures you control that entered this turn attack a player, /, "Whenever one or more creatures that entered this turn you control attack a player, ");
   const groupAttacksAPlayer = /^Whenever one or more (.+?) you control attack a player, /.exec(line);
   if (groupAttacksAPlayer) {
     perPlayer = true;
@@ -2380,7 +2387,8 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Elrond, Moon-Reader: "Whenever you activate an ability of a creature, ..." with nothing about mana abilities: mana
   // abilities too (rulings).
-  const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent), (?!if it isn't a mana ability)(.+)$/.exec(line);
+  // Ceaseless Searblades: "of an Elemental": a permanent of that creature type (rulings: not a card in another zone).
+  const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent|Elemental), (?!if it isn't a mana ability)(.+)$/.exec(line);
   if (anyOf) {
     const f = parseTargetPhrase(anyOf[1]!);
     const body = parseBody(anyOf[2]!, { activatedAbility: true });
@@ -2656,6 +2664,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Beastmaster's Magemark: "Whenever a creature you control that's enchanted becomes blocked": the same as "an enchanted
     // creature you control" (enchanted by any Aura, anyone's).
     .replace(/^Whenever a creature you control that's enchanted becomes blocked, /, "Whenever an enchanted creature you control becomes blocked, ")
+    // Insubordination: "At the beginning of the end step of enchanted creature's controller, ~ deals 2 damage to that player
+    // unless that creature attacked this turn": "that creature" is the enchanted creature, checked as it resolves.
+    .replace(/^(At the beginning of the end step of enchanted creature's controller, ~ deals \d+ damage to that player) unless that creature attacked this turn\.$/, "$1 unless enchanted creature attacked this turn.")
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")

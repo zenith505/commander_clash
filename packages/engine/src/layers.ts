@@ -160,6 +160,8 @@ export interface Characteristics {
   mustAttackMostLife?: true;
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
+  /** Tanglewalker: "can't be blocked as long as defending player controls an artifact land" (CR 506.2, 509.1b). */
+  cantBeBlockedIfDefending?: TargetSpec[];
   /**
    * "Can't be the target of spells or abilities your opponents control" and the like. `of`: whose opponents, the
    * controller of the ability saying it (an Aura's controller, not the enchanted creature's: rulings on Canopy Cover).
@@ -675,6 +677,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
+    case "combatSinceYourLastUpkeep": {
+      const o = cond.of === "attached" ? (src.attachedTo !== undefined ? s.objects[src.attachedTo] : undefined) : src;
+      if (!o || o.zone !== "battlefield") return false;
+      // The turn of your previous upkeep: the one before this upkeep if it's yours now, else your latest (none yet: any).
+      const p = s.players[you];
+      const since = (p?.upkeepTurn === s.turn && s.step === "upkeep" ? p.lastUpkeepTurn : p?.upkeepTurn) ?? 0;
+      const turns = [...(cond.attacked ? [o.attackedTurns?.at(-1)] : []), ...(cond.blocked ? [o.blockedTurn] : []), ...(cond.wasBlocked ? [o.becameBlockedTurn] : [])];
+      return turns.some((t) => t !== undefined && t >= since);
+    }
     case "selfInCommand":
       return src.zone === "command";
     case "selfDamagedCreature":
@@ -1742,6 +1753,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "cantBeBlockedIfDefendingControls":
+      c.cantBeBlockedIfDefending = [...(c.cantBeBlockedIfDefending ?? []), m.filter];
       return;
     case "untargetable":
       c.untargetable = [...(c.untargetable ?? []), { ...m.by, of: e.controller ?? (e.sourceId ? chars.get(e.sourceId)?.controller : undefined) ?? c.controller }];

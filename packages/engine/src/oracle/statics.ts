@@ -92,6 +92,14 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     const st = parseConditionalStatic0(`As long as ${aloneHost[1]!.toLowerCase()} creature is attacking alone, it can't be blocked.`);
     return st && { ...st, text: line };
   }
+  // Tanglewalker: "Each creature you control can't be blocked as long as defending player controls an artifact land": the
+  // player each of those creatures is attacking (CR 506.2), as blockers are declared (CR 509.1b), not ~'s.
+  const eachUnblockable = /^Each creature you control can't be blocked as long as defending player controls an? ([a-z]+ [a-z]+|[A-Z][a-z]+)\.$/.exec(line);
+  if (eachUnblockable) {
+    const filter = parseTargetPhrase(eachUnblockable[1]!);
+    if (filter?.kind !== "object" || filter.controller) return null;
+    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "each creature you control" } }, mods: [{ kind: "cantBeBlockedIfDefendingControls", filter: { ...filter, text: eachUnblockable[1]! } }], text: line };
+  }
   // Zhao, the Moon Slayer: "As long as ~ has a conqueror counter on him, ...": "him" (normalized to ~) is it.
   const onSelf = /^(As long as ~ has an? [a-z]+ counter on) ~(, .+)$/.exec(line);
   if (onSelf) return parseConditionalStatic0(`${onSelf[1]} it${onSelf[2]}`);
@@ -739,6 +747,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // still takes off {2} (rulings); the exiled card is the one its imprint ability exiled (linked in compile.ts).
   if ((m = /^Spells you cast that share a card type with the exiled card cost \{(\d+)\} less to cast$/.exec(text)))
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
+  // Mistform Warchief: "Creature spells you cast that share a creature type with ~ cost {1} less to cast."
+  if ((m = /^Creature spells you cast that share a creature type with ~ cost \{(\d+)\} less to cast$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", types: ["Creature"], text: "creature spells that share a creature type with ~" }, n: -Number(m[1]), sharesCreatureTypeWithSelf: true, text: line } };
   // "Spells your opponents cast during your turn cost {1} more to cast" (Paladin Class): "During your turn, ...".
   text = text.replace(/^(\S.*? (?:you|your opponents) cast) during your turn (?=costs? \{\d+\} (?:less|more) to cast$)/, "During your turn, $1 ");
   const ofChosen = / of the chosen type costs? \{/.test(text);

@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type BatchTrigger, type CounterKind, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
+import { allEffects, type AbilityBody, type BatchTrigger, type CounterKind, type Effect, type ObjRef, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
 import { COUNTER, counterKind, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -714,6 +714,17 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const unless = { cost: mariner[2]! };
     const onlyYou = mariner[1] === "become";
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
+  }
+  // Rayne, Academy Chancellor: "Whenever you or a permanent you control becomes the target of a spell or ability an
+  // opponent controls, you may draw a card. You may draw an additional card if ~ is enchanted.": once for you and once for
+  // each permanent it targets (rulings), whether ~ is enchanted checked as it resolves (rulings: the "if" is no intervening
+  // "if"). Nothing in it about that spell or its controller.
+  const youOrYours = /^Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls, (.+)$/.exec(line);
+  if (youOrYours) {
+    const text = youOrYours[1]!.replace(/\. You may draw an additional card if ~ is enchanted\.$/, ". If ~ is enchanted, you may draw a card.");
+    if (/\b(?:it|its|that player|that spell|that permanent|that spell or ability)\b/.test(text)) return "fail";
+    const body = parseBody(text, {});
+    return body ? { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body } : "fail";
   }
   // Dormant Gomazoa: "Whenever you become the target of a spell, you may untap ~": any player's spell, not an ability, once
   // for each spell however many of its targets are you (rulings).
@@ -1777,6 +1788,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you attack a player (with one or more equipped creatures)": once for each player attacked, not a
   // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
   let perPlayer = false;
+  let exactly = false;
   // "When you attack with three or more creatures, transform ~" (Legion's Landing): "when" and "whenever" trigger alike.
   line = line.replace(/^When you attack with /, "Whenever you attack with ");
   // Path of Mettle: "Whenever you attack with at least two creatures that have first strike, double strike, vigilance,
@@ -1843,6 +1855,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     phrase = m[1];
     bodyText = m[2]!;
     anyone = true;
+  } else if ((m = /^Whenever you attack with exactly (two|three) creatures, (.+)$/.exec(line))) {
+    // Alluring Suitor: "When you attack with exactly two creatures": as many attackers as were declared, no more or fewer
+    // (one put onto the battlefield attacking wasn't declared and doesn't count, rulings; CR 508.1).
+    event = "creaturesYouControlAttack";
+    bodyText = m[2]!;
+    min = num(m[1]!);
+    exactly = true;
   } else if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more ((?:[^,]+?, )+and\/or [a-z ]+?|.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
@@ -2025,7 +2044,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(exactly ? { exactAttackers: true as const } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -2543,6 +2562,15 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  // Wiitigo: "At the beginning of your upkeep, put a +1/+1 counter on ~ if it has blocked or been blocked since your last
+  // upkeep. Otherwise, remove a +1/+1 counter from it." Shape of the Wiitigo: the same about enchanted creature, "if it
+  // attacked or blocked": checked as it resolves (not an intervening if, CR 603.4); none to remove, nothing happens.
+  const wiitigo = /^At the beginning of your upkeep, put a \+1\/\+1 counter on (~|enchanted creature) if it (has blocked or been blocked|attacked or blocked) since your last upkeep\. Otherwise, remove a \+1\/\+1 counter from it\.$/.exec(raw);
+  if (wiitigo) {
+    const what: ObjRef = wiitigo[1] === "~" ? { ref: "self" } : { ref: "attached" };
+    const cond: StaticCondition = wiitigo[2] === "attacked or blocked" ? { kind: "combatSinceYourLastUpkeep", of: wiitigo[1] === "~" ? "self" : "attached", attacked: true, blocked: true } : { kind: "combatSinceYourLastUpkeep", of: wiitigo[1] === "~" ? "self" : "attached", blocked: true, wasBlocked: true };
+    return { event: "yourUpkeep", body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond }, effects: [{ type: "counters", what, counter: "+1/+1", n: 1 }], otherwise: [{ type: "removeCounters", what, counter: "+1/+1", n: 1 }] }], text: raw.replace(/^At the beginning of your upkeep, /, "") } };
+  }
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
   // Leyline Phantom: "When ~ deals combat damage, ..." triggers each time, as "whenever" does (CR 603.2).
@@ -2589,6 +2617,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Clockwork Beast: "At end of combat, if ~ attacked or blocked this combat, remove a +1/+0 counter from it": the
     // intervening if (CR 603.4) is about ~, and so is "it".
     .replace(/^(At end of combat, if ~ attacked or blocked this combat, remove an? \S+ counter from) it\.$/, "$1 ~.")
+    // Thunderkin Awakener: "choose target Elemental creature card in your graveyard with toughness less than ~'s toughness.
+    // Return that card to the battlefield tapped and attacking": the same as returning that target.
+    .replace(/^(Whenever ~ attacks), choose target ([A-Z][a-z]+ creature card) in your graveyard (with toughness less than ~'s toughness)\. Return that card (to the battlefield tapped and attacking)\./, "$1, return target $2 $3 from your graveyard $4.")
+    // Daredevil Dragster: "At end of combat, if ~ attacked or blocked this combat, put a velocity counter on it. Then if it
+    // has two or more velocity counters on it, sacrifice it and draw two cards": every "it" is ~; its counters as it last
+    // existed if it's gone (rulings: you draw even though it can't be sacrificed).
+    .replace(/^(At end of combat, if ~ attacked or blocked this combat, put an? [a-z]+ counter on) it\. Then if it (has two or more [a-z]+ counters on it), sacrifice it and (draw two cards)\.$/, "$1 ~. Then if ~ $2, sacrifice ~ and $3.")
     // Beastmaster's Magemark: "Whenever a creature you control that's enchanted becomes blocked": the same as "an enchanted
     // creature you control" (enchanted by any Aura, anyone's).
     .replace(/^Whenever a creature you control that's enchanted becomes blocked, /, "Whenever an enchanted creature you control becomes blocked, ")

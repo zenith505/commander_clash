@@ -825,6 +825,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[1]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }];
   }
+  // Mikey & Mona, Mutant Sitters: "Target player chooses a creature they control and puts two +1/+1 counters on it": that
+  // player picks one as this resolves (not targeted) and is the one putting the counters (Hapatra's "whenever you put").
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) chooses a creature they control and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = pickFilter("creature");
+    return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }, { type: "counters", what: { ref: "created" }, counter: "+1/+1", n: m[2] === "a" ? 1 : m[2] === "two" ? 2 : 3, by: who }] : null;
+  }
   // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": that player picks as it
   // resolves (not targeted); "that creature" is the one picked.
   if ((m = /^([Tt]arget opponent|[Tt]arget player) chooses (an? [a-z]+) they control$/.exec(s))) {
@@ -954,6 +961,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^Remove all ${COUNTER} counters from all permanents$`, "i").exec(s))) {
     const what = parseObject("all permanents", ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
+  }
+  // Temporal Distortion: "At the beginning of each player's upkeep, remove all hourglass counters from permanents that
+  // player controls": the upkeep's player's permanents, every one of that kind from each.
+  if ((m = new RegExp(`^Remove all ${COUNTER} counters from permanents that player controls$`, "i").exec(s))) {
+    const what = parseObject("each permanent that player controls", ctx);
+    return what?.ref === "each" && what.of ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
   }
   // Heartmender: "remove a -1/-1 counter from each creature you control": one from each that has one.
   if ((m = new RegExp(`^Remove (a|all) ${COUNTER} counters? from (each creature you control)$`, "i").exec(s))) {

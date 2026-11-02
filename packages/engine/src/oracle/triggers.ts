@@ -2444,6 +2444,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Lifeline: "Whenever a creature dies, if another creature is on the battlefield, return the first card to the
+    // battlefield under its owner's control at the beginning of the next end step": another than the one that died, which
+    // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if
+    // it's still in the graveyard then, under its owner's control.
+    .replace(/^Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step\.$/, "Whenever a creature dies, if a creature is on the battlefield, return that card to the battlefield under its owner's control at the beginning of the next end step.")
     // Cursed Wombat's granted ability: "put an additional +1/+1 counter on it" is one more on that permanent, ~.
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.

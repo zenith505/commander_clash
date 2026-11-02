@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, applyAction, botActions, characteristics, controllerOf, defOf, destroyPermanent, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { abilitiesOf, applyAction, botActions, castProblem, characteristics, compileCard, harmfulTargets, controllerOf, defOf, destroyPermanent, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -60,6 +60,11 @@ const flameBurst = (): CardDef => ({"oracleId":"37e44e1c-481d-4f5d-b76b-036f40e9
 const farmhand = (): CardDef => ({"oracleId":"5f6aa548-0ab3-451f-b291-10cac3f3ea1a","name":"Diligent Farmhand","manaCost":"{G}","cmc":1,"typeLine":"Creature — Human Druid","supertypes":[],"types":["Creature"],"subtypes":["Human","Druid"],"oracleText":"{1}{G}, Sacrifice this creature: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\nIf this card is in a graveyard, effects from spells named Muscle Burst count it as a card named Muscle Burst.","power":"1","toughness":"1","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/7/b/7bb40e09-6855-46d5-9bc9-bc6b2b0d7653.jpg?1783945219","artUrl":"https://cards.scryfall.io/art_crop/front/7/b/7bb40e09-6855-46d5-9bc9-bc6b2b0d7653.jpg?1783945219","commanderLegal":"legal","set":"ody","releasedAt":"2001-10-01","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const muscleBurst = (): CardDef => ({"oracleId":"97487ea5-2bbd-4ef6-a870-7e9f2db5e5e0","name":"Muscle Burst","manaCost":"{1}{G}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Target creature gets +X/+X until end of turn, where X is 3 plus the number of cards named Muscle Burst in all graveyards.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/1/217dada5-7ffc-488b-8062-34c034906ea9.jpg?1783945215","artUrl":"https://cards.scryfall.io/art_crop/front/2/1/217dada5-7ffc-488b-8062-34c034906ea9.jpg?1783945215","commanderLegal":"legal","set":"ody","releasedAt":"2001-10-01","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const banner = (): CardDef => ({"oracleId":"a355908b-4359-4bfe-9bc4-ccf721ab3a13","name":"Konda's Banner","manaCost":"{2}","cmc":2,"typeLine":"Legendary Artifact — Equipment","supertypes":["Legendary"],"types":["Artifact"],"subtypes":["Equipment"],"oracleText":"Konda's Banner can be attached only to a legendary creature.\nCreatures that share a color with equipped creature get +1/+1.\nCreatures that share a creature type with equipped creature get +1/+1.\nEquip {2}","colors":[],"colorIdentity":[],"keywords":["Equip"],"imageUrl":"https://cards.scryfall.io/normal/front/b/9/b9292a61-e7a9-49a8-b0b1-16a2b3e95c6b.jpg?1787575221","artUrl":"https://cards.scryfall.io/art_crop/front/b/9/b9292a61-e7a9-49a8-b0b1-16a2b3e95c6b.jpg?1787575221","commanderLegal":"legal","set":"sld","releasedAt":"2026-09-14","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+const prayers = (): CardDef => ({"oracleId":"8d087fe0-d554-4d7c-ba22-32db2cf71887","name":"Primal Prayers","manaCost":"{2}{G}{G}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"When this enchantment enters, you get {E}{E} (two energy counters).\nYou may cast creature spells with mana value 3 or less by paying {E} rather than paying their mana costs. If you cast a spell this way, you may cast it as though it had flash.","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/4/c4eda3db-b47d-4f1e-a93d-e2ea747d935c.jpg?1783911257","artUrl":"https://cards.scryfall.io/art_crop/front/c/4/c4eda3db-b47d-4f1e-a93d-e2ea747d935c.jpg?1783911257","commanderLegal":"legal","set":"mh3","releasedAt":"2024-06-14","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const grimoire = (): CardDef => ({"oracleId":"d4453b3e-733e-4038-81da-135a6a03079c","name":"Summoner's Grimoire","manaCost":"{3}{G}","cmc":4,"typeLine":"Artifact — Book Equipment","supertypes":[],"types":["Artifact"],"subtypes":["Book","Equipment"],"oracleText":"Job select\nEquipped creature is a Shaman in addition to its other types and has \"Whenever this creature attacks, you may put a creature card from your hand onto the battlefield. If that card is an enchantment card, it enters tapped and attacking.\"\nAbraxas — Equip {3}","colors":["G"],"colorIdentity":["G"],"keywords":["Job select","Equip","Abraxas"],"imageUrl":"https://cards.scryfall.io/normal/front/d/9/d9fda3fc-569d-49f8-a2ed-e0b1d6668426.jpg?1783906580","artUrl":"https://cards.scryfall.io/art_crop/front/d/9/d9fda3fc-569d-49f8-a2ed-e0b1d6668426.jpg?1783906580","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const destiny = (): CardDef => ({"oracleId":"ecb81888-589b-4486-a444-e0c26384854e","name":"Avatar Destiny","manaCost":"{2}{G}{G}","cmc":4,"typeLine":"Enchantment — Aura","supertypes":[],"types":["Enchantment"],"subtypes":["Aura"],"oracleText":"Enchant creature you control\nEnchanted creature gets +1/+1 for each creature card in your graveyard and is an Avatar in addition to its other types.\nWhen enchanted creature dies, mill cards equal to its power. Return this card to its owner's hand and up to one creature card milled this way to the battlefield under your control.","colors":["G"],"colorIdentity":["G"],"keywords":["Enchant","Mill"],"imageUrl":"https://cards.scryfall.io/normal/front/4/d/4d74da72-8443-4fce-9d64-d2041f6a3292.jpg?1783904948","artUrl":"https://cards.scryfall.io/art_crop/front/4/d/4d74da72-8443-4fce-9d64-d2041f6a3292.jpg?1783904948","commanderLegal":"legal","set":"tla","releasedAt":"2025-11-21","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const lifeline = (): CardDef => ({"oracleId":"f475b636-eb7f-4dd7-bc87-a1af07064ffe","name":"Lifeline","manaCost":"{5}","cmc":5,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"Whenever a creature dies, if another creature is on the battlefield, return the first card to the battlefield under its owner's control at the beginning of the next end step.","colors":[],"colorIdentity":[],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/0/40cee82f-36b2-48a9-930a-8e23cb2742fc.jpg?1783946304","artUrl":"https://cards.scryfall.io/art_crop/front/4/0/40cee82f-36b2-48a9-930a-8e23cb2742fc.jpg?1783946304","commanderLegal":"legal","set":"usg","releasedAt":"1998-10-12","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const enchantmentCard = card("Test Monument", "Enchantment", "{2}", { oracleText: "" });
 const auraOnEnchantment = card("Test Ward", "Enchantment — Aura", "{1}", { oracleText: "Enchant enchantment" });
@@ -209,5 +214,120 @@ describe("round 244", () => {
     expect(pt(s, elf)).toBe("3/3");
     expect(pt(s, redWarrior)).toBe("2/2");
     expect(pt(s, blue)).toBe("1/1");
+  });
+
+  it("bots aim Aura tokens: Mark of the Rani and Smoke Blessing at opponents' creatures, Estrid's Mask at their own", () => {
+    expect(harmfulTargets(compileCard(rani()).triggers[0]!.body)).toEqual([true]);
+    const sm = harmfulTargets(compileCard(smoke()).spell!);
+    expect(sm.length > 0 && sm.every(Boolean)).toBe(true);
+    expect(harmfulTargets(compileCard(estrid()).activated[1]!.body)).toEqual([false]);
+  });
+
+  it("Primal Prayers: a creature spell with mana value 3 or less for {E}, then any time you could cast an instant; not one costing more", () => {
+    const ogre = card("Test Ogre", "Creature — Ogre", "{2}{R}{R}", { power: "4", toughness: "4", cmc: 4 });
+    const bolt = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target.", cmc: 1 });
+    const { s: s0, ap, opp, ids } = setup([bear(), ogre, bolt]);
+    putOnBattlefield(s0, ap, prayers());
+    s0.players[ap]!.energy = 2;
+    const alt = { alt: "energyForSpell" as const };
+    expect(castProblem(s0, ap, ids[1]!, undefined, undefined, undefined, undefined, undefined, alt)).not.toBeNull();
+    // A spell on the stack: no sorcery timing now.
+    let s = run(s0, planCast(s0, ap, ids[2]!, [{ kind: "player", id: opp }]));
+    expect(s.stack.length).toBe(1);
+    expect(castProblem(s, ap, ids[0]!)).not.toBeNull();
+    expect(castProblem(s, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, alt)).toBeNull();
+    s = run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, alt));
+    expect(s.players[ap]!.energy).toBe(1);
+    s = settle(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+  });
+
+  it("Summoner's Grimoire: the equipped creature is a Shaman; as it attacks, an enchantment creature card from your hand enters tapped and attacking, any other creature card just enters", () => {
+    const nyx = card("Test Nyxborn Satyr", "Enchantment Creature — Satyr", "{3}{G}", { power: "3", toughness: "3" });
+    const { s: s0, ap, opp, ids } = setup([nyx, bear({ name: "Test Ox" })]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const g = putOnBattlefield(s0, ap, grimoire());
+    s0.objects[g]!.attachedTo = b;
+    invalidateCharacteristics(s0);
+    expect(characteristics(s0, s0.objects[b]!).subtypes).toEqual(expect.arrayContaining(["Bear", "Shaman"]));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    s = settle(s);
+    // Pick the Satyr from the hand.
+    expect(s.pending).toMatchObject({ player: ap });
+    const p = s.pending!;
+    if (p.kind === "chooseMay") s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    const q = s.pending!;
+    expect(q.kind).toBe("searchLibrary");
+    s = act(s, { type: "searchLibrary", player: ap, found: [ids[0]!] });
+    if (s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom") s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    s = settle(s);
+    expect(s.objects[ids[0]!]).toMatchObject({ zone: "battlefield", tapped: true, attacking: opp });
+  });
+
+  it("Summoner's Grimoire: a creature card that isn't an enchantment enters untapped and not attacking", () => {
+    const { s: s0, ap, opp, ids } = setup([bear({ name: "Test Ox" })]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const g = putOnBattlefield(s0, ap, grimoire());
+    s0.objects[g]!.attachedTo = b;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    s = settle(s);
+    if (s.pending?.kind === "chooseMay") s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending?.kind).toBe("searchLibrary");
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [ids[0]!] }));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.tapped).toBeFalsy();
+    expect(s.objects[ids[0]!]!.attacking).toBeUndefined();
+  });
+
+  it("Avatar Destiny: when the enchanted creature dies, mill cards equal to its power, return the Aura to its owner's hand and up to one creature card milled this way to the battlefield", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const a = putOnBattlefield(s0, ap, destiny());
+    s0.objects[a]!.attachedTo = b;
+    // Two creature cards in the graveyard: the Bear is 4/4 with them, so four cards are milled.
+    into(s0, ap, bear({ name: "Test Yak" }), "graveyard");
+    into(s0, ap, bear({ name: "Test Gnu" }), "graveyard");
+    invalidateCharacteristics(s0);
+    expect(pt(s0, b)).toBe("4/4");
+    const ox = into(s0, ap, bear({ name: "Test Ox" }), "library");
+    const lib = s0.players[ap]!.library.length;
+    let s = s0;
+    destroyPermanent(s, s.objects[b]!, "destroyed");
+    s = settle(s);
+    expect(s.players[ap]!.library.length).toBe(lib - 4);
+    if (s.pending?.kind === "searchLibrary") s = settle(act(s, { type: "searchLibrary", player: ap, found: [ox] }));
+    expect(s.objects[ox]!.zone).toBe("battlefield");
+    expect(s.objects[a]!.zone).toBe("hand");
+  });
+
+  it("Lifeline: a creature that dies while another creature is on the battlefield returns at the next end step under its owner's control; none left, none returns", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, lifeline());
+    const mine = putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Test Ox" }));
+    let s = s0;
+    destroyPermanent(s, s.objects[theirs]!, "destroyed");
+    s = settle(s);
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    s = passUntil(s, "end", ap);
+    s = settle(s);
+    const back = s.battlefield.find((id) => characteristics(s, s.objects[id]!).name === "Test Ox");
+    expect(back).toBeDefined();
+    expect(controllerOf(s, s.objects[back!]!)).toBe(opp);
+    // Both at once: nothing is left, so neither returns.
+    const { s: t0, ap: ap2, opp: opp2 } = setup([]);
+    putOnBattlefield(t0, ap2, lifeline());
+    const x = putOnBattlefield(t0, ap2, bear());
+    const y = putOnBattlefield(t0, opp2, bear({ name: "Test Ox" }));
+    let t = t0;
+    destroyPermanent(t, t.objects[x]!, "destroyed");
+    destroyPermanent(t, t.objects[y]!, "destroyed");
+    t = settle(t);
+    t = passUntil(t, "end", ap2);
+    t = settle(t);
+    expect(t.battlefield.some((id) => characteristics(t, t.objects[id]!).types.includes("Creature"))).toBe(false);
   });
 });

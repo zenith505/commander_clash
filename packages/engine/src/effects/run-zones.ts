@@ -2123,7 +2123,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Attacking that opponent" (Kaalia): the player its creature attacked, even if it's attacking something else now, and
       // with that player gone, it isn't attacking (rulings).
       const eventFoe = e.attackingEvent ? ctx.event?.player : undefined;
-      const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature")) ? [] : e.fromHandOf ? attackChoices(s, p.id, ctx.sourceId).filter((a) => a.player === from) : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
+      // Summoner's Grimoire: tapped and attacking only if it's an enchantment card.
+      const fits = (o: GameObject) => !e.onlyIf || printedMatches(e.onlyIf, defOf(s, o));
+      const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature") && fits(o)) ? [] : e.fromHandOf ? attackChoices(s, p.id, ctx.sourceId).filter((a) => a.player === from) : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         const name = defOf(s, cards[0]!).name;
         s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${name} attacks` };
@@ -2152,9 +2154,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // (rulings on Danitha, Benalia's Hope).
           const d = defOf(s, o);
           const equip = e.attachToSelf && !d.subtypes.includes("Aura") && d.subtypes.includes("Equipment") && !isType(d, "Creature") && !!self && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, self, p.id, false, d) ? { attachTo: self.id } : undefined;
-          const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
-          log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
+          const attacks = defender !== undefined && isType(defOf(s, o), "Creature") && fits(o);
+          const tapped = e.tapped && fits(o);
+          log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);

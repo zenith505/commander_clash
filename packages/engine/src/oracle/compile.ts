@@ -3008,6 +3008,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: "permanent spell" }))(spec), energy: n };
       continue;
     }
+    // Primal Prayers: "You may cast creature spells with mana value 3 or less by paying {E} rather than paying their mana
+    // costs. If you cast a spell this way, you may cast it as though it had flash.": an alternative cost of energy (CR
+    // 118.9, 107.14) matched by printed mana value with X at 0 (rulings), and only a spell cast this way has flash timing.
+    const prayers = new RegExp(`^You may cast creature spells with mana value (\\d+) or less by paying ((?:\\{E\\})+) rather than paying their mana costs\\. If you cast a spell this way, you may cast it as though it had flash\\.$`).exec(line);
+    if (prayers) {
+      const spec = parseTargetPhrase(`creature card with mana value ${prayers[1]} or less from a graveyard`);
+      if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `creature spell with mana value ${prayers[1]} or less` }))(spec), energy: prayers[2]!.length / 3, flash: true };
+      continue;
+    }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
     // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
     const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);

@@ -1946,8 +1946,8 @@ export function parseTargetPhrase(
     p = "creature";
   }
   // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell"; Sokka, Bold Boomeranger:
-  // "artifact or Lesson spell": either one (CR 205.3).
-  const orSub = /^(creature|instant) or (spacecraft|aura)$|^(artifact) or (lesson)$/.exec(p);
+  // "artifact or Lesson spell": either one (CR 205.3). Larval Scoutlander: "a land or Lander" (an artifact subtype).
+  const orSub = /^(creature|instant) or (spacecraft|aura)$|^(artifact|land) or (lesson|lander)$/.exec(p);
   if (orSub && !extra.orSubtypes) {
     extra.orSubtypes = [capital(orSub[2] ?? orSub[4]!)];
     p = orSub[1] ?? orSub[3]!;

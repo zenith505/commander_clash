@@ -1993,6 +1993,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
         if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // "A spell with one or more targets" (Voracious Bibliophile): cast with at least one (CR 115.1).
+        if (t.cast.hasTargets && !(item?.targets ?? []).some((x) => x.kind !== "none")) return false;
         // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.
         if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.

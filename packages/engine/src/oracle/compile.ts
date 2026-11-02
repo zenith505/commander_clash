@@ -3759,6 +3759,14 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n: annCount, action: "sacrifice" }], text: `Annihilator X: defending player sacrifices X permanents, where X is ${annX![1]}.` } });
       continue;
     }
+    // Fumiko the Lowblood: "~ has bushido X, where X is the number of attacking creatures": bushido (CR 702.45a) with X
+    // counted each time it resolves (rulings).
+    const bushidoX = /^~ has bushido X, where X is (the number of attacking creatures)\.$/.exec(line);
+    const bushidoCount = bushidoX && parseCount(bushidoX[1]!, null);
+    if (bushidoCount) {
+      out.triggers.push({ event: "selfBlocksOrBecomesBlocked", body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: bushidoCount, toughness: bushidoCount }], duration: "endOfTurn" }], text: `Bushido X: ~ gets +X/+X until end of turn, where X is ${bushidoX![1]}.` } });
+      continue;
+    }
     // The Water Crystal, Bruvac the Grandiloquent: a replacement effect on milling (CR 614.1a, 701.17).
     const millMore = /^If an opponent would mill one or more cards, they mill (that many cards plus (\w+)|twice that many cards) instead\.$/.exec(line);
     if (millMore && !Number.isNaN(num(millMore[2] ?? "0"))) {

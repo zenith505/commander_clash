@@ -2558,7 +2558,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Choose (any number of target creatures with equal toughness)\. Destroy the chosen creatures\.$/, "Destroy $1.");
   // Angelic Skirmisher: "Choose first strike, vigilance, or lifelink. Creatures you control gain that ability until end of
   // turn." The keyword is chosen as it resolves (CR 608.2d), and only creatures you control then gain it (CR 611.2c).
-  text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
+  // Linvala, Shield of Sea Gate: "Choose hexproof or indestructible. Creatures you control gain that ability ..." with two.
+  text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+|[a-z]+ or [a-z]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
   text = text.replace(/(^|\. )[Cc]reate a token that's a copy of an? (permanent|creature|artifact|non-Saga token) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
@@ -4398,6 +4399,39 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(capital(sacYouThen[1]!), ctx);
       if (!inner || ctx.targets.length !== before || !inner.every((e) => e.type === "createToken")) return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay", you: true }, effects: inner });
+      continue;
+    }
+    // Widespread Brutality: "Amass Zombies 2, then the Army you amassed deals damage equal to its power to each non-Army
+    // creature": the amassed Army is the source (CR 701.47c, rulings), its power as this resolves.
+    const armyDeals = /^The (?:Army you amassed|amassed Army) deals damage equal to its power to (.+)$/.exec(s);
+    if (armyDeals && ctx.amassed && sacPrev?.type === "amass") {
+      const before = ctx.targets.length;
+      const dmg = parseOne(`~ deals damage equal to the amassed Army's power to ${armyDeals[1]}`, ctx);
+      if (dmg?.length !== 1 || dmg[0]!.type !== "damage" || dmg[0]!.by || ctx.targets.length !== before) return null;
+      effects.push({ ...dmg[0]!, by: "amassed" });
+      continue;
+    }
+    // Starving Revenant: "Surveil 2. Then for each card you put on top of your library, you draw a card and you lose 3
+    // life.": the cards that surveil kept on top, the draws after it (rulings).
+    const surveilEach = /^For each card you put on top of your library, you draw a card and you lose (\d+) life$/.exec(s);
+    if (surveilEach && sacPrev?.type === "surveil") {
+      const n = { count: { kind: "surveilTopThisWay" as const } };
+      effects.push({ type: "draw", who: { ref: "you" }, n }, { type: "loseLife", who: { ref: "you" }, n: { ...n, times: Number(surveilEach[1]) } });
+      continue;
+    }
+    // Mistbreath Elder: "Return another creature you control to its owner's hand. If you do, put a +1/+1 counter on ~.
+    // Otherwise, you may return ~ to its owner's hand.": you must return one if you can; "if you do" is whether one went
+    // to its owner's hand (rulings).
+    if (sacDo && sacPrev?.type === "pick" && sacPrev.action === "bounce" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(sacDo[1]!), ctx);
+      const oth = /^Otherwise, (.+)$/.exec(sentences[si + 1] ?? "");
+      const othMay = oth && /^you may (.+)$/.exec(oth[1]!);
+      const othInner = oth ? parseOne(capital(othMay ? othMay[1]! : oth[1]!), ctx) : undefined;
+      const otherwise: Effect[] | null | undefined = othMay && othInner ? [{ type: "may", effects: othInner, text: othMay[1]! }] : othInner;
+      if (!inner || (oth && !otherwise) || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "bouncedThisWay", returned: true }, effects: inner, ...(otherwise ? { otherwise } : {}) });
+      if (oth) si++;
       continue;
     }
     // "Return a land you control to its owner's hand. If another Desert was returned this way, surveil 1" (Arid Archway).
@@ -9319,6 +9353,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (nthIf && (nthIf[1] || nthSeen.length)) {
       const ns = [nthIf[1] ?? nthIf[3]!, nthIf[2] ?? nthIf[4]].filter((x): x is string => !!x).map((w) => ORDINAL[w]!);
       const cond: SpellCondition = { kind: "resolvedNth", n: ns };
+      // Soulbright Flamekin: "If this is the third time this ability has resolved this turn, you may add {R}{R}...".
+      const nthMayAdd = /^you may (add (?:\{[WUBRGC]\})+)$/.exec(nthIf[5]!);
+      if (nthMayAdd) {
+        const inner = parseOne(capital(nthMayAdd[1]!), ctx);
+        if (!inner) return null;
+        nthSeen.push(...ns);
+        effects.push({ type: "if", cond, effects: [{ type: "may", effects: inner, text: nthMayAdd[1]! }] });
+        continue;
+      }
       const fx = parseKicked(nthIf[5]!, effects.slice(prevStart), ctx);
       if (!fx || (fx.instead && nthSeen.length)) return null;
       nthSeen.push(...ns);

@@ -1100,6 +1100,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "cardExiledThisTurn":
       return !!s.turnLog?.cardExiled;
+    case "playedOrCastNotFromHand":
+      return (s.turnLog?.landPlayedNotFromHand ?? []).includes(you) || (s.castThisTurn ?? []).some((x) => x.player === you && x.from !== "hand");
     case "youPutCounterOnCreature":
       return (s.turnLog?.creatureCounterPutters ?? []).includes(you);
     case "opponentCardsToGraveyard":
@@ -1388,6 +1390,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.other && id === e.sourceId) continue;
     if (a.otherThanAttached && id === s.objects[e.sourceId!]?.attachedTo) continue;
     if (!a.types.every((t) => c.types.includes(t))) continue;
+    if (a.selfOnlyAs && id === e.sourceId && !(c.allCreatureTypes && c.types.includes("Creature")) && !a.selfOnlyAs.some((t) => c.subtypes.some((x) => sameCI(x, t)))) continue;
     if (a.subtypes?.length && !(c.allCreatureTypes && c.types.includes("Creature")) && !a.subtypes.some((t) => c.subtypes.some((x) => sameCI(x, t)))) continue;
     if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;
     if (a.controller === "you" && c.controller !== you) continue;

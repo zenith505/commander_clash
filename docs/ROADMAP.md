@@ -1,7 +1,7 @@
 # Roadmap
 
-29,102 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,332 of
+29,116 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,346 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -161,21 +161,16 @@ line blocks.
    (counter all spells and abilities opponents control), Desertion (a countered card put onto the battlefield instead),
    Chandra, Spark Hunter (+2: "sacrifice an artifact or discard a card. If you do"), Phyrexian Unlife and Lich's Tomb
    and Transcendence (life at 0 or less with damage as infect, a sacrifice per life lost, life gained per life lost),
-   Starving Revenant (no count of the
-   cards a surveil kept on top), Mistbreath Elder (returning another creature with "if you do / otherwise"), Cult
-   Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Verdeloth the
-   Ancient ("other" applies to the Treefolk only), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
+   Cult
+   Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
    doesn't remove Auras", done in round B71), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
-   each of its colors), Welcome the Dead (cards put into your graveyard from your hand or library this turn), Konda's
-   Banner (creatures that share a color or a creature type with the equipped creature), Fork and Evereth ("except that
-   the copy is red"), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
-   Bones (a battlefield return then "another" to the hand), Voracious Bibliophile (draw as many as the spell has
-   targets), Locket of Yesterdays (cards with the same name as the spell), Huskburster Swarm (creature cards you own in
-   exile and in your graveyard), Larval Scoutlander ("a land or Lander"), Urdnan, Dromoka Warrior (double strike
+   each of its colors), Konda's
+   Banner (creatures that share a color or a creature type with the equipped creature), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
+   Bones (a battlefield return then "another" to the hand), Locket of Yesterdays (cards with the same name as the spell), Huskburster Swarm (creature cards you own in
+   exile and in your graveyard), Urdnan, Dromoka Warrior (double strike
    "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (a Pirate returned with
    base power and toughness 4/4), Alena, Kessig Trapper (the
-   greatest power among creatures that entered this turn), Kyoshi Island Plaza (Shrines you control), Widespread
-   Brutality (the amassed Army deals damage equal to its power). Round 171 went down the list to Hunter's Blowgun (rank
+   greatest power among creatures that entered this turn), Kyoshi Island Plaza (Shrines you control). Round 171 went down the list to Hunter's Blowgun (rank
    7,721), skipping over the cards still listed by `npm run popular`.
    Out after round 172: Primal Growth ("Kicker—Sacrifice a creature": a kicker that isn't mana needs its own cast
    choice and prompt), Plague Reaver ("return it to the battlefield under that player's control at the
@@ -441,8 +436,7 @@ line blocks.
    exile: a spell's ManaUse doesn't know its zone, as for Mm'menon), Barrow-Blade ("that creature loses all abilities" for a blocker or
    blocked creature), Ironsoul Enforcer ("~ or a commander you control attacks alone"), Smirking Spelljacker (exile
    target spell, cast it later), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
-   Schemes ("an exiled card with flashback you own" as a target), Fumiko the Lowblood (bushido X, counted as it
-   resolves), Archon of Coronation (damage that doesn't cause life loss).
+   Schemes ("an exiled card with flashback you own" as a target), Archon of Coronation (damage that doesn't cause life loss).
    Round 187 went on from the top: "the greatest mana value of a commander you own on the battlefield or in the command
    zone" (the Visions cycle's flashback costs {X} less, Cloudkill, Majestic Genesis, Imposing Grandeur with each
    player's own commanders), Visions of Dread (the target opponent picks the card, which enters under your control;
@@ -487,10 +481,10 @@ line blocks.
    test).
    Out after round 189 (looked at, not done): Belt of Giant Strength (equip cost less by the target's power), Retribution
    of the Ancients ("remove X +1/+1 counters from among creatures you control" as a cost), Pact Weapon and Jace, Mirror
-   Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Verdeloth the Ancient, Faerie Fencing, Flame
+   Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Faerie Fencing, Flame
    Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
-   of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Icebreaker Kraken, Mass
-   Diminish, Display of Power, Jason Bright, Spider-Man 2099, Blood for Bones, Quakebringer, Widespread Brutality,
+   of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Mass
+   Diminish, Display of Power, Jason Bright, Blood for Bones, Quakebringer,
    Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
    Round 190 went on from the top: "that many plus one of each of those kinds of counters" on any permanent you control
    (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist, with Pir), "as long as it was cast" on a static
@@ -542,10 +536,10 @@ line blocks.
    turn, you may cast that card and you may spend mana as though it were mana of any color" for an exiled creature
    (Hurl Through Hell). Rules fix: damage that can't be prevented is now dealt to the Phantom creatures (Phantom
    Centaur and the like), still removing a counter (rulings).
-   Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts), Irencrag Feat,
+   Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts),
    Oath of Nissa, Sharae of Numbing Depths and Hylda ("becomes tapped by you"), Sigurd, Dog Umbra, Call for Aid, Narset
    of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
-   miracle), Coram, Brimaz, Mindleech Mass, The Blue Spirit, Linvala, Shield of Sea Gate, Requiem Monolith, Behemoth of
+   miracle), Coram, Brimaz, Mindleech Mass, The Blue Spirit, Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
    graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
@@ -591,7 +585,7 @@ line blocks.
    Stalwart (two keywords chosen as it enters), Conspiracy Theorist ("you may exile one of the cards discarded this
    way"), Expand the Sphere, Observed Stasis ("remove enchanted creature from combat"), Captain Howler, Ephara, God of
    the Polis ("if you had another creature enter ... last turn"), Cache Grab, Abundant Harvest, Endless Sands,
-   Fumiko the Lowblood (bushido X), Historian's Boon ("the final chapter ability of a Saga you control triggers").
+   Historian's Boon ("the final chapter ability of a Saga you control triggers").
    Round 195 went on from the top: "distribute X +1/+1 counters among any number of target creatures you control, where X
    is the number of +1/+1 counters on ~" (Quirion Beastcaller, Undercity Upheaval), "If they can't, they lose 2 life and
    you draw a card. Then repeat this process for an enchantment and a planeswalker" (Invoke Despair), "you may copy ~ and
@@ -1615,6 +1609,11 @@ line blocks.
    (also Dinosaurs on a Spaceship: trigger selfTimeCounterRemovedExiled, from suspend's upkeep trigger and time travel),
    "When the last time counter is removed from this card while it's exiled" (Veiling Oddity). +16 (29,069 of 31,936 with
    B71-B77).
+   Out after round 243 (looked at, not done): Discerning Financier and Stiltzkin, Moogle Merchant ("choose another
+   player. That player gains control of target Treasure you control": a player chosen, not targeted, and no bot sense
+   for giving permanents away yet); Silverquill, the Disputant (granted casualty 1: with a spell's printed casualty that's
+   two instances, each paid separately, CR 702.153b, and one payment per spell is all there is); Blood for Bones (a
+   battlefield return then "another" to the hand, as before).
    Out after round 242 (looked at, not done): Frontline Heroism (the copy must target the token it created; with a
    token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
@@ -1946,7 +1945,7 @@ line blocks.
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
    that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
    to Dust and Knight-Errant of Eos (what convoked them); Nissa's two-sentence "Nth time" branches; Rose Room
-   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
+   Treasurer; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or

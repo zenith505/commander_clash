@@ -166,8 +166,6 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
-  /** "The number of unlocked doors among Rooms you control" (Misty Salon, CR 709.5c); `names`: "different names among unlocked doors of Rooms you control" (Promising Stairs: a Room with two unlocked doors has two names, rulings). */
-  | { kind: "unlockedDoors"; names?: true }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue" }
   /** "Reveal the top card of your library. Draw cards equal to that card's mana value." (Interpret the Signs): the card "revealTop" revealed, while it's still that card. */
@@ -534,8 +532,8 @@ export type Count =
     }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
-  /** "Unlocked doors among Rooms you control" (Rampaging Soulrager): the unlocked designations of those Room permanents (CR 709.5c). */
-  | { kind: "unlockedDoors" }
+  /** "Unlocked doors among Rooms you control" (Rampaging Soulrager, Misty Salon): the unlocked designations of those Room permanents (CR 709.5c); `names`: "different names among unlocked doors of Rooms you control" (Promising Stairs: a Room with two unlocked doors has two names, rulings). */
+  | { kind: "unlockedDoors"; names?: true }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */

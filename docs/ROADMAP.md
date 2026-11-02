@@ -4647,6 +4647,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this way" (Holistic Wisdom); "if an opponent was dealt noncombat damage last turn" and counters on "each other
   Wizard token you control" (Command the Stage); "Enchanted creature can't be blocked as long as it's attacking
   alone" (Gutter Skulker // Gutter Shortcut). +16 (29,295 of 31,936 with B85; 29,319 with rounds 248 and 249).
+- Round B87 (one-line templates from the bottom of the list): "Reveal the first card you draw each turn. Whenever you
+  reveal a basic land card / creature card this way" (Rowen, Primitive Etchings); "When you attack with exactly two
+  creatures, transform this creature" (Alluring Suitor // Deadly Dancer); Daredevil Dragster's velocity counters
+  (its "it" read as ~); revealing until a creature card, "you may put it onto
+  the battlefield", then shuffling all other revealed cards (Thicket Elemental); "choose target creature card in your
+  graveyard with toughness less than ~'s toughness. Return that card" (Thunderkin Awakener); "If it's a creature, it's
+  a Zombie in addition to its other creature types" (Lim-Dûl the Necromancer); "Return it at the beginning of the next
+  end step unless you pay" (Koya, Death from Above: a "you may pay; if you don't" delayed trigger); a named token
+  "that's all colors" (Dragonbroods' Relic); "A creature dealt damage this way can't block this turn" (Ballista
+  Watcher // Ballista Wielder); "if it has blocked or been blocked since your last upkeep" / "if it attacked or
+  blocked since your last upkeep", a +1/+1 counter, otherwise one removed (Wiitigo, Shape of the Wiitigo); "Return a creature card with mana value 1, 2, and 3 each" (Gruesome Menagerie); "Discard two
+  nonland cards with the same name" as an activation cost (Sphinx of the Chimes, with a picker that only takes a
+  same-name pair and a browser test). +14 (29,333 of 31,936 with B86 and rounds 248 and 249).
+- Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
+  number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
+  type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
+  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword, Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life, Mob Mentality,

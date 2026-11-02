@@ -949,6 +949,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const whose = whosePlayer(m[1]!, ctx);
     return whose && count({ kind: "cardsToGraveyardThisTurn", whose });
   }
+  // Welcome the Dead: "cards that were put into your graveyard from your hand or library this turn": cards, not tokens.
+  if ((m = /^cards? (?:that were )?put into your graveyard from your hand or library this turn$/i.exec(p)))
+    return count({ kind: "cardsToGraveyardThisTurn", whose: { ref: "you" }, fromHandOrLibrary: true });
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
   if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))

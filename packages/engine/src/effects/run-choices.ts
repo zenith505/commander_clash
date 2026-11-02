@@ -1,4 +1,4 @@
-import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type StaticCondition, type TargetSpec } from "../abilities";
+import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type SpellCondition, type StaticCondition, type TargetSpec } from "../abilities";
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -651,7 +651,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "searchFound"
             ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
             : e.cond.kind === "bouncedThisWay"
-            ? !!s.resolving!.bouncedThisWay?.some((b) => b.subtypes.includes((e.cond as { subtype: string }).subtype) && b.id !== ctx.sourceId)
+            ? ((c) => !!s.resolving!.bouncedThisWay?.some((b) => (!c.subtype || b.subtypes.includes(c.subtype)) && (!c.another || b.id !== ctx.sourceId) && (!c.returned || !!(b as { returned?: true }).returned)))(e.cond as Extract<SpellCondition, { kind: "bouncedThisWay" }>)
             : e.cond.kind === "excessDealt"
             ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
             : e.cond.kind === "noneAttackedYou"

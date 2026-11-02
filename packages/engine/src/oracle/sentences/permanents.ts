@@ -580,9 +580,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // controls don't untap during their next untap step"; Exhaustion: "Creatures and lands target opponent controls ...":
   // whatever of those that player controls when that step comes, also ones they got since (Mana Vapors rulings). Misstep:
   // "Creatures target player controls don't untap during that player's next untap step" (also ones that entered since, rulings).
-  if ((m = /^(Lands|Creatures|Creatures and lands) (you control|target player controls|target opponent controls) don't untap during (your|their|that player's) next untap step$/.exec(s)) && (m[2] === "you control") === (m[3] === "your")) {
+  // Icebreaker Kraken: "Artifacts and creatures target opponent controls don't untap during that player's next untap step":
+  // the same, also ones they didn't control as it resolved (rulings).
+  if ((m = /^([Ll]ands|[Cc]reatures|[Cc]reatures and lands|[Aa]rtifacts and creatures) (you control|target player controls|target opponent controls) don't untap during (your|their|that player's) next untap step$/.exec(s)) && (m[2] === "you control") === (m[3] === "your")) {
     const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
-    return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : m[1] === "Creatures" ? ["Creature"] : ["Creature", "Land"] }] : null;
+    const kinds = m[1]!.toLowerCase();
+    return who ? [{ type: "noUntapNext", who, types: kinds === "lands" ? ["Land"] : kinds === "creatures" ? ["Creature"] : kinds === "artifacts and creatures" ? ["Artifact", "Creature"] : ["Creature", "Land"] }] : null;
   }
   // Blinding Beam: "Creatures don't untap during target player's next untap step": every creature during that step,
   // another player's too (one that would untap then, like with Seedborn Muse), also ones that entered since (rulings).

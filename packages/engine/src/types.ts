@@ -1583,6 +1583,10 @@ export interface TurnLog {
   creatureCounterPutters?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */
   toGraveyard?: Record<number, number>;
+  /** Players who played a land this turn from anywhere other than their hand (Spider-Man 2099). */
+  landPlayedNotFromHand?: PlayerId[];
+  /** Cards put into each owner's graveyard from their hand or library this turn (Welcome the Dead). */
+  toGraveyardFromHandOrLibrary?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
   /** Each event that put cards into graveyards this turn: the cards (CardDef keys), by their owner (Crawling Sensation's "for the first time each turn"). */
@@ -1828,7 +1832,7 @@ export interface GameState {
   linkedPlays?: { player: PlayerId; source: string; turn: number; sourceName: string; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
-  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
+  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Irencrag Feat: only once they've cast this many spells this turn (s.castThisTurn). */ afterCasts?: number; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
@@ -2327,6 +2331,8 @@ export interface Resolving {
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
+  /** Starving Revenant: how many cards this resolution's surveil put on top of the library (Count surveilTopThisWay). */
+  surveilTop?: number;
   bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** As it last existed on the battlefield (Count bouncedThisWayPower). */ power?: number; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
   returnedToHand?: ObjectId[];

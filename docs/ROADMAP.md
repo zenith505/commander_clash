@@ -1,7 +1,7 @@
 # Roadmap
 
-29,350 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,953 of 4,988 (99%), top 10,000: 9,415 of
+29,359 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,953 of 4,988 (99%), top 10,000: 9,424 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1727,6 +1727,30 @@ line blocks.
    that card ... any type" (Reno and Rude); "exile all cards from all opponents' graveyards. You may cast a nonland card
    exiled this way for as long as it remains exiled" (Author of Shadows: a choose-one prompt, with browser tests for it
    and Jacob Frye). +8 (29,350 of 31,936 with B84 to B86).
+   Round 253 (the top of the list): "You may cast this card from your graveyard using its mutate ability" (Brokkos, Apex of
+   Forever: only for its mutate cost, rulings); "exile cards ... until you exile a nonland permanent card. Put that card
+   onto the battlefield or into your hand" (Illuna, Apex of Wishes: an artifact land doesn't stop it, the choice made after
+   seeing the card, with a browser test); "until you reveal a nonlegendary, nonland card with mana value 3 or less" and
+   "untap each creature you control, then tap any number of creatures you control" (Plargg, Dean of Chaos // Augusta, Dean
+   of Order; bots tap only their attackers); "you may put it on the bottom of its owner's library. If you do, reveal cards
+   ... until you reveal a nonland card. You may cast that card without paying its mana cost" (Neera, Wild Mage: the spell
+   that triggered it, not countered, with a browser test); "that player loses the game if the Ring has tempted you four or
+   more times this game. Otherwise, the Ring tempts you." granted by Frodo, Sauron's Bane; "As long as an artifact creature
+   you control is attacking, prevent all damage that would be dealt to ~" and "You may cast a Vehicle or artifact creature
+   spell from among them" paying its costs (Sanwell, Avenger Ace); "return ~ to the battlefield tapped under your control.
+   She's a land named Moon" (Princess Yue: a legendary land with its other abilities); "for each card you've discarded this
+   turn, create a token that's a copy of ~, except the token isn't legendary" (Living Laser); "For each mana from a Desert
+   spent to cast this spell" (Cataclysmic Prospecting: mana from a Desert is tracked like mana from a Treasure). +9 (29,359
+   of 31,936 with B84 to B86).
+   Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
+   a memory counter); Arna Kennerüd, Skycaptain (token copies of the Auras and Equipment attached to a creature, entering
+   attached to it); Imodane, the Pyrohammer ("an instant or sorcery spell you control that targets only a single creature
+   deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy ("You may play a
+   land from the top of your library" as the trigger resolves, a land play of its own, or a free spell with mana value up
+   to the damage dealt); Mizzix, Replica Rider (a copy of a permanent spell that gains haste and an end-step sacrifice);
+   Donal, Herald of Wings (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci
+   (a token copy of the discarded card "except it's a 0/2 Thopter artifact creature with flying"); Optimus Prime, Hero //
+   Autobot Leader ("The chosen creature" after bolster, and a delayed convert when it deals combat damage).
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
    battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher ("You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's

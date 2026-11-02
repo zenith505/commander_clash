@@ -868,6 +868,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each mana from Treasures spent to activate this ability" (Mr. House): an activated ability's own.
   if (each && /^mana from Treasures spent to activate this ability$/i.test(p) && ctx?.activated) return count({ kind: "treasureSpent", activated: true });
   if ((m = /^mana from a Treasure (?:that was )?spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it"))) return count({ kind: "treasureSpent" });
+  // Cataclysmic Prospecting: "for each mana from a Desert spent to cast this spell": the spell's own.
+  if (/^mana from a Desert spent to cast ~$/i.test(p) && ctx?.spell) return count({ kind: "spentFrom", origin: "desert" });
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });

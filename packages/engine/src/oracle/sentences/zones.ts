@@ -1320,6 +1320,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("that card", ctx);
     return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
   }
+  // Neera, Wild Mage: "Whenever you cast a spell, you may put it on the bottom of its owner's library": the spell that
+  // triggered it, if it's still on the stack; not a counter, so one that can't be countered goes too (CR 701.6a).
+  if (/^[Pp]ut it on the bottom of its owner's library$/.test(s) && ctx.castSpell && !ctx.subjectLeft) return [{ type: "causeToBottom" }];
   // The Cauldron of Eternity: "Whenever a creature you control dies, put it on the bottom of its owner's library": the card,
   // if it's still in the graveyard (CR 400.7).
   if ((m = /^[Pp]ut (it|that card) on (top|the bottom) of its owner's library$/.exec(s)) && ctx.subjectLeft) {

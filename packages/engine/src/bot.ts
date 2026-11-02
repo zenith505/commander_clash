@@ -3294,6 +3294,11 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   // "Tap any number of untapped creatures you control. ... for each creature tapped this way": all of them, but on our
   // own turn before attackers are declared, not the creatures that could still attack.
   if (action === "tap") {
+    // Augusta, Dean of Order: "untap each creature you control, then tap any number of creatures you control", nothing
+    // counting the creatures tapped: the attacking ones (tapped +1/+0), the others stay untapped to block.
+    const body = s.resolving?.body.effects ?? [];
+    const last = body.findIndex((e) => e.type === "tapAnyNumber") === body.length - 1;
+    if (last && s.activePlayer === pid && options.some((id) => obj(s, id).attacking !== undefined)) return options.filter((id) => obj(s, id).attacking !== undefined).slice(0, count);
     const beforeAttacks = s.activePlayer === pid && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
     const attackers = beforeAttacks ? new Set(potentialAttackers(s, pid).map((o) => o.id)) : new Set<ObjectId>();
     return options.filter((id) => !attackers.has(id)).slice(0, count);
@@ -3418,6 +3423,13 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do, reveal ... until you reveal a nonland
+  // card. You may cast that card without paying its mana cost": a cheap spell for a free card worth more on average.
+  if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "causeToBottom") {
+    const spell = s.stack.find((x) => x.id === r.item.cause && x.kind === "spell");
+    const o = spell?.objectId ? s.objects[spell.objectId] : undefined;
+    return !!o && !o.spellCopy && !o.isCommander && defMv(defOf(s, o)) <= 2 && player(s, pid).library.some((id) => !isType(defOf(s, obj(s, id)), "Land"));
+  }
   // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control": only a noncreature
   // token (a Food, a Treasure), for the Ally token it makes.
   const gift = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.giveTo ? e.effects[0]! : undefined;

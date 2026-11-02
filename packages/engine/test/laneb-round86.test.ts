@@ -168,12 +168,15 @@ const holistic = (): CardDef => ({"oracleId": "7e108285-52da-473c-accd-d48e646a4
 const commandStage = (): CardDef => ({"oracleId": "13bfc51f-d079-40ef-a4ba-47d06d3150a3", "name": "Command the Stage", "manaCost": "{2}{R}", "cmc": 3, "typeLine": "Sorcery", "supertypes": [], "types": ["Sorcery"], "subtypes": [], "oracleText": "Create a 2/2 colorless Wizard Soldier creature token named Cadet, then put a +1/+1 counter on each other Wizard token you control.\nAt the beginning of each upkeep, if an opponent was dealt noncombat damage last turn, return this card from your graveyard to your hand.", "colors": ["R"], "colorIdentity": ["R"], "keywords": [], "layout": "normal"}) as CardDef;
 const thinkTwice = (): CardDef => ({"oracleId": "fa85c5a2-8e83-4624-a35a-a0bbf17ecbb4", "name": "Think Twice", "manaCost": "{1}{U}", "cmc": 2, "typeLine": "Instant", "supertypes": [], "types": ["Instant"], "subtypes": [], "oracleText": "Draw a card.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)", "colors": ["U"], "colorIdentity": ["U"], "keywords": ["Flashback"], "layout": "normal"}) as CardDef;
 const anthem = (): CardDef => ({"oracleId": "e3886fe8-9b76-4613-8891-4ec74657c087", "name": "Glorious Anthem", "manaCost": "{1}{W}{W}", "cmc": 3, "typeLine": "Enchantment", "supertypes": [], "types": ["Enchantment"], "subtypes": [], "oracleText": "Creatures you control get +1/+1.", "colors": ["W"], "colorIdentity": ["W"], "keywords": [], "layout": "normal"}) as CardDef;
+const gutter = (): CardDef => ({"oracleId": "d2d753d4-3bb7-4503-8cc0-8f948b7a461e", "name": "Gutter Skulker // Gutter Shortcut", "manaCost": "{3}{U}", "cmc": 4, "typeLine": "Creature — Spirit // Enchantment — Aura", "supertypes": [], "types": ["Creature"], "subtypes": ["Spirit"], "oracleText": "This creature can't be blocked as long as it's attacking alone.\nDisturb {3}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", "power": "3", "toughness": "3", "colors": ["U"], "colorIdentity": ["U"], "keywords": ["Transform", "Enchant", "Disturb"], "layout": "transform", "faces": [{"name": "Gutter Skulker", "manaCost": "{3}{U}", "typeLine": "Creature — Spirit", "supertypes": [], "types": ["Creature"], "subtypes": ["Spirit"], "oracleText": "This creature can't be blocked as long as it's attacking alone.\nDisturb {3}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", "power": "3", "toughness": "3", "colors": ["U"]}, {"name": "Gutter Shortcut", "manaCost": "", "typeLine": "Enchantment — Aura", "supertypes": [], "types": ["Enchantment"], "subtypes": ["Aura"], "oracleText": "Enchant creature\nEnchanted creature can't be blocked as long as it's attacking alone.\nIf Gutter Shortcut would be put into a graveyard from anywhere, exile it instead.", "colors": ["U"], "colorIndicator": ["U"]}]}) as CardDef;
+/** Gutter Shortcut, the back face, as an Aura card of its own. */
+const shortcut = () => card("Gutter Shortcut", "Enchantment — Aura", "", { oracleText: "Enchant creature\nEnchanted creature can't be blocked as long as it's attacking alone.\nIf Gutter Shortcut would be put into a graveyard from anywhere, exile it instead.", keywords: ["Enchant"], colors: ["U"] });
 const aura = () => card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+1.", keywords: ["Enchant"] });
 const opponentsOf = (s: GameState, ap: PlayerId) => [1, 2, 3].map((i) => s.turnOrder[(s.turnOrder.indexOf(ap) + i) % 4]!);
 
 describe("Lane B round 86", () => {
   it("all of them are supported", () => {
-    supported(yuriko(), jiang(), vermin(), fallen(), sparkRupture(), nissasJudgment(), matriarch(), mightMakesRight(), favor(), peacekeeper(), gemini(), dragonMan(), altar(), holistic(), commandStage());
+    supported(yuriko(), jiang(), vermin(), fallen(), sparkRupture(), nissasJudgment(), matriarch(), mightMakesRight(), favor(), peacekeeper(), gemini(), dragonMan(), altar(), holistic(), commandStage(), gutter(), shortcut());
   });
 
   it("Yuriko, Blade of the Mighty: during combat no spell is cast and no ability but a mana ability is activated", () => {
@@ -593,5 +596,22 @@ describe("Lane B round 86", () => {
     s = settle(s);
     expect(cadets().length).toBe(2);
     expect(cadets().map((id) => counters(s, id, "+1/+1")).sort()).toEqual([0, 1]);
+  });
+  it("Gutter Shortcut: the enchanted creature can't be blocked while it attacks alone, and can be with another attacker", () => {
+    for (const alone of [true, false]) {
+      const { s: s0, ap } = setup([]);
+      let s = s0;
+      const [b] = opponentsOf(s, ap);
+      const a = veteran(s, ap, bears());
+      const friend = veteran(s, ap, bears());
+      const blocker = veteran(s, b!, bears());
+      attach(s, ap, shortcut(), a);
+      s = attackWith(s, alone ? [a] : [a, friend], b!);
+      s = toBlocks(s);
+      while (s.pending?.kind === "declareBlockers" && s.pending.player !== b) s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+      const doBlock = () => act(s, { type: "declareBlockers", player: b!, blocks: [{ blocker, attacker: a }] });
+      if (alone) expect(doBlock).toThrow(/can't be blocked/);
+      else expect(() => doBlock()).not.toThrow();
+    }
   });
 });

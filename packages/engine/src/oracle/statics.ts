@@ -85,6 +85,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 }
 
 function parseConditionalStatic0(line: string): StaticAbility | null {
+  // Gutter Shortcut: "Enchanted creature can't be blocked as long as it's attacking alone": the same as Security Bypass's
+  // "As long as enchanted creature is attacking alone, it can't be blocked" (CR 506.5).
+  const aloneHost = /^(Enchanted|Equipped) creature can't be blocked as long as it's attacking alone\.$/.exec(line);
+  if (aloneHost) {
+    const st = parseConditionalStatic0(`As long as ${aloneHost[1]!.toLowerCase()} creature is attacking alone, it can't be blocked.`);
+    return st && { ...st, text: line };
+  }
   // Zhao, the Moon Slayer: "As long as ~ has a conqueror counter on him, ...": "him" (normalized to ~) is it.
   const onSelf = /^(As long as ~ has an? [a-z]+ counter on) ~(, .+)$/.exec(line);
   if (onSelf) return parseConditionalStatic0(`${onSelf[1]} it${onSelf[2]}`);

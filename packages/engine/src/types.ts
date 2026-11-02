@@ -354,6 +354,8 @@ export interface GameObject {
   wasDealtNoncombatDamage?: true;
   /** It has dealt damage since it became this object (Karakyk Guardian: "as long as it hasn't dealt damage yet"). */
   hasDealtDamage?: true;
+  /** It has dealt combat damage since it became this object (Ruric Thar: "as long as they haven't dealt combat damage yet"). */
+  hasDealtCombatDamage?: true;
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
@@ -1549,6 +1551,8 @@ export interface TurnLog {
   damagedBy?: Record<number, string[]>;
   /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */
   noncombatDamage?: Record<number, number>;
+  /** Damage each player was dealt this turn by sources that were artifacts as they dealt it (Reverse Polarity). */
+  artifactDamage?: Record<number, number>;
   /** Players who scried or surveilled this turn (Proctor of Potential). */
   scried?: PlayerId[];
   /** Players who surveilled this turn (Darkblade Agent; Whispering Snitch's "for the first time each turn"). */

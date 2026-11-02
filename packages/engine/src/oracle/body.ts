@@ -3375,6 +3375,36 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random, then put the rest on top
+    // of your library in any order.": four of the eight at random; the rest are still the top cards, which you order
+    // (rulings: you see them first).
+    const librarian = /^Look at the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
+    // (The splitter has made "then put the rest ..." a sentence of its own.)
+    const libRest = librarian && /^Exile (one|two|three|four|five|six|seven|eight|nine) of them at random$/.exec(sentences[si + 1] ?? "");
+    if (librarian && libRest && /^Put the rest on top of your library in any order\.?$/.test(sentences[si + 2] ?? "") && num(libRest[1]!) < num(librarian[1]!)) {
+      const look = num(librarian[1]!);
+      const n = num(libRest[1]!);
+      effects.push({ type: "exileTop", who: { ref: "you" }, n, randomOf: look }, { type: "orderTop", who: { ref: "you" }, n: look - n });
+      si += 2;
+      continue;
+    }
+    // Rally the Horde: "Exile the top card of your library." three times, then "If the last card exiled isn't a land card,
+    // repeat this process.": three at a time, again while the third isn't a land card (Effect exileTop repeatUnlessLastLand).
+    if (s === "Exile the top card of your library" && sentences.slice(si + 1, si + 4).map((x) => x.replace(/\.$/, "")).join("|") === "Exile the top card of your library|Exile the top card of your library|If the last card exiled isn't a land card, repeat this process") {
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 3, repeatUnlessLastLand: true });
+      si += 3;
+      continue;
+    }
+    // Scalpelexis: "that player exiles the top four cards of their library. If two or more of those cards have the same
+    // name, repeat this process."
+    if (sentences[si + 1]?.replace(/\.$/, "") === "If two or more of those cards have the same name, repeat this process") {
+      const ex = parseSentence(capital(s), ctx);
+      const e0 = ex?.length === 1 ? ex[0] : undefined;
+      if (e0?.type !== "exileTop" || e0.linked || e0.putAll || typeof e0.n !== "number" || e0.n < 2) return null;
+      effects.push({ ...e0, repeatSameName: true });
+      si++;
+      continue;
+    }
     // Grindstone: "Target player mills two cards. If two cards that share a color were milled this way, repeat this
     // process.": again and again in this resolution while the two milled share a color (rulings: both colorless don't).
     if (sentences[si + 1]?.replace(/\.$/, "") === "If two cards that share a color were milled this way, repeat this process") {

@@ -956,7 +956,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Tell), "each opponent may put a legendary creature card ..." (Iwamori), "any number of ... cards" (Tempting Wurm):
   // chosen in turn order without revealing them, then put there at the same time (see the putFromHand effect). "Then
   // each opponent who didn't draws a card" (Kynaios and Tiro): those who put none.
-  if ((m = /^[Ee]ach (player|opponent) may put (a|an|any number of) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+  // Charmed Griffin: "each other player may put an artifact or enchantment card onto the battlefield from their hand": the
+  // same, in the other order ("each other player" is "each opponent" by now, CR 102.3).
+  if ((m = /^[Ee]ach (player|opponent) may put (a|an|any number of) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s) ?? /^[Ee]ach (player|opponent) may put (a|an) (.+?) onto the battlefield from their hand()$/.exec(s))) {
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (filter === null) return null;
     const put: Effect = { type: "putFromHand", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true, ...(m[2] === "any number of" ? { any: true } : {}) };

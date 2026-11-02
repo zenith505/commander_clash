@@ -91,7 +91,7 @@ export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 const PROTECTION_COLOR: Record<string, "W" | "U" | "B" | "R" | "G"> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
 const PROTECTION_TYPES: Record<string, string> = {
   artifacts: "Artifact", creatures: "Creature", enchantments: "Enchantment", instants: "Instant", sorceries: "Sorcery",
-  planeswalkers: "Planeswalker", lands: "Land", battles: "Battle",
+  planeswalkers: "Planeswalker", lands: "Land", battles: "Battle", kindred: "Kindred",
 };
 
 /** What protection looks at in a source (CR 702.16a): its colors, card types and subtypes. */
@@ -212,6 +212,15 @@ export const OWN_COLORS_HEXPROOF = "Hexproof from each of its colors";
  * commander (rulings).
  */
 export const IDENTITY_PROTECTION = "Protection from each color not in your commander's color identity";
+/**
+ * Mirror Golem: "~ has protection from each of the exiled card's card types": filled in from the cards its imprint
+ * ability exiled (CR 607.2a) that are still in exile, as the layers apply it.
+ */
+export const LINKED_TYPES_PROTECTION = "Protection from each of the exiled card's card types";
+/** "Protection from creatures" and the like for each of these card types (CR 205.2a, 702.16a). */
+export function protectionFromCardTypes(types: readonly string[]): string[] {
+  return Object.entries(PROTECTION_TYPES).filter(([, t]) => types.includes(t)).map(([q]) => `Protection from ${q}`);
+}
 /**
  * "Gain protection from each of that creature's colors until end of turn" (Éowyn, Fearless Knight): filled in as it
  * resolves with the colors of the ability's one target, as it last existed if it has left (rulings).

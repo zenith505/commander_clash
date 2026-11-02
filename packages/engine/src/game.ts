@@ -1037,6 +1037,7 @@ export function moveObject(
   o.wasDealtDamage = undefined;
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
+  o.hasDealtCombatDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -4704,7 +4705,7 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
 export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {

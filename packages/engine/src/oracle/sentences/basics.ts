@@ -287,6 +287,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[6]) ctx.eachSearched = true;
     return [{ ...fx[0]!, who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, may: true }];
   }
+  // Turtle Tracks: "Any number of target players may each search their library for a basic land card, put it onto the
+  // battlefield under their control, then shuffle": each of them, as Veteran Explorer's players do (in turn order, each
+  // searching or not; those who searched shuffle).
+  if ((m = /^Any number of target players may each search their library for (a basic land card), put it onto the battlefield under their control, then shuffle$/.exec(s))) {
+    const fx = parseSearch(`Search your library for ${m[1]!}, put it onto the battlefield, then shuffle`);
+    const who = parsePlayer("any number of target players", ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others || !who) return null;
+    return [{ ...fx[0]!, who, may: true }];
+  }
   // From the Ashes: "For each land destroyed this way, its controller may search their library for a basic land card and
   // put it onto the battlefield. Then each player who searched their library this way shuffles"; Krenko's Buzzcrusher:
   // "..., put it onto the battlefield tapped, then shuffle". Each of those players searches once (or chooses not to), in
@@ -962,6 +971,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!);
     if (filter?.kind !== "object") return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: m[1]! }, n: 1, action: "sacrifice" }], otherwise: [{ type: "counterCause" }], keep: true, text: `Sacrifice a ${m[1]} so that spell isn't countered` }];
+  }
+  // Chaos Lord: "target opponent gains control of ~ if the number of permanents is even": every player's permanents,
+  // counted as it resolves (zero is even); the target is chosen as the trigger is put on the stack either way.
+  if ((m = /^([Tt]arget opponent gains control of ~) if the number of permanents is (even|odd)$/.exec(s))) {
+    const fx = parseSentence(capital(m[1]!), ctx);
+    if (!fx) return null;
+    return [{ type: "if", cond: { kind: "state", cond: { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }, parity: m[2] as "even" | "odd" } }, effects: fx }];
   }
   // Custody Battle's granted "target opponent gains control of ~ unless you sacrifice a land": sacrifice one to keep it;
   // otherwise that opponent controls it for the rest of the game (layer 2).

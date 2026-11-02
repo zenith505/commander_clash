@@ -94,6 +94,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you pay ~'s cumulative upkeep, (.+)$/, "selfCumulativeUpkeepPaid"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
+  [/^Whenever you forage, (.+)$/, "youForage"], // CR 701.61a
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
   [/^Whenever an opponent becomes the monarch, (.+)$/, "opponentBecomesMonarch"],
   [/^Whenever another player loses the game, (.+)$/, "anotherPlayerLosesGame"],
@@ -1476,6 +1477,19 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
   }
+  // Essence Sliver: "Whenever a Sliver deals damage, its controller gains that much life": anyone's Sliver, any damage, once
+  // for all it deals at the same time (like lifelink, CR 120.3f); "its controller" is the Sliver's.
+  const anyTypeDeals = /^Whenever an? ([A-Z][a-z]+) deals damage, (.+)$/.exec(line);
+  if (anyTypeDeals && CREATURE_TYPES.has(anyTypeDeals[1]!)) {
+    let text = anyTypeDeals[2]!;
+    if (/\b(?:that player|defending player|X)\b/.test(text)) return "fail";
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    let body = parseBody(text, { subjectIt: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, anyTypeDeals[2]!) };
+    return { event: "permanentDealsDamage", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anyTypeDeals[1]!], text: anyTypeDeals[1]! }, anyone: true }, body };
+  }
   // The Beast, Deathless Prince: "Whenever a creature deals combat damage to its owner, untap ~ and draw a card": anyone's
   // creature, only to the player who owns it (CR 108.3), once for each creature.
   const toOwner = /^Whenever a creature deals combat damage to its owner, (.+)$/.exec(line);
@@ -1540,7 +1554,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // whatever it is and each other one that matches.
   const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line) ?? /^Whenever ~ or another (.+? you control deals combat damage to .+)$/.exec(line);
   if (orSelf) line = `Whenever ${/^an? /.test(orSelf[1]!) ? "" : "a "}${orSelf[1]}`;
-  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
+  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle| or planeswalker)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
   if (orSelf && (!m || withKw || /\b(it|its|that creature)\b/i.test(m[4]!))) return "fail";
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
@@ -1548,6 +1562,8 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   let text = m[3] === "an opponent" ? otherOpponents(m[4]!) : m[4]!;
   // "To a player or battle": "that player" isn't about a battle (CR 310).
   if (m[3] === "a player or battle" && /\b(that player|defending player)\b/.test(text)) return "fail";
+  // "To a player or planeswalker" (Flitterwing Nuisance): the same, "that player" isn't about a planeswalker.
+  if (m[3] === "a player or planeswalker" && /\b(that player|defending player|that much|that many|X)\b/.test(text)) return "fail";
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
     if (/\bX\b/.test(text)) return "fail";
@@ -1563,6 +1579,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
     ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
+    ...(m[3] === "a player or planeswalker" ? { orPlaneswalker: true as const } : {}),
   };
 }
 
@@ -2938,7 +2955,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Wundagore: "on another creature" (anyone's, not ~): the same.
     // Cloaked Cadet: "Whenever one or more +1/+1 counters are put on one or more Humans you control": once for each Human
     // they're put on, only the first each turn doing anything (rulings: one card however many).
-    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, "));
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Acrobatic Cheerleader: "This ability triggers only once.": never again for this object, even if it's countered
@@ -3703,6 +3720,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped", "Whenever a
   // permanent becomes untapped" (Mesmeric Orb: "that permanent's controller").
+  // "Whenever you tap an untapped creature an opponent controls" (Hylda of the Icy Crown), "Whenever you tap one or more
+  // untapped creatures your opponents control, draw a card. This ability triggers only once each turn." (Sharae of Numbing
+  // Depths): a creature becoming tapped because a spell or ability told this ability's controller to tap it (rulings), once
+  // for each one; triggering only once each turn, "one or more" is the same as each one.
+  // (The once-each-turn handler above turns Sharae's "one or more" into "an untapped creature an opponent controls".)
+  const youTap = /^Whenever you tap an untapped creature an opponent controls, (.+)$/.exec(line);
+  if (youTap) {
+    const body = parseBody(youTap[1]!, { subjectIt: true });
+    return body ? { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" }, tappedByYou: true, body } : "fail";
+  }
   const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {
     const filter = parseTargetPhrase(tapped[1]!);
@@ -3896,8 +3923,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const text = attacksOpp[2]!;
     const oneOrMore = attacksOpp[1] === "one or more";
     // Combat Calligrapher: "that attacking player creates a tapped ... token ... that's attacking that opponent": theirs,
-    // attacking the opponent attacked (CR 508.4), never declared as an attacker.
-    const inkling = !oneOrMore && !/, if that opponent/.test(line) ? /^that attacking player creates a tapped (.+? token(?: with [a-z, ]+)?) that's attacking that opponent\.?$/.exec(text) : null;
+    // attacking the opponent attacked (CR 508.4), never declared as an attacker. Ellie, Brick Master: "... token named
+    // Cordyceps Infected that's attacking that opponent", the same with the token's name.
+    const inkling = !oneOrMore && !/, if that opponent/.test(line) ? /^that attacking player creates a tapped (.+? token(?: with [a-z, ]+)?(?: named [A-Z][A-Za-z' ]+?)?) that's attacking that opponent\.?$/.exec(text) : null;
     if (inkling) {
       const body = parseBody(`Create a ${inkling[1]} that's tapped and attacking that player.`, { eventPlayer: true });
       const e = body?.effects[0];

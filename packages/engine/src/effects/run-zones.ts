@@ -236,7 +236,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       if (e.action === "flicker") continue; // the flicker after it says what it exiles
       if (e.action === "tap") {
         if (o.tapped) continue;
-        tapPermanent(s, o);
+        tapPermanent(s, o, undefined, pid);
         log(s, `${player(s, pid).name} taps ${defOf(s, o).name}.`);
         continue;
       }
@@ -776,6 +776,37 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "suspendCard":
       for (const o of objects(s, e.what, ctx)) if (!o.isToken) suspendExiled(s, o, e.n);
       return;
+    case "secretChoose": {
+      // Malik, Grim Manipulator: you choose first, then that player; neither choice is logged until both are made.
+      const them = players(s, e.who, ctx)[0];
+      if (them === undefined || player(s, them).lost) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const options = () => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === them && objectMatches(s, e.filter, obj(s, id), them, false));
+      if (!sc.queue) {
+        sc.queue = [ctx.controller, them];
+        sc.chosen = {};
+      }
+      while (sc.queue.length) {
+        const pid = sc.queue[0]!;
+        const opts = options();
+        if (opts.length <= 1) {
+          sc.chosen![pid] = opts;
+          sc.queue.shift();
+          continue;
+        }
+        const a = /^[aeiou]/i.test(e.filter.text) ? "an" : "a";
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: e.filter.text, options: opts, count: 1, secret: pid === them ? "own" : "theirs", ...(pid !== them ? { of: them } : {}), prompt: pid === them ? `secretly choose ${a} ${e.filter.text} you control. Both choices are then revealed, and you sacrifice the chosen ones.` : `secretly choose ${a} ${e.filter.text} ${player(s, them).name} controls. Both choices are then revealed, and they sacrifice the chosen ones.` };
+        return "paused";
+      }
+      const mine = sc.chosen?.[ctx.controller] ?? [];
+      const theirs = sc.chosen?.[them] ?? [];
+      const name = (ids: ObjectId[]) => (ids.length ? defOf(s, obj(s, ids[0]!)).name : "nothing");
+      log(s, `The choices are revealed: ${player(s, ctx.controller).name} chose ${name(mine)}, ${player(s, them).name} chose ${name(theirs)}.`);
+      s.resolving!.created = [...new Set([...mine, ...theirs])].filter((id) => s.objects[id]?.zone === "battlefield");
+      sc.queue = undefined;
+      sc.chosen = undefined;
+      return;
+    }
     case "commanderToHand": {
       // "Your commander" is a commander you own (CR 903.3); in the command zone as this resolves, or nothing happens.
       const p = player(s, ctx.controller);
@@ -2979,7 +3010,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             putCounters(s, c, e.yoursCounterElseTap, 1);
             log(s, `${src} puts a ${e.yoursCounterElseTap} counter on ${defOf(s, c).name}.`);
           } else if (!c.tapped) {
-            tapPermanent(s, c);
+            tapPermanent(s, c, undefined, ctx.controller);
             log(s, `${src} taps ${defOf(s, c).name}.`);
           }
         }

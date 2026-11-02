@@ -1,7 +1,7 @@
 # Roadmap
 
-29,427 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,444 of
+29,438 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,448 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1765,6 +1765,32 @@ line blocks.
    is an Elemental, so it's always a cast as it resolves); "Whenever ~ enters or a planeswalker you control dies" and
    "Planeswalkers' loyalty abilities you activate cost an additional [+1] to activate" (Carth the Lion: a [−2] costs [−1],
    so it can be activated with one loyalty, rulings; CR 606.6). +10 (29,417 of 31,936 with B84 to B89; 29,427 with B90).
+   Round 256 (the top of the list): a legendary card's two-word name with an accented letter, "Dáin" for "Dáin Ironfoot"
+   (CR 201.5c), and "create a colorless Equipment artifact token named Axe ... When you do, attach it to target creature
+   you control" (the token made, attached as the reflexive ability resolves); "exile the top card of that player's
+   library. If it's a permanent card, you may put it onto the battlefield under your control. If you don't, create a 1/1
+   blue Fish creature token" (Fishing Gear, with a browser test); "That land becomes a 0/0 green and blue Fractal creature
+   that's still a land. Put a +1/+1 counter on it for each land you had enter the battlefield under your control this
+   turn" (Emergent Sequence: the land found counts, rulings); "Until end of turn, you may cast spells from your hand
+   without paying their mana costs" (Chandra, Flame's Catalyst: Omniscience's alternative cost as a rule for the turn,
+   with a browser test); "Until end of turn, creatures you control gain 'You may have this creature assign its combat
+   damage as though it weren't blocked'" (Garruk, Savage Herald: those you control as it resolves); "Cast any number of
+   red instant and/or sorcery cards from your graveyard without paying their mana costs" (Chandra Ablaze, with a browser
+   test); "When this creature dies or is put into exile" granted by Kaya the Inexorable's +1, and her emblem's "you may
+   cast a legendary spell from your hand, from your graveyard, or from among cards you own in exile without paying its
+   mana cost" (legendary as the spell cast; a face-down card only if you may look at it, rulings; with a browser test);
+   "up to two land cards that each have a basic land type" (Slimefoot's Survey); "target opponent takes an extra turn
+   after this one. Until your next turn, you and planeswalkers you control gain protection from that player" (Eon
+   Frolicker); "Counters remain on ~ as it moves to any zone other than a player's hand or library" (Skullbriar, the
+   Walking Grave and Me, the Immortal: only with the ability in the zone it leaves, rulings). +11 (29,428 of 31,936 with
+   B84 to B89; 29,438 with B90).
+   Out after round 256 (looked at, not done): Scrap Welder ("Sacrifice an artifact with mana value X" as a cost, X set by
+   the artifact sacrificed and the target's mana value less than it: no sacrifice cost with a mana value X yet, in the
+   engine, the bot or the app); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
+   Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
+   abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
+   (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic and Crashing Wave (tap creatures, or
+   artifacts and creatures, to pay generic mana of an ability's or a waterbend cost).
    Out after round 255 (looked at, not done): Benevolent Blessing (protection that doesn't remove Auras and Equipment
    already attached when the effect began: no record of what was attached then); Overgrown Zealot (mana spendable only to
    turn permanents face up: no ManaUse for a turn-face-up cost).

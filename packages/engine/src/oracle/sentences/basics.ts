@@ -1349,6 +1349,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Players can't lose life this turn and players can't lose the game or win the game this turn$/.test(s)) return [{ type: "turnRules", rules: ["cantLoseLife", "cantLoseGame", "cantWinGame"], everyone: true }];
   if (/^Players gain hexproof until end of turn$/.test(s)) return [{ type: "playerGains", keywords: ["Hexproof"], everyone: true }];
   if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];
+  // Chandra, Flame's Catalyst: "Until end of turn, you may cast spells from your hand without paying their mana costs":
+  // Omniscience's alternative cost (CR 118.9) for the rest of this turn, with the normal timing (rulings); X is 0.
+  if (/^(?:Until end of turn, you may cast spells from your hand without paying their mana costs|You may cast spells from your hand without paying their mana costs until end of turn)$/.test(s)) return [{ type: "turnRules", rules: ["castFromHandFree"] }];
   // The Chain Veil (CR 606.3, rulings): planeswalkers that come under your control later this turn too.
   if (/^For each planeswalker you control, you may activate one of its loyalty abilities once this turn as though none of its loyalty abilities have been activated this turn$/.test(s)) return [{ type: "turnRules", rules: ["extraLoyalty"] }];
   if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {

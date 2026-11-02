@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -91,7 +91,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST },
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -4196,10 +4196,25 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
+    // Azula, Cunning Usurper: "Mana of any type can be spent to cast those spells."
+    if (plain && a.playLinkedAnyType) return "anyType";
     if (life) how = "life";
     else if (!how) how = "plain";
   }
   return how;
+}
+
+/**
+ * Azula, Cunning Usurper: "you may cast them as though they had flash": a permanent `pid` controls whose "cast cards
+ * exiled with ~" holds now and whose linked exile took this card (CR 607.2a, 702.8a).
+ */
+function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.zone !== "exile" || !s.linkedExile) return false;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    const a = abilitiesOf(s, p);
+    return controllerOf(s, p) === pid && !!a.playLinkedFlash && !!a.playLinkedWhile && staticConditionNow(s, a.playLinkedWhile, id, pid) && (s.linkedExile![`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0));
+  });
 }
 
 /**
@@ -4343,6 +4358,10 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
+  // Robber of the Rich: only during a turn they declared a Rogue as an attacker (its creature types as it attacked).
+  // Summon: Brynhildr: only during a turn they put a lore counter on that Saga, as that object (CR 400.7).
+  if (m.loreOn && !(s.turnLog?.lorePut ?? []).includes(`${pid}:${m.loreOn.id}@${m.loreOn.zc}`)) return false;
+  if (m.attackedWithType && !((w) => w?.turn === s.turn && Object.values(w.kinds ?? {}).some((k) => k === "all" || k.includes(m.attackedWithType!)))(s.players[pid]?.attackedWith)) return false;
   // Possibility Technician: only while that player controls a Kavu.
   if (m.ifControl && !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, m.ifControl!, obj(s, id), pid, false))) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
@@ -4590,6 +4609,11 @@ export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, unta
   putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
 }
 
+/** Visions of Phyrexia: a card played from exile this turn, a land or a spell (TurnLog.playedFromExile). */
+function notePlayedFromExile(s: GameState, pid: PlayerId): void {
+  if (!(s.turnLog?.playedFromExile ?? []).includes(pid)) ((s.turnLog ??= {}).playedFromExile ??= []).push(pid);
+}
+
 function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
   const o = obj(s, id);
   const d = defOf(s, o);
@@ -4599,6 +4623,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   p.landsPlayedThisTurn++;
   // Spider-Man 2099: "if you've played a land ... this turn from anywhere other than your hand".
   if (o.zone !== "hand" && !(s.turnLog?.landPlayedNotFromHand ?? []).includes(p.id)) ((s.turnLog ??= {}).landPlayedNotFromHand ??= []).push(p.id);
+  if (o.zone === "exile") notePlayedFromExile(s, p.id);
   if (untapped && choice?.kind === "payLife") {
     payLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
@@ -5043,7 +5068,7 @@ export function castProblem(
   // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
   // with that X announced (601.2b); before X is announced it counts as 0.
   const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -6287,6 +6312,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
   if (p.id === s.activePlayer) p.actedTurn = s.turn; // Arboria: a spell cast during their own turn
+  if (castFrom === "exile" && !o.spellCopy) notePlayedFromExile(s, p.id);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).

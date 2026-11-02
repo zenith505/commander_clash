@@ -429,14 +429,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         s.resolving!.drawReplaced = undefined;
       }
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
+      // Tales of the Ancestors: "each player with fewer cards in hand than the player with the most ... draws cards equal to
+      // the difference": every difference worked out before anyone draws (CR 608.2h), or the first draws would change it.
+      if (typeof e.n === "object" && "count" in e.n && e.n.count.kind === "behindMost") sc.drawEach ??= Object.fromEntries(queue.map((pid) => [pid, amountNow(s, e.n, { ...ctx, eachOne: pid })]));
       while (queue.length) {
         const pid = queue.shift()!;
         s.resolving!.drawing = true;
-        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
+        const n = sc.drawEach?.[pid] ?? amountNow(s, e.n, { ...ctx, eachOne: pid });
         s.resolving!.drawing = undefined;
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
       }
+      sc.drawEach = undefined;
       return;
     }
     case "drawUpTo": {

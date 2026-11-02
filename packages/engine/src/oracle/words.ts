@@ -79,10 +79,12 @@ export const SPENT_TO_CAST = `${SPENT} was spent to cast (~|it|that spell)`;
 export function parseSpentReq(what: string): SpentReq | null {
   const COLOR_OF: Record<string, Color> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
   let m: RegExpExecArray | null;
+  // Drowner of Truth: "if {C} was spent to cast it": some colorless mana (CR 106.1b, 107.4c), which isn't a color.
+  if (/^(?:\{C\})+$/.test(what)) return { colorless: what.length / 3 };
   if (/^(?:\{[WUBRGC]\})+$/.test(what)) {
     const colors: Partial<Record<Color, number>> = {};
     for (const c of what.match(/[WUBRGC]/g)!) {
-      if (c === "C") return null; // {C} isn't a color; no card asks for it
+      if (c === "C") return null; // {C} isn't a color: {C} with colors isn't on any card
       colors[c as Color] = (colors[c as Color] ?? 0) + 1;
     }
     return { colors };

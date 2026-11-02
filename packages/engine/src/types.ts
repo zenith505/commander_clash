@@ -165,8 +165,12 @@ export interface CardFace {
 
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
 /** How it became face down: cast with morph, megamorph or disguise, or put onto the battlefield manifested or cloaked (CR 701.40, 701.58). */
-/** "forest": put onto the battlefield face down as a Forest land with no other types or abilities (Yedora, CR 708.2a). */
-export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest";
+/**
+ * "forest": put onto the battlefield face down as a Forest land with no other types or abilities (Yedora, CR 708.2a).
+ * "cyberman": face down as "2/2 Cyberman artifact creatures" (The Cyber-Controller, Death in Heaven), with no name or
+ * color (rulings).
+ */
+export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest" | "cyberman";
 
 /**
  * "merged": a card or token that's a component of a merged permanent other than the permanent's own object (CR 730.2):
@@ -397,6 +401,10 @@ export interface GameObject {
     attackedWithToken?: true;
     /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only in a turn its player declared a commander as an attacker (Player.commanderAttackedTurn). */
     attackedWithCommander?: true;
+    /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared an attacker with this creature type as it attacked (Player.attackedWith.kinds). */
+    attackedWithType?: string;
+    /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on this object (TurnLog.lorePut). */
+    loreOn?: { id: ObjectId; zc: number };
     /** "If you control a Kavu" (Possibility Technician): only while `player` controls a permanent like this. */
     ifControl?: TargetSpec;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
@@ -1605,6 +1613,10 @@ export interface TurnLog {
   toGraveyard?: Record<number, number>;
   /** Players who played a land this turn from anywhere other than their hand (Spider-Man 2099). */
   landPlayedNotFromHand?: PlayerId[];
+  /** Visions of Phyrexia: who played a card from exile this turn, a land or a spell (not a copy, which isn't a card). */
+  playedFromExile?: PlayerId[];
+  /** Lore counters put on a permanent this turn, as `player:id@zoneChanges` (who put them, CR 122.6): "during any turn you put a lore counter on ~" (Summon: Brynhildr). */
+  lorePut?: string[];
   /** Cards put into each owner's graveyard from their hand or library this turn (Welcome the Dead). */
   toGraveyardFromHandOrLibrary?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
@@ -2362,6 +2374,8 @@ export interface Resolving {
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
   returnedNontoken?: PlayerId[];
+  /** Who controlled each permanent its "return ... to their owners' hands" returned from the battlefield, as it left; one a replacement sent elsewhere (a commander, CR 903.9b) wasn't returned (Count opponentsReturnedFrom). */
+  returnedFrom?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
   /** How many cards a dig with rest "keep" left on top (an orderTop with `digRest` arranges them). */
@@ -2407,6 +2421,8 @@ export interface Resolving {
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
+    /** Tales of the Ancestors: how many each player draws, worked out before anyone draws. */
+    drawEach?: Record<PlayerId, number>;
     scryDrew?: true; // Eligeth: the scry became a draw, which may have stopped for dredge
     /** Elder Brain: the hand was exiled (a draw after it that stopped for dredge is finished by the answer). */
     handExiled?: true;

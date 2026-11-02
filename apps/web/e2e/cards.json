@@ -1510,6 +1510,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8bad4e43-4375-4e7f-897e-d28be72308d7",
+  "name": "Author of Shadows",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Shade Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shade",
+   "Warlock"
+  ],
+  "oracleText": "When this creature enters, exile all opponents' graveyards. Choose a nonland card exiled this way. You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
   "name": "Avacyn's Pilgrim",
   "manaCost": "{G}",
@@ -10382,6 +10413,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "31af65c3-602b-4ac9-a25f-dccb88f8f751",
+  "name": "Jacob Frye",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Assassin",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin"
+  ],
+  "oracleText": "Partner with Evie Frye (When this creature enters, target player may put Evie into their hand from their library, then shuffle.)\nWhenever one or more Assassins you control deal combat damage to a player, exile up to one target Assassin card or card with freerunning from your graveyard. If you do, copy it. You may cast the copy.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Partner with",
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "396b943c-b45d-4e5b-a9c1-f70bc603ee9f",
   "name": "Jester's Scepter",
   "manaCost": "{3}",
@@ -17161,6 +17228,34 @@
   "set": "blb",
   "releasedAt": "2024-08-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f60234e4-9b53-47a5-a21a-82c80b5af072",
+  "name": "Rowan's Grim Search",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nIf this spell was bargained, look at the top four cards of your library, then put up to two of them back on top of your library in any order and the rest into your graveyard.\nYou draw two cards and you lose 2 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Bargain"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

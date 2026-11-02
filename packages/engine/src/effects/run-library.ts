@@ -1692,6 +1692,16 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         return "paused";
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+      // Rowan's Grim Search: "put up to two of them back on top of your library in any order": their owner orders them (CR
+      // 401.4); each one put back goes on top of the ones before, so the first chosen ends on top.
+      if (e.into === "libraryTop" && found.length > 1) {
+        if (!sc.arranged) {
+          s.pending = { kind: "arrangeTop", player: from, how: "order", cards: [...found], source: src };
+          return "paused";
+        }
+        found = sc.arranged.top.filter((id) => found.includes(id)).reverse();
+        sc.arranged = undefined;
+      }
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.play ? " and may play it this turn" : ""}.`);

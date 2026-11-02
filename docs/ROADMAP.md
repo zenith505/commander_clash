@@ -4596,6 +4596,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   types ("Eldrazi Scion", "Sand Warrior", "Spider Hero") now need both types instead of either (CR 205.3), which fixes
   Kor Castigator, Deathless Behemoth, Hand of Emrakul, Drowner of Hope, Brood Birthing and Radioactive Spider. +16
   (29,279 of 31,936 with B84).
+- Round B86 (one-line templates from the bottom of the list): "Whenever a creature you control attacks a player
+  alone" (Yuriko, Blade of the Mighty, Jiang Yanggu, Alone: attackers of that player's planeswalkers don't count,
+  per the rulings) and Yuriko's "During combat, players can't cast spells or activate abilities that aren't mana
+  abilities"; "target opponent previously dealt damage by it" and "each opponent and planeswalker it has dealt damage
+  to this game" (Diseased Vermin, The Fallen: a permanent remembers whom it has dealt damage to while it stays on the
+  battlefield); a planeswalker with loyalty counters is a creature with no abilities whose power and toughness equal
+  its loyalty (Spark Rupture); support then "each creature you control with a +1/+1 counter on it deals damage"
+  (Nissa's Judgment); "for as long as that creature is enchanted" (Rootwater Matriarch); "you control each creature
+  on the battlefield with the greatest power" (Might Makes Right); "each creature with the greatest mana value"
+  (Favor of the Mighty); "the player with the lowest life total or tied for lowest" gains control (Loxodon
+  Peacekeeper); a token "that's attacking" with ~'s power and toughness (Gemini Engine); the greatest mana value
+  among noncreature permanents and noncreature cards in your graveyard (Dragon Man, Reformed Robot); mana spent only
+  on a spell with flashback cast from a graveyard (Altar of the Lost); "if it shares a card type with the card exiled
+  this way" (Holistic Wisdom); "if an opponent was dealt noncombat damage last turn" and counters on "each other
+  Wizard token you control" (Command the Stage); "Enchanted creature can't be blocked as long as it's attacking
+  alone" (Gutter Skulker // Gutter Shortcut). +16 (29,295 of 31,936 with B85).
+- Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
+  Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
+  attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life, Mob Mentality,
+  Breaking // Entering, Darigaaz, Grime Gorger, Naya Soulbeast.
 - Out after round B85 (looked at, not done): Grave Consequences (each player exiles any number from their own
   graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
   (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on

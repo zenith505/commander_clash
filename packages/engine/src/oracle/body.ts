@@ -1913,6 +1913,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Dragonbroods' Relic: "... token named Reliquary Dragon that's all colors. It has flying, lifelink, and "..."": the same,
   // all colors (CR 105.1) said as its colors, since a quoted ability has to end the sentence.
   text = text.replace(/\b([Cc]reate an? \d+\/\d+) ((?:[A-Z][a-z]+ )+creature token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*) that's all colors\. It has ((?:[^."]|"[^"]*")+?)(\.|(?<="))(?=\s|$)/, "$1 white, blue, black, red, and green $2 with $3$4");
+  // Gruesome Menagerie: "Choose a creature card with mana value 1 in your graveyard, then do the same for creature cards
+  // with mana value 2 and 3. Return those cards to the battlefield.": one card of each of those mana values that's there,
+  // chosen as it resolves (not targeted), all entering at once (rulings).
+  text = text.replace(/^Choose a creature card with mana value 1 in your graveyard, then do the same for creature cards with mana value 2 and 3\. Return those cards to the battlefield\.$/, "Return a creature card with mana value 1, 2, and 3 each from your graveyard to the battlefield.");
   // Orzhov Advokist: "If a player does" is about the "may" of the sentence before: one instruction.
   text = text.replace(/(each player may put (?:two|three) \S+ counters on a creature they control)\. If a player does, (creatures that player controls can't attack you or planeswalkers you control until your next turn)\./i, "$1; if a player does, $2.");
   // Stinging Study: "where X is the mana value of a commander you own on the battlefield or in the command zone": one of

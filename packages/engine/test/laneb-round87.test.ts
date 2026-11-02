@@ -158,7 +158,11 @@ const ballista = (): CardDef => ({"oracleId": "b6811c31-fcd3-4d00-89d5-cf974575a
 const suitor = (): CardDef => ({"oracleId": "e98e8129-3e0e-45cc-b00c-1387cc592023", "name": "Alluring Suitor // Deadly Dancer", "manaCost": "{2}{R}", "cmc": 3, "typeLine": "Creature — Vampire // Creature — Vampire", "supertypes": [], "types": ["Creature"], "subtypes": ["Vampire"], "oracleText": "When you attack with exactly two creatures, transform this creature.", "power": "2", "toughness": "3", "colors": ["R"], "colorIdentity": ["R"], "keywords": ["Transform", "Trample"], "producedMana": ["R"], "layout": "transform", "faces": [{"name": "Alluring Suitor", "manaCost": "{2}{R}", "typeLine": "Creature — Vampire", "supertypes": [], "types": ["Creature"], "subtypes": ["Vampire"], "oracleText": "When you attack with exactly two creatures, transform this creature.", "power": "2", "toughness": "3", "colors": ["R"]}, {"name": "Deadly Dancer", "manaCost": "", "typeLine": "Creature — Vampire", "supertypes": [], "types": ["Creature"], "subtypes": ["Vampire"], "oracleText": "Trample\nWhen this creature transforms into Deadly Dancer, add {R}{R}. Until end of turn, you don't lose this mana as steps and phases end.\n{R}{R}: This creature and another target creature each get +1/+0 until end of turn.", "power": "3", "toughness": "3", "colors": ["R"], "colorIndicator": ["R"]}]}) as CardDef;
 const wiitigo = (): CardDef => ({"oracleId": "7f956a21-854e-41cc-96f9-ad774e69fa8e", "name": "Wiitigo", "manaCost": "{3}{G}{G}{G}", "cmc": 6, "typeLine": "Creature — Yeti", "supertypes": [], "types": ["Creature"], "subtypes": ["Yeti"], "oracleText": "This creature enters with six +1/+1 counters on it.\nAt the beginning of your upkeep, put a +1/+1 counter on this creature if it has blocked or been blocked since your last upkeep. Otherwise, remove a +1/+1 counter from it.", "power": "0", "toughness": "0", "colors": ["G"], "colorIdentity": ["G"], "keywords": [], "layout": "normal"}) as CardDef;
 const shape = (): CardDef => ({"oracleId": "16950554-0e39-4705-aab4-7a8734771844", "name": "Shape of the Wiitigo", "manaCost": "{3}{G}{G}{G}", "cmc": 6, "typeLine": "Enchantment — Aura", "supertypes": [], "types": ["Enchantment"], "subtypes": ["Aura"], "oracleText": "Enchant creature\nWhen this Aura enters, put six +1/+1 counters on enchanted creature.\nAt the beginning of your upkeep, put a +1/+1 counter on enchanted creature if it attacked or blocked since your last upkeep. Otherwise, remove a +1/+1 counter from it.", "colors": ["G"], "colorIdentity": ["G"], "keywords": ["Enchant"], "layout": "normal"}) as CardDef;
+const menagerie = (): CardDef => ({"oracleId": "f95fda8c-0737-447f-9212-1c459062b9e7", "name": "Gruesome Menagerie", "manaCost": "{3}{B}{B}", "cmc": 5, "typeLine": "Sorcery", "supertypes": [], "types": ["Sorcery"], "subtypes": [], "oracleText": "Choose a creature card with mana value 1 in your graveyard, then do the same for creature cards with mana value 2 and 3. Return those cards to the battlefield.", "colors": ["B"], "colorIdentity": ["B"], "keywords": [], "layout": "normal"}) as CardDef;
+const sphinx = (): CardDef => ({"oracleId": "690df8d2-9538-4c51-b730-cee09ad0ef1c", "name": "Sphinx of the Chimes", "manaCost": "{4}{U}{U}", "cmc": 6, "typeLine": "Creature — Sphinx", "supertypes": [], "types": ["Creature"], "subtypes": ["Sphinx"], "oracleText": "Flying\nDiscard two nonland cards with the same name: Draw four cards.", "power": "5", "toughness": "6", "colors": ["U"], "colorIdentity": ["U"], "keywords": ["Flying"], "layout": "normal"}) as CardDef;
 
+const shock = (): CardDef => ({"oracleId":"a9d288b8-cdc1-4e55-a0c9-d6edfc95e65d","name":"Shock","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Shock deals 2 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"layout":"normal"}) as CardDef;
+const bolt = (): CardDef => ({"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"layout":"normal"}) as CardDef;
 const testDraw = () => card("Test Draw", "Instant", "{U}", { oracleText: "Draw a card." });
 const elemental = (toughness: string) => card(`Test Elemental ${toughness}`, "Creature — Elemental", "{R}", { power: "3", toughness });
 const nonbasicLand = () => card("Test Land", "Land", "", { oracleText: "{T}: Add {C}." });
@@ -168,7 +172,7 @@ const subtypesOf = (s: GameState, id: string) => characteristics(s, s.objects[id
 
 describe("Lane B round 87", () => {
   it("all of them are supported", () => {
-    supported(rowen(), etchings(), dragster(), thicket(), awakener(), limDul(), koya(), relic(), ballista(), suitor(), wiitigo(), shape());
+    supported(rowen(), etchings(), dragster(), thicket(), awakener(), limDul(), koya(), relic(), ballista(), suitor(), wiitigo(), shape(), menagerie(), sphinx());
   });
 
   it("Rowen: the first card drawn each turn is revealed; a basic land card draws another card, other cards don't", () => {
@@ -469,5 +473,56 @@ describe("Lane B round 87", () => {
     s = settle(toNextUpkeep(s, ap));
     expect(counters(s, bear, "+1/+1")).toBe(7);
     expect(counters(s, giant, "+1/+1")).toBe(5);
+  });
+
+  it("Gruesome Menagerie: one creature card each of mana value 1, 2 and 3 from your graveyard, all returned at once", () => {
+    const { s: s0, ap, ids } = setup([menagerie()]);
+    let s = s0;
+    const one = toZone(s, ap, card("Test One", "Creature — Rat", "{B}", { cmc: 1, power: "1", toughness: "1" }), "graveyard");
+    const oneB = toZone(s, ap, card("Test One B", "Creature — Rat", "{W}", { cmc: 1, power: "1", toughness: "1" }), "graveyard");
+    const three = toZone(s, ap, card("Test Three", "Creature — Rat", "{2}{B}", { cmc: 3, power: "3", toughness: "3" }), "graveyard");
+    const four = toZone(s, ap, card("Test Four", "Creature — Rat", "{3}{B}", { cmc: 4, power: "4", toughness: "4" }), "graveyard");
+    s = castNow(s, ap, ids[0]!);
+    s = settle(s, { me: [ap] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 2, max: 2 });
+    const pend = s.pending as Extract<typeof s.pending, { kind: "searchLibrary" }>;
+    expect([...pend.cards].sort()).toEqual([one, oneB, three].sort());
+    // Two of the same mana value don't do.
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [one, oneB] })).toThrow();
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [one] })).toThrow();
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [oneB, three] }));
+    expect(zone(s, oneB)).toBe("battlefield");
+    expect(zone(s, three)).toBe("battlefield");
+    expect(zone(s, one)).toBe("graveyard");
+    expect(zone(s, four)).toBe("graveyard");
+  });
+
+  it("Sphinx of the Chimes: discard two nonland cards with the same name to draw four; other pairs don't pay", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const sp = veteran(s, ap, sphinx());
+    const [shockA, shockB, boltA, landA, landB] = handOf(s, ap, [shock(), shock(), bolt(), nonbasicLand(), nonbasicLand()]);
+    expect(planActivate(s, ap, sp, 0, [], undefined, undefined, undefined, { discard: [shockA!, boltA!] })).toBeNull();
+    expect(abilityProblem(s, ap, sp, 0, [], undefined, undefined, undefined, { discard: [landA!, landB!] })).toMatch(/choose 2 nonland cards with the same name/);
+    s = settle(run(s, planActivate(s, ap, sp, 0, [], undefined, undefined, undefined, { discard: [shockA!, shockB!] })));
+    expect(yard(s, ap)).toEqual(expect.arrayContaining([shockA, shockB]));
+    expect(hand(s, ap).length).toBe(3 + 4);
+    // With no two nonland cards of one name, it can't be activated.
+    handOf(s, ap, [shock(), bolt(), nonbasicLand(), nonbasicLand()]);
+    expect(abilityProblem(s, ap, sp, 0)).toMatch(/you need to discard 2 nonland cards with the same name/);
+  });
+
+  it("Sphinx of the Chimes: a bot discards a pair that shares a name", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const sp = veteran(s, ap, sphinx());
+    poolOnly(s, ap, {});
+    // Activated abilities wait for the bot's second main phase.
+    s = goUntil(s, (x) => x.step === "main2" && waitingOn(x) === ap && !x.stack.length && !x.pending);
+    const [giantA, giantB] = handOf(s, ap, [hillGiant(), hillGiant(), bolt()]);
+    s.players[ap]!.isBot = true;
+    const a = botActions(s, ap).find((x) => x.type === "activateAbility" && x.objectId === sp) as Extract<Action, { type: "activateAbility" }> | undefined;
+    expect(a).toBeDefined();
+    expect([...(a!.costs?.discard ?? [])].sort()).toEqual([giantA, giantB].sort());
   });
 });

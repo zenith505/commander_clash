@@ -2557,7 +2557,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.milled) s.resolving!.did = false;
         if (!max) return;
         const kind = filter?.text ?? "card";
-        const what = e.distinctManaValues
+        const what = e.distinctManaValues && !e.upTo
+          ? `one ${kind} of each mana value`
+          : e.distinctManaValues
           ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
           : e.oneEach && e.upTo && e.n >= 99
             ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different names`

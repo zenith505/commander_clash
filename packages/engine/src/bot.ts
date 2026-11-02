@@ -4984,6 +4984,12 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       out.collect = ids;
     } else if (c.kind === "discard" && c.random) {
       if (player(s, pid).hand.length < c.n + 4) return null;
+    } else if (c.kind === "discard" && c.sameName) {
+      // Sphinx of the Chimes: cards of one name (CR 201.2), the ones we'd rather discard first.
+      const order = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => x !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
+      const group = order.map((x) => order.filter((y) => sameName(defOf(s, obj(s, y)).name, defOf(s, obj(s, x)).name))).find((g) => g.length >= c.n);
+      if (!group) return null;
+      out.discard = group.slice(0, c.n);
     } else if (c.kind === "discard") {
       const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
       if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;

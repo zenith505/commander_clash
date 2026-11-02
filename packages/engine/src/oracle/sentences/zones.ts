@@ -673,6 +673,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 0, upTo: true, distinctManaValues: true, ...(filter ? { filter } : {}) }];
   }
+  // Gruesome Menagerie (rewritten in body.ts): one creature card of each mana value from 1 to 3 that's in your graveyard,
+  // as many as there are of those mana values (a card with {X} in its cost has mana value 0 there, rulings).
+  if (s === "Return a creature card with mana value 1, 2, and 3 each from your graveyard to the battlefield")
+    return [{ type: "chooseFromGraveyard", n: 3, distinctManaValues: true, dest: "battlefield", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], manaValue: { min: 1, max: 3 }, text: "creature card with mana value 1, 2 or 3" } }];
   // "Return any number of permanent cards with different names from your graveyard to the battlefield" (Eerie Ultimatum):
   // chosen as it resolves (rulings), one of each name; an Aura can't enchant another card entering with it (rulings).
   if ((m = /^[Rr]eturn any number of (.+?) with different names from your graveyard to the battlefield$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {

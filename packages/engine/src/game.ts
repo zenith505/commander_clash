@@ -5,7 +5,7 @@ import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
-import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
@@ -7123,7 +7123,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     // "Discard an Island card and another card" (Foil): one of them an Island card.
     const oneOf = c.kind === "discard" ? c.oneOf : undefined;
     const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
-    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
+    // Sphinx of the Chimes: "two nonland cards with the same name" (CR 201.2).
+    const alike = c.kind === "discard" && c.sameName;
+    const nameOf = (id: ObjectId) => defOf(s, obj(s, id)).name;
+    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
     // "You may exile any number of blue cards from your hand": none is fine.
     if (c.kind === "exileFromHand" && c.anyNumber) {
       if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
@@ -7133,11 +7136,13 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       // Untapping: also what can be tapped for mana first (Halo Fountain).
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
+      if (alike && !pool.some((id) => pool.filter((x) => sameName(nameOf(x), nameOf(id))).length >= c.n)) return `you need to ${verb} ${full} to ${doing}`;
       if (c.kind === "sacrifice" && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
+    if (alike && !chosen.every((id) => sameName(nameOf(id), nameOf(chosen[0]!)))) return `choose ${full} to ${verb}`;
     if (c.kind === "sacrifice" && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full} to ${verb}`;
   }
   return null;

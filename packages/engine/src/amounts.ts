@@ -416,6 +416,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "opponentsReturnedFrom":
+      return new Set((s.resolving?.returnedFrom ?? []).filter((p) => opponents(s, ctx.controller).includes(p))).size;
     case "surveilTopThisWay":
       return s.resolving?.surveilTop ?? 0;
     case "bouncedThisWayPower":
@@ -1206,6 +1208,8 @@ function describeCount(c: Count): string {
       return "#cards put on top";
     case "bouncedThisWayCount":
       return "#returned";
+    case "opponentsReturnedFrom":
+      return "#opponents whose creatures were returned";
     case "bouncedThisWayPower":
       return "the returned creature's power";
     case "preventedByRule":

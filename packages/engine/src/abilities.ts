@@ -192,6 +192,8 @@ export type Count =
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
+  /** Faerie Slumber Party: "for each opponent who controlled a creature returned this way": the different opponents who controlled a permanent its "return all ..." returned (Resolving.returnedFrom). */
+  | { kind: "opponentsReturnedFrom" }
   /** Starving Revenant: "for each card you put on top of your library" after "surveil 2": the cards that surveil kept on top. */
   | { kind: "surveilTopThisWay" }
   /** First Responder: "you may return another creature you control to its owner's hand, then put ... equal to that creature's power": its power as it last existed on the battlefield (CR 608.2h), if it went to a hand. */
@@ -3114,7 +3116,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -3138,6 +3140,8 @@ export type Effect =
       untilMvAtLeast?: number;
       /** With `reveal`: "You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your library in a random order." (Treasure Keeper): the cards stay in the library, revealed, and the found card is cast from there; then the rest go to the bottom. */
       inPlace?: true;
+      /** With `then` "hitToHand": "If the card's mana value is 4 or greater, repeat this process" (Demonlord Belzenlok): again while the card put into the hand has at least this mana value. */
+      repeatMvAtLeast?: number;
     }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;

@@ -122,6 +122,8 @@ export interface Ctx {
   lastDugLands?: boolean;
   /** Arthur, Marigold Knight: "You may put a creature card from among them onto the battlefield ..." made one creature "that creature". */
   lastDugCreature?: boolean;
+  /** Demonlord Belzenlok: after its repeated "exile ... until you exile a nonland card, then put that card into your hand": "each card put into your hand this way" (Count "dugToHand"). */
+  untilToHand?: boolean;
   /** After "look at the top N cards ... You may put any number of them into your hand": "each card you put into your hand this way" (Count "dugToHand"). */
   dugToHand?: boolean;
   /** The same, exactly one card: "that card's mana value" (Reviving Vapors; Count "dugToHandMv"). */
@@ -793,6 +795,13 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     if (ctx.targets.length !== 1) return "fail";
     const inner: Effect = { type: "exileUntilNonland", who: { ref: "targetController", index: 0 }, then: "castFree", ownerCasts: true };
     return { effect: { type: "if", cond: { kind: "destroyedThisWay" }, effects: [inner] }, next: at + 1 };
+  }
+  // Demonlord Belzenlok: "..., then put that card into your hand. If the card's mana value is 4 or greater, repeat this
+  // process." Again while the card put there has that mana value or more (rulings).
+  const repeatMv = exile && !they && /^[Pp]ut that card into your hand$/.test(sentences[at + 1] ?? "") ? new RegExp(`^If the card's mana value is (${NUM}) or greater, repeat this process$`).exec(sentences[at + 2]?.replace(/\.$/, "") ?? "") : null;
+  if (repeatMv) {
+    ctx.untilToHand = true;
+    return { effect: { type: "exileUntilNonland", then: "hitToHand", repeatMvAtLeast: num(repeatMv[1]!) }, next: at + 3 };
   }
   if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
   // Erratic Explosion, Goblin Machinist: "... until you reveal a nonland card. ~ deals damage equal to that card's mana
@@ -1983,6 +1992,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
   // libraries.": one instruction.
   text = text.replace(/(^|\. )Choose (up to (?:one|two|three|four|five)|any number of) target cards in graveyards\. The owners of those cards shuffle them into their libraries\./, "$1Shuffle $2 target cards from graveyards into their owners' libraries.");
+  // Aang's Journey: "Search your library for a basic land card. If ~ was kicked, instead search your library for a basic
+  // land card and a Shrine card. Reveal those cards, put them into your hand, then shuffle.": one search either way (CR
+  // 701.23), what's found revealed and put into the hand.
+  text = text.replace(/^Search your library for (an? [a-z ]+ card)\. If ~ was kicked, instead search your library for (an? [a-z ]+ card and an? [A-Za-z ]+ card)\. Reveal those cards, put them into your hand, then shuffle\./, "Search your library for $1, reveal it, put it into your hand, then shuffle. If ~ was kicked, instead search your library for $2, reveal them, put them into your hand, then shuffle.");
   // Carnival of Souls: "you lose 1 life and add {B}": two instructions, in order.
   text = text.replace(/(^|\. )[Yy]ou lose (\d+) life and add ((?:\{[WUBRGC]\})+)\./, "$1You lose $2 life. Add $3.");
   // Azula, Ruthless Firebender: "Until end of turn, ~ gets +1/+1 for each experience counter you have and gains menace":
@@ -4845,6 +4858,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     [prevStart, curStart] = [curStart, effects.length];
     if (!thenParts.has(sentences[si]!)) [prevWhole, curWhole] = [curWhole, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
+    // Faerie Slumber Party: "Return all creatures to their owners' hands. For each opponent who controlled a creature returned
+    // this way, you create two 1/1 blue Faerie creature tokens ...": the opponents who controlled one as it left (a token
+    // counts, a commander sent to the command zone instead doesn't, CR 903.9b), counted as it resolves.
+    const perOppReturned = /^For each opponent who controlled a creature returned this way, you create (two|three|four|an?) (.+ tokens?(?: with .+)?)$/.exec(s);
+    const lastBounce = effects[effects.length - 1];
+    if (perOppReturned && lastBounce?.type === "bounce" && lastBounce.what.ref === "each" && lastBounce.what.filter?.types?.length === 1 && lastBounce.what.filter.types[0] === "Creature") {
+      const fx = parseOne(`Create ${perOppReturned[1]} ${perOppReturned[2]}`, ctx);
+      const make = fx?.length === 1 ? fx[0] : undefined;
+      if (make?.type !== "createToken" || typeof make.n !== "number") return null;
+      effects.push({ ...make, n: { count: { kind: "opponentsReturnedFrom" }, times: make.n } });
+      continue;
+    }
+    // Aurelia, Exemplar of Justice: "Until end of turn, that creature gets +2/+0, gains trample if it's red, and gains
+    // vigilance if it's white": the bonus always, each keyword only if the creature has that color as it resolves (rulings:
+    // checked once, and kept even if its colors change later).
+    const pumpIfColors = /^Until end of turn, (that creature|it) gets ([+-]\d+\/[+-]\d+), gains (\w+) if it's (white|blue|black|red|green), and gains (\w+) if it's (white|blue|black|red|green)$/.exec(s);
+    if (pumpIfColors) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (i < 0 || t?.kind !== "object" || t.many || t.divided) return null;
+      const who = capital(pumpIfColors[1]!);
+      const pump = parseOne(`${who} gets ${pumpIfColors[2]} until end of turn`, ctx);
+      const k1 = parseOne(`${who} gains ${pumpIfColors[3]} until end of turn`, ctx);
+      const k2 = parseOne(`${who} gains ${pumpIfColors[5]} until end of turn`, ctx);
+      if (!pump || !k1 || !k2 || ctx.targets.length !== i + 1 || ![...pump, ...k1, ...k2].every((e) => mentionsTarget(e, i))) return null;
+      const color = (w: string): TargetSpec => ({ kind: "object", types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[w]!], text: w });
+      effects.push(...pump, { type: "if", cond: { kind: "targetIs", index: i, filter: color(pumpIfColors[4]!) }, effects: k1 }, { type: "if", cond: { kind: "targetIs", index: i, filter: color(pumpIfColors[6]!) }, effects: k2 });
+      continue;
+    }
     // "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4).
     const keepMana = /^Until end of turn, you don't lose unspent (?:(white|blue|black|red|green) )?mana as steps and phases end$/.exec(s);
     if (keepMana) {
@@ -5710,6 +5752,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (filter?.kind !== "object" || filter.combat !== "attackedThisTurn") return null;
       effects.push({ type: "destroyRandom", filter });
       si++;
+      continue;
+    }
+    // Hidetsugu and Kairi: "exile the top card of your library. Target opponent loses life equal to its mana value. If it's
+    // an instant or sorcery card, you may cast it without paying its mana cost." The card as it is in exile, face up (CR
+    // 406.3); cast as this resolves or not at all, ignoring timing (rulings, CR 608.2g); one not cast stays exiled.
+    const lossIts = /^[Ee]xile the top card of your library$/.test(s) ? /^(Target opponent|Each opponent|Target player) loses life equal to its mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (lossIts && sentences[si + 2]?.replace(/\.$/, "") === "If it's an instant or sorcery card, you may cast it without paying its mana cost") {
+      ctx.exiledTop = true;
+      const loss = parseOne(`${lossIts[1]} loses life equal to that card's mana value`, ctx);
+      const filter = parseSearchFilter("instant or sorcery card");
+      if (!loss || loss.length !== 1 || loss[0]!.type !== "loseLife" || !filter) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 1 }, ...loss, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: [{ type: "castTargetFree", what: { ref: "exiledTop" } }] });
+      ctx.exiledTop = true;
+      si += 2;
       continue;
     }
     // Bruse Tarl, Roving Rancher: "Exile the top card of your library. If it's a land card, create a 2/2 white Ox creature
@@ -8439,10 +8495,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them without
     // paying its mana cost.": one of those cards, not any card in that graveyard (rulings).
-    const millCast = effects[effects.length - 1]?.type === "mill" ? /^You may cast an? ([a-z ]+?) spell from among them without paying its mana cost$/.exec(s) : null;
-    const millCastFilter = millCast && parseTargetPhrase(`${millCast[1]} spell`);
-    if (millCastFilter?.kind === "spell" && !millCastFilter.controller) {
-      effects.push({ type: "castFromHand", filter: { ...millCastFilter, text: `${millCast![1]} spell` }, milled: true });
+    // Summons of Saruman: "... spell with mana value X or less from among them": the X it was cast with (TargetSpec.xRange).
+    const millCast = effects[effects.length - 1]?.type === "mill" ? /^You may cast an? ([a-z ]+?) spell( with mana value X or less)? from among them without paying its mana cost$/.exec(s) : null;
+    const millCastFilter = millCast && (!millCast[2] || ctx.spell) ? parseTargetPhrase(`${millCast[1]} spell`) : null;
+    if (millCastFilter?.kind === "spell" && !millCastFilter.controller && !millCastFilter.manaValue && !millCastFilter.xRange) {
+      effects.push({ type: "castFromHand", filter: { ...millCastFilter, ...(millCast![2] ? { xRange: { key: "manaValue" as const, at: "most" as const } } : {}), text: `${millCast![1]} spell${millCast![2] ?? ""}` }, milled: true });
       continue;
     }
     // Nurturing Pixie: "return up to one target non-Faerie, nonland permanent you control to its owner's hand. If a permanent
@@ -10357,6 +10414,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: howCast.cond, effects: [{ ...back, counters: { ...back.counters, [k]: (back.counters?.[k] ?? 0) + 1 } }], otherwise: [back] };
       continue;
     }
+    // Rowan's Grim Search: "If ~ was bargained, look at the top four cards of your library, then put up to two of them back
+    // on top of your library in any order and the rest into your graveyard": the whole look only then.
+    const condLook = howCast && !howCast.not && !howCast.ungated && /^look at the top (two|three|four|five|six|seven) cards of your library, then (put .+)$/.exec(howCast.text);
+    if (condLook && howCast) {
+      const d = parseDig(capital(condLook[2]!), { type: "dig", n: num(condLook[1]!), reveal: false }, ctx);
+      if (!d || d === "more") return null;
+      effects.push({ type: "if", cond: howCast.cond, effects: [d] });
+      continue;
+    }
     // A spell's targets are chosen whatever was spent (Cankerous Thirst rulings), so they aren't gated.
     if (howCast?.ungated && (howCast.cond.kind !== "castInMain" || /\btarget\b/.test(howCast.text)) && !howCast.not && !howCast.ofTarget && /^you may /i.test(howCast.text) && !/ instead$/.test(howCast.text)) {
       mayGate = { cond: howCast.cond, start: effects.length };
@@ -10509,7 +10575,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // announced but an amount compared as the target is chosen and again as it resolves (TargetSpec.bound; CR 601.2c,
         // 608.2b; rulings on Spellstutter Sprite). Only an amount that can be worked out then.
         if (t.xRange) {
-          if (!boundAtTargeting(def)) return false;
+          // Astelli Reclaimer: "where X is the amount of mana spent to cast ~" in its enters trigger, fixed as it was cast.
+          const spentOnSelf = def.count.kind === "manaSpent" && ctx.selfEntered && !ctx.spell && !ctx.activated && def.times === undefined && def.plus === undefined;
+          if (!boundAtTargeting(def) && !spentOnSelf) return false;
           const { xRange, ...rest } = t;
           ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at, amount: def } };
           continue;

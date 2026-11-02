@@ -1565,7 +1565,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
           // Dire Fleet Daredevil: this turn only, with its usual timing (rulings).
-          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : e.youMay.nextTurn ? "nextTurn" : "exiled", turn: s.turn, ...(e.youMay.play ? {} : { castOnly: true as const }), ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
+          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : e.youMay.nextTurn ? "nextTurn" : e.youMay.whileControlled ? "whileControlled" : "exiled", turn: s.turn, ...(e.youMay.whileControlled && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.youMay.play ? {} : { castOnly: true as const }), ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
         }
       }
       return;

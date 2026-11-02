@@ -1,6 +1,6 @@
 # Roadmap
 
-29,095 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,128 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,348 of
 9,979 (93%).
 
@@ -1620,7 +1620,7 @@ line blocks.
    Prayers (creature spells with mana value 3 or less for {E}, with flash only that way; browser test); Summoner's
    Grimoire ("If that card is an enchantment card, it enters tapped and attacking": putFromHand onlyIf); Avatar Destiny
    (the Aura back to hand and up to one milled creature card); Lifeline (another creature on the battlefield, the card
-   back at the next end step). +12 (29,095 of 31,936).
+   back at the next end step). +12 (29,128 of 31,936 with B78+B79).
    Out after round 244 (looked at, not done): Reed Richards, Smartest Man ("the first time you would draw a card each
    turn except the first in your draw step, draw four instead": needs a place among the draw replacements the player
    orders, CR 616.1); The First Tyrannic War I ("if its mana cost contains {X}": a copy's cost counts, rulings, and the
@@ -4405,6 +4405,47 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature you don't control and tap it" (Celestial Regulator); "discards cards equal to the damage" (Jagged Poppet);
   "put a +1/+1 counter on another target creature you control, and that creature gains flying" (Skyrider Patrol). +23
   (29,032 of 31,936 with rounds 237 to 239).
+- Round B78 (one-line templates from the bottom of the list): "If it's an enchantment creature or legendary creature,
+  instead put a +1/+1 counter on it and it gets +1/+1" (Regent's Authority); "you control a land creature or a land
+  entered the battlefield under your control this turn" (Earth Rumble Wrestlers); "~ escapes with N +1/+1 counters on
+  it. When it enters this way, ..." (Pharika's Spawn, an enters trigger "if it escaped"); "Exile that creature until ~
+  leaves the battlefield" (Grasping Giant); "At end of combat, gain control of that creature" (Tolarian Entrancer, and
+  Charisma); "Whenever one or more creatures you control become blocked" (Hezrou); "~ loses all abilities and gains
+  haste" as it returns (Hellcat, Undying Vigilante); a dies trigger "if it's not a Spirit" that returns it, "It's a
+  Spirit Detective" (Otherworldly Escort); "Shuffle ~ and up to three target cards from a single graveyard into their owners'
+  libraries" (Serene Remembrance); "Put a plague counter on ~ or remove a plague counter from it" (Plague Boiler, the
+  either prompt); "has double strike as long as it's an enchantment. Otherwise, prevent all damage that would be dealt
+  by enchanted creature" (Armament of Nyx); a search of that player's library that shuffles it once (Rootwater Thief);
+  "until your next upkeep" (Xenic Poltergeist); "You may play that card for as long as you control ~" (Victor Mancha,
+  Runaway); "counters equal to half that card's mana value, rounded up" of a card exiled from your graveyard (Torrent
+  Sculptor). No new prompt. +16 (29,085 of 31,936 with rounds 240 to 242).
+- Round B79 (one-line templates from the bottom of the list): an equip cost "{1} if it targets a colorless creature"
+  (Ghostfire Blade); "You can't choose an untapped permanent as ~'s target as you cast it" (Dream Leash, Enthralling
+  Hold; the bot picks tapped targets too); "{N} less to cast if it targets a creature whose controller has eight or more
+  cards in their graveyard" (Lullmage's Domination); "Prevent all combat damage non-Soldier creatures would deal this
+  turn" (Frontline Strategist); "+2/-2 or -2/+2" on target creature (Shaper Parasite); "put two time counters on it and
+  it gains vanishing" (Maelstrom Djinn, CR 702.63b); look at the top card of target player's library and pay 2 life to
+  put a nonland card into their graveyard (Wand of Denial: the pick says "you pay 2 life for each"; browser test);
+  "gets +1/+0 if you've cast another instant or sorcery spell this turn. Then it deals damage" (Burrog Barrage); "Add
+  {B}{B} or {G}{G}" (Cadaverous Bloom; browser test of the two-color choice); "Prevent all damage that would be dealt by
+  instant and sorcery spells" (Energy Storm); "can't be the target of abilities from artifact sources" (Artifact Ward);
+  "When a Vehicle you control attacks, exile enchanted creature" (Caught in the Brights); "When ~'s echo cost is paid"
+  (Shah of Naar Isle, mana echo only); "You may play that card this turn" after an opponent exiles their top card
+  (Ornate Kanzashi); "Remove an oil counter from ~: It becomes a 5/5" (Meldweb Strider); "Whenever you become the target
+  of a spell" (Dormant Gomazoa). UI fix: a look at another player's library is headed "The top of Ana's library", not
+  "your library". +17 (29,065 of 31,936; 29,102 with rounds 240 to 242).
+- Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
+  can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
+  Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,
+  Bronze Horse, Mister Immortal (activated from exile), Wall of Deceit and Backslide (turn a creature face down),
+  Sarkhan's Whelp, Dredging Claw, Defiant Vanguard. Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
+  changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
+- Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
+  batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (the
+  creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion ("Sacrifice enchanted creature" as
+  a cost), Rasputin, the Oneiromancer (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
+  face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (a state trigger bound
+  to the chosen color), Grim Contest (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an

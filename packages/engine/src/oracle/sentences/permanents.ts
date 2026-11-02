@@ -284,6 +284,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
+  // Plague Boiler: "Put a plague counter on ~ or remove a plague counter from it": one or the other, chosen as it resolves,
+  // removing only with one there to remove (rulings, CR 608.2d).
+  if ((m = /^Put an? ([a-z]+) counter on ~ or remove an? ([a-z]+) counter from (?:it|~)$/.exec(s)) && m[1] === m[2] && !ctx.spell) {
+    const k = m[1]!;
+    return [{ type: "either", options: [[{ type: "counters", what: { ref: "self" }, counter: k, n: 1 }], [{ type: "removeCounters", what: { ref: "self" }, counter: k, n: 1 }]], labels: [`Put a ${k} counter on ~`, `Remove a ${k} counter from ~`], onlyDoable: true }];
+  }
   // Telekinetic Bonds: "If you do, you may tap or untap target permanent": tap, untap or neither, as one question.
   if ((m = /^You may tap or untap (target permanent)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -1291,6 +1297,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Jet's Brainwashing: "If ~ was kicked, gain control of that creature until end of turn": the target before.
   // Crown of Empires: "Tap target creature. Gain control of that creature instead if ...": an activated ability's target the
   // same way, for good (CR 611.2a).
+  // Tolarian Entrancer: "Whenever ~ becomes blocked by a creature, gain control of that creature at end of combat": the
+  // blocking creature the trigger is about (the delayed part is "at end of combat", see sentences/basics.ts), for good,
+  // whether or not ~ is still around then (rulings).
+  if (/^Gain control of that creature$/.test(s) && ctx.subject && !ctx.spell && !ctx.activated) {
+    const what = parseObject("that creature", ctx);
+    return what?.ref === "subject" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game" }] : null;
+  }
   if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && (ctx.spell || ctx.activated)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
@@ -1448,8 +1461,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
   }
   // "Enchanted creature gets +1/-1 or -1/+1 until end of turn" (Pemmin's Aura): which one is chosen as it resolves
-  // (CR 608.2d), like the above.
-  if ((m = /^(enchanted creature|~) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
+  // (CR 608.2d), like the above. Shaper Parasite: "target creature gets +2/-2 or -2/+2 until end of turn", the target
+  // chosen as the trigger is put on the stack, the bonus as it resolves (rulings).
+  if ((m = /^(enchanted creature|~|target creature) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!.toLowerCase() === "~" ? "~" : m[1]!.toLowerCase(), ctx);
     const a = parseChanges(`gets ${m[2]}`);
     const b = parseChanges(`gets ${m[3]}`);
@@ -1459,10 +1473,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
   // Creator): the same as with the duration after it.
   // Hydro-Man, Fluid Felon: "Until your next turn, ~ becomes a land and gains "{T}: Add {U}."": itself.
-  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+  // Xenic Poltergeist: "Until your next upkeep, target noncreature artifact becomes ...": over as your next upkeep begins
+  // (rulings).
+  if ((m = /^Until (end of turn|your next turn|your next upkeep), ((?:up to one )?target .+?|~) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     const mods = what && parseChanges(m[3]!);
-    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : m[1] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
   // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.

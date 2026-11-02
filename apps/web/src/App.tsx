@@ -4066,7 +4066,10 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand${pending.handYard ? " and graveyard" : ""}` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
+              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand${pending.handYard ? " and graveyard" : ""}` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : (() => {
+                const o = dig.looked.length ? s.objects[dig.looked[0]!]?.owner : undefined;
+                return o !== undefined && o !== pending.player ? `The top of ${s.players[o]!.name}'s library` : "The top of your library";
+              })()}</h4>
               <div className="modal-cards">
                 {dig.looked
                   .filter((id) => !found.includes(id))

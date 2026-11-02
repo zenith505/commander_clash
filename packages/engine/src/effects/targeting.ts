@@ -126,6 +126,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
+  if (spec.controllersGraveyardAtLeast !== undefined && (s.players[c.controller]?.graveyard.length ?? 0) < spec.controllersGraveyardAtLeast) return false;
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
@@ -261,10 +262,11 @@ function seesOpponents(s: GameState, pid: PlayerId): boolean {
  */
 function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId, src?: SourceQuality): boolean {
   if (u.opponents && u.of === controller) return false;
-  if (!src) return !u.spells && !u.abilities && !u.colors && !u.notColors;
+  if (!src) return !u.spells && !u.abilities && !u.colors && !u.notColors && !u.sourceTypes;
   if (u.spells && !src.spell) return false;
   if (u.abilities && src.spell) return false;
   if (u.subtype && !src.subtypes?.includes(u.subtype)) return false;
+  if (u.sourceTypes && !u.sourceTypes.some((t) => src.types?.includes(t))) return false;
   if (u.colors && !u.colors.some((col) => src.colors.includes(col))) return false;
   return !u.notColors?.some((col) => src.colors.includes(col));
 }

@@ -419,6 +419,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
   // libraries." (body.ts reads it as this): each card into its owner's library, each library shuffled once (rulings, CR
   // 701.24c).
+  // Serene Remembrance: "Shuffle ~ and up to three target cards from a single graveyard into their owners' libraries": the
+  // cards, then the spell itself (with no targets chosen, only the spell; with all of them illegal, it doesn't resolve,
+  // rulings, CR 608.2b).
+  if ((m = /^Shuffle ~ and (up to (?:two|three|four|five) target cards from a single graveyard) into their owners' libraries$/.exec(s)) && ctx.spell) {
+    const what = parseCardTarget(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }, { type: "shuffleSpell" }] : null;
+  }
   if ((m = /^Shuffle (up to (?:one|two|three|four|five)|any number of) target cards from graveyards into their owners' libraries$/.exec(s))) {
     const what = parseCardTarget(`${m[1]} target cards from graveyards`, ctx);
     return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }] : null;
@@ -1345,6 +1352,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Exile (target .+|up to one (?:other )?target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
+  }
+  // Grasping Giant: "Whenever ~ becomes blocked by a creature, exile that creature until ~ leaves the battlefield": the
+  // blocking creature the trigger is about (CR 610.3).
+  if (/^Exile that creature until ~ leaves the battlefield$/i.test(s) && ctx.subject && !ctx.spell) {
+    const what = parseObject("that creature", ctx);
+    return what?.ref === "subject" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
   // Calix, Destiny's Hand: "Exile target creature or enchantment you don't control until target enchantment you control
   // leaves the battlefield" (CR 610.3): the card returns when that permanent leaves; if it's an illegal target as this

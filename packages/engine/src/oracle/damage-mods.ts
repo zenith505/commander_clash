@@ -125,6 +125,9 @@ export function parseDamageMod(line: string): StaticAbility | null {
     // Gideon's Intervention: "Prevent all damage that would be dealt to you and permanents you control by sources with the
     // chosen name" is the same prevention, for each source (CR 615.1a).
     .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage")
+    // Energy Storm: "Prevent all damage that would be dealt by instant and sorcery spells": each such spell's damage to
+    // anything, as it would be dealt (CR 615.1a).
+    .replace(/^Prevent all damage that would be dealt by instant and sorcery spells$/, "If an instant or sorcery spell would deal damage to a permanent or player, prevent that damage")
     // Glacial Chasm, Solitary Confinement: "Prevent all damage that would be dealt to you" is the same, from any source.
     .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage")
     // "Prevent all damage that ~ would deal to red creatures" (Indentured Oaf), "... to snow creatures" (Goblin Furrier):

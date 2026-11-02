@@ -901,7 +901,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Press the Enemy, after "Return target spell or nonland permanent ...": "You may cast an instant or sorcery spell with
   // equal or lesser mana value from your hand without paying its mana cost": no more than that target's mana value as it
   // last existed (a spell's with its X, rulings), as this resolves (TargetSpec.bound).
-  if ((m = /^(?:You may c|C)ast an? (.+? spell) with equal or lesser mana value from your hand without paying its mana cost$/.exec(s)) && (/^You/.test(s) || ctx.mayNow) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget] && !ctx.targets[ctx.lastObjectTarget]!.many) {
+  // Reinterpret: "Counter target spell. You may cast a spell with equal or lesser mana value ...": any spell.
+  if ((m = /^(?:You may c|C)ast an? ((?:.+? )?spell) with equal or lesser mana value from your hand without paying its mana cost$/.exec(s)) && (/^You/.test(s) || ctx.mayNow) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget] && !ctx.targets[ctx.lastObjectTarget]!.many) {
     const filter = parseTargetPhrase(m[1]!);
     if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || filter.manaValue || filter.bound) return null;
     const amount = { count: { kind: "manaValue" as const, of: { ref: "target" as const, index: ctx.lastObjectTarget } } };

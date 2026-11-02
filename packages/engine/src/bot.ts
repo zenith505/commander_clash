@@ -3422,6 +3422,16 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // World Queller: "you may choose a card type. If you do, each player sacrifices ...": only for a type that costs the
   // opponents more than us.
   if (e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "choose" && e.effects[0]!.choice === "cardType" && edictsChosenType(s)) return (e.effects[0]!.options ?? []).some((ty) => edictTypeScore(s, pid, ty) > 0);
+  // Belligerent Yearling: "you may have ~'s base power become equal to that creature's power": only when that's more than
+  // its power now, counters aside (they apply on top either way).
+  const setPow = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" && e.effects[0]!.mods.length === 1 && e.effects[0]!.mods[0]!.kind === "setPower" ? e.effects[0]!.mods[0]! : undefined;
+  if (r && setPow?.kind === "setPower") {
+    const me = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield") return false;
+    const now = power(s, me) - (me.counters["+1/+1"] ?? 0) + (me.counters["-1/-1"] ?? 0);
+    const sub = r.item.subject ? s.objects[r.item.subject.id] : undefined;
+    return !!sub && sub.zone === "battlefield" && power(s, sub) > now;
+  }
   // Eternity Vessel: "you may have your life total become the number of charge counters on ~": when that's more life.
   const set = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "setLife" && e.effects[0]!.who.ref === "you" ? e.effects[0]! : undefined;
   if (r && set?.type === "setLife" && set.amount) return evalAmount(s, set.amount, { controller: pid, sourceId: r.item.sourceId }) > player(s, pid).life;

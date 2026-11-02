@@ -1861,6 +1861,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
   }
+  // Fall of the Impostor: "Exile a creature with the greatest power among creatures target opponent controls": not a target
+  // (rulings); you choose among those that player controls tied for the greatest power.
+  if ((m = /^[Ee]xile a creature with the greatest power among creatures (target opponent) controls$/.exec(s))) {
+    const among = parsePlayer(m[1]!, ctx);
+    return among?.ref === "target" ? [{ type: "pick", who: { ref: "you" }, among, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
+  }
   // Blot Out: "Target opponent exiles a creature or planeswalker they control with the greatest mana value among creatures
   // and planeswalkers they control": that player chooses among those tied.
   if ((m = /^(.+?) (sacrifices?|exiles?) a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {

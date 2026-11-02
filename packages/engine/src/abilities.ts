@@ -521,7 +521,7 @@ export type Count =
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
   /** "Fewer lands than the player who controls the most lands ... the difference" (Scholarship Sponsor): the most permanents like this any player in the game controls, less the number `who` controls. */
-  | { kind: "behindMost"; filter: TargetSpec; who: PlayerRef }
+  | { kind: "behindMost"; filter: TargetSpec; who: PlayerRef; /** Tales of the Ancestors: cards in hand instead of permanents (`filter` unused). */ hand?: true }
   /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
   | { kind: "absDifference"; of: [Count, Count] }
   /** "X or Y, whichever is greater" (Willowdusk, Essence Seer). */
@@ -2114,6 +2114,8 @@ export type StaticCondition =
   | { kind: "cardExiledThisTurn" }
   /** Spider-Man 2099: "if you've played a land or cast a spell this turn from anywhere other than your hand" (a cast copy counts, as for "spells cast from anywhere other than your hand"). */
   | { kind: "playedOrCastNotFromHand" }
+  /** Visions of Phyrexia: "if you didn't play a card from exile this turn" (with "not"): a land played or a spell cast from exile, for any reason (rulings); a copy isn't a card (TurnLog.playedFromExile). */
+  | { kind: "playedFromExile" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
   /**

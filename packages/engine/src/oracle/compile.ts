@@ -361,6 +361,9 @@ export function normalizeSelf(d: CardDef): string {
   // creature token named Kobolds of Kher Keep").
   const tokenNames: string[] = [];
   t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Tamiyo, Compleated Sage: "Create Tamiyo's Notebook, a legendary colorless Book artifact token": the same.
+  // Only when the text never names the token again (Volo's Journal is named later, so it stays "~'s Journal" throughout).
+  t = t.replace(/(\b[Cc]reate )([A-Z][\w'-]*'s(?: [A-Z][\w'-]*)+)(?=, a legendary )/g, (m: string, a: string, n: string) => t.split(n).length !== 2 ? m : `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);

@@ -729,6 +729,8 @@ export function moveObject(
     destroyedBy?: PlayerId;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
     exploitedBy?: { id: ObjectId; zc: number };
+    /** Exiled as a material while its controller activates a craft ability (CR 702.167a): Market Gnome. */
+    crafted?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1256,7 +1258,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -1476,10 +1478,16 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     const target = obj(s, choice);
     // Vizier of Many Faces: more exceptions for an embalmed token (CR 702.128b).
     const except = own.ifEmbalmed && o.embalmed ? { ...own.except, ...own.ifEmbalmed } : own.except;
-    const key = copyKey(s, defOf(s, target), exceptFor(s, o, except, realDefOf(s, o).name));
+    const { keywordsIfCreature, ...exceptNow } = exceptFor(s, o, except, realDefOf(s, o).name) ?? {};
+    let key = copyKey(s, defOf(s, target), exceptNow);
     if (own.tapped) opts = { ...opts, tapped: true };
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     else o.copyOf = key;
+    // Moritte of the Frost: "if it's a creature, it ... has changeling": a creature as it enters, as this copy (rulings).
+    if (keywordsIfCreature?.length && !own.untilEndOfTurn) {
+      invalidateCharacteristics(s);
+      if (objIsType(s, o, "Creature")) o.copyOf = key = copyKey(s, defOf(s, target), { ...exceptNow, keywords: [...(exceptNow.keywords ?? []), ...keywordsIfCreature] });
+    }
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
@@ -4868,6 +4876,8 @@ export function castProblem(
     if (choices.alt === "payZero" && !payZeroSource(s, pid, o)) return `nothing lets you pay {0} rather than ${d.name}'s mana cost now`;
     if (choices.alt === "lifeForMv" && !payZeroSource(s, pid, o, true)) return `nothing lets you pay life rather than ${d.name}'s mana cost now`;
     if (choices.alt === "genericMv" && x) return "X is 0 when you pay generic mana rather than the mana cost";
+    if (choices.alt === "energyForSpell" && x) return "X is 0 when you pay energy rather than the mana cost";
+    if (choices.alt === "energyForSpell" && !payZeroSource(s, pid, o, "energy")) return `nothing lets you pay energy rather than ${d.name}'s mana cost now`;
     if (choices.alt === "genericMv" && !payZeroSource(s, pid, o, "generic")) return `nothing lets you pay generic mana rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0) return `${d.name} isn't a card you may cast this way`;
@@ -5572,6 +5582,12 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.genericMv && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
     return { kind: "genericMv", mana: `{${manaValue(parseManaCost(d.manaCost))}}` };
   }
+  // Nissa, Worldsoul Speaker: that many {E} (CR 107.14); castProblem checks it covers this spell.
+  if (alt === "energyForSpell") {
+    const by = s && pid !== undefined ? s.battlefield.map((id) => obj(s, id)).find((p) => controllerOf(s, p) === pid && compileCard(defOf(s, p)).payZero?.energy && characteristics(s, p).hasPrintedAbilities) : undefined;
+    const n = by ? compileCard(defOf(s!, by)).payZero!.energy! : 0;
+    return n ? { kind: "energyForSpell", mana: "", costs: [{ kind: "payEnergy", n }], text: `pay ${n} energy` } : undefined;
+  }
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -5693,19 +5709,19 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
  * Storm, Darksteel Monolith), or any player's Weftwalking, X counted as 0 (rulings): one with no once-each-turn limit
  * first, then the first unused one.
  */
-export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life: boolean | "generic" = false): GameObject | undefined {
+export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life: boolean | "generic" | "energy" = false): GameObject | undefined {
   const ok = payZeroSources(s, pid, o, life);
   return ok.find((p) => !compileCard(defOf(s, p)).payZero!.once) ?? ok[0];
 }
 
 /** Every permanent whose "pay {0} rather than the mana cost" (or life, `life`) covers `pid`'s spell `o` now. */
-function payZeroSources(s: GameState, pid: PlayerId, o: GameObject, life: boolean | "generic" = false): GameObject[] {
+function payZeroSources(s: GameState, pid: PlayerId, o: GameObject, life: boolean | "generic" | "energy" = false): GameObject[] {
   const d = defOf(s, o);
   if (isType(d, "Land")) return [];
   const used = s.turnLog?.payZeroUsed ?? [];
   const ok = s.battlefield.map((id) => obj(s, id)).filter((p) => {
     const z = compileCard(defOf(s, p)).payZero;
-    if (!z || (z.life ? true : z.genericMv ? "generic" : false) !== life || (controllerOf(s, p) !== pid && !z.eachPlayerFirst && !z.anyPlayer) || !characteristics(s, p).hasPrintedAbilities) return false;
+    if (!z || (z.life ? true : z.genericMv ? "generic" : z.energy ? "energy" : false) !== life || (controllerOf(s, p) !== pid && !z.eachPlayerFirst && !z.anyPlayer) || !characteristics(s, p).hasPrintedAbilities) return false;
     // Weftwalking: during `pid`'s own turn, before they've cast a spell this turn.
     if (z.eachPlayerFirst && (s.activePlayer !== pid || (s.castThisTurn ?? []).some((c) => c.player === pid))) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
@@ -5731,7 +5747,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const freerun = grantedFreerunning(s, pid, defOf(s, o));
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -5995,6 +6011,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (compileCard(defOf(s, by)).payZero!.once) ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
     log(s, `${p.name} pays {0} rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
   }
+  if (choices.alt === "energyForSpell") log(s, `${p.name} pays energy rather than ${d.name}'s mana cost (${characteristics(s, payZeroSource(s, p.id, o, "energy")!).name}).`);
   if (choices.alt === "genericMv") log(s, `${p.name} pays generic mana rather than ${d.name}'s mana cost (${characteristics(s, payZeroSource(s, p.id, o, "generic")!).name}).`);
   if (choices.alt === "lifeForMv") {
     const by = payZeroSource(s, p.id, o, true)!;
@@ -6065,7 +6082,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "genericMv" ? " for generic mana" : choices.alt === "energyForSpell" ? " for energy" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -6280,7 +6297,9 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 }
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
-export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape);
+export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast);
+/** "You may cast this card from your graveyard" an effect gave this card until end of turn (Case of the Uneaten Feast). */
+const hasGrantedCast = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.cast);
 /**
  * Escape an effect gave this card until end of turn with a cost of its own (The Grim Captain's Locker): a grantedEscape
  * way, unless a permanent already gives it escape (one escape way is offered for each kind, see grantedWays).
@@ -6365,6 +6384,13 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       else if (had >= 0 || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
+  }
+  // Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end
+  // of turn": its owner may cast it, paying its mana cost and following the normal timing rules (CR 601.2, 601.3).
+  if (d.manaCost && hasGrantedCast(s, o) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
+    const i = out.findIndex((w) => w.kind === "permission");
+    if (i >= 0) out.splice(i, 1);
+    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
   }
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
@@ -6864,6 +6890,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (problem) return `${problem} to ${doing}`;
       continue;
     }
+    if (c.kind === "payEnergy") {
+      if ((p.energy ?? 0) < c.n) return `you need ${c.n} energy`; // CR 107.14
+      continue;
+    }
     if (c.kind === "payLife") {
       if (c.n && (lifeFor === "special" ? payableLife(s, p.id) : sylexed(s, payableLife(s, p.id), lifeFor === "mana")) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
       continue;
@@ -7267,6 +7297,9 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const ids = choices.tap ?? [];
       for (const id of ids) (c.untap ? untapPermanent : tapPermanent)(s, obj(s, id));
       log(s, `${p.name} ${c.untap ? "untaps" : "taps"} ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
+    } else if (c.kind === "payEnergy") {
+      loseEnergy(s, p.id, c.n);
+      log(s, `${p.name} pays ${c.n} {E}.`);
     } else if (c.kind === "payLife") {
       if (!c.n) continue; // "pay X life" with X = 0
       payLife(s, p.id, c.n);
@@ -7278,7 +7311,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} exiles ${ids.map((id) => `${nameOf(s, id)}${obj(s, id).zone === "graveyard" ? " from their graveyard" : ""}`).join(", ")} to craft.`);
       for (const id of ids) {
         const o = obj(s, id);
-        moveObject(s, id, "exile");
+        moveObject(s, id, "exile", { crafted: true });
         if (o.zone === "exile" && !o.isToken) exiled?.push({ id, zc: o.zoneChanges ?? 0 });
       }
       closeZoneBatch(s);

@@ -2737,6 +2737,12 @@ function parseStaticLine(line: string): StaticAbility | null {
     const sub = which === "lands" ? undefined : which === "Plains" ? "Plains" : which.slice(0, -1);
     return mods ? { affects: { kind: "filter", types: ["Land"], ...(landsAre[2] ? { controller: "you" as const } : {}), ...(sub ? { spec: { kind: "object", types: ["Land"], subtypes: [sub], text: sub } } : {}) }, mods, text: line } : null;
   }
+  // Life and Limb: "All Forests and all Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their
+  // other types": both card types and both subtypes in layer 4 (each subtype stays with its own card type, rulings, CR
+  // 205.3d), green in layer 5, base 1/1 in 7b, the same set of permanents in each layer (CR 613.6). A Forest has "{T}: Add
+  // {G}" by its subtype (CR 305.6), so a Saproling taps for {G} once it's a Forest.
+  if (/^All Forests and all Saprolings are 1\/1 green Saproling creatures and Forest lands in addition to their other types$/.test(text))
+    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Forest", "Saproling"], text: "Forest or Saproling" } }, mods: [{ kind: "addTypes", types: ["Creature", "Land"], subtypes: ["Saproling", "Forest"] }, { kind: "setColors", colors: [COLOR_WORDS.green!] }, { kind: "setPT", power: 1, toughness: 1 }], text: line };
   // Natural Emergence: "Lands you control are 2/2 creatures with first strike. They're still lands.": the same, with the
   // keyword in layer 6.
   const emergence = /^Lands you control are (\d+)\/(\d+) creatures with ([a-z ]+)\. They're still lands$/.exec(text);

@@ -446,6 +446,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter?.kind !== "card" || !parseManaCost(m[2]!).supported) return null;
     return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]} card in your graveyard` }, escape: { mana: m[2]!, exile: num(m[3]!) } }];
   }
+  // Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end
+  // of turn": the cards there now (CR 611.2c), each with a permission to cast it from there (game.ts grantedWays).
+  if ((m = /^([A-Z][a-z]+) cards in your graveyard gain "You may cast (?:~|this card) from your graveyard\.?" until end of turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]!.toLowerCase()} card from your graveyard`);
+    if (filter?.kind !== "card") return null;
+    return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]!.toLowerCase()} card in your graveyard` }, cast: true }];
+  }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
   if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {
@@ -1074,6 +1081,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
   // Chorale of the Void: "onto the battlefield under your control tapped and attacking" is the same as "tapped and
   // attacking under your control": attacking what you choose (rulings, CR 508.4).
+  // Immortal Obligation: "Return target creature card from an opponent's graveyard to the battlefield under their control":
+  // "their" is that opponent, the card's owner, so the same as "under its owner's control".
+  if (/^Return target [a-z ]+ card from an opponent's graveyard to the battlefield under their control\b/.test(s)) s = s.replace(/ under their control\b/, " under its owner's control");
   if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s.replace(/ onto the battlefield under your control tapped and attacking$/, " onto the battlefield tapped and attacking under your control")))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's

@@ -2381,7 +2381,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when === "yourNextFirstMain"
               ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
-              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === (d.when === "playersNextUpkeep" ? d.player : d.controller)) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
       // "If any of those cards remain exiled" (Glimpse the Impossible): it triggers only if one does (CR 603.4).

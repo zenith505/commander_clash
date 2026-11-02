@@ -179,6 +179,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Yy]ou may cast your commander from the command zone without paying its mana cost$/.test(s)) return [{ type: "castCommanderFree" }];
   // Hellkite Courser: "you may put a commander you own from the command zone onto the battlefield" (not cast, so no tax).
   if (/^[Pp]ut a commander you own from the command zone onto the battlefield$/.test(s)) return [{ type: "commanderToBattlefield" }];
+  // Shadow of the Grave: "Return to your hand all cards in your graveyard that you cycled or discarded this turn": any
+  // card you discarded for any reason (cycling is discarding, CR 702.29a), still in your graveyard as that object (rulings:
+  // not a madness card you cast).
+  if (/^Return to your hand all cards in your graveyard that you cycled or discarded this turn$/.test(s))
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", discardedThisTurn: true, text: "card you cycled or discarded this turn" }, toHand: true }];
   // "Put there from the battlefield this turn" (GameObject.fromBattlefieldTurn): Faith's Reward's "return to the
   // battlefield all permanent cards in your graveyard ...", Gerrard's Hourglass Pendant's "return to the battlefield tapped
   // all ...", Second Sunrise's "each player returns to the battlefield all ... in their graveyard ...", Gleancrawler's
@@ -516,6 +521,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && ctx.activated && !ctx.targets.length && (m = /^Return ~ and ((?:up to one other )?target [a-z]+ card) from your graveyard to the battlefield( tapped)?$/.exec(s))) {
     const what = parseObject(`${m[1]} from your graveyard`, ctx, true);
     return what?.ref === "target" && !what.n && ctx.targets[what.index]?.kind === "card" && ctx.targets[what.index]?.owner === "you" ? [{ type: "putOntoBattlefield", what: { ...what, andSelfCard: true }, ...(m[2] ? { tapped: true } : {}) }] : null;
+  }
+  // Thwart the Grave: "Return target creature card and up to one target Cleric, Rogue, Warrior, or Wizard creature card from
+  // your graveyard to the battlefield": both enter at the same time (CR 608.2c), and with one target illegal the other
+  // still returns (CR 608.2b). The first needn't have a party type (rulings). Choosing one card for both targets (CR
+  // 115.3) would return it once, so the second must be another card.
+  if (!ctx.targets.length && (m = /^Return (target [a-z]+ card) and (up to one target [A-Za-z, ]+? card) from your graveyard to the battlefield$/.exec(s))) {
+    const a = parseObject(`${m[1]} from your graveyard`, ctx, true);
+    const b = a?.ref === "target" ? parseObject(`${m[2]} from your graveyard`, ctx, true) : null;
+    if (a?.ref !== "target" || b?.ref !== "target" || a.n || b.n || b.index !== a.index + 1) return null;
+    const ta = ctx.targets[a.index]!, tb = ctx.targets[b.index]!;
+    if (ta.kind !== "card" || tb.kind !== "card" || ta.owner !== "you" || tb.owner !== "you" || ta.optional || !tb.optional) return null;
+    tb.distinctFrom = [a.index];
+    return [{ type: "putOntoBattlefield", what: { ref: "target", index: a.index, n: 2 } }];
   }
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
@@ -1621,8 +1639,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked", combat: "this" }], duration: "endOfTurn" }];
   }
   // Dulcet Sirens: "Target creature attacks target opponent this turn if able": that player, not a planeswalker of theirs
-  // (rulings), in each combat this turn (CR 508.1d). With either target illegal, nothing happens (rulings).
-  if (/^Target creature attacks target opponent this turn if able$/.test(s)) {
+  // (rulings), in each combat this turn (CR 508.1d). With either target illegal, nothing happens (rulings). Ravener: the
+  // same after a trigger's condition ("When ~ enters, target creature attacks ...").
+  if (/^[Tt]arget creature attacks target opponent this turn if able$/.test(s)) {
     const what = parseObject("target creature", ctx);
     const whom = parsePlayer("target opponent", ctx);
     if (what && !isGroup(what) && whom?.ref === "target") return [{ type: "continuous", what, mods: [{ kind: "mustAttackPlayer", player: { target: whom.index } }], duration: "endOfTurn" }];

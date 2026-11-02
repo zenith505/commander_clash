@@ -1154,6 +1154,12 @@ export function moveObject(
     const count = (s.turnLog!.leftGraveyardCount ??= {});
     count[o.owner] = (count[o.owner] ?? 0) + 1;
   }
+  // Barrin, Tolarian Archmage: "if a permanent was put into your hand from the battlefield this turn": its owner's hand
+  // (CR 400.3), a token too, which is put there before it ceases to exist (rulings, CR 111.7).
+  if (fromZone === "battlefield" && to === "hand") {
+    const toHand = ((s.turnLog ??= {}).permanentToHand ??= []);
+    if (!toHand.includes(o.owner)) toHand.push(o.owner);
+  }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
   // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere.
   if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile"))
@@ -4644,6 +4650,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   if (ab.tap) tapPermanent(s, o);
+  if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
   // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
   // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
   if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
@@ -10340,7 +10347,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
     bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
-    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}` });
+    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0 });
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -10355,7 +10362,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
       m.becameBlockedTurn = s.turn;
-      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}` });
+      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0 });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }

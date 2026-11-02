@@ -395,6 +395,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
   // Joven's Ferrets: "all creatures that blocked ~ this turn": declared blocking it this turn, even if they've left combat.
   if (/^all creatures that blocked ~ this turn$/i.test(p.trim()) && !ctx.spell) return { ref: "blockHistory", of: { ref: "self" }, blockers: true };
+  // Ride Down: "Creatures that were blocked by that creature this combat", after "Destroy target blocking creature": the
+  // attackers it was declared blocking this combat, the target as it was chosen (rulings: not if it entered blocking).
+  if (/^creatures that were blocked by that creature this combat$/i.test(p.trim()) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object")
+    return { ref: "blockHistory", of: { ref: "target", index: ctx.lastObjectTarget }, blocked: true, thisCombat: true };
   // Wall of Nets: "exile all creatures blocked by ~": the attackers it's blocking as this resolves.
   if (/^all creatures blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "blockingIt", blocked: true };
   // The Wretched: "gain control of all creatures blocking ~": the same.
@@ -545,6 +549,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (t?.ref !== "target" || t.n) return null;
     if (ctl) ctx.controllerNamed = t.index;
     return { ...t, sameName: { filter: g.filter, ...(ctl ? { of: true as const } : {}) } };
+  }
+  // Mists of Lórien: "target nonland permanent and each other nonland permanent with the same mana value as that
+  // permanent": one target, and the others by mana value as it resolves.
+  const sameMv = /^(target (nonland permanent|creature|permanent)) and each other (nonland permanent|creature|permanent) with the same mana value as that (?:permanent|creature)$/i.exec(x);
+  if (sameMv && !cards && sameMv[2] === sameMv[3]) {
+    const g = parseGroup(`all ${sameMv[3]}s`, true);
+    const t = parseObjectNow(sameMv[1]!, ctx, cards);
+    if (!g || g.other || t?.ref !== "target" || t.n) return null;
+    return { ...t, sameMv: { filter: g.filter } };
   }
   // Hubris: "target creature and all Auras attached to it"; Silence the Believers: "any number of target creatures and all
   // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
@@ -1323,6 +1336,12 @@ export function parseTargetPhrase(
   if (nonMana) {
     const rest = parseTargetPhrase(phrase.trim().slice(0, nonMana.index), opts);
     return rest?.kind === "object" && !rest.nonManaActivated ? { ...rest, nonManaActivated: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
+  // Edgewall Inn: "target card that has an Adventure from your graveyard": an adventurer card (CR 715.2), whatever its types.
+  const adv = /^(target )?(card) that has an Adventure( from your graveyard)$/i.exec(phrase.trim());
+  if (adv) {
+    const rest = parseTargetPhrase(`${adv[1] ?? ""}${adv[2]}${adv[3]}`, opts);
+    return rest?.kind === "card" && !rest.many ? { ...rest, hasAdventure: true, text: `target ${phrase.trim().replace(/^target /i, "")}` } : null;
   }
   // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
   const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());

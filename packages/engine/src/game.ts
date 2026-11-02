@@ -3325,7 +3325,9 @@ function creaturesEnteredOf(s: GameState): { creaturesEntered?: { controller: Pl
 function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
-  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...creaturesEnteredOf(s) };
+  // Command the Stage: the players dealt noncombat damage during it.
+  const noncombat = Object.entries(s.turnLog?.noncombatDamage ?? {}).filter(([, n]) => n > 0).map(([p]) => Number(p) as PlayerId);
+  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...(noncombat.length ? { noncombatDamaged: noncombat } : {}), ...creaturesEnteredOf(s) };
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
   const controlled = s.controlledTurn;
@@ -4728,7 +4730,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; flashbackFromGraveyard?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");

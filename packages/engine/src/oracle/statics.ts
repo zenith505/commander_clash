@@ -1217,6 +1217,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
   if (/^an opponent lost life last turn$/.test(text)) return { kind: "opponentLostLifeLastTurn" };
+  if (/^an opponent was dealt noncombat damage last turn$/.test(text)) return { kind: "opponentNoncombatDamagedLastTurn" };
   if (/^you lost life last turn$/.test(text)) return { kind: "lostLifeLastTurn" };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
@@ -1290,6 +1291,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // High Score: "if you control a creature with the greatest power among creatures on the battlefield": tied counts too.
   if ((m = /^you control a (creature|artifact) with the greatest (power|toughness|mana value) among (creatures|artifacts) on the battlefield$/.exec(text)) && `${m[1]}s` === m[3])
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
+  // Might Makes Right: "if you control each creature on the battlefield with the greatest power".
+  if (text === "you control each creature on the battlefield with the greatest power") return { kind: "controlGreatest", type: "Creature", stat: "power", each: true };
   // Isolated Watchtower: "an opponent controls at least two more lands than you".
   if ((m = /^an opponent controls at least (two|three|four) more (lands|creatures) than you$/.exec(text))) return { kind: "opponentMore", what: m[2] as "lands" | "creatures", atLeast: num(m[1]!) };
   // Teachings of the Archaics: "an opponent has at least four more cards in hand than you".
@@ -2993,6 +2996,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   // goads them.
   if (/^Creatures your opponents control with power less than ~'s power are goaded$/.test(text))
     return { affects: { kind: "filter", types: ["Creature"], controller: "opponent", lesserPowerThanSource: true }, mods: [{ kind: "goad" }], text: line };
+  // Favor of the Mighty: "Each creature with the greatest mana value has protection from each color" (ties all have it).
+  if (text === "Each creature with the greatest mana value has protection from each color") {
+    const mods = parseStaticMods("has protection from each color");
+    return mods ? { affects: { kind: "filter", types: ["Creature"], greatestManaValue: true }, mods, text: line } : null;
+  }
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
   // Marble Priest: "All Walls able to block ~ do so": only Walls (CR 509.1c), any player's.
   const lureBy = /^All ([A-Z][a-z]+)s able to block ~ do so$/.exec(text);

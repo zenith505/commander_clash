@@ -1829,6 +1829,8 @@ export type Affects =
        * after layer 7 (goad).
        */
       lesserPowerThanSource?: true;
+      /** Favor of the Mighty: "Each creature with the greatest mana value": those tied for the greatest among all creatures, checked continuously (rulings). */
+      greatestManaValue?: true;
       /** Konda's Banner: "Creatures that share a color with equipped creature", "... a creature type ...": with what the source is attached to, as it is then; none while unattached. */
       sharesWithAttached?: "color" | "creatureType";
     };
@@ -1984,7 +1986,7 @@ export type StaticCondition =
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
   | { kind: "attackedPlayerPoisoned" }
   /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
-  | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
+  | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue"; /** "If you control each creature on the battlefield with the greatest power" (Might Makes Right): every one tied for it is yours (rulings). */ each?: true }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   /** "If it's night" (CR 731.1): the game is night (or day) now; neither before day/night begins. */
@@ -2209,6 +2211,8 @@ export type StaticCondition =
   | { kind: "castLastTurn"; none?: true; onePlayer?: number }
   /** "If an opponent lost life last turn" (Feast on the Fallen): during the whole previous turn (GameState.lastTurn). */
   | { kind: "opponentLostLifeLastTurn" }
+  /** "If an opponent was dealt noncombat damage last turn" (Command the Stage): GameState.lastTurn.noncombatDamaged. */
+  | { kind: "opponentNoncombatDamagedLastTurn" }
   /** "During your first, second, or third turns of the game" (Serra Avenger): your turn, one of the first `n` you've begun, extra turns too. */
   | { kind: "ownTurnAtMost"; n: number }
   /**
@@ -4138,7 +4142,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -4322,6 +4326,8 @@ export type SpellCondition =
   | { kind: "targetsSameColors"; index: number; n: number }
   /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
   | { kind: "targetSharesName"; index: number }
+  /** "If it shares a card type with the card exiled this way" (Holistic Wisdom): target card `index` and the card the ability's "exile a card from your hand" cost exiled, their card types (CR 205.2a), checked as it resolves. */
+  | { kind: "targetSharesTypeWithCostExiled"; index: number }
   /** "Destroy target creature if no other creature has greater power" (Getaway Glamer): that creature as it is now, still a legal target, against every other creature on the battlefield. */
   | { kind: "targetGreatestPower"; index: number }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
@@ -5700,6 +5706,8 @@ export interface ManaSpend {
   notFromHand?: true;
   /** "Spend this mana only to cast spells you don't own" (Thieving Varmint): only on a spell another player owns (ManaUse.owner, CR 108.3). */
   notOwnSpells?: true;
+  /** "Spend this mana only to cast spells with flashback from a graveyard" (Altar of the Lost): ManaUse.flashbackFromGraveyard. */
+  flashbackFromGraveyard?: true;
   text: string;
 }
 

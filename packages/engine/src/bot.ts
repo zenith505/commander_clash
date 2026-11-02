@@ -666,6 +666,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: fewest }];
       }
+      // Loxodon Peacekeeper: "that player gains control of ~": ourselves if we're among those tied, else the opponent with
+      // the least power on the battlefield.
+      if (next?.type === "continuous" && next.giveTo?.ref === "chosenPlayer" && next.what.ref === "self") {
+        if (pend.options.includes(String(pid))) return [{ type: "chooseOption", player: pid, choice: String(pid) }];
+        const weakest = [...pend.options].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: weakest }];
+      }
       // Sandstone Oracle: "If that player has more cards in hand than you, draw cards equal to the difference": the most.
       if (next?.type === "if" && next.cond.kind === "amountsCompare" && opps.length && JSON.stringify(next.cond.a).includes('"chosenPlayer"') && next.effects.some((e) => e.type === "draw")) {
         const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;

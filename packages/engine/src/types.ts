@@ -1979,7 +1979,7 @@ export interface GameState {
   /** How much damage each damage rule with a tallied `countersOn` has prevented (Sacred Boon), by rule id. */
   preventedTally?: Record<string, number>;
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
-  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[]; /** The creatures that entered the battlefield during it, with their controllers then (Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn"). */ creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] };
+  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[]; /** The players dealt noncombat damage during it (Command the Stage). */ noncombatDamaged?: PlayerId[]; /** The creatures that entered the battlefield during it, with their controllers then (Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn"). */ creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */

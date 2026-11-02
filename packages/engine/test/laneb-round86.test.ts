@@ -158,12 +158,22 @@ const fallen = (): CardDef => ({"oracleId": "19348c1e-b683-4d2c-b4eb-82e538b314b
 const sparkRupture = (): CardDef => ({"oracleId": "82e5642a-0803-432c-85d3-091fca75c82f", "name": "Spark Rupture", "manaCost": "{2}{W}", "cmc": 3, "typeLine": "Enchantment", "supertypes": [], "types": ["Enchantment"], "subtypes": [], "oracleText": "When this enchantment enters, draw a card.\nEach planeswalker with one or more loyalty counters on it loses all abilities and is a creature with power and toughness each equal to the number of loyalty counters on it.", "colors": ["W"], "colorIdentity": ["W"], "keywords": [], "layout": "normal"}) as CardDef;
 const nissasJudgment = (): CardDef => ({"oracleId": "14247820-5ecb-40bd-8dee-0625cc745ec2", "name": "Nissa's Judgment", "manaCost": "{4}{G}", "cmc": 5, "typeLine": "Sorcery", "supertypes": [], "types": ["Sorcery"], "subtypes": [], "oracleText": "Support 2. (Put a +1/+1 counter on each of up to two target creatures.)\nChoose up to one target creature an opponent controls. Each creature you control with a +1/+1 counter on it deals damage equal to its power to that creature.", "colors": ["G"], "colorIdentity": ["G"], "keywords": ["Support"], "layout": "normal"}) as CardDef;
 const matriarch = (): CardDef => ({"oracleId": "1d260526-db57-486d-b0bc-d523139a0148", "name": "Rootwater Matriarch", "manaCost": "{2}{U}{U}", "cmc": 4, "typeLine": "Creature — Merfolk", "supertypes": [], "types": ["Creature"], "subtypes": ["Merfolk"], "oracleText": "{T}: Gain control of target creature for as long as that creature is enchanted.", "power": "2", "toughness": "3", "colors": ["U"], "colorIdentity": ["U"], "keywords": [], "layout": "normal"}) as CardDef;
+const mightMakesRight = (): CardDef => ({"oracleId": "ec73863f-417b-45d7-a6b7-97a69ce0196a", "name": "Might Makes Right", "manaCost": "{5}{R}", "cmc": 6, "typeLine": "Enchantment", "supertypes": [], "types": ["Enchantment"], "subtypes": [], "oracleText": "At the beginning of combat on your turn, if you control each creature on the battlefield with the greatest power, gain control of target creature an opponent controls until end of turn. Untap that creature. It gains haste until end of turn. (It can attack and {T} this turn.)", "colors": ["R"], "colorIdentity": ["R"], "keywords": [], "layout": "normal"}) as CardDef;
+const favor = (): CardDef => ({"oracleId": "f2ad82e6-4669-4d87-bea3-f2ac6ebe5ba9", "name": "Favor of the Mighty", "manaCost": "{1}{W}", "cmc": 2, "typeLine": "Kindred Enchantment — Giant", "supertypes": [], "types": ["Kindred", "Enchantment"], "subtypes": ["Giant"], "oracleText": "Each creature with the greatest mana value has protection from each color.", "colors": ["W"], "colorIdentity": ["W"], "keywords": [], "layout": "normal"}) as CardDef;
+const peacekeeper = (): CardDef => ({"oracleId": "89390fc2-17af-4754-bb1c-7af905d4a2a8", "name": "Loxodon Peacekeeper", "manaCost": "{1}{W}", "cmc": 2, "typeLine": "Creature — Elephant Soldier", "supertypes": [], "types": ["Creature"], "subtypes": ["Elephant", "Soldier"], "oracleText": "At the beginning of your upkeep, the player with the lowest life total gains control of this creature. If two or more players are tied for lowest life total, you choose one of them, and that player gains control of this creature.", "power": "4", "toughness": "4", "colors": ["W"], "colorIdentity": ["W"], "keywords": [], "layout": "normal"}) as CardDef;
+const gemini = (): CardDef => ({"oracleId": "eab4241d-a0d8-4914-85a4-56bc4ff718f2", "name": "Gemini Engine", "manaCost": "{6}", "cmc": 6, "typeLine": "Artifact Creature — Construct", "supertypes": [], "types": ["Artifact", "Creature"], "subtypes": ["Construct"], "oracleText": "Whenever this creature attacks, create a colorless Construct artifact creature token named Twin that's attacking. Its power is equal to this creature's power and its toughness is equal to this creature's toughness. Sacrifice the token at end of combat.", "power": "3", "toughness": "4", "colors": [], "colorIdentity": [], "keywords": [], "layout": "normal"}) as CardDef;
+const dragonMan = (): CardDef => ({"oracleId": "c03ca2e6-fcce-4018-952f-1c451ab92cfd", "name": "Dragon Man, Reformed Robot", "manaCost": "{2}{W}{U}", "cmc": 4, "typeLine": "Legendary Artifact Creature — Dragon Robot", "supertypes": ["Legendary"], "types": ["Artifact", "Creature"], "subtypes": ["Dragon", "Robot"], "oracleText": "Flying\nDragon Man's power is equal to the greatest mana value among noncreature permanents you control and noncreature cards in your graveyard.\nYou may cast this card from your graveyard by discarding a card in addition to paying its other costs.", "power": "*", "toughness": "5", "colors": ["U", "W"], "colorIdentity": ["U", "W"], "keywords": ["Flying"], "layout": "normal"}) as CardDef;
+const altar = (): CardDef => ({"oracleId": "171a3ac4-0c9c-46ac-b273-089d566cca05", "name": "Altar of the Lost", "manaCost": "{3}", "cmc": 3, "typeLine": "Artifact", "supertypes": [], "types": ["Artifact"], "subtypes": [], "oracleText": "This artifact enters tapped.\n{T}: Add two mana in any combination of colors. Spend this mana only to cast spells with flashback from a graveyard.", "colors": [], "colorIdentity": [], "keywords": [], "layout": "normal"}) as CardDef;
+const holistic = (): CardDef => ({"oracleId": "7e108285-52da-473c-accd-d48e646a49c0", "name": "Holistic Wisdom", "manaCost": "{1}{G}{G}", "cmc": 3, "typeLine": "Enchantment", "supertypes": [], "types": ["Enchantment"], "subtypes": [], "oracleText": "{2}, Exile a card from your hand: Return target card from your graveyard to your hand if it shares a card type with the card exiled this way. (Artifact, battle, creature, enchantment, kindred, instant, land, planeswalker, and sorcery are card types.)", "colors": ["G"], "colorIdentity": ["G"], "keywords": [], "layout": "normal"}) as CardDef;
+const commandStage = (): CardDef => ({"oracleId": "13bfc51f-d079-40ef-a4ba-47d06d3150a3", "name": "Command the Stage", "manaCost": "{2}{R}", "cmc": 3, "typeLine": "Sorcery", "supertypes": [], "types": ["Sorcery"], "subtypes": [], "oracleText": "Create a 2/2 colorless Wizard Soldier creature token named Cadet, then put a +1/+1 counter on each other Wizard token you control.\nAt the beginning of each upkeep, if an opponent was dealt noncombat damage last turn, return this card from your graveyard to your hand.", "colors": ["R"], "colorIdentity": ["R"], "keywords": [], "layout": "normal"}) as CardDef;
+const thinkTwice = (): CardDef => ({"oracleId": "fa85c5a2-8e83-4624-a35a-a0bbf17ecbb4", "name": "Think Twice", "manaCost": "{1}{U}", "cmc": 2, "typeLine": "Instant", "supertypes": [], "types": ["Instant"], "subtypes": [], "oracleText": "Draw a card.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)", "colors": ["U"], "colorIdentity": ["U"], "keywords": ["Flashback"], "layout": "normal"}) as CardDef;
+const anthem = (): CardDef => ({"oracleId": "e3886fe8-9b76-4613-8891-4ec74657c087", "name": "Glorious Anthem", "manaCost": "{1}{W}{W}", "cmc": 3, "typeLine": "Enchantment", "supertypes": [], "types": ["Enchantment"], "subtypes": [], "oracleText": "Creatures you control get +1/+1.", "colors": ["W"], "colorIdentity": ["W"], "keywords": [], "layout": "normal"}) as CardDef;
 const aura = () => card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+1.", keywords: ["Enchant"] });
 const opponentsOf = (s: GameState, ap: PlayerId) => [1, 2, 3].map((i) => s.turnOrder[(s.turnOrder.indexOf(ap) + i) % 4]!);
 
 describe("Lane B round 86", () => {
   it("all of them are supported", () => {
-    supported(yuriko(), jiang(), vermin(), fallen(), sparkRupture(), nissasJudgment(), matriarch());
+    supported(yuriko(), jiang(), vermin(), fallen(), sparkRupture(), nissasJudgment(), matriarch(), mightMakesRight(), favor(), peacekeeper(), gemini(), dragonMan(), altar(), holistic(), commandStage());
   });
 
   it("Yuriko, Blade of the Mighty: during combat no spell is cast and no ability but a mana ability is activated", () => {
@@ -398,5 +408,190 @@ describe("Lane B round 86", () => {
     attach(s, b!, aura(), enchanted);
     s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(controllerOf(s, s.objects[enchanted]!)).toBe(b);
+  });
+
+  it("Might Makes Right: with each greatest-power creature yours, steal one until end of turn; a tie with an opponent stops it", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    handOf(s, ap, []);
+    veteran(s, ap, mightMakesRight());
+    veteran(s, ap, hillGiant());
+    const [b, c] = opponentsOf(s, ap);
+    const victim = veteran(s, b!, bears());
+    s.objects[victim]!.tapped = true;
+    for (let i = 0; i < 20 && !s.stack.length && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.step).toBe("beginCombat");
+    s = settle(s, { targets: [[tgt(victim)]] });
+    expect(controllerOf(s, s.objects[victim]!)).toBe(ap);
+    expect(s.objects[victim]!.tapped).toBe(false);
+    expect(characteristics(s, s.objects[victim]!).keywords).toContain("Haste");
+    // Another turn, an opponent's 3-power creature ties: it doesn't trigger.
+    const { s: s1, ap: ap1 } = setup([]);
+    s = s1;
+    handOf(s, ap1, []);
+    veteran(s, ap1, mightMakesRight());
+    veteran(s, ap1, hillGiant());
+    const [b1, c1] = opponentsOf(s, ap1);
+    veteran(s, c1!, hillGiant());
+    const other = veteran(s, b1!, bears());
+    for (let i = 0; i < 20 && s.step !== "beginCombat"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.length + s.triggerQueue.length).toBe(0);
+    expect(s.pending?.kind).not.toBe("chooseTargets");
+    expect(controllerOf(s, s.objects[other]!)).toBe(b1);
+    void c;
+  });
+
+  it("Favor of the Mighty: each creature tied for the greatest mana value has protection from each color, checked continuously", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    veteran(s, ap, favor());
+    const giant = veteran(s, ap, hillGiant());
+    const [b] = opponentsOf(s, ap);
+    const giant2 = veteran(s, b!, hillGiant());
+    const bear = veteran(s, ap, bears());
+    const pro = (id: string) => characteristics(s, s.objects[id]!).keywords.filter((k) => /^Protection from/i.test(k)).length > 0;
+    expect(pro(giant)).toBe(true);
+    expect(pro(giant2)).toBe(true);
+    expect(pro(bear)).toBe(false);
+    const big = veteran(s, b!, card("Test Big", "Creature — Giant", "{5}{G}", { power: "6", toughness: "6" }));
+    expect(pro(giant)).toBe(false);
+    expect(pro(big)).toBe(true);
+    // A red spell can't target it.
+    const bolted = toZone(s, ap, bolt(), "hand");
+    expect(planCast(s, ap, bolted, [tgt(big)])).toBeNull();
+  });
+
+  it("Loxodon Peacekeeper: the player with the lowest life gains control of it; on a tie its controller chooses", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    handOf(s, ap, []);
+    const ele = veteran(s, ap, peacekeeper());
+    const [b, c, d] = opponentsOf(s, ap);
+    s.players[c!]!.life = 20;
+    s = toNextUpkeep(s, ap);
+    s = settle(s);
+    expect(controllerOf(s, s.objects[ele]!)).toBe(c);
+    // At C's next... back to the original owner's upkeep isn't its controller's: the trigger is C's now ("your upkeep").
+    s.players[b!]!.life = 10;
+    s.players[d!]!.life = 10;
+    s = toNextUpkeep(s, c!);
+    s = settle(s, { me: [c!] });
+    const p = s.pending;
+    expect(p?.kind).toBe("chooseOption");
+    if (p?.kind !== "chooseOption") throw new Error("no choice");
+    expect([...p.options].sort()).toEqual([String(b), String(d)].sort());
+    s = act(s, { type: "chooseOption", player: c!, choice: String(d) });
+    s = settle(s);
+    expect(controllerOf(s, s.objects[ele]!)).toBe(d);
+  });
+
+  it("Gemini Engine: an attacking Twin token with its P/T, kept as they were, sacrificed at end of combat", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    handOf(s, ap, []);
+    const engine = veteran(s, ap, gemini());
+    veteran(s, ap, anthem());
+    const [b] = opponentsOf(s, ap);
+    s = attackWith(s, [engine], b!);
+    s = settle(s);
+    const twin = s.battlefield.find((id) => characteristics(s, s.objects[id]!).name === "Twin")!;
+    expect(twin).toBeDefined();
+    // Engine 4/5 with the Anthem: the Twin's base is 4/5, 5/6 with the Anthem (rulings).
+    expect(pt(s, twin)).toBe("5/6");
+    expect(s.objects[twin]!.attacking).toBe(b);
+    expect(characteristics(s, s.objects[twin]!).types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    s = passUntilThat(s, (x) => x.step === "main2");
+    expect(s.objects[twin]?.zone === "battlefield").toBe(false);
+  });
+
+  it("Dragon Man, Reformed Robot: power is the greatest mana value among your noncreature permanents and noncreature cards in your graveyard", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const dm = veteran(s, ap, dragonMan());
+    expect(power(s, s.objects[dm]!)).toBe(0);
+    veteran(s, ap, anthem());
+    expect(pt(s, dm)).toBe("4/6");
+    toZone(s, ap, card("Test Big Sorcery", "Sorcery", "{5}{R}", { oracleText: "Draw a card." }), "graveyard");
+    expect(pt(s, dm)).toBe("7/6");
+    // Creatures don't count.
+    toZone(s, ap, card("Test Big Creature", "Creature — Giant", "{9}", { power: "9", toughness: "9" }), "graveyard");
+    expect(pt(s, dm)).toBe("7/6");
+  });
+
+  it("Altar of the Lost: its mana casts a spell with flashback from a graveyard, not from the hand", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const alt = veteran(s, ap, altar());
+    const inHand = toZone(s, ap, thinkTwice(), "hand");
+    const inYard = toZone(s, ap, thinkTwice(), "graveyard");
+    poolOnly(s, ap, { U: 1 });
+    s = act(s, { type: "activateMana", player: ap, objectId: alt, mana: "U", ability: 0, combo: 5 });
+    expect(s.players[ap]!.manaPool.U).toBe(3);
+    // The one in hand ({1}{U}) would need one of the Altar's mana: it can't.
+    expect(planCast(s, ap, inHand)).toBeNull();
+    s = run(s, planCast(s, ap, inYard, [], undefined, "auto", undefined, { via: "flashback" }));
+    s = settle(s);
+    expect(zone(s, inYard)).toBe("exile");
+  });
+
+  it("Altar of the Lost: its mana can't pay for a spell cast from the hand", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const alt = veteran(s, ap, altar());
+    const inHand = toZone(s, ap, thinkTwice(), "hand");
+    poolOnly(s, ap, {});
+    s = act(s, { type: "activateMana", player: ap, objectId: alt, mana: "U", ability: 0, combo: 5 });
+    expect(planCast(s, ap, inHand)).toBeNull();
+  });
+
+  it("Holistic Wisdom: returns the target only if it shares a card type with the exiled card", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const hw = veteran(s, ap, holistic());
+    const deadBear = toZone(s, ap, bears(), "graveyard");
+    const deadBolt = toZone(s, ap, bolt(), "graveyard");
+    handOf(s, ap, [hillGiant(), shock()]);
+    const [giantCard, shockCard] = hand(s, ap);
+    s = run(s, planActivate(s, ap, hw, 0, [tgt(deadBolt)], undefined, undefined, undefined, { exileFromHand: [giantCard!] }));
+    s = settle(s);
+    expect(zone(s, giantCard!)).toBe("exile");
+    expect(zone(s, deadBolt)).toBe("graveyard");
+    s = run(s, planActivate(s, ap, hw, 0, [tgt(deadBolt)], undefined, undefined, undefined, { exileFromHand: [shockCard!] }));
+    s = settle(s);
+    expect(zone(s, deadBolt)).toBe("hand");
+    void deadBear;
+  });
+
+  it("Command the Stage: a Cadet, counters on the other Wizard tokens, and back to hand after noncombat damage to an opponent", () => {
+    const { s: s0, ap } = setup([commandStage(), shock()]);
+    let s = s0;
+    const [cmd, shk] = hand(s, ap).slice(-2);
+    s = castNow(s, ap, cmd!);
+    s = settle(s);
+    const cadets = () => s.battlefield.filter((id) => characteristics(s, s.objects[id]!).name === "Cadet");
+    expect(cadets().length).toBe(1);
+    expect(counters(s, cadets()[0]!, "+1/+1")).toBe(0);
+    expect(zone(s, cmd!)).toBe("graveyard");
+    // No noncombat damage this turn: at the next upkeep it stays.
+    const turn = s.turn;
+    s = goUntil(s, (x) => x.turn > turn && x.step === "upkeep");
+    s = settle(s);
+    expect(zone(s, cmd!)).toBe("graveyard");
+    // Back on its controller's turn: Shock an opponent, then the next upkeep returns it.
+    s = goUntil(s, (x) => x.activePlayer === ap && x.step === "main1");
+    const [b] = opponentsOf(s, ap);
+    s = castNow(s, ap, shk!, [player(b!)]);
+    s = settle(s);
+    const t2 = s.turn;
+    s = goUntil(s, (x) => x.turn > t2 && x.step === "upkeep" && (x.stack.length > 0 || x.triggerQueue.length > 0 || !!x.pending));
+    s = settle(s);
+    expect(zone(s, cmd!)).toBe("hand");
+    // Cast again: the new Cadet, and a counter on the first one.
+    s = goUntil(s, (x) => x.activePlayer === ap && x.step === "main1");
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, R: 3 };
+    s = castNow(s, ap, cmd!);
+    s = settle(s);
+    expect(cadets().length).toBe(2);
+    expect(cadets().map((id) => counters(s, id, "+1/+1")).sort()).toEqual([0, 1]);
   });
 });

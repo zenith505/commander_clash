@@ -389,6 +389,18 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Inferno Project: "the total mana value of instant and sorcery cards in your graveyard": a split card's halves added (CR 709.4).
   if (!each && /^the total mana value of instant and sorcery cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, totalMv: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   if (!each && /^the greatest mana value among cards in your graveyard$/i.test(p)) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, greatestMv: true } };
+  // Dragon Man, Reformed Robot: "the greatest mana value among noncreature permanents you control and noncreature cards in
+  // your graveyard": the greatest of both groups together, 0 with none.
+  if (!each && /^the greatest mana value among noncreature permanents you control and noncreature cards in your graveyard$/i.test(p))
+    return {
+      count: {
+        kind: "greaterOf",
+        of: [
+          { kind: "greatestManaValue", filter: { kind: "object", types: [], notTypes: ["Creature"], notColors: [], controller: "you", text: "noncreature permanent you control" } },
+          { kind: "cardsInGraveyard", who: { ref: "you" }, greatestMv: true, filter: { kind: "card", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature card" } },
+        ],
+      },
+    };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   // Emissary Escort: "the greatest mana value among other artifacts you control", the source left out.
   if (!each && (m = /^the greatest mana value among (other )?(.+?) you control$/i.exec(p))) {

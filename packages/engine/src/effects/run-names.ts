@@ -4,13 +4,13 @@ import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, mo
 import { currentName } from "../names";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
-import type { GameState, ObjectId } from "../types";
+import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindChosen, objectMatches, printedMatches } from "./targeting";
 import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
-import { ResolveCtx, amountNow, players } from "./resolve";
+import { ResolveCtx, amountNow, apnap, players } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -65,6 +65,49 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       (s.namedBansUntil ??= []).push({ name, ...(who ? { players: who } : {}), ...(e.lands ? { lands: true as const } : {}), controller: ctx.controller, source: src });
       const until = `until ${player(s, ctx.controller).name}'s next turn`;
       log(s, who ? `${who.map((p) => player(s, p).name).join(", ")} can't cast spells named ${name} ${until}.` : `Spells named ${name} can't be cast${e.lands ? " and lands named it can't be played" : ""} ${until}.`);
+      return;
+    }
+    case "revealUntilPerDestroyed": {
+      // Indomitable Creativity (rulings): each destroyed permanent's controller as it last existed, once for each, in
+      // turn order; the revealed cards stay in the library (on top) until the shuffle, so a second reveal sees them again;
+      // a player whose library has no such card reveals it all and exiles nothing. Then all the exiled cards enter at
+      // once (CR 608.2c), and each of those players shuffles.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.creativity) {
+        const by = new Map<PlayerId, number>();
+        for (const d of s.resolving!.destroyed ?? []) if (d.controller !== undefined) by.set(d.controller, (by.get(d.controller) ?? 0) + 1);
+        const exiled: { id: ObjectId; under: PlayerId }[] = [];
+        const who = apnap(s, [...by.keys()]).filter((pid) => !player(s, pid).lost);
+        for (const pid of who) {
+          const p = player(s, pid);
+          for (let i = 0; i < by.get(pid)!; i++) {
+            const at = p.library.findIndex((id) => printedMatches(e.filter, defOf(s, obj(s, id))));
+            const seen = at < 0 ? [...p.library] : p.library.slice(0, at + 1);
+            log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${at < 0 ? `, finding no ${e.filter.text}` : ""}.`);
+            if (at < 0) break;
+            const hit = p.library[at]!;
+            moveObject(s, hit, "exile");
+            if (obj(s, hit).zone === "exile") {
+              exiled.push({ id: hit, under: pid });
+              log(s, `${p.name} exiles ${defOf(s, obj(s, hit)).name}.`);
+            }
+          }
+        }
+        sc.creativity = { exiled: exiled.map((x) => ({ ...x, zc: obj(s, x.id).zoneChanges ?? 0 })), shufflers: who };
+      }
+      const st = sc.creativity;
+      const still = st.exiled.filter((x) => s.objects[x.id]?.zone === "exile" && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc);
+      // An Aura among them: its new controller chooses what it enchants as it enters, or it stays exiled (CR 303.4f-g).
+      const hosts = chooseAuraHosts(s, still.map((x) => ({ o: obj(s, x.id), under: x.under })), src);
+      if (hosts === "paused") return "paused";
+      const entering = still.filter((x) => !defOf(s, obj(s, x.id)).subtypes.includes("Aura") || hosts.has(x.id));
+      enterTogether(s, () => entering.forEach((x) => moveObject(s, x.id, "battlefield", { controller: x.under, ...hosts.get(x.id) })));
+      if (entering.length) log(s, `${entering.map((x) => `${player(s, x.under).name} puts ${defOf(s, obj(s, x.id)).name}`).join(", ")} onto the battlefield.`);
+      for (const pid of st.shufflers) {
+        if (player(s, pid).lost) continue;
+        shuffleLibrary(s, player(s, pid));
+        log(s, `${player(s, pid).name} shuffles their library.`);
+      }
       return;
     }
     case "revealUntil": {

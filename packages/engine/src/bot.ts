@@ -374,6 +374,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
       const ranked = chooseSearch(s, pend.forPlayer, pend.cards, pend.cards.length);
+      // Guided Passage: one of each kind, the ones that help them least (a set that fits, built greedily, is as big as
+      // any: the kinds are a transversal matroid).
+      if (pend.oneOfEach) {
+        const found: string[] = [];
+        for (const id of pend.helps ? [...ranked].reverse() : ranked) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+        return [{ type: "searchLibrary", player: pid, found }];
+      }
       return [{ type: "searchLibrary", player: pid, found: pend.helps ? ranked.slice(ranked.length - pend.max) : ranked.slice(0, pend.max) }];
     }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];

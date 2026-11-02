@@ -1346,6 +1346,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
     case "revealUntil":
+    case "revealUntilPerDestroyed":
     case "banName":
       return runNamesEffect(s, e, ctx, src);
     case "venture":

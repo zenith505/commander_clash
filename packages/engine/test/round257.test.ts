@@ -44,12 +44,15 @@ const scramble = (): CardDef => ({"oracleId":"35fe3c61-8eaa-465d-ac34-63efda72fe
 const rip = (): CardDef => ({"oracleId":"c027f369-e445-46a8-94ad-93396321295a","name":"Rip, Spawn Hunter","manaCost":"{2}{G}{W}","cmc":4,"typeLine":"Legendary Creature — Human Survivor","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Survivor"],"oracleText":"Survival — At the beginning of your second main phase, if Rip is tapped, reveal the top X cards of your library, where X is its power. Put any number of creature and/or Vehicle cards with different powers from among them into your hand. Put the rest on the bottom of your library in a random order.","power":"4","toughness":"4","colors":["G","W"],"colorIdentity":["G","W"],"keywords":["Survival"],"imageUrl":"https://cards.scryfall.io/normal/front/5/f/5f12e3b3-a260-4913-b13a-7fbb753dd702.jpg?1783909438","artUrl":"https://cards.scryfall.io/art_crop/front/5/f/5f12e3b3-a260-4913-b13a-7fbb753dd702.jpg?1783909438","commanderLegal":"legal","set":"dsk","releasedAt":"2024-09-27","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const wheel = (): CardDef => ({"oracleId":"95a7db5d-26f6-4192-9dc7-4342f7e0e9c5","name":"Wheel of Potential","manaCost":"{2}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}.\nEach player may exile their hand and draw a number of cards equal to the amount of {E} paid this way. If seven or more {E} was paid this way, you may play cards you own exiled this way until the end of your next turn.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/c/4/c4eb9a82-91f7-4741-a029-a07a3ff6af78.jpg?1783911264","artUrl":"https://cards.scryfall.io/art_crop/front/c/4/c4eb9a82-91f7-4741-a029-a07a3ff6af78.jpg?1783911264","commanderLegal":"legal","set":"mh3","releasedAt":"2024-06-14","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const devils = (): CardDef => ({"oracleId":"b446b485-c10b-4175-bb49-16ac2f9e7718","name":"Wildfire Devils","manaCost":"{3}{R}","cmc":4,"typeLine":"Creature — Devil","supertypes":[],"types":["Creature"],"subtypes":["Devil"],"oracleText":"When this creature enters and at the beginning of your upkeep, choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy that card. You may cast the copy without paying its mana cost.","power":"4","toughness":"2","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/9/09eb879c-5caf-4d6d-b340-5b99ffeefc3a.jpg?1783932804","artUrl":"https://cards.scryfall.io/art_crop/front/0/9/09eb879c-5caf-4d6d-b340-5b99ffeefc3a.jpg?1783932804","commanderLegal":"legal","set":"c19","releasedAt":"2019-08-23","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const creativity = (): CardDef => ({"oracleId":"e2161ae2-e5d2-4a56-85d4-d2214c5b3e2e","name":"Indomitable Creativity","manaCost":"{X}{R}{R}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy X target artifacts and/or creatures. For each permanent destroyed this way, its controller reveals cards from the top of their library until an artifact or creature card is revealed and exiles that card. Those players put the exiled cards onto the battlefield, then shuffle.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","artUrl":"https://cards.scryfall.io/art_crop/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","commanderLegal":"legal","set":"aer","releasedAt":"2017-01-20","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const passage = (): CardDef => ({"oracleId":"f4b30f6c-09ac-407e-9c72-da64d212ce93","name":"Guided Passage","manaCost":"{G}{U}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Reveal the cards in your library. An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.","colors":["G","R","U"],"colorIdentity":["G","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","artUrl":"https://cards.scryfall.io/art_crop/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","commanderLegal":"legal","set":"apc","releasedAt":"2001-06-04","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const redBolt = card("Test Bolt", "Instant", "{R}", { cmc: 1, colors: ["R"], oracleText: "Test Bolt deals 3 damage to any target." });
 const blueStudy = card("Test Study", "Sorcery", "{1}{U}", { cmc: 2, colors: ["U"], oracleText: "Draw two cards." });
 const ogre = card("Test Ogre", "Creature — Ogre", "{2}{R}", { cmc: 3, colors: ["R"], power: "3", toughness: "3" });
 const cart = card("Test Cart", "Artifact — Vehicle", "{2}", { cmc: 2, subtypes: ["Vehicle"], power: "3", toughness: "2", oracleText: "Crew 1" });
 const cycle = card("Test Cycle", "Artifact — Vehicle", "{1}", { cmc: 1, subtypes: ["Vehicle"], power: "1", toughness: "1", oracleText: "Crew 1" });
+const forestCard = card("Forest", "Basic Land — Forest", "", { supertypes: ["Basic"], subtypes: ["Forest"] });
 const greenGrow = card("Test Growth", "Instant", "{G}", { cmc: 1, colors: ["G"], oracleText: "Target creature gets +3/+3 until end of turn." });
 
 /** Attack `defender` with `attackers` and play combat out, stopping at a question for `ap` (a "you may"). */
@@ -68,7 +71,7 @@ const fight = (s: GameState, ap: PlayerId, attackers: ObjectId[], defender: Play
 
 describe("round 257", () => {
   it("every card of the round compiles fully", () => {
-    supported(talent(), scramble(), rip(), wheel(), devils());
+    supported(talent(), scramble(), rip(), wheel(), devils(), creativity(), passage());
   });
 });
 
@@ -295,5 +298,74 @@ describe("Wildfire Devils", () => {
     let s = passUntil(s1, "upkeep", ap);
     s = settle(s);
     expect(s.log.slice(-8).map((x) => x.text).join(" ")).toMatch(/is chosen at random for Wildfire Devils/);
+  });
+});
+
+describe("Indomitable Creativity", () => {
+  it("each destroyed permanent's controller reveals until an artifact or creature card, exiles it; all enter at once, then they shuffle", () => {
+    const { s: s0, ap, opp, ids } = setup([creativity()]);
+    const third = nextOpp(s0, ap, 2);
+    s0.players[ap]!.manaPool.R = 3;
+    const mine = putOnBattlefield(s0, ap, bear());
+    const theirs = [putOnBattlefield(s0, opp, bear()), putOnBattlefield(s0, opp, cart)];
+    const tough = putOnBattlefield(s0, third, bear({ name: "Test Stalwart", keywords: ["Indestructible"], oracleText: "Indestructible" }));
+    invalidateCharacteristics(s0);
+    // Your library: Forest, Ogre. Theirs: Forest, Cart, Forest, Bears. The third player's: Ogre (never revealed).
+    const myLib = [forestCard, ogre].reverse().map((d) => into(s0, ap, d, "library")).reverse();
+    const oppLib = [forestCard, cart, forestCard, bear()].reverse().map((d) => into(s0, opp, d, "library")).reverse();
+    const thirdTop = into(s0, third, ogre, "library");
+    s0.players[ap]!.manaPool.C = 4;
+    const plan = planCast(s0, ap, ids[0]!, [tgt(mine), tgt(theirs[0]!), tgt(theirs[1]!), tgt(tough)], undefined, undefined, 4);
+    let s = settle(run(s0, plan));
+    expect(s.pending).toBeNull();
+    expect(zone(s, mine)).toBe("graveyard");
+    expect(theirs.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard"]);
+    expect(zone(s, tough)).toBe("battlefield");
+    // Yours: the Ogre. Theirs (two destroyed): the Cart, then the Bears (the Forests revealed again stay in the library).
+    expect([zone(s, myLib[1]!), controllerOf(s, s.objects[myLib[1]!]!)]).toEqual(["battlefield", ap]);
+    expect([oppLib[1], oppLib[3]].map((id) => [zone(s, id!), controllerOf(s, s.objects[id!]!)])).toEqual([["battlefield", opp], ["battlefield", opp]]);
+    expect([zone(s, myLib[0]!), zone(s, oppLib[0]!), zone(s, oppLib[2]!)]).toEqual(["library", "library", "library"]);
+    // The indestructible one wasn't destroyed: its controller reveals nothing.
+    expect(s.players[third]!.library[0]).toBe(thirdTop);
+    const shuffled = s.log.filter((x) => / shuffles their library\.$/.test(x.text)).slice(-2).map((x) => x.text.replace(/ shuffles.*/, ""));
+    expect(shuffled.sort()).toEqual([s.players[ap]!.name, s.players[opp]!.name].sort());
+  });
+});
+
+describe("Guided Passage", () => {
+  it("an opponent you choose picks a creature card, a land card and a noncreature, nonland card from your library for your hand", () => {
+    const { s: s0, ap, opp, ids } = setup([passage()]);
+    s0.players[ap]!.manaPool.R = 1;
+    const study = into(s0, ap, blueStudy, "library");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    // You choose the opponent.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "opponent" });
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    const p = s.pending;
+    expect(p).toMatchObject({ kind: "searchLibrary", player: opp, forPlayer: ap, min: 3, max: 3 });
+    if (p?.kind !== "searchLibrary") return;
+    // Only one noncreature, nonland card: the Study.
+    expect(p.cards).toContain(study);
+    const lib = s.players[ap]!.library;
+    const aBear = lib.find((id) => characteristics(s, s.objects[id]!).types.includes("Creature"))!;
+    const aLand = lib.find((id) => characteristics(s, s.objects[id]!).types.includes("Land"))!;
+    const otherBear = lib.find((id) => id !== aBear && characteristics(s, s.objects[id]!).types.includes("Creature"))!;
+    expect(() => act(s, { type: "searchLibrary", player: opp, found: [aBear, otherBear, aLand] })).toThrow(/one card for each/);
+    const hand = s.players[ap]!.hand.length;
+    s = settle(act(s, { type: "searchLibrary", player: opp, found: [aBear, aLand, study] }));
+    expect([zone(s, aBear), zone(s, aLand), zone(s, study)]).toEqual(["hand", "hand", "hand"]);
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+  });
+  it("a kind you have none of is skipped (rulings); a bot opponent picks one of each kind you do have", () => {
+    const { s: s0, ap, opp, ids } = setup([passage()]);
+    s0.players[ap]!.manaPool.R = 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    const p = s.pending;
+    expect(p).toMatchObject({ kind: "searchLibrary", player: opp, min: 2, max: 2 });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(botActions(s, opp).reduce((x, a) => act(x, a), s));
+    const got = s.players[ap]!.hand.slice(hand).map((id) => characteristics(s, s.objects[id]!).types[0]);
+    expect(got.sort()).toEqual(["Creature", "Land"]);
   });
 });

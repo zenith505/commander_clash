@@ -2623,6 +2623,8 @@ export interface Resolving {
     pushLuck?: { ids: { id: ObjectId; zc: number }[]; asked?: true; stop?: true };
     /** Time travel (CR 701.56a): the objects with time counters, and for each one chosen so far "add", "remove" or "none". */
     timeTravel?: { ids: { id: ObjectId; zc: number }[]; picks: Record<ObjectId, string> };
+    /** Indomitable Creativity: the cards exiled, under whose control each enters, and who shuffles. */
+    creativity?: { exiled: { id: ObjectId; under: PlayerId; zc: number }[]; shufflers: PlayerId[] };
     castAmong?: { ids: { id: ObjectId; zc: number }[]; /** Kefka: each spell cast this way, its owner and mana value on the stack. */ castSpells?: { owner: PlayerId; mv: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** With `copyTimes`: how many copies of each card have been made. */ copied?: Record<ObjectId, number>; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId; /** `maxIfYard`: how many may be cast, set as it starts resolving. */ max?: number };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */

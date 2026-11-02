@@ -6324,6 +6324,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
+    // Guided Passage: "Reveal the cards in your library. An opponent chooses from among them a creature card, a land card,
+    // and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.": an opponent you choose
+    // picks one of each kind you have (none of a kind you have none of, rulings), seeing the whole library (rulings).
+    if (/^Reveal the cards in your library$/.test(s) && /^An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card\.?$/.test(sentences[si + 1] ?? "") && /^You put the chosen cards into your hand\.?$/.test(sentences[si + 2] ?? "") && /^(?:Then )?[Ss]huffle\.?$/.test(sentences[si + 3] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer) return null;
+      const kinds = ["creature card", "land card", "noncreature, nonland card"].map((w) => parseSearchFilter(w));
+      if (kinds.some((f) => !f || f.kind !== "card")) return null;
+      const anyOf = kinds as TargetSpec[];
+      effects.push(
+        { type: "choose", choice: "opponent" },
+        { type: "dig", n: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, reveal: true, count: 3, upTo: false, required: true, oneOfEach: anyOf, filter: { kind: "card", anyOf, text: "creature card, land card, and noncreature, nonland card" }, into: "hand", rest: "shuffle", chooser: { ref: "chosenPlayer" } },
+      );
+      ctx.chosenOpponent = true;
+      si += 3;
+      continue;
+    }
+    // Indomitable Creativity, after "Destroy X target artifacts and/or creatures": "For each permanent destroyed this way, its
+    // controller reveals cards from the top of their library until an artifact or creature card is revealed and exiles that
+    // card. Those players put the exiled cards onto the battlefield, then shuffle." Each destroyed permanent's controller
+    // as it last existed, once for each (one put elsewhere than a graveyard counts; one not destroyed doesn't), all the
+    // exiled cards onto the battlefield at once; a player with none destroyed doesn't reveal or shuffle (rulings).
+    const perDestroyed = /^For each permanent destroyed this way, its controller reveals cards from the top of their library until an? (.+? card) is revealed and exiles that card$/.exec(s);
+    if (perDestroyed && /^Those players put the exiled cards onto the battlefield, then shuffle\.?$/.test(sentences[si + 1] ?? "") && effects[effects.length - 1]?.type === "destroy") {
+      const filter = parseSearchFilter(perDestroyed[1]!);
+      if (!filter || filter.kind !== "card") return null;
+      effects.push({ type: "revealUntilPerDestroyed", filter });
+      si++;
+      continue;
+    }
     // Scrambleverse: "For each nonland permanent, choose a player at random. Then each player gains control of each
     // permanent for which they were chosen. Untap those permanents.": any player, its controller too, chosen at random
     // for each one; all the control changes at once, indefinitely, and every one of them untaps (rulings).

@@ -4713,7 +4713,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Watcher // Ballista Wielder); "if it has blocked or been blocked since your last upkeep" / "if it attacked or
   blocked since your last upkeep", a +1/+1 counter, otherwise one removed (Wiitigo, Shape of the Wiitigo); "Return a creature card with mana value 1, 2, and 3 each" (Gruesome Menagerie); "Discard two
   nonland cards with the same name" as an activation cost (Sphinx of the Chimes, with a picker that only takes a
-  same-name pair and a browser test). +14 (29,333 of 31,936 with B86 and rounds 248 and 249).
+  same-name pair and a browser test). +14 (29,333 of 31,936 with B86 and rounds 248 and 249; 29,364 with rounds 250 to 252).
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until

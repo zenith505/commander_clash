@@ -416,6 +416,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "opponentsReturnedFrom":
+      return new Set((s.resolving?.returnedFrom ?? []).filter((p) => opponents(s, ctx.controller).includes(p))).size;
     case "surveilTopThisWay":
       return s.resolving?.surveilTop ?? 0;
     case "bouncedThisWayPower":
@@ -570,7 +572,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
     case "behindMost": {
       // Scholarship Sponsor: the most any player in the game controls, less this player's (0 when they're the most).
-      const held = (pid: PlayerId) => s.battlefield.filter((id) => { const ch = view(s.objects[id]!); return !!ch && ch.controller === pid && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view); }).length;
+      // Tales of the Ancestors: the cards in their hands.
+      const held = (pid: PlayerId) => c.hand ? s.players[pid]!.hand.length : s.battlefield.filter((id) => { const ch = view(s.objects[id]!); return !!ch && ch.controller === pid && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view); }).length;
       const who = refPlayers(s, c.who, ctx)[0];
       if (who === undefined) return 0;
       const most = Math.max(0, ...s.turnOrder.filter((pid) => !s.players[pid]!.lost).map(held));
@@ -1205,6 +1208,8 @@ function describeCount(c: Count): string {
       return "#cards put on top";
     case "bouncedThisWayCount":
       return "#returned";
+    case "opponentsReturnedFrom":
+      return "#opponents whose creatures were returned";
     case "bouncedThisWayPower":
       return "the returned creature's power";
     case "preventedByRule":
@@ -1351,7 +1356,7 @@ function describeCount(c: Count): string {
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
     case "behindMost":
-      return `the most ${c.filter.text}s a player controls - their ${c.filter.text}s`;
+      return c.hand ? "the most cards in a player's hand - the cards in their hand" : `the most ${c.filter.text}s a player controls - their ${c.filter.text}s`;
     case "absDifference":
       return `|${describeCount(c.of[0])} - ${describeCount(c.of[1])}|`;
     case "greaterOf":

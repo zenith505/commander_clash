@@ -1605,6 +1605,8 @@ export interface TurnLog {
   toGraveyard?: Record<number, number>;
   /** Players who played a land this turn from anywhere other than their hand (Spider-Man 2099). */
   landPlayedNotFromHand?: PlayerId[];
+  /** Visions of Phyrexia: who played a card from exile this turn, a land or a spell (not a copy, which isn't a card). */
+  playedFromExile?: PlayerId[];
   /** Cards put into each owner's graveyard from their hand or library this turn (Welcome the Dead). */
   toGraveyardFromHandOrLibrary?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
@@ -2362,6 +2364,8 @@ export interface Resolving {
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
   returnedNontoken?: PlayerId[];
+  /** Who controlled each permanent its "return ... to their owners' hands" returned from the battlefield, as it left; one a replacement sent elsewhere (a commander, CR 903.9b) wasn't returned (Count opponentsReturnedFrom). */
+  returnedFrom?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
   /** How many cards a dig with rest "keep" left on top (an orderTop with `digRest` arranges them). */
@@ -2407,6 +2411,8 @@ export interface Resolving {
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
+    /** Tales of the Ancestors: how many each player draws, worked out before anyone draws. */
+    drawEach?: Record<PlayerId, number>;
     scryDrew?: true; // Eligeth: the scry became a draw, which may have stopped for dredge
     /** Elder Brain: the hand was exiled (a draw after it that stopped for dredge is finished by the answer). */
     handExiled?: true;

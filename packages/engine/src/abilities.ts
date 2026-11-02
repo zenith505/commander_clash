@@ -192,6 +192,8 @@ export type Count =
   | { kind: "poisonLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
+  /** Faerie Slumber Party: "for each opponent who controlled a creature returned this way": the different opponents who controlled a permanent its "return all ..." returned (Resolving.returnedFrom). */
+  | { kind: "opponentsReturnedFrom" }
   /** Starving Revenant: "for each card you put on top of your library" after "surveil 2": the cards that surveil kept on top. */
   | { kind: "surveilTopThisWay" }
   /** First Responder: "you may return another creature you control to its owner's hand, then put ... equal to that creature's power": its power as it last existed on the battlefield (CR 608.2h), if it went to a hand. */
@@ -521,7 +523,7 @@ export type Count =
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
   /** "Fewer lands than the player who controls the most lands ... the difference" (Scholarship Sponsor): the most permanents like this any player in the game controls, less the number `who` controls. */
-  | { kind: "behindMost"; filter: TargetSpec; who: PlayerRef }
+  | { kind: "behindMost"; filter: TargetSpec; who: PlayerRef; /** Tales of the Ancestors: cards in hand instead of permanents (`filter` unused). */ hand?: true }
   /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
   | { kind: "absDifference"; of: [Count, Count] }
   /** "X or Y, whichever is greater" (Willowdusk, Essence Seer). */
@@ -2131,6 +2133,8 @@ export type StaticCondition =
   | { kind: "cardExiledThisTurn" }
   /** Spider-Man 2099: "if you've played a land or cast a spell this turn from anywhere other than your hand" (a cast copy counts, as for "spells cast from anywhere other than your hand"). */
   | { kind: "playedOrCastNotFromHand" }
+  /** Visions of Phyrexia: "if you didn't play a card from exile this turn" (with "not"): a land played or a spell cast from exile, for any reason (rulings); a copy isn't a card (TurnLog.playedFromExile). */
+  | { kind: "playedFromExile" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
   /**
@@ -3121,7 +3125,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -3145,6 +3149,8 @@ export type Effect =
       untilMvAtLeast?: number;
       /** With `reveal`: "You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your library in a random order." (Treasure Keeper): the cards stay in the library, revealed, and the found card is cast from there; then the rest go to the bottom. */
       inPlace?: true;
+      /** With `then` "hitToHand": "If the card's mana value is 4 or greater, repeat this process" (Demonlord Belzenlok): again while the card put into the hand has at least this mana value. */
+      repeatMvAtLeast?: number;
     }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;

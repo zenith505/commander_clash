@@ -1066,6 +1066,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "untap" && e.what.ref === "target" && effects.length === 1 && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    // Jolted Awake: "If you do, return it from your graveyard to the battlefield", with no target chosen ("up to one"):
+    // nothing to return, so nothing to pay for.
+    if (e.type === "putOntoBattlefield" && e.what.ref === "target" && !objects(s, e.what, ctx).length) return false;
     // Iroh, Tea Master: "have target opponent gain control of ...": only with that player still a legal target, in the game.
     if (e.type === "continuous" && e.giveTo && !players(s, e.giveTo, ctx).some((p) => !player(s, p).lost)) return false;
     if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;

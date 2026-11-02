@@ -632,6 +632,30 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
         // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
         const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) && (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast);
+        // Demonlord Belzenlok: "exile cards ... until you exile a nonland card, then put that card into your hand. If the
+        // card's mana value is 4 or greater, repeat this process." Exiled one at a time (rulings on Laelia); the land cards
+        // stay exiled; it goes on until a nonland card with a lesser mana value, or no nonland card (rulings).
+        if (e.then === "hitToHand") {
+          let toHand = 0;
+          for (;;) {
+            const at = p.library.findIndex(fits);
+            const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
+            const hit = at < 0 ? undefined : p.library[at];
+            for (const id of seen) {
+              moveObject(s, id, "exile");
+              closeZoneBatch(s);
+            }
+            log(s, `${p.name} exiles ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit ? "" : ", finding no nonland card"}.`);
+            if (!hit || s.objects[hit]?.zone !== "exile") break;
+            const mv = defMv(defOf(s, obj(s, hit)));
+            moveObject(s, hit, "hand");
+            if (obj(s, hit).zone === "hand") toHand++;
+            log(s, `${p.name} puts ${defOf(s, obj(s, hit)).name} into their hand.`);
+            if (e.repeatMvAtLeast === undefined || mv < e.repeatMvAtLeast) break;
+          }
+          s.resolving!.dugToHand = toHand;
+          return;
+        }
         const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);

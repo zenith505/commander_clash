@@ -973,7 +973,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.castingTarget = undefined;
       }
       for (const o of objects(s, e.what, ctx)) {
-        if (o.zone !== "graveyard" || done.includes(o.id)) continue;
+        // Hidetsugu and Kairi: "exile the top card of your library ... you may cast it": the card just exiled, still there.
+        if ((o.zone !== "graveyard" && !(o.zone === "exile" && e.what.ref === "exiledTop")) || done.includes(o.id)) continue;
         sc.castingTarget = o.id;
         s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
         if (freeCastable(s, ctx.controller, o.id)) return "paused";
@@ -2014,8 +2015,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Flood of Tears: who controlled the nontoken permanents returned, even one a replacement sends elsewhere (rulings).
         if (o.zone === "battlefield" && !o.isToken && s.resolving) (s.resolving.returnedNontoken ??= []).push(controllerOf(s, o));
         const token = o.isToken;
+        const from = o.zone === "battlefield" ? controllerOf(s, o) : undefined;
         moveObject(s, o.id, "hand");
         if (!token && s.objects[o.id]?.zone === "hand" && s.resolving) (s.resolving.returnedToHand ??= []).push(o.id);
+        // A token goes to the hand too, then ceases to exist (CR 111.7, 704.5d).
+        if (from !== undefined && s.resolving && (token || s.objects[o.id]?.zone === "hand")) (s.resolving.returnedFrom ??= []).push(from);
         if (e.setsDid && s.resolving && (token || s.objects[o.id]?.zone === "hand")) s.resolving.did = true;
       }
       return;
@@ -2626,7 +2630,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return;
         }
         if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
-        enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) })));
+        enterTogether(s, () => {
+          ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) }));
+          // Drana, the Last Bloodchief: "The creature is a Vampire in addition to its other types", as it enters and for good.
+          const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
+          if (e.alsoMods && entered.length) {
+            s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });
+            invalidateCharacteristics(s);
+          }
+        });
         return;
       }
       if (e.dest === "castThisTurn") {

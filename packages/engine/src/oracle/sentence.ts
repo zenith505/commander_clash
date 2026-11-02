@@ -147,7 +147,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
         if (!ctx || (!whereX && !(ctx.spell || ctx.activated || ctx.selfCastSpell)) || ctx.whereX) return null;
         what = what.slice(0, mvX.index);
       }
-      const filter = parseSearchFilter(what);
+      // Kamahl's Druidic Vow: "land and/or legendary permanent cards with mana value X or less": a card that's either one.
+      const either = /^([a-z]+) or ([a-z]+ [a-z]+ card)$/.exec(what);
+      const sides = either && !parseSearchFilter(what) ? [parseSearchFilter(`${either[1]} card`), parseSearchFilter(either[2]!)] : null;
+      const filter = sides ? (sides.every((f) => f?.kind === "card") ? ({ kind: "card", types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: what } as TargetSpec) : null) : parseSearchFilter(what);
       if (!filter) return null;
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
@@ -174,6 +177,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // Cream of the Crop: one of them must go back on top.
       Object.assign(dig, { count: 1, upTo: false, required: true, into: "libraryTop" });
       if (m[1]) Object.assign(dig, restOf(m[1]));
+    } else if ((m = new RegExp(`^Put up to (two|three) of them back on top of your library in any order(?: and the rest ${REST})?$`).exec(s))) {
+      // Rowan's Grim Search: the ones kept go back on top in the order their owner chooses (CR 401.4); none need be kept.
+      Object.assign(dig, { count: num(m[1]!), upTo: true, into: "libraryTop" });
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if ((m = new RegExp(`^Put up to one of them on top of your library(?: and the rest ${REST})?$`).exec(s))) {
       // Thassa's Oracle.
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });

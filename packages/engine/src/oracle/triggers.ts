@@ -4296,7 +4296,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const spentIf = new RegExp(`^if ${SPENT} was spent to cast it, (.+)$`, "i").exec(body0);
       if (spentIf) {
         const req = parseSpentReq(spentIf[1]!);
-        if (event !== "selfEnters" || !req) return "fail" as const;
+        // Drowner of Truth: "When you cast ~, if {C} was spent to cast it, ...": the same, as the spell is cast.
+        if ((event !== "selfEnters" && event !== "selfCast") || !req) return "fail" as const;
         ifSpent = req;
         body0 = spentIf[2]!;
       }

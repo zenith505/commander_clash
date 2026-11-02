@@ -17129,6 +17129,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f60234e4-9b53-47a5-a21a-82c80b5af072",
+  "name": "Rowan's Grim Search",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nIf this spell was bargained, look at the top four cards of your library, then put up to two of them back on top of your library in any order and the rest into your graveyard.\nYou draw two cards and you lose 2 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Bargain"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ed6f28f-a3db-48c5-9ab0-b90a7fba5f57",
   "name": "Royal Assassin",
   "manaCost": "{1}{B}{B}",

@@ -1,6 +1,6 @@
 # Roadmap
 
-29,342 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,350 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,953 of 4,988 (99%), top 10,000: 9,415 of
 9,979 (94%).
 
@@ -1712,6 +1712,26 @@ line blocks.
    Journey); a target "with mana value X or less ... where X is the amount of mana spent to cast this creature" (Astelli
    Reclaimer: X is the mana actually spent, so 3 with warp and 0 if it wasn't cast). +10
    (29,342 of 31,936 with B84 to B86).
+   Round 252 (the top of the list and earlier skip lists): "mill X cards. Put up to X creature cards milled this way onto
+   the battlefield face down under your control as 2/2 Cyberman artifact creatures" (The Cyber-Controller: a face-down
+   Cyberman kind); "each opponent exiles their graveyard ... put all creature cards exiled with ~ onto the battlefield
+   under your control as face-down 2/2 Cyberman artifact creatures" (Death in Heaven: exiles from two chapters linked);
+   "if defending player has more cards in hand than you, exile the top card of their library. During any turn you
+   attacked with a Rogue, you may cast that card and you may spend mana as though it were mana of any color" (Robber of
+   the Rich); "you may cast it until the end of your next turn ... if you put a lore counter on a Saga you control this
+   turn" (Summon: Brynhildr: TurnLog.lorePut); "During your turn, you may cast cards exiled with ~ and you may cast them
+   as though they had flash. Mana of any type can be spent to cast those spells" (Azula, Cunning Usurper: the nontoken
+   permanent and the graveyard card both linked); "copy up to one target Assassin card or card with freerunning from your
+   graveyard. You may cast the copy by paying its mana cost" (Jacob Frye: a paid castFromAmong); "exile the top card of
+   that player's library. Then you may sacrifice another creature or artifact. If you do, until end of turn you may play
+   that card ... any type" (Reno and Rude); "exile all cards from all opponents' graveyards. You may cast a nonland card
+   exiled this way for as long as it remains exiled" (Author of Shadows: a choose-one prompt, with browser tests for it
+   and Jacob Frye). +8 (29,350 of 31,936 with B84 to B86).
+   Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
+   battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher ("You may cast the copy.
+   If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
+   Legacy would follow); Ob Nixilis, the Adversary (casualty X: the copy's starting loyalty from the chosen X);
+   Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
    Out after round 251 (looked at, not done): Ill-Timed Explosion ("you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).
    Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a

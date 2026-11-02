@@ -7778,6 +7778,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "68e45c07-96c5-4f87-a816-d9fa4f119740",
+  "name": "Gemcutter Buccaneer",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Orc Pirate Artificer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc",
+   "Pirate",
+   "Artificer"
+  ],
+  "oracleText": "Whenever this creature or another Pirate you control enters, create a tapped Treasure token.\nTreasures you control are Equipment in addition to their other types and have \"Equipped creature gets +2/+0,\" equip Pirate {1}, and equip {3}.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "lcc",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3dfb0c0a-b68f-43b9-8475-28d0192fc4ed",
   "name": "Gemrazer",
   "manaCost": "{3}{G}",
@@ -11949,6 +11983,43 @@
   "set": "spg",
   "releasedAt": "2026-04-24",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2270daaf-252d-40c4-bed5-bd46ae15f041",
+  "name": "Liesa, Shroud of Dusk",
+  "manaCost": "{2}{W}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Angel",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Rather than pay {2} for each previous time you've cast this spell from the command zone this game, pay 2 life that many times.\nFlying, lifelink\nWhenever a player casts a spell, they lose 2 life.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

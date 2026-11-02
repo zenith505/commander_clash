@@ -3217,6 +3217,26 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   beginStep(s, "cleanup");
 }
 
+/**
+ * "End the combat phase" (CR 724.2, Mandate of Peace), after the spell doing it has finished resolving (`item`):
+ * abilities waiting to go on the stack cease to exist (724.2a); every object on the stack is exiled, the resolving spell
+ * too, and none of them is countered (724.2b, rulings); state-based actions are checked with no priority and no triggers
+ * put on the stack (724.2c); the combat phase ends, with everything removed from combat and "until end of combat" effects
+ * gone, and the game goes straight on to the next phase (724.2d), so no "at end of combat" triggers (724.2e).
+ */
+export function endTheCombatPhase(s: GameState, item?: StackItem): void {
+  s.triggerQueue = [];
+  const spells = [...(item?.kind === "spell" && item.objectId ? [item.objectId] : []), ...s.stack.flatMap((x) => (x.kind === "spell" && x.objectId ? [x.objectId] : []))];
+  s.stack = [];
+  for (const id of spells) if (s.objects[id]?.zone === "stack") moveObject(s, id, "exile");
+  log(s, `The combat phase ends${spells.length ? `: ${spells.map((id) => nameOf(s, id)).join(", ")} ${spells.length === 1 ? "is" : "are"} exiled from the stack` : ""}.`);
+  runStateBasedActions(s, true);
+  // As the end of combat step ends (advanceStep): combat and its effects end, then the next phase begins (an added one
+  // first, CR 500.8).
+  s.step = "endCombat";
+  advanceStep(s);
+}
+
 /** The last step of each phase that can have phases added after it (CR 500.8): beginning, main, combat. */
 const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
 
@@ -4460,6 +4480,8 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   // Territorial Dispute: "Players can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
+  // Aggressive Mining: "You can't play lands."
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).youCantPlayLands && controllerOf(s, obj(s, id)) === pid)) return 0;
   // Rock Jockey: "You can't play lands if ~ was cast this turn".
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).noLandsIfCastThisTurn && controllerOf(s, obj(s, id)) === pid && obj(s, id).wasCast && obj(s, id).enteredTurn === s.turn)) return 0;
   let n = 1;

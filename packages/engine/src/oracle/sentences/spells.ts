@@ -118,6 +118,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "End the turn." (CR 724.1): Sundial of the Infinite, Time Stop.
   if (/^End the turn$/i.test(s)) return [{ type: "endTurn" }];
+  // Mandate of Peace: "End the combat phase." (CR 724.2).
+  if (/^End the combat phase$/i.test(s)) return [{ type: "endCombatPhase" }];
   // Obeka, Brute Chronologist: "The player whose turn it is may end the turn" (CR 724.1): that player decides as it
   // resolves, whoever controls the ability.
   if (/^The player whose turn it is may end the turn$/.test(s)) return [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ type: "endTurn" }], text: "end the turn" }];

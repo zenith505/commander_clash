@@ -166,6 +166,13 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (spec?.kind !== "object") return null;
     return rule({ by: { target: { ref: "target", index: addTarget(ctx, spec) } }, ...(m[1] ? { to: { target: { ref: "self" } } } : {}) });
   }
+  // Terrifying Presence: "Prevent all combat damage that would be dealt by creatures other than target creature this
+  // turn": a rule until the turn ends, for creatures that arrive later too (CR 611.2c), but not that creature's.
+  if (/^Prevent all combat damage that would be dealt by creatures other than target creature this turn$/.test(s)) {
+    const spec = parseTargetPhrase("creature");
+    if (spec?.kind !== "object") return null;
+    return rule({ combat: "only", by: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures other than target creature" }, notTarget: addTarget(ctx, spec) } });
+  }
   // "Prevent all damage that would be dealt by target instant or sorcery spell this turn" (Hidden Retreat): as Hallow.
   if ((m = /^Prevent all damage that would be dealt by target ((?:instant or sorcery )?spell) this turn$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

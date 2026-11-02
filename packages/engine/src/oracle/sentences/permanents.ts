@@ -331,6 +331,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const anyOf: TargetSpec[] = [{ kind: "object", combat: "blocking", text: "blocking" }, { kind: "object", combat: "blocked", text: "blocked" }];
     return [{ type: "destroy", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf, text: "all blocking creatures and all blocked creatures" } } }];
   }
+  // End Hostilities: "Destroy all creatures and all permanents attached to creatures": all at once (CR 701.8a), each
+  // permanent that's either, what's attached seen before anything is destroyed.
+  if (/^Destroy all creatures and all permanents attached to creatures$/.test(s)) {
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    const anyOf: TargetSpec[] = [creature, { kind: "object", types: [], notTypes: [], notColors: [], attachedTo: creature, text: "permanent attached to a creature" }];
+    return [{ type: "destroy", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: "all creatures and all permanents attached to creatures" } } }];
+  }
   // Steel Hellkite: "Destroy each nonland permanent with mana value X whose controller was dealt combat damage by ~ this
   // turn": whoever controls it now (rulings).
   if ((m = /^Destroy (each .+?) whose controller was dealt combat damage by ~ this turn$/i.exec(s))) {

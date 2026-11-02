@@ -1207,6 +1207,15 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? was.id : undefined;
     return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => id === host);
   }
+  // Sporogenic Infection: "a creature of their choice other than enchanted creature": any but the one the source is
+  // attached to, or was as it last existed (CR 608.2h).
+  if (e.filter.notSourceHost) {
+    const { notSourceHost: _, ...filter } = e.filter;
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const was = me?.zone === "battlefield" ? (me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined) : sourceId ? s.lastKnown?.[sourceId]?.attachedTo : undefined;
+    const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? was.id : undefined;
+    return pickOptions(s, { ...e, filter }, pid, sourceId, sourceZc).filter((id) => id !== host);
+  }
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;

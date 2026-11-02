@@ -12,7 +12,7 @@ import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { nameActivationBan } from "./names";
 import { sameName } from "./faces";
-import { removableCounters } from "./counters";
+import { countersStay, removableCounters } from "./counters";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
@@ -428,6 +428,11 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (banned) return banned;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
+  // {Q} (CR 107.6): it must be tapped, a stun counter that stays keeps it so (rulings on Fear of Sleep Paralysis), and a
+  // creature can't pay it while summoning sick (CR 302.6).
+  if (ab.untapSelf && !o.tapped) return `${name} is untapped`;
+  if (ab.untapSelf && (o.counters.stun ?? 0) > 0 && countersStay(s, o, "stun")) return `${name}'s stun counter can't be removed`;
+  if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`;
   if (ab.sacrificeSelf && !canSacrificeForCost(s, o)) return `${name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a

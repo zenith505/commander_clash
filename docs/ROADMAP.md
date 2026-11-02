@@ -1,8 +1,8 @@
 # Roadmap
 
-29,245 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,371 of
-9,979 (93%).
+29,263 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,384 of
+9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -116,7 +116,7 @@ line blocks.
    though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
    opponent at random, then that player or their planeswalker), Ragost, Deft Gastronaut (artifacts become Foods with a
    granted ability), Observed Stasis ("remove enchanted creature from combat"), Eshki, Temur's Roar ("that spell's
-   power"), Pili-Pala ({Q} in a mana ability), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
+   power"), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
    Out after round 167: Dinosaurs on a Spaceship and Deep-Sea Kraken (abilities that work while the card is exiled,
    triggered by a time counter coming off or by "if ~ is suspended"; the many ways counters are removed don't send such
    events yet), The Infamous Cruelclaw ("cast that card by discarding a card rather than paying its mana cost", a new
@@ -202,7 +202,7 @@ line blocks.
    Círdan the Shipwright (secret council for players), Dragonlord
    Kolaghan, Back for Seconds (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
    cost), Kamiz, Obscura Oculus, Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery, Thunderwave,
-   Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Enchanted Evening, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
+   Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
    Aurelia, Exemplar of Justice (its "choose up to one target creature you control" sentence with color conditions
    doesn't parse yet), Relic Amulet ("that much"), Hankyu (a granted ability with its own counters), Essence Sliver
    ("whenever a Sliver deals damage", any damage: no trigger for that yet), Topography Tracker (an explore
@@ -226,8 +226,7 @@ line blocks.
    Is How It Ends (villainous choice after a shuffle), Azor's Gateway (counting mana values among cards exiled with
    it), Tamiyo, Collector of Tales, Anchor to Reality (the sacrificed permanent's mana value after a search), Detective's
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
-   commander's mana value), Strata Scythe (imprint a land from the library), Wickersmith's Tools ("one or more -1/-1
-   counters are put on a creature"), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
+   commander's mana value), Strata Scythe (imprint a land from the library), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
    among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
    attacked player, activated by that player), Aggressive Mining ("you can't play
@@ -247,14 +246,12 @@ line blocks.
    in APNAP order), Black Panther, Wakandan King ("move all +1/+1 counters ... if one or more are moved this way, that
    much"), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
    replacement), Etrata, Deadly Fugitive (a granted turn-face-up ability and cloak), The Creation of Avacyn (turning
-   the exiled card face up), Honest Work (a name change), Pawpatch Recruit ("target creature other than that
+   the exiled card face up), Pawpatch Recruit ("target creature other than that
    creature" needs the trigger's subject at target choice), Jhoira's Timebug and Greater Gargadon (suspended cards),
    Huntmaster of the Fells (two targets, one about the other's controller), Archelos, Lagoon Mystic (enters tapped or
    untapped by its own state), Venerable Warsinger (a target's X from the trigger's damage, unknown at targeting),
-   Rushed Rebirth (a this-turn dies trigger with "lesser mana value" than that creature), Barrin, Tolarian Archmage (no
-   turn log of permanents put into hands), Omarthis (manifest a counted number), Pull from Eternity (no targets in
-   exile yet), Wall of Shards (cumulative upkeep "an opponent gains 1 life"), Shadow of the Grave (the discard log keeps
-   card keys, not the cards), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
+   Rushed Rebirth (a this-turn dies trigger with "lesser mana value" than that creature), Omarthis (manifest a counted number), Pull from Eternity (no targets in
+   exile yet), Wall of Shards (cumulative upkeep "an opponent gains 1 life"), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
    Mutant creature), the hybrid Mimics ("a spell that's both blue and red": no all-of-these-colors filter), Does
    Machines, Crown of Convergence ("share a color with that card"). Round 176 went down the list from Bristlebud Farmer to about rank
    9,240 (Kelsien, the five Runes, Great Hall of the Biblioplex, Questing Druid, Worldslayer, Progenitor Exarch,
@@ -275,16 +272,15 @@ line blocks.
    redirects the damage to a creature), Drach'Nyen ("the exiled card's power"), Kalamax ("whenever you copy an instant
    spell"), Extinction Event (odd or even), Fateful Handoff (draw by a target's mana value, then give it away),
    Reprocess (sacrifice any number of three kinds), Wave of Rats ("if it dealt combat damage to a player this turn"),
-   Darksteel Angel (-1/-1 counters can't be put), Reality Acid, Hammerheim (landwalk), Coalition Victory. Round 177
+   Darksteel Angel (-1/-1 counters can't be put), Hammerheim (landwalk). Round 177
    went down from rank 9,240 to about rank 10,060 (Frost Titan, Seasoned Pyromancer, Devil's Play, Mind Funeral,
    Custodi Lich, Resolute Archangel, Jadelight Spelunker, Smaug, Tatyova, Gaddock Teeg, Aether Storm, Taigam, Lord of
    the Pit, Biorhythm, Flux, Awaken the Erstwhile, Martha Jones, Phoenix Fleet Airship, Bloodspore Thrinax, Yorvo,
    Prismari Pianist, Baru, Sokka, Arcbound Tracker, Gold Rush, Tainted Treats and others), taking the easy ones.
    Out after round 178: Giott, Colossal Rattlewurm, Dregscape Sliver, Foe-Razer Regent, Mathas, Ozox and Arcbound
-   Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Ravener
-   (must attack a target opponent), Zameck Guildmage ("this turn" extra counters as creatures enter), Cunning
+   Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Zameck Guildmage ("this turn" extra counters as creatures enter), Cunning
    Nightbonder (spells "cast", copies left out), Bushy Bodyguard and Treetop Sentries (forage as an effect, a new
-   choice), Ride Down ("blocked by that creature"), Flesh Reaver (damage to several recipients at once), Quest for the
+   choice), Flesh Reaver (damage to several recipients at once), Quest for the
    Nihil Stone (two intervening-if conditions), Alpharael (ward with a random discard), Fealty to the Realm. Known
    limits: Spellbreaker Behemoth and Carrion Grub read a spell's or card's printed power, so a */* is 0 there. Round 178
    went down from rank 10,060 to about rank 10,640 (Baneful Omen, Galvanic Relay, Lightning, Security Sergeant, Daxos
@@ -395,7 +391,7 @@ line blocks.
    Out after round 184 (looked at, not done): Blood Scrivener (a draw
    replaced by two draws and a life loss), Knight Rampager (a target chosen at random), Rot Hulk (up to X cards returned
    from a graveyard to the battlefield), Agility Bobblehead ("can't be blocked except by creatures with haste"),
-   Pili-Pala ({Q} in a mana ability), Trail of Mystery ("whenever a permanent you control is turned face up"), Sarkhan
+   Trail of Mystery ("whenever a permanent you control is turned face up"), Sarkhan
    the Masterless (each Dragon deals damage to the attacker), Ephara, God of the Polis (another creature entered under
    your control last turn), Mindblade Render (combat damage dealt by a Warrior), Dreadhound (a creature card put into a graveyard from a library), Indoraptor (bloodthirst
    X), Werewolf Pack Leader ("isn't a Human").
@@ -746,7 +742,7 @@ line blocks.
    Assassin Lord (attacked this turn by an Assassin you controlled), Kros, Defense Contractor (no record of who put
    counters on a creature), Visions of Phyrexia (no record of playing a card from exile), Glorious Purpose (the sixth
    plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
-   counters), Bladegriff Prototype (a target the damaged player chooses), Bronze Bombshell, Zidane, Tantalus Thief ("an
+   counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
    hand), Obeka, Splitter of Seconds (extra upkeep steps after this phase).
    Round 203 went on from the top: storied and the enduring story (CR 702.195: Balin, Bifur, Bombur, Dáin, Fíli, Kíli,
@@ -764,7 +760,7 @@ line blocks.
    ("whenever you tap an untapped creature an opponent controls"), Admiral Beckett Brass (combat damage by three or
    more Pirates to one player), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
    nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
-   Summary Dismissal, Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
+   Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
    Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
    Skycoach Waypoint, Hexhaven Dueling Arena, Biblioplex Tomekeeper, Infinite Coursework; the bot aims it at its own
    creature with a prepare spell), "you may exile N cards from your graveyard. If you do" with N above one (CR 609.3:
@@ -820,8 +816,7 @@ line blocks.
    enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
    Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist ("remove all
-   counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Honest Work
-   (a name change), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
+   counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
    Entity (its "is turned face up" path).
    Round 207 went on from the top: "each creature card in your graveyard has unearth {2}{B}" and the same for artifact
@@ -1651,6 +1646,31 @@ line blocks.
    creatures, and/or lands. Draw a card for each permanent sacrificed this way" (Reprocess); "a creature of their choice
    other than enchanted creature" (Sporogenic Infection: pickOptions honors notSourceHost); "That Vehicle" in a mode of
    an attack trigger (Kitsune Ace). +18 (29,194 of 31,936 with B80+B81).
+   Round 247 (earlier rounds' skip lists, from the top): "All permanents are enchantments in addition to their other
+   types" (Enchanted Evening, CR 205.1b); the untap symbol {Q} in a mana ability (Pili-Pala: ManaAbility.untapSelf) and an
+   activated ability (Puresight Merrow, "You may exile that card" after looking at the top card), not while untapped or
+   summoning sick (CR 107.6, 302.6); "target card that has an Adventure" (Edgewall Inn); a target creature card plus "up
+   to one target Cleric, Rogue, Warrior, or Wizard creature card" (Thwart the Grave); "and each other nonland permanent
+   with the same mana value as that permanent" (Mists of Lórien: ObjRef target sameMv); "You win the game if you control a
+   land of each basic land type and a creature of each color" (Coalition Victory); "return it ... under its owner's
+   control at the beginning of their next upkeep" (Phytotitan: delayed when ownersNextUpkeep); "When this Aura leaves the
+   battlefield, enchanted permanent's controller sacrifices it" (Reality Acid; also Parasitic Implant's "enchanted
+   creature's controller sacrifices it"; a leaves-the-battlefield trigger now finds what its source was attached to as it
+   left, CR 603.10a); Ravener's "target creature attacks target opponent this turn if able"; "if a permanent was put into
+   your hand from the battlefield this turn" (Barrin, Tolarian Archmage: TurnLog.permanentToHand); "Whenever one or more
+   -1/-1 counters are put on a creature" (Wickersmith's Tools); "all cards in your graveyard that you cycled or discarded
+   this turn" (Shadow of the Grave: TargetSpec.discardedThisTurn); "Creatures that were blocked by that creature this
+   combat" (Ride Down: blockHistory thisCombat); "... named Humble Merchant" (Honest Work); "Exile all other spells and
+   counter all abilities" (Summary Dismissal: Effect dismissStack; bots only cast it when none of the stack is theirs);
+   "When a player other than this creature's owner controls it, that player sacrifices it" (Bronze Bombshell, a state
+   trigger, CR 603.8). +18 (29,227 of 31,936 with B82; 29,244 with B83).
+   Out after round 247 (looked at, not done): Hushbringer (see round 156); Endless Detour ("target spell, nonland
+   permanent, or card in a graveyard": one target across three zones); Jaws, Relentless Predator ("Whenever one or more
+   ... are sacrificed or destroyed": no event for that pair); Wall of Shards (cumulative upkeep "an opponent gains 1
+   life", an opponent chosen for each age counter); Squandered Resources ("Sacrifice a land: Add one mana of any type that
+   land could produce": a sacrifice cost inside a mana ability and "could produce"); Night Soil ("Exile two creature cards
+   from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity ("target face-up card in
+   exile": no exile-card targets yet).
    Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
    "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg ("loses first
    strike or swampwalk", one of the two chosen as it resolves, rulings); Consume Spirit ("Spend only black mana on X":
@@ -1716,7 +1736,7 @@ line blocks.
    Out after round 235 (looked at, not done): Squandered Resources (mana of a type the sacrificed land could produce);
    Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
    players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
-   Pili-Pala (the untap symbol {Q} as a cost); Radiant Lotus (sacrifice one or more artifacts, another player adds the
+   Radiant Lotus (sacrifice one or more artifacts, another player adds the
    mana).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
@@ -1746,7 +1766,7 @@ line blocks.
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
-   the Wild Hunt, Audacious Reshapers, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
+   the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
@@ -1961,8 +1981,7 @@ line blocks.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
    their choice) and Eluge (a cost reduction for each flooded land) are out; Cemetery Illuminator and the other "look at the top card, you may cast it if ..." cards are
-   out; Lozhan ("any target that isn't a commander") is out; Knacksaw Clique, Pale Wayfarer, Pili-Pala and Puresight Merrow
-   ({Q} with another cost or a mana ability) are out; Moxite Refinery (Remove X counters as a cost) and Subversive
+   out; Lozhan ("any target that isn't a commander") is out; Moxite Refinery (Remove X counters as a cost) and Subversive
    Acolyte are out; bots never choose Aetheric Amplifier's "each kind of counter you have" mode. Smaller gaps from round
    113: autopay never exiles a creature to Food Chain (choosing what to exile is the player's; bots do use it);
    Urianger Augurelt's Arcanum abilities are out.
@@ -2270,8 +2289,7 @@ line blocks.
      Auditor's "When ~ enters and whenever you solve a Case" (the engine has a "solved" event for it).
    - "Enters with a number of counters equal to" still out: "three minus X" (Slumbering Trudge), Ulamog; Kurbis, Marath,
      Dyadrine and Gyrus are blocked on other lines.
-   - Dies-return still out: Not Dead After All, Vincent's Limit Break, Phytotitan ("at the beginning
-     of their next upkeep").
+   - Dies-return still out: Not Dead After All, Vincent's Limit Break.
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
      Vat), two destinations in one sentence (Bounty of Skemfar, Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
      Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
@@ -2521,7 +2539,7 @@ line blocks.
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
    Left from the round after Seasons (lists of targets, Vivid, Gates/Deserts/Caves, counts):
    - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
-     to the battlefield (they enter at the same time; Thwart the Grave also has commas inside one target), and "it" or
+     to the battlefield (they enter at the same time), and "it" or
      "its controller" after a list (Acolyte Hybrid-style "its controller draws").
    - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
      target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
@@ -2550,7 +2568,7 @@ line blocks.
    - Auras put onto the battlefield without being cast ask what they enchant (CR 303.4f), returns from exile and
      "until ~ leaves" included. An "until ~ leaves" Aura is placed after the instruction or state-based-action pass
      that made the source leave, not mid-instruction. Still out: Calix, Push the Limit, Mount/Vehicle groups.
-   - Auras that transform: Lignify (the Kindred type), Witness Protection and Honest Work (a new name), Frozen in Ice
+   - Auras that transform: Lignify (the Kindred type), Witness Protection (a new name), Frozen in Ice
      ("can't become untapped"), Withercrown (granted upkeep trigger with "unless you sacrifice"), Swift
      Reconfiguration (Vehicle with crew), enchant unions with a subtype (In Too Deep, Sugar Coat, Puppet Crafting).
    - "Whenever a creature you control attacks" bodies still out: Hellrider ("the player or planeswalker it's
@@ -2864,7 +2882,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrifice); Laquatus's Creativity ("that many" counted after the draw); Voidpouncer (two kinds of counters);
   Ravaging Riftwurm (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
   block); Orcish Spy (looking at the top cards without reordering); Gandalf, Wandering Wizard ("~'s owner ... and
-  draws"); Parasitic Implant ("enchanted creature's controller sacrifices it"); Jaded Response ("shares a color with a
+  draws"); Jaded Response ("shares a color with a
   creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
   Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (moving every +1/+1 counter); Driftgloom Coyote
   ("if that creature had power 2 or less" after an exile until).
@@ -4561,8 +4579,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Turtle Tracks); look at the top eight, exile four at random (Orcish Librarian); "Whenever a creature card leaves an
   opponent's graveyard" from the graveyard (Erebos's Titan); "That opponent may put ... from their hand onto the
   battlefield" (Metamorphose); protection from each color whose basic land type you control (Dominaria's Judgment);
-  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,227 of 31,936 with B83; 29,245 with
-  round 246).
+  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,263 of 31,936 with B83 and rounds 246
+  and 247).
 - Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
   choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
   check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share

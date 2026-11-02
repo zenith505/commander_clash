@@ -1185,6 +1185,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
   if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
+  if (text === "a permanent was put into your hand from the battlefield this turn") return { kind: "permanentToYourHand" };
   if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
   // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).
   if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };
@@ -2485,7 +2486,8 @@ function parseTransform(line: string): StaticAbility | null {
   const head = /^(Enchanted (?:creature|permanent|artifact|land)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
   if (!head) return null;
   // "... with base power and toughness 1/1 named Legitimate Businessperson" (Witness Protection): its name too (layer 3).
-  const named = /^(.+ is an? [^"]+?) named ([A-Z][A-Za-z' ,-]+)$/.exec(head[2]!);
+  // Honest Work: "... and "{T}: Add {C}" named Humble Merchant": after a quoted ability.
+  const named = /^(.+ is an? (?:[^"]+?|[^"]*"[^"]*"[^"]*?)) named ([A-Z][A-Za-z' ,-]+)$/.exec(head[2]!);
   if (named) {
     const rest = parseTransform(`${head[1]} ${named[1]}`);
     return rest && { ...rest, mods: [{ kind: "setName", name: named[2]! }, ...rest.mods], text: line };
@@ -2814,7 +2816,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (!kws) return null;
     return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: Number(emergence[1]), toughness: Number(emergence[2]) }, { kind: "addKeywords", keywords: kws }], text: line };
   }
-  if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
+  // Enchanted Evening: "All permanents are enchantments in addition to their other types": the same, in layer 4 (CR
+  // 205.1b, 613.1d); nothing else changes (rulings).
+  const allPermsAre = /^All permanents are (artifacts|enchantments) in addition to their other types$/.exec(text);
+  if (allPermsAre) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: [allPermsAre[1] === "artifacts" ? "Artifact" : "Enchantment"], subtypes: [] }], text: line };
   // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
   const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };

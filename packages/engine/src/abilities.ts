@@ -733,6 +733,8 @@ export interface TargetSpec {
   milledThisTurn?: true;
   /** "... that were put there from the battlefield this turn" (Brought Back): GameObject.fromBattlefieldTurn. */
   fromBattlefieldThisTurn?: true;
+  /** "Cards in your graveyard that you cycled or discarded this turn" (Shadow of the Grave): GameObject.discardedTurn. */
+  discardedThisTurn?: true;
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /** "With greater power" than the ability's source (Éowyn, Fearless Knight). */
@@ -1170,6 +1172,12 @@ export type ObjRef =
        */
       sharesColor?: { filter: TargetSpec };
       /**
+       * "Return target nonland permanent and each other nonland permanent with the same mana value as that permanent"
+       * (Mists of Lórien): also every other permanent matching `filter` with the target's mana value as this resolves (a
+       * face-down one's is 0, CR 708.2). Only the target is targeted; none are affected if it's illegal (CR 608.2b, rulings).
+       */
+      sameMv?: { filter: TargetSpec };
+      /**
        * "Return target creature and all Auras attached to it" (Hubris): also each permanent matching `filter` attached to
        * the target as this resolves (none if the target is illegal, CR 608.2b). `only`: "Destroy all Equipment attached to
        * that creature" (Turn to Slag): just those.
@@ -1289,7 +1297,7 @@ export type ObjRef =
    * turn with `of` as it was then (TurnLog.blocks), even if they're no longer blocking (rulings), each still that object.
    * `at`: `of` as a delayed trigger remembers it.
    */
-  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
+  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -2205,6 +2213,8 @@ export type StaticCondition =
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number }
+  /** "If a permanent was put into your hand from the battlefield this turn" (Barrin, Tolarian Archmage): the whole turn, a token too (rulings). */
+  | { kind: "permanentToYourHand" }
   | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Enters with ... unless you've cast another red spell this turn" (Hotheaded Giant): as it enters, other than itself if it was cast (rulings). */ entering?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color; /** "Another instant or sorcery spell" (Mage Duel): one with any of these card types. */ types?: string[] }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
@@ -2882,7 +2892,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "At the beginning of their next upkeep" (Phytotitan), with `each` "selfCard": the card's owner's next upkeep. */ "ownersNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | /** "At the beginning of the end step on your next turn" (Kav Landseeker): your end step on a later turn. */ "yourNextTurnEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With `when` "dies": "When the permanent you don't control dies this turn" (Devouring Tendrils): a planeswalker too, any permanent put into a graveyard from the battlefield (CR 700.4). */ anyPermanent?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; /** With "dies": "if it has an egg counter on it" (Xira), as it last existed (CR 603.4, 603.10a). */ ifHadCounter?: CounterKind; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu"; /** Zareth San, the Trickster: not ninjutsu, so it attacks what its controller chooses as it enters (CR 508.4; rulings), not what the returned creature attacked (702.49c). */ chooseDefender?: true }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3547,6 +3557,12 @@ export type Effect =
    */
   /** "Counter each spell you don't control" (overloaded Counterflux): every spell on the stack matching it, not abilities. */
   | { type: "counterEach"; filter: TargetSpec }
+  /**
+   * Summary Dismissal: "Exile all other spells and counter all abilities": each spell on the stack but this one is exiled
+   * (not countered, so one that can't be countered goes too, rulings; a copy ceases to exist, CR 707.10a), and each
+   * activated and triggered ability on it is countered (CR 701.6b). Static abilities and later activations aren't affected.
+   */
+  | { type: "dismissStack" }
   /** "Target spell can't be countered" (Vexing Shusher): that spell, a copy too, while it's on the stack (CR 101.2). */
   | { type: "spellUncounterable"; index: number }
   /**
@@ -5502,6 +5518,11 @@ export interface ManaAbility {
   toChosenPlayer?: true;
   manaCost: string; // "{1}" or ""
   tap: boolean;
+  /**
+   * The untap symbol {Q} in its cost (Pili-Pala, CR 107.6): it must be tapped, and a creature not summoning sick (CR
+   * 302.6). Untapping it isn't tapping it for mana (rulings: Mana Reflection doesn't see it). Never used by automatic payment.
+   */
+  untapSelf?: true;
   sacrificeSelf: boolean;
   lifeCost?: number;
   energyCost?: number;

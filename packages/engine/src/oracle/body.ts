@@ -7081,6 +7081,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Puresight Merrow: "Look at the top card of your library. You may exile that card." (face up, CR 406.3).
+    if (lookTop?.[1] === "your" && /^You may exile that card\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "exile", rest: "keep", reveal: false });
+      si++;
+      continue;
+    }
     // Jace, the Mind Sculptor: "Look at the top card of target player's library. You may put that card on the bottom of that
     // player's library." The one who looks decides.
     if (lookTop && /^You may put (?:that card|it) on the bottom of (?:that player's|your) library$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /your/.test(sentences[si + 1]!) === (lookTop[1] === "your")) {
@@ -12717,6 +12723,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const doorNames = !ctx.spell ? new RegExp(`^[Yy]ou win the game if there are ${NUM} or more different names among unlocked doors of Rooms you control$`).exec(s) : null;
     if (doorNames) {
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "unlockedDoors", names: true } }, min: num(doorNames[1]!) }, effects: [{ type: "winGame", who: { ref: "you" } }] });
+      continue;
+    }
+    // Coalition Victory: "You win the game if you control a land of each basic land type and a creature of each color":
+    // checked as it resolves; one land may have several basic land types and one creature several colors (rulings).
+    if (/^You win the game if you control a land of each basic land type and a creature of each color$/.test(s)) {
+      const creatures: TargetSpec = { kind: "object", types: ["Creature"], text: "creatures you control" };
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "allOf", conds: [{ kind: "amount", amount: { count: { kind: "basicLandTypes" } }, min: 5 }, { kind: "amount", amount: { count: { kind: "colorsAmongPermanents", filter: creatures } }, min: 5 }] } }, effects: [{ type: "winGame", who: { ref: "you" } }] });
       continue;
     }
     // Twenty-Toed Toad: "you win the game if there are twenty or more counters on it or you have twenty or more cards in

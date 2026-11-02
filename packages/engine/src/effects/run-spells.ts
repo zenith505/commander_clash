@@ -274,6 +274,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
       return;
     }
+    case "castSelfFree": {
+      // Thunderblade Charge: the card in its owner's graveyard, still the object the ability came from (CR 400.7), cast
+      // from there as this resolves, timing ignored (CR 608.2g); X is 0 (CR 107.3b). Not casting it is offered too.
+      const sc = (s.resolving!.scratch ??= {});
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (sc.playLinked || !o || o.zone !== "graveyard" || (o.zoneChanges ?? 0) !== ctx.sourceZc || o.owner !== ctx.controller) return;
+      sc.playLinked = true;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+      if (freeCastable(s, ctx.controller, o.id)) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, o).name} can't be cast.`);
+      return;
+    }
     case "castCommanderFree": {
       // Geode Golem: a commander you own (CR 903.3) in the command zone as this resolves, cast then (CR 608.2g); the
       // commander tax is an additional cost, still paid (CR 903.8, 118.9d; rulings). With two, either one (rulings on

@@ -1,6 +1,6 @@
 # Roadmap
 
-29,194 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,209 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,371 of
 9,979 (93%).
 
@@ -4513,6 +4513,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   to that permanent or player instead" (Divine Presence). Rules bug fixed: a static "As long as enchanted/equipped
   creature ..., it ..." applied "it" to the Aura or Equipment itself instead of the creature (no other card's
   compilation changed). +16 (29,136 of 31,936; 29,162 with rounds 243 and 244).
+- Round B82 (one-line templates from the bottom of the list): "You gain 1 life and ~ deals 1 damage to target player"
+  as two sentences (Axelrod Gunnarson); "The next time a creature with shadow of your choice would deal damage to you
+  this turn, prevent that damage" (Circle of Protection: Shadow); the same for "a creature of the chosen type" (Circle
+  of Solace); "~ deals damage to that creature and that player equal to X" after "target creature's controller"
+  (Friendly Fire); "During combat, players can't cast instant spells or activate abilities that aren't mana
+  abilities" (Hand to Hand); "Whenever another card is put into your graveyard from anywhere" (Measure of
+  Wickedness); "discards all cards of each of the sacrificed creature's colors" (Mind Extraction: a colorless creature
+  makes them discard nothing); "unless defending player sacrifices a creature of their choice" (Ogre Marauder);
+  "Reveal your hand and discard a card of target opponent's choice. Then that player reveals their hand and discards a
+  card of your choice" (Rakdos Augermage); three creature targets dealt 2, 3 and 4 damage with an "exile it instead" rider
+  (Serpentine Spike); "That player looks at the top N cards of your library, then puts them back in any order"
+  (Tahngarth's Glare, the opponent orders your library); "you may pay {2}{R}{R}. If you do, you may cast ~ from your
+  graveyard without paying its mana cost" (Thunderblade Charge); "Whenever an artifact you control is put into a
+  graveyard from the battlefield, if it wasn't sacrificed" (Urza's Miter); "Whenever a creature dealt damage by
+  enchanted creature this turn dies" (Vampiric Embrace); "destroy ~ and it deals damage to you equal to the number of
+  pin counters on it" and "X is the number of pin counters on ~" (Voodoo Doll). +15 (29,177 of 31,936 with rounds 243
+  and 244; 29,191 with round 245).
+- Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
+  targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
+  revealed card), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice
+  condition and a mutual damage ability).
 - Out after round B81 (looked at, not done): Kaervek's Spite (an additional cost of sacrificing all permanents and
   discarding your hand), Ignorant Bliss, Turn the Tables, Angry Mob, Time to Reflect (not attempted this round).
 - Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a

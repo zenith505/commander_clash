@@ -1263,6 +1263,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castSearched":
+    case "castSelfFree":
     case "castCommanderFree":
     case "castCipher":
     case "castParadigm":

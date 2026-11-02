@@ -6303,6 +6303,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer && (!cantCastIf || (o.zone === "battlefield" && staticConditionNow(s, cantCastIf, o.id, controllerOf(s, o)))))
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
+    // Hand to Hand: an instant spell (its card type as it's cast) during the combat phase, anyone's.
+    if (abilitiesOf(s, o).combatNoInstantsOrAbilities && o.zone === "battlefield" && d.types.includes("Instant") && inCombatPhase(s))
+      return `${characteristics(s, o).name}: players can't cast instant spells during combat`;
     const duringCombat = abilitiesOf(s, o).opponentsCantCastDuringCombat;
     if (duringCombat && (duringCombat === "all" || controllerOf(s, o) !== pid) && inCombatPhase(s))
       return `${characteristics(s, o).name}: ${duringCombat === "all" ? "players" : "opponents"} can't cast spells during combat`;
@@ -7500,6 +7503,7 @@ const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
  */
 export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility): number | null | undefined {
+  if (ab.xIs && typeof ab.xIs === "object") return o.counters[ab.xIs.counters] ?? 0;
   if (ab.xIs !== "linkedCardMv") return undefined;
   const card = linkedCards(s, o.id)[0];
   return card ? defMv(defOf(s, obj(s, card.id))) : null;
@@ -7557,6 +7561,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
     // Abeyance: this turn, in any zone (rulings).
     if (turnRule(s, pid, "noActivations")) return "you can't activate abilities that aren't mana abilities this turn";
+    // Hand to Hand: during the combat phase, in any zone (CR 506.1).
+    const handToHand = inCombatPhase(s) ? s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).combatNoInstantsOrAbilities) : undefined;
+    if (handToHand) return `${characteristics(s, obj(s, handToHand)).name}: players can't activate abilities that aren't mana abilities during combat`;
   }
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;

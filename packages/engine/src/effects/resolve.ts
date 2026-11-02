@@ -321,7 +321,9 @@ function attachedHost(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number
   if (me.zone === "battlefield" && same) was = me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined;
   else {
     const lk = s.lastKnown?.[me.id];
-    was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
+    // A leaves-the-battlefield trigger (Reality Acid) carries the zone change it made: what it was attached to as it left
+    // (CR 603.10a, 608.2h).
+    was = lk && (lk.zc === ctx.sourceZc || (ctx.sourceZc !== undefined && lk.zc === ctx.sourceZc - 1)) ? lk.attachedTo : undefined;
   }
   if (!was) return undefined;
   const o = s.objects[was.id];

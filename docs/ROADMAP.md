@@ -1,6 +1,6 @@
 # Roadmap
 
-29,209 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,226 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,371 of
 9,979 (93%).
 
@@ -4530,6 +4530,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enchanted creature this turn dies" (Vampiric Embrace); "destroy ~ and it deals damage to you equal to the number of
   pin counters on it" and "X is the number of pin counters on ~" (Voodoo Doll). +15 (29,177 of 31,936 with rounds 243
   and 244; 29,191 with round 245).
+- Round B83 (one-line templates from the bottom of the list): "Whenever a legendary permanent other than ~ is put into a
+  graveyard from the battlefield" (Yomiji, Who Bars the Way: it sees a legendary permanent that dies with it); "At the
+  beginning of your upkeep, if ~ is on the battlefield, each player returns all cards named ~ from their graveyard to
+  the battlefield" (Myr Servitor); "This ability triggers only once" (Acrobatic Cheerleader, kept on the object, CR
+  603.2h); "Tap another untapped creature you control with flying" as a cost (Radiant, Serra Archangel); exchanging
+  control with "target artifact or creature you don't control" (Shrewd Negotiation); "target creature with power less
+  than or equal to that creature's power an opponent controls", checked again as it resolves (Spawnbroker); "For each
+  of those permanents, its controller creates ..." after destroying up to three targets (Soul of Emancipation);
+  "Change the target of target spell (or ability) that targets only a player / ~. The new target must be a
+  player/creature", every target that names it changing (Rebound, Torchling, Silver Wyvern; bots use Torchling's and
+  Silver Wyvern's against an opponent's harmful spell); "Prevent all combat damage that would be dealt this turn by
+  creatures other than enchanted creatures and enchantment creatures" (Inspire Awe); a delayed "Whenever a creature
+  attacking you deals combat damage to you this turn" (Harsh Justice); "Prevent all combat damage a creature of your
+  choice would deal this turn", offering only permanents (Ajani's Aid); a delayed "Whenever ~ becomes blocked by a
+  creature of that color this turn, destroy that creature" (Zombie Boa); "Whenever one or more cards are put into
+  exile during your turn" (Stonebinder's Familiar); "Each creature you control is no longer goaded" (Serene Sleuth);
+  "X is the number of times this ability has resolved this turn" (Bronze Cudgels). +17 (29,208 of 31,936; 29,226 with round 246).
+- Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes
+  (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
+  what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder
+  (protection from each of a target permanent's colors).
 - Out after round B82 (looked at, not done): Builder's Bane (destroy X target artifacts: a variable number of
   targets), Burning of Xinye (each player destroys lands of their choice), Sirocco and Wand of Ith (a punisher per
   revealed card), Stench of Evil (a punisher per land destroyed), Gargantuan Gorilla (a snow Forest sacrifice

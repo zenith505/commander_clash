@@ -55,6 +55,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // The Archimandrite: "Tap three untapped Advisors, Artificers, and/or Monks you control": any mix of them, each one that
     // has any of those creature types.
     .replace(/(^|, )Tap (\w+) untapped ((?:[A-Z][a-z]+s, )+)and\/or ([A-Z][a-z]+s) you control(?=[,:])/, (_, pre: string, n: string, list: string, last: string) => `${pre}Tap ${n} untapped ${[...list.split(", ").filter(Boolean), last].map((w) => w.replace(/s$/, "")).join(" or ")} you control`)
+    // Radiant, Serra Archangel: "Tap another untapped creature you control with flying": the same as "... untapped creature
+    // with flying you control".
+    .replace(/(^|, )(Tap (?:an|another|one|two|three) (?:other )?untapped (?:creature|creatures)) you control (with (?:flying|reach|defender|vigilance|haste))(?=[,:])/, "$1$2 $3 you control")
     // Razor Boomerang: "{T}, Unattach Razor Boomerang: It deals 1 damage to any target": "it" is the Equipment, the one
     // thing named, the source of the damage (rulings).
     .replace(/(Unattach \u27easource\u27eb): It deals /, "$1: \u27easource\u27eb deals ")

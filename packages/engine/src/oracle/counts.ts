@@ -22,6 +22,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
   // Collision Course: "the number of permanents you control that are creatures and/or Vehicles".
   p = p.replace(/^the number of permanents you control that are (creatures|artifacts) or (Vehicles)$/, "the number of $1 or $2 you control");
+  // Bronze Cudgels: "the number of times this ability has resolved this turn" (see Count resolvedThisTurn).
+  if (!each && /^the number of times this ability has resolved this turn$/.test(p) && (!ctx || ctx.activated)) return { count: { kind: "resolvedThisTurn" } };
   // Erestor of the Council: in its "whenever players finish voting" trigger, the opponents who voted for a choice you
   // didn't (each counted once, even with several votes; one may count both ways, rulings).
   if (!each && p === "the number of opponents who voted for a choice you didn't vote for" && ctx?.votesEvent) return { count: { kind: "opponentsVotedOtherwise" } };

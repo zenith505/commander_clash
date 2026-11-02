@@ -2364,6 +2364,8 @@ export interface Resolving {
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
   returnedNontoken?: PlayerId[];
+  /** Who controlled each permanent its "return ... to their owners' hands" returned from the battlefield, as it left; one a replacement sent elsewhere (a commander, CR 903.9b) wasn't returned (Count opponentsReturnedFrom). */
+  returnedFrom?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
   /** How many cards a dig with rest "keep" left on top (an orderTop with `digRest` arranges them). */

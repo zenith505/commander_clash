@@ -339,6 +339,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // Ogre Marauder: "it gains "~ can't be blocked" until end of turn unless defending player sacrifices a creature of their
+  // choice": the defending player decides as it resolves (CR 608.2d), and the creature gains the ability only if they don't.
+  if ((m = /^(?:it|~) (gains "~ can't be blocked" until end of turn) unless defending player (sacrifices a creature of their choice)$/.exec(s))) {
+    const who = parsePlayer("defending player", ctx);
+    const fx = parseSentence(`~ ${m[1]}`, ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (who?.ref !== "eventPlayer" || fx?.length !== 1 || !options) return null;
+    return [{ type: "punisher", who, options, effects: fx, penalty: "Let ~ become unblockable this turn" }];
+  }
   // Tomb Blade: "that player loses life equal to the number of creatures they control unless they sacrifice a creature of
   // their choice": counted once they haven't (CR 608.2h), that player's own.
   if ((m = /^that player loses life equal to the number of ([a-z ]+?) they control unless they (.+)$/.exec(s)) && ctx.eventPlayer) {

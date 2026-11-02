@@ -1646,6 +1646,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Karma: "~ deals damage to that player equal to the number of Swamps they control": that player's (the trigger's).
   // Decimator Web: "Target opponent loses 2 life, gets a poison counter, then mills six cards": in that order.
   text = text.replace(/^Target opponent loses (\d+) life, gets a poison counter, then mills (\w+) cards\.$/, "Target opponent loses $1 life and gets a poison counter. That player mills $2 cards.");
+  // Axelrod Gunnarson: "you gain 1 life and ~ deals 1 damage to target player or planeswalker": one, then the other.
+  text = text.replace(/(^|\. )[Yy]ou gain (\d+) life and (~ deals \d+ damage to [^.]+)\./, (_, pre: string, n: string, rest: string) => `${pre}You gain ${n} life. ${rest}.`);
   // Tangled Skyline: "you gain 5 life and incubate 5": one, then the other.
   text = text.replace(/\b([Yy]ou gain \d+ life) and (incubate \d+)\./g, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Plan the Heist: "Surveil 3 if you have no cards in hand. Then draw three cards.": the condition first, the same.
@@ -2407,6 +2409,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     return {
       targets: [any(0), any(1), any(2)],
       effects: [cone[1]!, cone[2]!, cone[3]!].map((n, i) => ({ type: "damage" as const, amount: Number(n), to: { ref: "anyTarget" as const, index: i } })),
+      text,
+    };
+  }
+  // Serpentine Spike: "~ deals 2 damage to target creature, 3 damage to another target creature, and 4 damage to a third
+  // target creature. If a creature dealt damage this way would die this turn, exile it instead.": three different target
+  // creatures (CR 115.3, rulings), each dealt its own amount, then the exile replacement for those dealt damage.
+  const spike = /^~ deals (\d+) damage to target creature, (\d+) damage to another target creature, and (\d+) damage to a third target creature\.( If a creature dealt damage this way would die this turn, exile it instead\.)?$/.exec(text.trim());
+  if (spike) {
+    const creature = (i: number): TargetSpec => ({ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature", ...(i ? { distinctFrom: [...Array(i).keys()] } : {}) });
+    return {
+      targets: [creature(0), creature(1), creature(2)],
+      effects: [...[spike[1]!, spike[2]!, spike[3]!].map((n, i) => ({ type: "damage" as const, amount: Number(n), to: { ref: "target" as const, index: i } })), ...(spike[4] ? [{ type: "exileIfDies" as const, what: { ref: "damagedThisWay" as const } }] : [])],
       text,
     };
   }
@@ -6809,6 +6823,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Tahngarth's Glare: "That player looks at the top three cards of your library, then puts them back in any order": the
+    // targeted player orders your top cards (CR 401.4 has the owner do it only when no player is named).
+    const theyOrder = new RegExp(`^That player looks at the top ${NUM} cards of your library$`).exec(s);
+    if (theyOrder && /^(?:[Tt]hen )?[Pp]uts? them back in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const by = parsePlayer("that player", ctx);
+      if (by?.ref !== "target") return null;
+      effects.push({ type: "orderTop", who: { ref: "you" }, n: num(theyOrder[1]!), by });
+      si++;
+      continue;
+    }
     // Visions: "Look at the top five cards of target player's library. You may then have that player shuffle that
     // library.": only looked at, not reordered (CR 701.16a has no other instruction for them), then the may.
     const visions = new RegExp(`^Look at the top ${NUM} cards of (target player's|target opponent's) library$`).exec(s);
@@ -7073,6 +7097,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!who) return null;
       effects.push({ type: "revealTop", randomFromHand: true, who });
       ctx.revealedTop = true;
+      continue;
+    }
+    // Friendly Fire: "~ deals damage to that creature and that player equal to the revealed card's mana value": both dealt
+    // that much at once (CR 120.3), "that player" being the creature's controller named before.
+    const toBoth = ctx.controllerNamed !== undefined ? /^~ deals damage to that creature and that player equal to (.+)$/.exec(s) : null;
+    if (toBoth) {
+      const one = parseOne(`~ deals damage to that creature equal to ${toBoth[1]}`, ctx);
+      const them = parsePlayer("that player", ctx);
+      if (one?.length !== 1 || one[0]!.type !== "damage" || one[0]!.also || them?.ref !== "targetController") return null;
+      effects.push({ ...one[0]!, also: [them] });
       continue;
     }
     const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
@@ -8829,6 +8863,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.lastPlayerTarget = index;
       effects.push({ type: "dig", n, count, upTo: false, required: true, into: "graveyard", rest: "keep", reveal: true, library: { ref: "target", index } }, { type: "orderTop", who: { ref: "target", index }, n: n - count, digRest: true });
       si += 2;
+      continue;
+    }
+    // Rakdos Augermage: "Reveal your hand and discard a card of target opponent's choice. Then that player reveals their hand
+    // and discards a card of your choice.": that opponent chooses from your hand (CR 701.9b), then you from theirs.
+    if (/^Reveal your hand and discard a card of target opponent's choice\.?$/.test(s) && /^Then that player reveals their hand and discards a card of your choice\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+      ctx.lastPlayerTarget = index;
+      const them = { ref: "target", index } as const;
+      effects.push({ type: "lookAtHand", who: { ref: "you" }, reveal: true }, { type: "takeFromHand", who: { ref: "you" }, action: "discard", by: them }, { type: "lookAtHand", who: them, reveal: true }, { type: "takeFromHand", who: them, action: "discard" });
+      si++;
       continue;
     }
     // Ransack: "Look at the top five cards of target player's library. Put any number of them on the bottom of that library

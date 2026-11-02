@@ -382,7 +382,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "discard": {
       const who = players(s, e.who, ctx);
       // "Discards all cards with that name" (Cabal Therapy): the name chosen as it resolved.
-      const filter = e.filter && bindChosen(e.filter, ctx.chosen);
+      let filter = e.filter && bindChosen(e.filter, ctx.chosen);
+      // Mind Extraction: the colors of the creature the spell's cost sacrificed, as it last existed; a colorless one has
+      // none, so nothing is discarded (rulings).
+      if (filter?.sharesColorWithSacrificed) {
+        const colors = ctx.sacrificed?.[0]?.colors ?? [];
+        if (!colors.length) return void log(s, `${src}: the sacrificed creature had no color, so no cards are discarded.`);
+        filter = { ...filter, sharesColorWithSacrificed: undefined, colors: [...colors] };
+      }
       // Worked out once, before anyone discards.
       const sc0 = (s.resolving!.scratch ??= {});
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
@@ -522,7 +529,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const kind = e.anyFromYard ? `${e.filter?.text ?? "card"} from the hand or card from the graveyard` : e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
         const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
+        const by = e.by ? players(s, e.by, ctx)[0] : ctx.controller;
+        if (by === undefined) return;
+        s.pending = { kind: "searchLibrary", player: by, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...pool], to, rest: `stay in ${p.name}'s hand${e.orGraveyard ? " and graveyard" : ""}` }, hand: pid, ...(e.orGraveyard ? { handYard: true as const } : {}) };
         return "paused";
       }
       const ids = sc.found.filter((id) => (obj(s, id).zone === "hand" || (e.orGraveyard && obj(s, id).zone === "graveyard")) && obj(s, id).owner === pid);
@@ -802,7 +811,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // has nothing to order.
         const look = (n === 1 && cards.length === 1) || (!!e.lookOnly && cards.length > 0);
         if (cards.length < 2 && !look) return;
-        s.pending = { kind: "arrangeTop", player: ctx.controller, how: e.mayBottom ? "scry" : look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
+        const by = e.by ? players(s, e.by, ctx)[0] : ctx.controller;
+        if (by === undefined) return;
+        s.pending = { kind: "arrangeTop", player: by, how: e.mayBottom ? "scry" : look ? "look" : "order", cards, source: src, ...(owner !== by ? { owner } : {}) };
         return "paused";
       }
       if (e.mayBottom) {
@@ -817,7 +828,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
       if (e.lookOnly && looked.size > 1) return void log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       if (looked.size === 1) return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
-      log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
+      const by = (e.by && players(s, e.by, ctx)[0]) ?? ctx.controller;
+      log(s, `${player(s, by).name} looks at the top ${looked.size} cards of ${owner === by ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;
     }
     case "handToTop": {

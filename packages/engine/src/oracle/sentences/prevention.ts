@@ -119,6 +119,15 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (redirect === null) return null;
     return rule({ by: { choose: by }, ...(to ? { to } : {}), nextTime: true, ...(redirect ? { redirect } : {}) });
   }
+  // Circle of Protection: Shadow: "The next time a creature of your choice with shadow would deal damage to you this
+  // turn, prevent that damage": a source chosen as it resolves (CR 609.7a), any damage it deals, not only combat damage
+  // (ruling).
+  if (/^The next time a creature of your choice with shadow would deal damage to you this turn, prevent that damage$/i.test(s))
+    return rule({ by: { choose: { kind: "object", types: ["Creature"], keywords: ["Shadow"], text: "creature with shadow" } }, to: { players: "you" }, nextTime: true });
+  // Circle of Solace: "The next time a creature of the chosen type would deal damage to you this turn, prevent that
+  // damage": no source is chosen; the first creature of the type chosen as ~ entered to deal you damage (CR 615.7).
+  if (/^The next time a creature of the chosen type would deal damage to you this turn, prevent that damage$/i.test(s))
+    return rule({ by: { filter: { kind: "object", types: ["Creature"], chosen: "type", text: "creature of the chosen type" } }, to: { players: "you" }, nextTime: true });
   // "Prevent all damage a source of your choice would deal this turn" (Pay No Heed), "... would deal to you this turn",
   // "Prevent all damage that would be dealt to you this turn by a source of your choice" (Consulate Surveillance).
   if ((m = new RegExp(`^Prevent all damage ${QUAL} would deal(?: to (.+?))? this turn$`, "i").exec(s)) ?? (m = new RegExp(`^Prevent all damage that would be dealt(?: to (.+?))? this turn by ${QUAL}$`, "i").exec(s))) {

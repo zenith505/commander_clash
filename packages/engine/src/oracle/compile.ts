@@ -561,6 +561,12 @@ export function compile(d: CardDef): CompiledCard {
       // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
       // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
       .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
+      // Voodoo Doll: "destroy ~ and it deals damage to you equal to the number of pin counters on it": one, then the other, its
+      // counters as it last existed if it's gone (CR 608.2h); destroyed whether or not the damage is dealt (rulings).
+      .replace(/^(At the beginning of your end step, if ~ is untapped), destroy ~ and it deals damage to you equal to the number of ([a-z]+) counters on it\.$/m, "$1, destroy ~. ~ deals damage to you equal to the number of $2 counters on ~.")
+      // Vampiric Embrace: "put a +1/+1 counter on that creature": the enchanted one, as the older wording says ("on the
+      // creature it enchants"), not the creature that died.
+      .replace(/^(Whenever a creature dealt damage by enchanted creature this turn dies), put a \+1\/\+1 counter on that creature\.$/m, "$1, put a +1/+1 counter on enchanted creature.")
       // Meldweb Strider: "Remove an oil counter from this Vehicle: It becomes an artifact creature until end of turn": "it"
       // is the Vehicle, the only object named.
       .replace(/^(Remove an? [a-z]+ counter from ~): It becomes /m, "$1: ~ becomes ")
@@ -4227,6 +4233,12 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastDuringCombat = true;
       continue;
     }
+    // Hand to Hand: during the combat phase (CR 506.1) no player casts an instant spell or activates an ability that isn't a
+    // mana ability, in any zone; mana abilities and special actions aren't stopped.
+    if (line === "During combat, players can't cast instant spells or activate abilities that aren't mana abilities.") {
+      out.combatNoInstantsOrAbilities = true;
+      continue;
+    }
     // Basandra, Battle Seraph: every player, its controller too.
     if (line === "Players can't cast spells during combat.") {
       out.opponentsCantCastDuringCombat = "all";
@@ -5836,7 +5848,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedColor") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.sharesColorWithSacrificed || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedColor") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;

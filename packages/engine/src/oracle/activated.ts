@@ -443,6 +443,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.replace(/ X is the mana value of (?:that|the exiled) card\.$/, "").replace(/^Create a token that's a copy of the exiled card\./, "Create a token that's a copy of a card exiled with ~.");
       found = true;
     }
+    // Voodoo Doll: "{X}{X}, {T}: ... X is the number of pin counters on ~.": X is defined by the ability (CR 107.3c), the
+    // counters on it as it's activated (rulings).
+    const xCounters = !xIs && /\{X\}/.test(costs) ? / X is the number of ([a-z]+) counters on ~\.$/.exec(effectText) : null;
+    if (xCounters) {
+      xIs = { counters: counterKind(xCounters[1]!) };
+      effectText = effectText.slice(0, xCounters.index) + "";
+      if (!/\.$/.test(effectText)) effectText += ".";
+      found = true;
+    }
     // Marath, Will of the Wild: "Choose one — • ... X can't be 0. • ... X can't be 0.": the same rule in every mode, so
     // one for the ability, whichever mode is chosen.
     if (/^Choose one — (?:• [^•]+? X can't be 0\.\s*)+$/.test(effectText.trim()) && !xMin) effectText = `${effectText.trim().replace(/ X can't be 0\.(?=\s*•|\s*$)/g, "")} X can't be 0.`;

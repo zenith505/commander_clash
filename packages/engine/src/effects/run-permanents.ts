@@ -1344,6 +1344,28 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${src} and ${defOf(s, other).name} exchange their power (${mine} and ${theirs})${e.duration === "endOfCombat" ? " until end of combat" : " until end of turn"}.`);
       return;
     }
+    case "ungoad": {
+      const ids = new Set(objects(s, e.what, ctx).map((o) => o.id));
+      let n = 0;
+      const next: typeof s.effects = [];
+      for (const ef of s.effects) {
+        const goad = (m: Modification) => m.kind === "goad" && !m.notGoaded;
+        const hit = ef.affected?.filter((id) => ids.has(id)) ?? [];
+        if (!hit.length || !ef.mods.some(goad)) {
+          next.push(ef);
+          continue;
+        }
+        n += hit.length;
+        const rest = ef.mods.filter((m) => !goad(m));
+        // The others it affects stay goaded; what else it does to these goes on (a copy without the goad, same timestamp).
+        if (ef.affected!.length > hit.length) next.push({ ...ef, affected: ef.affected!.filter((id) => !ids.has(id)) });
+        if (rest.length) next.push({ ...ef, id: `e${s.nextId++}`, affected: hit, mods: rest });
+      }
+      s.effects = next;
+      invalidateCharacteristics(s);
+      if (n) log(s, `${src}: ${n} creature${n === 1 ? " is" : "s are"} no longer goaded.`);
+      return;
+    }
     case "continuous": {
       // The Laces: a target spell's color changes while it's that spell (CR 105.3); a permanent spell's change stays with
       // the permanent it becomes, for as long as the effect lasts (CR 112.4, 400.7a).

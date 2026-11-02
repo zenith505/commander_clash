@@ -3718,6 +3718,16 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Myr Servitor: "At the beginning of your upkeep, if ~ is on the battlefield, ...": an intervening "if" (CR 603.4) that's
+    // true as it triggers, so what counts is that ~ is still on the battlefield as it resolves (rulings).
+    const stillHere = /^(At the beginning of your upkeep), if ~ is on the battlefield, (.+)$/.exec(line);
+    if (stillHere) {
+      const t = parseTrigger(`${stillHere[1]}, ${stillHere[2]}`);
+      if (t && t !== "fail" && t.event === "yourUpkeep" && !t.body.targets.length && Object.keys(t).every((k) => k === "event" || k === "body")) {
+        out.triggers.push({ ...t, body: { ...t.body, effects: [{ type: "if", cond: { kind: "selfHere" }, effects: t.body.effects }], text: line.replace(/^At the beginning of your upkeep, /, "") } });
+        continue;
+      }
+    }
     // Pharika's Spawn: "~ escapes with two +1/+1 counters on it. When it enters this way, each opponent sacrifices ...": the
     // counters (CR 702.138c) and a trigger only when it escaped.
     const escThisWay = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\. When it enters this way, (.+)$`).exec(line);

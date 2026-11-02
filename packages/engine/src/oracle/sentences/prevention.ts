@@ -128,6 +128,10 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   // damage": no source is chosen; the first creature of the type chosen as ~ entered to deal you damage (CR 615.7).
   if (/^The next time a creature of the chosen type would deal damage to you this turn, prevent that damage$/i.test(s))
     return rule({ by: { filter: { kind: "object", types: ["Creature"], chosen: "type", text: "creature of the chosen type" } }, to: { players: "you" }, nextTime: true });
+  // Ajani's Aid: "Prevent all combat damage a creature of your choice would deal this turn": a creature chosen as it
+  // resolves, not a target (rulings, CR 609.7a); with none, nothing is prevented.
+  if (/^Prevent all combat damage a creature of your choice would deal this turn$/.test(s))
+    return rule({ combat: "only", by: { choose: { kind: "object", types: ["Creature"], text: "creature" }, permanent: true } });
   // "Prevent all damage a source of your choice would deal this turn" (Pay No Heed), "... would deal to you this turn",
   // "Prevent all damage that would be dealt to you this turn by a source of your choice" (Consulate Surveillance).
   if ((m = new RegExp(`^Prevent all damage ${QUAL} would deal(?: to (.+?))? this turn$`, "i").exec(s)) ?? (m = new RegExp(`^Prevent all damage that would be dealt(?: to (.+?))? this turn by ${QUAL}$`, "i").exec(s))) {
@@ -180,6 +184,11 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "spell" ? rule({ by: { target: { ref: "target", index: addTarget(ctx, spec) } } }) : null;
   }
+  // Inspire Awe: "Prevent all combat damage that would be dealt this turn except combat damage that would be dealt by
+  // enchanted creatures and enchantment creatures": a creature that is neither, checked right before the damage would be
+  // dealt (rulings).
+  if (/^Prevent all combat damage that would be dealt this turn except combat damage that would be dealt by enchanted creatures and enchantment creatures$/.test(s))
+    return rule({ combat: "only", by: { filter: { kind: "object", notTypes: ["Enchantment"], status: "unenchanted", text: "creatures that are neither enchanted nor enchantments" } } });
   if ((m = /^Prevent all (combat |noncombat )?damage that would be dealt (.+)$/i.exec(s))) {
     const rest = m[2]!;
     if (!/\bthis turn\b/i.test(rest) || (rest.match(/\bthis turn\b/gi) ?? []).length > 1) return undefined;

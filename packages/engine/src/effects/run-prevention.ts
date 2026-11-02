@@ -23,7 +23,7 @@ export interface SourceOption {
  * that fit `filter` now ("a red source of your choice"). Face-up objects in the command zone can be chosen too, but
  * they can't deal damage from there, so they aren't offered.
  */
-export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined, controller: PlayerId): SourceOption[] {
+export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined, controller: PlayerId, permanentOnly?: true): SourceOption[] {
   const out: SourceOption[] = [];
   const seen = new Set<string>();
   const add = (o: SourceOption) => {
@@ -37,7 +37,7 @@ export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined
     const zc = o.zoneChanges ?? 0;
     add({ key: `${id}@${zc}`, id, zc, spell: false, name: characteristics(s, o).name, controller: controllerOf(s, o) });
   }
-  for (const item of [...s.stack].reverse()) {
+  for (const item of permanentOnly ? [] : [...s.stack].reverse()) {
     if (item.kind === "spell" && item.objectId) {
       const o = s.objects[item.objectId];
       if (!o || (filter && !printedMatches(filter, defOf(s, o)))) continue;
@@ -60,10 +60,10 @@ export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined
  * Asks the ability's controller for a source of damage (CR 609.7a) as it resolves, then gives the one chosen, as the
  * object it is; null when there's none to choose.
  */
-export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: TargetSpec, src: string): "paused" | { id: ObjectId; zc: number; spell?: true } | null {
+export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: TargetSpec, src: string, permanentOnly?: true): "paused" | { id: ObjectId; zc: number; spell?: true } | null {
   const sc = (s.resolving!.scratch ??= {});
   if (sc.damageSource === undefined) {
-    const options = damageSourceOptions(s, filter, ctx.controller);
+    const options = damageSourceOptions(s, filter, ctx.controller, permanentOnly);
     if (!options.length) {
       log(s, `${src}: there's no ${filter.text ? `${filter.text.replace(/^target /, "")} ` : ""}source to choose.`);
       return null;
@@ -113,7 +113,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {
     const filter = bindChosen(spec.by.choose, ctx.chosen);
-    const chosen = chooseDamageSource(s, ctx, filter, src);
+    const chosen = chooseDamageSource(s, ctx, filter, src, spec.by.permanent);
     if (chosen === "paused") return "paused";
     if (!chosen) return;
     rule.by = { chosen, filter };

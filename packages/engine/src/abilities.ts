@@ -341,6 +341,11 @@ export type Count =
   | { kind: "unspentMana"; color?: Color }
   /** "The amount of life you gained this turn", "for each 1 life you gained this turn" (CR 119.3, 119.9): its total, whatever was lost. */
   | { kind: "lifeGainedThisTurn" }
+  /**
+   * "The number of times this ability has resolved this turn" (Bronze Cudgels): this time included, for this ability of
+   * this object (a copy of it counts, a countered one doesn't, rulings); see ResolvingState.nth.
+   */
+  | { kind: "resolvedThisTurn" }
   /** "For each {E} you've paid or lost this turn" (Blaster Hulk): energy counters you've paid or lost in total (CR 107.14, 122.1). */
   | { kind: "energyLostThisTurn" }
   /** "The number of times you descended this turn" (The Mycotyrant): permanent cards put into your graveyard this turn (CR 700.11, rulings). */
@@ -875,6 +880,11 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Two target permanents that share a card type" (Shifting Loyalties): shares a card type with each of these targets, checked both ways and again as it resolves (rulings). */
   sharesCardTypeWith?: number[];
+  /**
+   * "Target creature with power less than or equal to that creature's power" (Spawnbroker): its power is at most each of
+   * these targets' power, as they're chosen and again as it resolves (rulings).
+   */
+  powerAtMostOf?: number[];
   /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
   sharesCardTypeAmong?: string[];
   /** "Two target creatures that share no creature types" (Rivals' Duel): shares none with each of these targets, checked both ways and again as it resolves (rulings). */
@@ -1008,6 +1018,12 @@ export interface TargetSpec {
   creatureTokens?: true;
   /** That very object (see `targetsSource`). */
   objectId?: string;
+  /**
+   * "Target spell that targets only a player" (Rebound), "... only ~" (Torchling, Silver Wyvern): with `targetsWhat` (or
+   * `targetsSource`), every target it has is that one player or object (rulings on Torchling: several targets all naming
+   * it count; one with other targets doesn't, even if those have become illegal).
+   */
+  targetsOnly?: true;
   /** "That targets you or a creature you control" (Siren Stormtamer): with `targetsWhat`, a spell that targets you counts too. */
   targetsYouToo?: true;
   /**
@@ -1420,7 +1436,7 @@ export interface DamageRuleSpec {
   /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
   to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
   /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
-  by?: { filter?: TargetSpec; choose?: TargetSpec; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true };
+  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true };
   /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
   n?: Amount;
   /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
@@ -3123,6 +3139,12 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
+  /**
+   * "Each creature you control is no longer goaded" (Serene Sleuth): the goad effects from resolved spells and abilities
+   * (CR 701.15) stop applying to them; a static ability that goads goes on applying, as does an "attacks each combat as
+   * though it were goaded" (not goaded, Kardur).
+   */
+  | { type: "ungoad"; what: ObjRef }
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
@@ -3588,7 +3610,12 @@ export type Effect =
    * `anyOne` with `toSelf`: "change a target of target spell or ability to ~" (Spellskite): any one of its targets, chosen
    * as this resolves among those ~ could become without making another of its targets illegal (rulings).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true }
+  /**
+   * `all`: "change the target of target spell that targets only ~" (Torchling): every target naming that one thing changes
+   * to the same new target, one that meets each of those targets' conditions (rulings). `mustBe`: "The new target must be a
+   * player / a creature" (Rebound, Silver Wyvern).
+   */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature" }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -4829,6 +4856,8 @@ export interface TriggeredAbility {
   onYourTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
+  /** "This ability triggers only once." (Acrobatic Cheerleader): once ever for this object (rulings; a new object starts over, CR 400.7). See GameObject.triggeredEver. */
+  onceEver?: true;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */
   grant?: number;
   /** Eminence: it also works while ~ is a commander in the command zone (CR 903.3, 113.6). */
@@ -5203,7 +5232,8 @@ export interface BatchTrigger {
   /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
   /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
   /** `exiledFromGraveyardsOrBattlefield`: "cards are put into exile from graveyards and/or the battlefield" (Ketramose): anyone's. */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "created";
+  /** `exiled`: "Whenever one or more cards are put into exile" (Stonebinder's Familiar): cards from anywhere, anyone's, for any reason. */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "exiled" | "created";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";

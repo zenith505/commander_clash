@@ -854,6 +854,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", named: "~", text: "card named ~" } }];
   }
+  // Myr Servitor: "each player returns all cards named ~ from their graveyard to the battlefield": every card with the
+  // source's name (CR 201.5) from all graveyards, each under its owner's control.
+  if (/^[Ee]ach player returns all cards named ~ from their graveyard to the battlefield$/.test(s)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" }, owners: true }];
+  }
   // "Return each Aura card from your graveyard to the battlefield" (Retether): its controller chooses what each enchants as
   // it enters (CR 303.4f); one with nothing to enchant stays in the graveyard (303.4g).
   if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {

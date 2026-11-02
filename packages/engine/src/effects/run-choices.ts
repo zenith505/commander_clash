@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
-import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
+import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
@@ -1065,6 +1065,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // Only tapped permanents can be untapped (CR 701.26b), but with more to do it does only as much as it can (CR 609.3):
     // Yasova Dragonclaw's "you may pay ... If you do, gain control of target creature ..., untap that creature, and it gains
     // haste" can be paid for an untapped creature.
+    // Hauntwoods Shrieker: "If it's a creature card, you may turn it face up": no choice unless it is one, still face down.
+    if (e.type === "turnFaceUp" && e.ifCreatureCard && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield" && !!o.faceDown && isType(realDefOf(s, o), "Creature"))) return false;
     if (e.type === "untap" && e.what.ref === "target" && effects.length === 1 && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;

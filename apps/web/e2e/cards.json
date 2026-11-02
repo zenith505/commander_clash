@@ -9215,6 +9215,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "09c275bd-8323-485e-81f6-aff1f99d0d03",
+  "name": "Hauntwoods Shrieker",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Beast Mutant",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast",
+   "Mutant"
+  ],
+  "oracleText": "Whenever this creature attacks, manifest dread. (Look at the top two cards of your library. Put one onto the battlefield face down as a 2/2 creature and the other into your graveyard. Turn it face up any time for its mana cost if it's a creature card.)\n{1}{G}: Reveal target face-down permanent. If it's a creature card, you may turn it face up.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Manifest",
+   "Manifest dread"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845b40b1-dc09-44fa-9910-22544c1424ba",
   "name": "Hazel of the Rootbloom",
   "manaCost": "{2}{B}{G}",
@@ -19577,6 +19611,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "620d0572-6d22-43e2-83a9-000e605c8a2b",
+  "name": "Squandered Resources",
+  "manaCost": "{B}{G}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a land: Add one mana of any type the sacrificed land could produce.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5cd17347-5558-46f9-b8bb-ae5deeb1f229",
   "name": "Sram's Expertise",
   "manaCost": "{2}{W}{W}",
@@ -21886,6 +21955,38 @@
   "commanderLegal": "legal",
   "set": "c13",
   "releasedAt": "2013-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "02418479-9455-417f-a6a1-004356faff37",
+  "name": "Tundra",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Plains Island",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Plains",
+   "Island"
+  ],
+  "oracleText": "({T}: Add {W} or {U}.)",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

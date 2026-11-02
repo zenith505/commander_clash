@@ -44,8 +44,9 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // Needle Drop: "any target that was dealt damage this turn" (a player, creature, planeswalker or battle, CR 115.4).
   if (/^any target that was dealt damage this turn$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", dealtDamageThisTurn: true, text: p.toLowerCase() }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
-  const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
-  if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // Chandra, Dressed to Kill: "up to one target player or planeswalker": the same, or none (CR 115.6).
+  const pw = /^(up to one )?target (player|opponent) or planeswalker$/i.exec(p);
+  if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[2]!.toLowerCase() === "opponent" ? { opponent: true } : {}), ...(pw[1] ? { optional: true } : {}), text: p.toLowerCase().replace(/^up to one /, "") }) };
   // Coalborn Entity: "target creature token, player, or planeswalker": a player, a planeswalker, or a creature that's a token.
   if (/^target creature token, player, or planeswalker$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], creatureTokens: true, text: p.toLowerCase() }) };
   // All Will Be One, Nicol Bolas, God-Pharaoh: "target opponent, creature an opponent controls, or planeswalker an opponent
@@ -1925,9 +1926,10 @@ export function parseTargetPhrase(
     extra.transformed = true;
     p = p.slice(m[0].length);
   }
-  // "A face-down creature you control" (Ugin's Mastery, CR 708.2).
-  if ((m = /^face-down (?=permanent|creature)/.exec(p))) {
-    extra.faceDown = true;
+  // "A face-down creature you control" (Ugin's Mastery, CR 708.2); "face-up nontoken creatures you control" (Whisperwood
+  // Elemental): not face down.
+  if ((m = /^face-(down|up) (?=permanent|creature|nontoken creature)/.exec(p))) {
+    extra.faceDown = m[1] === "down";
     p = p.slice(m[0].length);
   }
   let tapped: boolean | undefined;
@@ -2185,7 +2187,7 @@ export function parseTargetPhrase(
   // doesn't change. Only "legendary" among supertypes.
   // "Creature spell with power or toughness 2 or less" (Stern Scolding): as it is on the stack (see spellMatches).
   const spellPt = (extra.power || extra.toughness || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf.every((a) => a.power || a.toughness))) && types.length === 1 && types[0] === "Creature";
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf !== CREATURE_OR_LEGENDARY && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown !== undefined || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf !== CREATURE_OR_LEGENDARY && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

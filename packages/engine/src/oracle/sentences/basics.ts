@@ -1186,6 +1186,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
+  // Squandered Resources: "Sacrifice a land: Add one mana of any type the sacrificed land could produce" (CR 106.7).
+  if (ctx.activated && /^[Aa]dd one mana of any type the sacrificed land could produce$/.test(s)) return [{ type: "addMana", sacrificedType: true }];
   // "Add X {G}" (Mark of Sakiko's "add that much {G}", the damage dealt): X of that one mana.
   if ((m = /^[Aa]dd X (\{[WUBRGC]\})$/.exec(s))) return [{ type: "addMana", mana: m[1]!, times: amt("X") }];
   if ((m = new RegExp(`^[Aa]dd ${NUM} (\\{[WUBRGC]\\})$`).exec(s)) && num(m[1]!) > 1) return [{ type: "addMana", mana: m[2]!.repeat(num(m[1]!)) }];

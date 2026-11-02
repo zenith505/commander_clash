@@ -81,16 +81,28 @@ function landsCouldProduce(s: GameState, pid: PlayerId, whose: "you" | "opponent
     if (asking.has(id) || !objIsType(s, land, "Land") || (whose === "you" ? ctrl !== pid : ctrl === pid)) continue;
     if (subtype && !characteristics(s, land).subtypes.includes(subtype)) continue;
     if (basic && !characteristics(s, land).supertypes.includes("Basic")) continue;
-    for (const ab of manaAbilitiesOn(s, land)) {
-      if (ab.activeIf && !staticConditionNow(s, ab.activeIf, land.id, ctrl)) continue;
-      const p = ab.produces;
-      const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, new Set([...asking, id]), p.subtype, p.basic) : manaChoices(s, land, ab);
-      made.forEach((m) => out.add(m));
-    }
-    // Its activated mana abilities too ("{T}, Sacrifice a creature: Add {B}{B}"): whatever their costs (CR 106.7).
-    for (const ab of abilitiesOf(s, land).activated) if (ab.mana) activatedManaTypes(s, land, ab).forEach((m) => out.add(m));
+    landCouldProduce(s, land, new Set([...asking, id])).forEach((m) => out.add(m));
   }
   return (["W", "U", "B", "R", "G", "C"] as ManaType[]).filter((m) => out.has(m) && (anyType || m !== "C"));
+}
+
+/**
+ * The types of mana this one permanent's mana abilities could produce (CR 106.7), whatever their costs; `asking` as for
+ * landsCouldProduce (the permanent itself in it). Squandered Resources reads it for the land it sacrifices, as that land
+ * last existed (LastKnown.couldProduce).
+ */
+export function landCouldProduce(s: GameState, land: GameObject, asking: ReadonlySet<ObjectId> = new Set([land.id])): ManaType[] {
+  const out = new Set<ManaType>();
+  const ctrl = controllerOf(s, land);
+  for (const ab of manaAbilitiesOn(s, land)) {
+    if (ab.activeIf && !staticConditionNow(s, ab.activeIf, land.id, ctrl)) continue;
+    const p = ab.produces;
+    const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, asking, p.subtype, p.basic) : manaChoices(s, land, ab);
+    made.forEach((m) => out.add(m));
+  }
+  // Its activated mana abilities too ("{T}, Sacrifice a creature: Add {B}{B}"): whatever their costs (CR 106.7).
+  for (const ab of abilitiesOf(s, land).activated) if (ab.mana) activatedManaTypes(s, land, ab).forEach((m) => out.add(m));
+  return (["W", "U", "B", "R", "G", "C"] as ManaType[]).filter((m) => out.has(m));
 }
 
 /** The mana a player picks from when activating it: one entry per possible result. */

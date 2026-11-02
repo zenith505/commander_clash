@@ -1605,6 +1605,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.activationTaxes ??= []).push({ n: Number(loyaltyTax[1]), opponents: true, loyalty: true, text: line });
       continue;
     }
+    // Carth the Lion: "Planeswalkers' loyalty abilities you activate cost an additional [+1] to activate": the loyalty cost
+    // changed before any counter is put on or removed (rulings: [-3] removes two; [0] puts one on; two Carths add [+2]).
+    if (line === "Planeswalkers' loyalty abilities you activate cost an additional [+1] to activate.") {
+      out.loyaltyCostMore = (out.loyaltyCostMore ?? 0) + 1;
+      continue;
+    }
     // Tithe Taker (the second half of its line, split above).
     const theirs = /^During your turn, abilities your opponents activate cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
     if (theirs) {
@@ -5217,7 +5223,8 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
       // Jerren, Corrupted Bishop: "Whenever ~ enters or another nontoken Human you control dies, ...": entering and another
       // creature dying are never one event.
-      /^Whenever ~ enters or (another [^,]+? you control) dies, (.+)$/.exec(line) ??
+      // Carth the Lion: "Whenever ~ enters or a planeswalker you control dies": the same (Carth is never a planeswalker).
+      /^Whenever ~ enters or (another [^,]+? you control|a planeswalker you control) dies, (.+)$/.exec(line) ??
       // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
       // Restless Revenant): a death and combat damage are never one event.
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
@@ -5318,7 +5325,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
-            : /^Whenever ~ enters or another [^,]+? you control dies, /.test(line)
+            : /^Whenever ~ enters or (?:another [^,]+?|a planeswalker) you control dies, /.test(line)
               ? [`When ~ enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]

@@ -623,8 +623,17 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spellX = filter.xInCost && /\bX\b/.test(m[2]!) && !/\bwhere X is\b/.test(m[2]!);
     const xBody = spellX ? parseBody(`${m[2]!.replace(/^./, (c) => c.toUpperCase())}.`, { castSpell: true, ownX: true }) : undefined;
     if (xBody === null || (xBody && xBody.targets.length)) return null;
-    const inner = xBody ? replaceX(xBody.effects, { count: { kind: "castSpellX" } }) : parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
-    if (!inner || ctx.targets.length !== before) return null;
+    // Vivien, Monsters' Advocate: "search your library for a creature card with lesser mana value, put it onto the
+    // battlefield, then shuffle": less than that spell's mana value, X included (rulings), as it resolves.
+    const lesser = !xBody ? /^(search your library for an? [a-z]+ card) with lesser mana value(, .+)$/.exec(m[2]!) : null;
+    const inner0 = xBody ? replaceX(xBody.effects, { count: { kind: "castSpellX" } }) : parseSentence((lesser ? `${lesser[1]}${lesser[2]}` : m[2]!).replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
+    if (!inner0 || ctx.targets.length !== before) return null;
+    let inner = inner0;
+    if (lesser) {
+      const search = inner0[0];
+      if (inner0.length !== 1 || search?.type !== "search" || !search.filter || search.filter.bound || search.filter.manaValue) return null;
+      inner = [{ ...search, filter: { ...search.filter, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "castSpell" } }, plus: -1 } }, text: `${search.filter.text} with lesser mana value` } }];
+    }
     if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
     return [{ type: "nextCast", filter, effects: inner, text: m[2]!, ...(fromHand ? { fromHand: true as const } : {}) }];
   }

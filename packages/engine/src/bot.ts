@@ -17,6 +17,7 @@ import {
   blocksMayCost,
   livingPlayers,
   abilityProblem,
+  loyaltyChange,
   definedX,
   faceUpWays,
   faceUpManaCost,
@@ -5704,10 +5705,11 @@ function chooseLoyalty(s: GameState, pid: PlayerId): Action[] | null {
       const ab = abilities[i]!;
       if (ab.loyalty === undefined && !ab.loyaltyX) continue;
       const x = ab.loyaltyX ? loyalty - 1 : undefined;
-      const cost = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+      // Carth the Lion: the cost as changed ([+1] more), what the planeswalker is left with.
+      const cost = loyaltyChange(s, o, pid, ab, x);
       if (ab.loyaltyX && (x ?? 0) < 1) continue;
       const after = loyalty + cost;
-      const ultimate = cost <= -6;
+      const ultimate = (ab.loyaltyX ? -(x ?? 0) : ab.loyalty!) <= -6;
       if (after < 0 || (after === 0 && !ultimate)) continue;
       const problem = abilityProblem(s, pid, id, i, undefined, undefined, undefined, x);
       if (problem && !/not enough mana/.test(problem)) continue;

@@ -1562,7 +1562,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) continue;
         // Haunted Plate Mail: its equip ability while it's "no longer an Equipment" does nothing (rulings, CR 701.3b).
         if (!e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || t === "Aura" || t === "Fortification")) continue;
+        const before = me.attachedTo;
         attachTo(s, me, host, e.asCreature);
+        // Thorin: what became attached this way (one already attached there doesn't become attached, CR 701.3c).
+        if (me.attachedTo === host.id && before !== host.id && s.resolving) (s.resolving.attachedThisWay ??= []).push(me.id);
       }
       return;
     }

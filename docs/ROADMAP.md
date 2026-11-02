@@ -1,7 +1,7 @@
 # Roadmap
 
-29,042 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,318 of
+29,053 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,324 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1583,6 +1583,25 @@ line blocks.
    Zombie creature cards equal to the number of Zombies sacrificed this way" (Empty the Laboratory); "When this
    creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome: trigger
    selfExiledCrafting, CR 702.167a). +10 (29,042 of 31,936 with B71-B77).
+   Round 241 (top of the list, now done): "unattach ~, then transform it" (Elbrus, the Binding Blade); "target creature
+   that crewed it this turn explores" (Subterranean Schooner); "a Treasure token for each creature that crewed it this
+   turn" and "Crew 1. Activate only once each turn." (Luxurious Locomotive: Count crewedSource, gone crewers too); "you
+   may return any number of creatures that saddled it this turn" (Rambling Possum); "at end of combat, exile it and up to
+   one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed: flicker withSelf); "if an
+   Assassin crewed it this turn" (Adrestia: TurnLog.crewedTypes, the crewers' subtypes as they were tapped); "you may have
+   target opponent gain control of target permanent you control. When you do, ..." (Iroh, Tea Master; bots give only a
+   noncreature token); a ninjutsu-shaped hand ability for an unblocked Rogue, attacking whom you choose (Zareth San, the
+   Trickster: ninjutsu chooseDefender, CR 508.4; browser test); "must be blocked by an Eldrazi / a Dalek if able"
+   (Slayer's Cleaver, Ace's Baseball Bat: mustBeBlocked by, CR 509.1c, in blockRequirementProblem and the bot's blocks);
+   "attach any number of target Equipment you control to target creature you control. When one or more Equipment become
+   attached to that creature this way, ..." (Thorin, Mountain-king: reflexive about.attachedThisWay; expandMany no
+   longer rewrites a reflexive trigger's own target references). +11 (29,053 of 31,936 with B71-B77).
+   Out after round 241 (looked at, not done): Nuka-Nuke Launcher ("until the end of defending player's next turn, that
+   player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
+   ends); Psionic Ritual, Exterminate! and Reiterating Bolt (replicate with a cost that isn't mana, paid any number of
+   times); Nacatl War-Pride and Gorm the Great ("must be blocked by exactly one creature" / "by two or more creatures if
+   able": requirements on the number of blockers); Calamity, Galloping Inferno (token copies of the creatures that saddled
+   it, chosen one by one).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
    on them: the protection quality would need the source's counters); Altar of the Wretched and The Enigma Jewel (their
    back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted

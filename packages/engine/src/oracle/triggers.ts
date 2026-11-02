@@ -296,6 +296,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!h) continue;
     if (m[2] !== "creature" && event !== "selfBecomesTapped" && event !== "selfBecomesUntapped") return "fail";
     let text = o.toOpponent ? otherOpponents(h[1]!) : h[1]!;
+    // Elbrus, the Binding Blade: "unattach ~, then transform it": "it" is the Equipment (it transforms even if it can't be
+    // unattached, rulings).
+    text = text.replace(/^unattach ~, then transform it(\.?)$/, "unattach ~. Transform ~$1");
     // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
     const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
     if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";

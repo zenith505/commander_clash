@@ -1497,6 +1497,11 @@ export interface TurnLog {
   saddledBy?: Record<string, string[]>;
   /** The same for crewing each Vehicle this turn (CR 702.122d: tapped to pay its crew cost; Getaway Car). */
   crewedBy?: Record<string, string[]>;
+  /**
+   * The creature subtypes the creatures that crewed each Vehicle this turn had as they were tapped for its crew cost, keyed
+   * the same way (Adrestia: "if an Assassin crewed it this turn", even if it has left or stopped being one since, rulings).
+   */
+  crewedTypes?: Record<string, string[]>;
   /** How many times each Vehicle became crewed this turn, by `${id}@${zoneChanges}` (CR 702.122e; "for the first time each turn"). */
   timesCrewed?: Record<string, number>;
   /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
@@ -2157,6 +2162,8 @@ export interface Resolving {
   spellObjects?: (ObjectId | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
+  /** Thorin, Mountain-king: the Aura and Equipment its "attach" effects attached (moved) this resolution, for "when one or more Equipment become attached to that creature this way". */
+  attachedThisWay?: ObjectId[];
   /** The permanents its last continuous effect changed, for "untap those creatures" after it (ObjRef "affected"). */
   affected?: { id: ObjectId; zc: number }[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */

@@ -883,6 +883,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Chandra, Fire of Kaladesh: "If ~ has dealt 3 or more damage this turn": all the damage this object dealt this turn,
   // to anything, under any controller (TurnLog.sourceDamage, by the object it is now, CR 400.7).
   if ((m = new RegExp(`^~ has dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "selfDealtDamageThisTurn", n: num(m[1]!) };
+  // Adrestia: "if an Assassin crewed it this turn" (CR 702.122d): one tapped for its crew cost while it was one (rulings).
+  if ((m = /^an? ([A-Z][a-z]+) crewed (?:it|~) this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "crewedByType", subtype: m[1]! };
   // Heroic Return: "~ costs {2} less to cast if a creature is attacking you": attacking you, not a planeswalker you control
   // (CR 506.3).
   if (text === "a creature is attacking you") return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackingYou", text: "creatures attacking you" } } }, min: 1 };
@@ -2142,7 +2144,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual),
   // "gets +1/+1 and doesn't untap during its controller's untap step" (Dance of the Dead), "gets +3/+0 and can only attack
   // alone" (Errantry).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities|doesn't untap during its controller's untap step|can only attack alone)$`).exec(rest))) {
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|must be blocked by an? [A-Z][a-z]+ if able|is goaded|loses all abilities|doesn't untap during its controller's untap step|can only attack alone)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
@@ -2209,6 +2211,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack a player it has already attacked this turn$/.test(rest)) return [{ kind: "cantAttackSamePlayer" }];
   if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
+  // Slayer's Cleaver: "must be blocked by an Eldrazi if able": one of its blockers is an Eldrazi whenever one is able to
+  // block it (CR 509.1c).
+  if ((m = /^must be blocked by an? ([A-Z][a-z]+) if able$/.exec(rest)) && CREATURE_TYPES.has(m[1]!)) return [{ kind: "mustBeBlocked", by: { kind: "object", types: ["Creature"], subtypes: [m[1]!], text: m[1]! } }];
   // "Each nonland permanent you control is all colors" (Leyline of the Guildpact): layer 5 (CR 105.2, 613.1e).
   if (/^(?:is|are) all colors$/.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   // Shifting Sky: "All nonland permanents are the chosen color": the color chosen as the source entered (CR 614.12),
@@ -2753,6 +2758,12 @@ function parseStaticLine(line: string): StaticAbility | null {
     const sub = which === "lands" ? undefined : which === "Plains" ? "Plains" : which.slice(0, -1);
     return mods ? { affects: { kind: "filter", types: ["Land"], ...(landsAre[2] ? { controller: "you" as const } : {}), ...(sub ? { spec: { kind: "object", types: ["Land"], subtypes: [sub], text: sub } } : {}) }, mods, text: line } : null;
   }
+  // Life and Limb: "All Forests and all Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their
+  // other types": both card types and both subtypes in layer 4 (each subtype stays with its own card type, rulings, CR
+  // 205.3d), green in layer 5, base 1/1 in 7b, the same set of permanents in each layer (CR 613.6). A Forest has "{T}: Add
+  // {G}" by its subtype (CR 305.6), so a Saproling taps for {G} once it's a Forest.
+  if (/^All Forests and all Saprolings are 1\/1 green Saproling creatures and Forest lands in addition to their other types$/.test(text))
+    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Forest", "Saproling"], text: "Forest or Saproling" } }, mods: [{ kind: "addTypes", types: ["Creature", "Land"], subtypes: ["Saproling", "Forest"] }, { kind: "setColors", colors: [COLOR_WORDS.green!] }, { kind: "setPT", power: 1, toughness: 1 }], text: line };
   // Natural Emergence: "Lands you control are 2/2 creatures with first strike. They're still lands.": the same, with the
   // keyword in layer 6.
   const emergence = /^Lands you control are (\d+)\/(\d+) creatures with ([a-z ]+)\. They're still lands$/.exec(text);

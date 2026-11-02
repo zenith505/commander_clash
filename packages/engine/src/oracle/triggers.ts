@@ -22,6 +22,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever a player wins a coin flip, (.+)$/, "playerWinsFlip"],
   // The God-Eternals: "When ~ dies or is put into exile from the battlefield" (CR 700.4: "dies" is going to a graveyard).
   [/^When(?:ever)? ~ dies or is put into exile from the battlefield, (.+)$/, "selfDiesOrExiled"],
+  // Exiled as a craft material (CR 702.167a). The rulings' other case, exiled by a mana ability activated while paying
+  // for the craft ability, can't happen here: mana abilities are activated before the craft ability is.
+  [/^When ~ is exiled from the battlefield while you're activating a craft ability, (.+)$/, "selfExiledCrafting"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
   [/^When you lose control of ~, (.+)$/, "selfLostControl"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
@@ -165,7 +168,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
+  "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
@@ -295,6 +298,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!h) continue;
     if (m[2] !== "creature" && event !== "selfBecomesTapped" && event !== "selfBecomesUntapped") return "fail";
     let text = o.toOpponent ? otherOpponents(h[1]!) : h[1]!;
+    // Elbrus, the Binding Blade: "unattach ~, then transform it": "it" is the Equipment (it transforms even if it can't be
+    // unattached, rulings).
+    text = text.replace(/^unattach ~, then transform it(\.?)$/, "unattach ~. Transform ~$1");
     // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
     const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
     if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
@@ -1864,7 +1870,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Look at the top five cards of your library. You may reveal a creature card from among them and put it into your
   // hand." (Horn of the Mark) too, and "a Hero card ... put that card into your hand" (Director Nick Fury).
   // Cosmic Cube: "Look at the top six cards of your library. You may cast a spell from among them ..." too.
-  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? (?:[a-z ]+|[A-Z][a-z]+) card from among them and put (?:it|that card) into your hand|You may cast a spell from among them [^.]+)\./;
+  // Choco, Seeker of Paradise: "look at that many cards from the top of your library. You may put one of them into your
+  // hand. Then put any number of land cards from among them ...": the cards.
+  const lookAt = /\b[Ll]ook at (?:the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? (?:[a-z ]+|[A-Z][a-z]+) card from among them and put (?:it|that card) into your hand|You may cast a spell from among them [^.]+)|that many cards from the top of your library\. You may put one of them into your hand\. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard)\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
@@ -4247,7 +4255,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       text = text.replace(/THAT_MUCH/g, "that much").replace(/THAT_MANY/g, "that many");
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
-      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";
+      const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfExiledCrafting" || event === "selfToGraveyard" || event === "selfLeaves";
       if (event === "selfDealtDamageBySource") text = text.replace(/\bthat source's controller\b/g, "that player");
       if (event === "selfAttacksUnblocked" && /^Whenever ~ attacks a player and isn't blocked, /.test(line)) text = text.replace(/\b[Tt]hat player\b/g, (w) => (w[0] === "T" ? "Defending player" : "defending player"));
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.

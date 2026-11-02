@@ -1497,6 +1497,11 @@ export interface TurnLog {
   saddledBy?: Record<string, string[]>;
   /** The same for crewing each Vehicle this turn (CR 702.122d: tapped to pay its crew cost; Getaway Car). */
   crewedBy?: Record<string, string[]>;
+  /**
+   * The creature subtypes the creatures that crewed each Vehicle this turn had as they were tapped for its crew cost, keyed
+   * the same way (Adrestia: "if an Assassin crewed it this turn", even if it has left or stopped being one since, rulings).
+   */
+  crewedTypes?: Record<string, string[]>;
   /** How many times each Vehicle became crewed this turn, by `${id}@${zoneChanges}` (CR 702.122e; "for the first time each turn"). */
   timesCrewed?: Record<string, number>;
   /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
@@ -1690,7 +1695,7 @@ export interface GameState {
    */
   animated?: Record<string, { id: ObjectId; zc: number }>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
-  flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number } }[];
+  flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**
@@ -2157,6 +2162,8 @@ export interface Resolving {
   spellObjects?: (ObjectId | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
+  /** Thorin, Mountain-king: the Aura and Equipment its "attach" effects attached (moved) this resolution, for "when one or more Equipment become attached to that creature this way". */
+  attachedThisWay?: ObjectId[];
   /** The permanents its last continuous effect changed, for "untap those creatures" after it (ObjRef "affected"). */
   affected?: { id: ObjectId; zc: number }[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */

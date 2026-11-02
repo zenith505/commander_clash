@@ -1577,8 +1577,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         : e.what
           ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard")
           : [];
-      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(e.escape ? { escape: e.escape } : {}) });
-      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${e.escape.mana}, exile ${e.escape.exile} other cards from your graveyard)` : "flashback"} until end of turn.`);
+      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(e.escape ? { escape: e.escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${e.escape.mana}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
       return;
     }
     case "cipher":
@@ -2347,7 +2347,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Craft: "the exiled cards used to craft it" are the cards the cost exiled, while they stay exiled (CR 702.167c).
           if (e.linkCostExiled && s.resolving?.item.costExiled?.length) (s.linkedExile ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] = [...s.resolving.item.costExiled];
-          if (e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype))) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+          if (e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype))) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) });
           // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
           if (e.attachSelf) {
             const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -2890,8 +2890,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const t = ctx.targets.slice(e.what.index, e.what.index + (e.what.n ?? 1)).find((x) => x?.kind === "object" && x.id === o.id);
           return t?.kind !== "object" || t.zc === undefined || t.zc === (o.zoneChanges ?? 0);
         };
-        for (const o of objects(s, e.what, ctx)) {
-          if (o.zone !== "battlefield" || !stamped(o)) continue;
+        // Fortune, Loyal Steed: "exile it and up to one creature that saddled it this turn": the source too, while it's the
+        // object it was (CR 400.7), all exiled at once.
+        const me = e.withSelf && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        const withMe = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? [me] : [];
+        for (const o of [...withMe, ...objects(s, e.what, ctx).filter((x) => !withMe.includes(x))]) {
+          if (o.zone !== "battlefield" || (!withMe.includes(o) && !stamped(o))) continue;
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
           // As it last existed, for "if a Pirate was exiled this way" (Siren's Ruse, CR 608.2h).
@@ -3166,13 +3170,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const zc = s.resolving?.item.sourceZc;
       // Commander ninjutsu: from the command zone too (CR 702.49d).
       if (!o || (o.zone !== "hand" && o.zone !== "command") || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
+      // Zareth San: what it attacks is chosen as it enters (CR 508.4), during combat only (506.3d).
+      const attackOptions = e.chooseDefender && inCombat(s) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+      const sc = (s.resolving!.scratch ??= {});
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, o).name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       // Attacking as it enters, before its enters abilities trigger ("if it's attacking", Thousand-Faced Shadow).
       enterTogether(s, () => {
         moveObject(s, o.id, "battlefield", { tapped: true });
-        if ((o.zone as string) === "battlefield" && ctx.lki) enterAttacking(s, o, ctx.lki);
+        if ((o.zone as string) !== "battlefield") return;
+        if (e.chooseDefender) {
+          if (attack) {
+            o.attacking = attack.player;
+            if (attack.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
+          }
+        } else if (ctx.lki) enterAttacking(s, o, ctx.lki);
       });
       if ((o.zone as string) !== "battlefield") return;
-      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
+      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""}${e.chooseDefender ? "" : " (ninjutsu)"}.`);
       return;
     }
     case "forEachThisWay": {

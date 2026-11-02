@@ -3104,6 +3104,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0d8730b5-f7ba-48b0-928d-d8b7685347d3",
+  "name": "Case of the Uneaten Feast",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Case",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Case"
+  ],
+  "oracleText": "Whenever a creature you control enters, you gain 1 life.\nTo solve — You've gained 5 or more life this turn. (If unsolved, solve at the beginning of your end step.)\nSolved — Sacrifice this Case: Creature cards in your graveyard gain \"You may cast this card from your graveyard\" until end of turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Solved"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "case",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
   "name": "Cavalier of Night",
   "manaCost": "{2}{B}{B}{B}",
@@ -12514,6 +12544,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "be8b9bef-a98d-40a8-bedd-d78f1f08f93b",
+  "name": "Merfolk Windrobber",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Creature — Merfolk Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Rogue"
+  ],
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, that player mills a card. (They put the top card of their library into their graveyard.)\nSacrifice this creature: Draw a card. Activate only if an opponent has eight or more cards in their graveyard.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "218d9277-c179-4de3-9c7f-79b5a6d4fa38",
   "name": "Merfolk of the Pearl Trident",
   "manaCost": "{U}",
@@ -13863,6 +13927,41 @@
   "commanderLegal": "legal",
   "set": "c21",
   "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "00037840-6089-42ec-8c5c-281f9f474504",
+  "name": "Nissa, Worldsoul Speaker",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Elf Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "Landfall — Whenever a land you control enters, you get {E}{E} (two energy counters).\nYou may pay eight {E} rather than pay the mana cost for permanent spells you cast.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Landfall"
+  ],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23459,6 +23558,43 @@
   "commanderLegal": "legal",
   "set": "cmr",
   "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a316b0ce-1f63-4a8e-9a6e-bfbe03ca4e9e",
+  "name": "Zareth San, the Trickster",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Merfolk Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Rogue"
+  ],
+  "oracleText": "Flash\n{2}{U}{B}, Return an unblocked attacking Rogue you control to its owner's hand: Put this card from your hand onto the battlefield tapped and attacking.\nWhenever Zareth San deals combat damage to a player, you may put target permanent card from that player's graveyard onto the battlefield under your control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

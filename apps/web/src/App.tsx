@@ -1007,7 +1007,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
-      if (c.kind === "payLife" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
       // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
       if (c.kind === "collectEvidence") {
         if (d.collect !== undefined) continue;
@@ -2040,12 +2040,13 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
   lifeForMv: "life equal to its mana value instead of its mana cost, once during each of your turns (Demon of Fate's Design); X is 0",
   genericMv: "generic mana equal to its mana value instead of its mana cost (Kentaro, the Smiling Cat); X is 0",
+  energyForSpell: "energy instead of its mana cost (Nissa, Worldsoul Speaker); X is 0",
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
@@ -2093,6 +2094,7 @@ function counterOnWhat(c: Extract<AdditionalCost, { kind: "putCounter" }>): stri
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${plural(what)}`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
+  if (c.kind === "payEnergy") return `pay ${c.n} energy`;
   if (c.kind === "forage") return "forage (exile three cards from your graveyard or sacrifice a Food)";
   if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${c.oneOfEach ? `a ${c.filter.text}` : n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;

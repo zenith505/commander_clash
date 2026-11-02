@@ -2,7 +2,7 @@
 // own, registered in GameState.cards, so everything that reads an object's definition (its name, types,
 // power and toughness, abilities compiled from its rules text) sees the copied values (layer 1, CR 613.2).
 
-import { defOf, lockIfRoom, ownDefOf } from "./cards";
+import { defOf, lockIfRoom, ownDefOf, prototypedDef, realDefOf } from "./cards";
 import { unroomed } from "./faces";
 import { subtypeSet } from "./keywords";
 import { invalidateCharacteristics } from "./layers";
@@ -17,6 +17,18 @@ export interface CopyExcept {
   unlessHas?: string;
   notLegendary?: boolean;
   legendary?: boolean;
+  /** Moritte of the Frost: "it's legendary and snow in addition to its other types" (the snow supertype, CR 205.4a). */
+  snow?: boolean;
+  /**
+   * Moritte of the Frost: "if it's a creature, it ... has changeling": these keywords only for a copy that's a creature
+   * as it enters (rulings: judged by its characteristics then); game.ts enterAsCopy turns them into `keywords`.
+   */
+  keywordsIfCreature?: string[];
+  /**
+   * Hulking Metamorph: "its power and toughness are equal to this creature's power and toughness": the entering
+   * permanent's own printed ones, its prototype's if it was cast prototyped (rulings); exceptFor turns it into `pt`.
+   */
+  ptOwn?: boolean;
   /** "Its starting loyalty is 1" (Jace, Mirror Mage): the printed loyalty of a copy of a planeswalker (CR 306.5b, 707.9b). */
   loyalty?: number;
   /**
@@ -49,7 +61,7 @@ export interface CopyExcept {
    * replacement effect on its entering (CR 614.1c), not a copiable value, so it isn't part of the copy. `ifType`: only if
    * it is that card type as it enters, as a copy (rulings).
    */
-  enterCounters?: { counter: string; ifType?: string; /** "Except it enters with X additional +1/+1 counters on it" (Altered Ego): the X of the spell it was, 0 if it wasn't cast (CR 107.3m). */ x?: true; /** Undercover Operative: "except it enters with a shield counter on it if you control that creature" (the copied creature, as it enters). */ ifYouControl?: true }[];
+  enterCounters?: { counter: string; /** Moritte of the Frost: "two additional +1/+1 counters" (1 if left out). */ n?: number; ifType?: string; /** "Except it enters with X additional +1/+1 counters on it" (Altered Ego): the X of the spell it was, 0 if it wasn't cast (CR 107.3m). */ x?: true; /** Undercover Operative: "except it enters with a shield counter on it if you control that creature" (the copied creature, as it enters). */ ifYouControl?: true }[];
   /**
    * "Except their power is half that creature's power and their toughness is half that creature's toughness. Round up
    * each time." (Saw in Half): base power and toughness, half the copied creature's as it last existed (rulings), worked
@@ -102,6 +114,7 @@ function exceptedFaces(base: CardDef, except: CopyExcept | undefined): CardFace[
 function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "subtypes" | "typeLine" | "oracleText" | "colors" | "manaCost"> & { keywords?: string[] }>(base: T, except: CopyExcept): Partial<T> & { cmc?: number } {
   const supertypes = base.supertypes.filter((t) => !(except.notLegendary && t === "Legendary"));
   if (except.legendary && !supertypes.includes("Legendary")) supertypes.push("Legendary");
+  if (except.snow && !supertypes.includes("Snow")) supertypes.push("Snow");
   const baseTypes = except.setTypes ?? base.types;
   // Subtypes of card types it no longer has go, and set subtypes replace those of the same kind (CR 205.1a).
   const sets = new Set((except.setSubtypes ?? []).map(subtypeSet));
@@ -164,8 +177,11 @@ export function tokenCopyKey(s: GameState, base: CardDef, except0?: CopyExcept):
  */
 export function exceptFor(s: GameState, o: GameObject, except: CopyExcept | undefined, ownName: string): CopyExcept | undefined {
   if (!except) return undefined;
-  const { keepColors, thisAbility: _, enterCounters: _c, ...rest } = except;
-  return { ...rest, ...(rest.name === "~" ? { name: ownName } : {}), ...(keepColors ? { colors: [...defOf(s, o).colors] } : {}) };
+  const { keepColors, thisAbility: _, enterCounters: _c, ptOwn, ...rest } = except;
+  // Hulking Metamorph: its own printed power and toughness, the prototype's if it was cast prototyped (CR 718.3b).
+  const own = ptOwn ? (o.prototyped ? prototypedDef(realDefOf(s, o)) : realDefOf(s, o)) : undefined;
+  const pt: [number, number] | undefined = own ? [Number(own.power), Number(own.toughness)] : undefined;
+  return { ...rest, ...(rest.name === "~" ? { name: ownName } : {}), ...(keepColors ? { colors: [...defOf(s, o).colors] } : {}), ...(pt && pt.every((n) => Number.isFinite(n)) ? { pt } : {}) };
 }
 
 /**
@@ -198,6 +214,6 @@ export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
  */
 export function copyEnterCounters(except: CopyExcept | undefined, isA: (type: string) => boolean, x = 0, youControl = false): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const c of except?.enterCounters ?? []) if ((!c.ifType || isA(c.ifType)) && (!c.x || x > 0) && (!c.ifYouControl || youControl)) out[c.counter] = (out[c.counter] ?? 0) + (c.x ? x : 1);
+  for (const c of except?.enterCounters ?? []) if ((!c.ifType || isA(c.ifType)) && (!c.x || x > 0) && (!c.ifYouControl || youControl)) out[c.counter] = (out[c.counter] ?? 0) + (c.x ? x : (c.n ?? 1));
   return out;
 }

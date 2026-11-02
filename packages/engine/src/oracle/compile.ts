@@ -1072,6 +1072,36 @@ export function compile(d: CardDef): CompiledCard {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;
     }
+    // Zareth San, the Trickster: "{2}{U}{B}, Return an unblocked attacking Rogue you control to its owner's hand: Put ~ from
+    // your hand onto the battlefield tapped and attacking." Ninjutsu's shape (CR 702.49a) without being ninjutsu: it attacks
+    // what you choose (CR 508.4), never declared as an attacker (rulings); revealing it is part of activating it from hand.
+    const zareth = /^((?:\{(?:\d+|[WUBRGC])\})+), Return an unblocked attacking ([A-Z][a-z]+) you control to its owner's hand: Put ~ from your hand onto the battlefield tapped and attacking\.$/.exec(line);
+    if (zareth && CREATURE_TYPES.has(zareth[2]!) && d.types.includes("Creature")) {
+      out.activated.push({
+        manaCost: zareth[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        zone: "hand",
+        costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], subtypes: [zareth[2]!], controller: "you", text: `unblocked attacking ${zareth[2]} you control` }, n: 1, unblockedAttacker: true }],
+        body: { targets: [], effects: [{ type: "ninjutsu", chooseDefender: true }], text: "Put ~ from your hand onto the battlefield tapped and attacking." },
+        text: line,
+      });
+      continue;
+    }
+    // Luxurious Locomotive: "Crew 1. Activate only once each turn." (CR 702.122a, 602.5b): its crew ability, at most once
+    // each turn.
+    const crewOnce = /^(Crew \d+)\. Activate only once each turn\.$/.exec(line);
+    if (crewOnce && d.subtypes.includes("Vehicle")) {
+      const ck = keywordAbilities(crewOnce[1]!, d);
+      if (ck?.activated.length !== 1 || ck.triggers.length) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.activated.push({ ...ck.activated[0]!, oncePerTurn: true, text: line });
+      out.textKeywords.push(...textKeywords(crewOnce[1]!));
+      continue;
+    }
     const kw = keywordAbilities(kwLine, d);
     if (kw) {
       out.triggers.push(...kw.triggers);
@@ -2989,6 +3019,16 @@ export function compile(d: CardDef): CompiledCard {
       const spec = parseTargetPhrase(`${genericAlt[1]} card from a graveyard`);
       if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${genericAlt[1]} spell` }))(spec), genericMv: true };
+      continue;
+    }
+    // Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast": an
+    // alternative cost (CR 118.9) of energy counters (CR 107.14), X at 0 in it (CR 107.3, 601.2b).
+    const energyAlt = new RegExp(`^You may pay ${NUM} \\{E\\} rather than pay the mana cost for permanent spells you cast\\.$`).exec(line);
+    if (energyAlt) {
+      const n = num(energyAlt[1]!);
+      const spec = parseTargetPhrase("permanent card from a graveyard");
+      if (!n || spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: "permanent spell" }))(spec), energy: n };
       continue;
     }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand

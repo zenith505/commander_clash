@@ -2304,7 +2304,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -3053,6 +3053,8 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const pick = spareCounterHost(s, pid, c, targeted);
       if (!pick) return null;
       out.counterOn = [pick];
+    } else if (c.kind === "payEnergy") {
+      if ((player(s, pid).energy ?? 0) < c.n) return null;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -3345,6 +3347,14 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control": only a noncreature
+  // token (a Food, a Treasure), for the Ally token it makes.
+  const gift = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.giveTo ? e.effects[0]! : undefined;
+  if (r && gift?.type === "continuous" && gift.what.ref === "target") {
+    const t = r.item.targets?.[gift.what.index];
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && o.zone === "battlefield" && o.isToken && !objIsType(s, o, "Creature");
+  }
   // World Queller: "you may choose a card type. If you do, each player sacrifices ...": only for a type that costs the
   // opponents more than us.
   if (e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "choose" && e.effects[0]!.choice === "cardType" && edictsChosenType(s)) return (e.effects[0]!.options ?? []).some((ty) => edictTypeScore(s, pid, ty) > 0);
@@ -5912,6 +5922,21 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });
+    }
+  }
+  // Slayer's Cleaver: "must be blocked by an Eldrazi if able": our sturdiest one of those blocks it, with helpers against
+  // menace.
+  for (const at of incoming.filter((a) => !!characteristics(s, a).mustBeBlockedBy)) {
+    for (const f of characteristics(s, at).mustBeBlockedBy!) {
+      if (blocks.some((b) => b.attacker === at.id && objectMatches(s, f, obj(s, b.blocker), controllerOf(s, at), false))) continue;
+      const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
+      const fits = able.find((b) => objectMatches(s, f, b, controllerOf(s, at), false));
+      const n = blockersNeeded(s, at) - blocks.filter((b) => b.attacker === at.id).length;
+      if (!fits || able.length < n) continue;
+      for (const b of [fits, ...able.filter((x) => x !== fits)].slice(0, Math.max(1, n))) {
+        used.add(b.id);
+        blocks.push({ blocker: b.id, attacker: at.id });
+      }
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {

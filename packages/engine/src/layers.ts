@@ -251,6 +251,8 @@ export interface Characteristics {
   allMustBlock: boolean;
   /** "All Walls able to block ~ do so" (Marble Priest): the blockers that must block it, if able (CR 509.1c). */
   allMustBlockBy?: TargetSpec[];
+  /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): each filter one of its blockers must fit, if able (CR 509.1c). */
+  mustBeBlockedBy?: TargetSpec[];
   mustBlock: boolean;
   /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
   assignsToughness: boolean;
@@ -420,6 +422,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   ...(c.attackUnlessMore ? { attackUnlessMore: [...c.attackUnlessMore] } : {}),
   ...(c.attackOnlyWith ? { attackOnlyWith: [...c.attackOnlyWith] } : {}),
   ...(c.allMustBlockBy ? { allMustBlockBy: [...c.allMustBlockBy] } : {}),
+  ...(c.mustBeBlockedBy ? { mustBeBlockedBy: [...c.mustBeBlockedBy] } : {}),
   ...(c.reachVs ? { reachVs: [...c.reachVs] } : {}),
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
@@ -825,6 +828,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ok = !!other && (!cond.withKeyword || !!chars.get(other.id)?.keywords.some((k) => sameCI(k, cond.withKeyword!)));
       return ok !== !!cond.not;
     }
+    case "crewedByType":
+      return !!s.turnLog?.crewedTypes?.[`${sourceId}@${s.objects[sourceId]?.zoneChanges ?? 0}`]?.includes(cond.subtype);
     case "selfDealtDamageThisTurn": {
       const key = `${sourceId}@${s.objects[sourceId]?.zoneChanges ?? 0}`;
       return Object.values(s.turnLog?.sourceDamage ?? {}).reduce((n, byKey) => n + (byKey[key] ?? 0), 0) >= cond.n;
@@ -1676,7 +1681,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "mustBeBlocked":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
-      c.mustBeBlocked = true;
+      if (m.by) c.mustBeBlockedBy = [...(c.mustBeBlockedBy ?? []), m.by];
+      else c.mustBeBlocked = true;
       return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;

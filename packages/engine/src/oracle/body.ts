@@ -487,6 +487,9 @@ const checkableMay = (e: Effect): boolean =>
   // as you control ~", Orcish Squatters): done if that target is still legal, which a lone target must be for the
   // ability to resolve at all (CR 608.2b).
   (e.type === "continuous" && e.what.ref === "target" && !e.what.n && !e.giveTo && e.mods.length === 1 && e.mods[0]!.kind === "control" && (e.duration === "game" || e.duration === "whileControlled")) ||
+  // Iroh, Tea Master: "you may have target opponent gain control of target permanent you control. When you do, ...": done
+  // if both targets are still legal (rulings: either one illegal, it does nothing and can't be chosen).
+  (e.type === "continuous" && e.what.ref === "target" && !e.what.n && e.giveTo?.ref === "target" && !("n" in e.giveTo && e.giveTo.n) && e.mods.length === 1 && e.mods[0]!.kind === "control" && e.duration === "game") ||
   // "You may have that player gain control of equipped creature until end of turn. If you do, untap it." (Assault Suit).
   (e.type === "continuous" && e.what.ref === "attached" && e.giveTo?.ref === "eventPlayer" && e.duration === "endOfTurn") ||
   // Sphinx-Bone Wand: "you may put a charge counter on ~. If you do, ...": done if it's still on the battlefield to put
@@ -1501,6 +1504,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scythe of the Wretched: "return that card to the battlefield under your control. Attach ~ to that creature.": the
   // permanent it became (CR 400.7), the same as "... and attach ~ to it" (Nim Deathmantle); not onto a noncreature (rulings).
   text = text.replace(/^(return that card to the battlefield under your control)\. Attach ~ to that creature\.$/, "$1 and attach ~ to it.");
+  // Fortune, Loyal Steed: one delayed trigger doing both (sentences/basics.ts), kept whole past the ", then" split.
+  text = text.replace(/^at end of combat, exile it and up to one creature that saddled it this turn, then return those cards to the battlefield under their owner's control\.$/, "At end of combat, exile it and up to one creature that saddled it this turn and return those cards to the battlefield under their owner's control.");
   // Silent Gravestone: "Exile ~ and all cards from all graveyards": both at once; ~ goes to exile, not a graveyard.
   text = text.replace(/^Exile ~ and all cards from all graveyards\./, "Exile ~. Exile all cards from all graveyards.");
   // Sinkhole Surveyor: "you lose 1 life and ~ endures 1" (CR 701.63a), one after the other.
@@ -2385,6 +2390,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ],
       text,
     };
+  // Choco, Seeker of Paradise: "Whenever one or more Birds you control attack, look at that many cards from the top of your
+  // library. You may put one of them into your hand. Then put any number of land cards from among them onto the
+  // battlefield tapped and the rest into your graveyard.": the attacking Birds' number (the trigger's), one card to your
+  // hand, then the lands of the others, all of them in this one resolution.
+  if (/^[Ll]ook at (?:that many|X) cards from the top of your library\. You may put one of them into your hand\. Then put any number of land cards from among them onto the battlefield tapped and the rest into your graveyard\.$/.test(text.trim())) {
+    const many: Amount = { count: { kind: "eventAmount" } };
+    const land = parseSearchFilter("land card");
+    if (!land) return null;
+    const lands = (n: Amount): Effect => ({ type: "dig", n, count: 99, upTo: true, filter: land, into: "battlefield", tapped: true, rest: "graveyard", reveal: false });
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: many, count: 1, upTo: true, into: "hand", rest: "keep", reveal: false },
+        { type: "if", cond: { kind: "digTook" }, effects: [lands({ ...many, plus: -1 })], otherwise: [lands(many)] },
+      ],
+      text,
+    };
+  }
   // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
   // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
   // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
@@ -3673,8 +3696,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
     // your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
-    // (Gwenom, Remorseless): Bolas's Citadel's permission for the rest of the turn (Effect topTurn).
-    const topTurn = /^[Uu]ntil end of turn, you may look at the top card of your library any time and (you may .+)$/.exec(s);
+    // (Gwenom, Remorseless): Bolas's Citadel's permission for the rest of the turn (Effect topTurn). The Belligerent: "...
+    // any time, and you may play lands and cast spells from the top of your library" (the same, with a comma).
+    const topTurn = /^[Uu]ntil end of turn, you may look at the top card of your library any time,? and (you may .+)$/.exec(s);
     if (topTurn) {
       const top = parseFromTop(topTurn[1]!);
       const life = sentences[si + 1] === "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost";
@@ -3883,6 +3907,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || !fx?.length || ctx.targets.length !== before) return null;
       effects.push({ type: "revealFromHand", filter, one: true, ...(revealOne[2] ? { orControl: true as const } : {}) }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
       si++;
+      continue;
+    }
+    // Thorin, Mountain-king: "attach any number of target Equipment you control to target creature you control. When one or
+    // more Equipment become attached to that creature this way, that creature deals damage equal to its power to up to one
+    // target creature": a reflexive trigger (CR 603.12) only if one of them moved onto it (CR 701.3c), about that creature.
+    const attachedWhen = /^When one or more Equipment become attached to that creature this way, (.+?)\.?$/.exec(s);
+    const lastAttach = effects.at(-1);
+    if (attachedWhen && lastAttach?.type === "attach" && lastAttach.what.ref === "target" && lastAttach.source?.ref === "target" && lastAttach.source.n && si + 1 === sentences.length) {
+      const reflexive = reflexiveBody(attachedWhen[1]!, ctx, false, true);
+      if (!reflexive) return null;
+      effects.push({ type: "reflexive", body: reflexive, about: { target: lastAttach.what.index, attachedThisWay: true } });
+      continue;
+    }
+    // Rambling Possum: "Then you may return any number of creatures that saddled it this turn to their owner's hand":
+    // chosen as it resolves, not targeted, none if you like (CR 107.1c); each one tapped for its saddle cost this turn
+    // (CR 702.171c), as the object it was then.
+    const saddledBack = /^(?:Then )?[Yy]ou may return any number of creatures that (saddled|crewed) (?:it|~) this turn to their owner's hand$/.exec(s);
+    if (saddledBack && !ctx.spell) {
+      const filter = pickFilter(`creature that ${saddledBack[1]} it this turn`);
+      if (!filter || filter.kind !== "object" || !(filter.saddledSource || filter.crewedSource)) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", anyNumber: true });
       continue;
     }
     // Sweep (Plow Through Reito): "Return any number of Plains you control to their owner's hand. Target creature gets
@@ -11502,6 +11547,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { ...prev, look: true };
       continue;
     }
+    // Immortal Obligation: "Return target creature card from an opponent's graveyard to the battlefield under their control
+    // with a duty counter on it. For as long as that creature has a duty counter on it, it is goaded, can't attack you or a
+    // permanent you control, and can't block creatures you control.": effects on the permanent the card became (CR 400.7,
+    // 611.2c) while it has a duty counter (611.2b): goaded by you (CR 701.15), no attacking you or your planeswalkers and
+    // battles (508.1c), no blocking your creatures (509.1b).
+    const dutyCtr = new RegExp(`^For as long as that creature has an? ${COUNTER} counter on it, it is goaded, can't attack you or a permanent you control, and can't block creatures you control$`).exec(s);
+    if (dutyCtr) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(dutyCtr[1]!);
+      if (prev?.type !== "putOntoBattlefield" || !prev.counters?.[counter] || prev.what.ref !== "target" || prev.alsoMods || effects.length !== 1) return null;
+      effects[0] = { ...prev, alsoMods: [{ kind: "goad" }, { kind: "cantAttackYou" }, { kind: "cantBlockCreatures", filter: { kind: "object", types: ["Creature"], controller: "you", text: "creatures you control" } }], alsoModsWhileCounter: counter };
+      continue;
+    }
     // "Put a shadow counter on target creature. For as long as that creature has a shadow counter on it, it's a Wraith in
     // addition to its other types" (Minas Morgul), "That land is an Island for as long as it has a flood counter on it"
     // (Quicksilver Fountain): an effect on what the counter was just put on, for as long as it has one of them (CR
@@ -12810,6 +12868,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const n = parseCount(where[2]!, ctx);
       if (prev?.type !== "exile" || prev.what.ref !== "each" || !n) return null;
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "battlefield", rest: "shuffle", n });
+      si++;
+      continue;
+    }
+    // Empty the Laboratory: "Sacrifice X Zombies, then reveal cards from the top of your library until you reveal a number of
+    // Zombie creature cards equal to the number of Zombies sacrificed this way. Put those cards onto the battlefield and the
+    // rest on the bottom of your library in a random order.": as many as were sacrificed (fewer if you had fewer), all
+    // entering together (rulings).
+    const untilSacked = /^[Rr]eveal cards from the top of your library until you reveal a number of ([A-Z][a-z]+) creature cards equal to the number of ([A-Z][a-z]+)s sacrificed this way$/.exec(s);
+    if (untilSacked && untilSacked[1] === untilSacked[2] && CREATURE_TYPES.has(untilSacked[1]!) && /^Put those cards onto the battlefield and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const prev = effects[effects.length - 1];
+      const sub = untilSacked[1]!;
+      if (prev?.type !== "pick" || prev.action !== "sacrifice" || prev.who.ref !== "you" || prev.filter.subtypes?.length !== 1 || prev.filter.subtypes[0] !== sub || prev.filter.types?.length) return null;
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], subtypes: [sub], text: `${sub} creature card` }, found: "battlefield", rest: "bottom", n: { count: { kind: "sacrificedThisWayCount" } } });
       si++;
       continue;
     }

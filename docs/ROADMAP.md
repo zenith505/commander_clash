@@ -1,7 +1,7 @@
 # Roadmap
 
-29,048 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,308 of
+29,086 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,324 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1564,6 +1564,51 @@ line blocks.
    that returns every card put into your graveyard from anywhere); Scion of the Ur-Dragon (becomes a copy of a card in
    your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
    mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
+   Round 240 (top of the list, now done): "Until end of turn, you may look at the top card of your library any time,
+   and you may play lands and cast spells from the top of your library" (The Belligerent); "All Forests and all
+   Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their other types" (Life and Limb,
+   layers 4, 5 and 7b); "You may pay eight {E} rather than pay the mana cost for permanent spells you cast" (Nissa,
+   Worldsoul Speaker: alternative cost energyForSpell with additional cost payEnergy, X is 0, CR 118.9 and 107.3g; a
+   "Cast it: pay 8 energy" button with a browser test); "Creature cards in your graveyard gain "You may cast this card
+   from your graveyard" until end of turn" (Case of the Uneaten Feast: grantFlashback cast, browser test); "enter as a
+   copy ..., except it's legendary and snow ... and, if it's a creature, it enters with two additional +1/+1 counters
+   on it and has changeling" (Moritte of the Frost: CopyExcept snow, keywordsIfCreature, enterCounters n); "its power
+   and toughness are equal to this creature's power and toughness" (Hulking Metamorph: CopyExcept ptOwn, prototyped
+   3/3 included; a copy of a prototyped permanent now keeps the copied prototype values, CR 718.3d); "Return target
+   creature card from an opponent's graveyard to the battlefield under their control with a duty counter on it. For as
+   long as that creature has a duty counter on it, it is goaded, can't attack you ... and can't block creatures you
+   control" (Immortal Obligation: alsoModsWhileCounter); "look at that many cards ... You may put one of them into your
+   hand. Then put any number of land cards from among them onto the battlefield tapped and the rest into your
+   graveyard" (Choco, Seeker of Paradise); "Sacrifice X Zombies, then reveal cards ... until you reveal a number of
+   Zombie creature cards equal to the number of Zombies sacrificed this way" (Empty the Laboratory); "When this
+   creature is exiled from the battlefield while you're activating a craft ability" (Market Gnome: trigger
+   selfExiledCrafting, CR 702.167a). +10 (29,042 of 31,936 with B71-B77).
+   Round 241 (top of the list, now done): "unattach ~, then transform it" (Elbrus, the Binding Blade); "target creature
+   that crewed it this turn explores" (Subterranean Schooner); "a Treasure token for each creature that crewed it this
+   turn" and "Crew 1. Activate only once each turn." (Luxurious Locomotive: Count crewedSource, gone crewers too); "you
+   may return any number of creatures that saddled it this turn" (Rambling Possum); "at end of combat, exile it and up to
+   one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed: flicker withSelf); "if an
+   Assassin crewed it this turn" (Adrestia: TurnLog.crewedTypes, the crewers' subtypes as they were tapped); "you may have
+   target opponent gain control of target permanent you control. When you do, ..." (Iroh, Tea Master; bots give only a
+   noncreature token); a ninjutsu-shaped hand ability for an unblocked Rogue, attacking whom you choose (Zareth San, the
+   Trickster: ninjutsu chooseDefender, CR 508.4; browser test); "must be blocked by an Eldrazi / a Dalek if able"
+   (Slayer's Cleaver, Ace's Baseball Bat: mustBeBlocked by, CR 509.1c, in blockRequirementProblem and the bot's blocks);
+   "attach any number of target Equipment you control to target creature you control. When one or more Equipment become
+   attached to that creature this way, ..." (Thorin, Mountain-king: reflexive about.attachedThisWay; expandMany no
+   longer rewrites a reflexive trigger's own target references). +11 (29,053 of 31,936 with B71-B77).
+   Out after round 241 (looked at, not done): Nuka-Nuke Launcher ("until the end of defending player's next turn, that
+   player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
+   ends); Psionic Ritual, Exterminate! and Reiterating Bolt (replicate with a cost that isn't mana, paid any number of
+   times); Nacatl War-Pride and Gorm the Great ("must be blocked by exactly one creature" / "by two or more creatures if
+   able": requirements on the number of blockers); Calamity, Galloping Inferno (token copies of the creatures that saddled
+   it, chosen one by one).
+   Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
+   on them: the protection quality would need the source's counters); Altar of the Wretched and The Enigma Jewel (their
+   back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
+   statics don't support); Nethergoyf and Winter, Cynical Opportunist (exile any number of cards with four or more card types
+   among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
+   next loyalty ability, as before); Summoner's Grimoire, Jon Irenicus, Shattered One and Strago and Relm (looked at,
+   several new pieces each).
    Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
    Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
@@ -4343,7 +4388,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Shah of Naar Isle, mana echo only); "You may play that card this turn" after an opponent exiles their top card
   (Ornate Kanzashi); "Remove an oil counter from ~: It becomes a 5/5" (Meldweb Strider); "Whenever you become the target
   of a spell" (Dormant Gomazoa). UI fix: a look at another player's library is headed "The top of Ana's library", not
-  "your library". +17 (29,065 of 31,936).
+  "your library". +17 (29,065 of 31,936; 29,086 with rounds 240 and 241).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,

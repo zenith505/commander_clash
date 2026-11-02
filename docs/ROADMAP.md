@@ -1,8 +1,8 @@
 # Roadmap
 
-29,245 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,371 of
-9,979 (93%).
+29,263 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,384 of
+9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -4579,8 +4579,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Turtle Tracks); look at the top eight, exile four at random (Orcish Librarian); "Whenever a creature card leaves an
   opponent's graveyard" from the graveyard (Erebos's Titan); "That opponent may put ... from their hand onto the
   battlefield" (Metamorphose); protection from each color whose basic land type you control (Dominaria's Judgment);
-  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,227 of 31,936 with B83; 29,245 with
-  round 246).
+  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,263 of 31,936 with B83 and rounds 246
+  and 247).
 - Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
   choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
   check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share

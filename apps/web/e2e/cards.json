@@ -9714,6 +9714,48 @@
   "gameChanger": false
  },
  {
+  "oracleId": "08daa30f-7ce0-4a72-b539-fbb0c585fd73",
+  "name": "Illuna, Apex of Wishes",
+  "manaCost": "{2}{G}{U}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Beast Elemental Dinosaur",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast",
+   "Elemental",
+   "Dinosaur"
+  ],
+  "oracleText": "Mutate {3}{R/G}{U}{U} (If you cast this spell for its mutate cost, put it over or under target non-Human creature you own. They mutate into the creature on top plus all abilities from under it.)\nFlying, trample\nWhenever this creature mutates, exile cards from the top of your library until you exile a nonland permanent card. Put that card onto the battlefield or into your hand.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Mutate",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "mythic",
+  "layout": "mutate",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac2b3adb-45bb-4f56-9d52-e08771164b35",
   "name": "Imperial Edict",
   "manaCost": "{1}{B}",
@@ -14078,6 +14120,42 @@
   "set": "zen",
   "releasedAt": "2009-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "88fb1dd1-60fb-4f51-ac4d-30b43156a474",
+  "name": "Neera, Wild Mage",
+  "manaCost": "{4}{U}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Elf Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Elf",
+   "Shaman"
+  ],
+  "oracleText": "Whenever you cast a spell, you may put it on the bottom of its owner's library. If you do, reveal cards from the top of your library until you reveal a nonland card. You may cast that card without paying its mana cost. Then put all revealed cards not cast this way on the bottom of your library in a random order. This ability triggers only once each turn.",
+  "power": "2",
+  "toughness": "7",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

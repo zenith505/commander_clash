@@ -631,7 +631,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
         // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
-        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) && (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast);
+        // Plargg: "a nonlegendary, nonland card"; Illuna: "a nonland permanent card" (not an artifact land).
+        const fits = (id: ObjectId) =>
+          (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
+          (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) &&
+          (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast) &&
+          !(e.untilNonlegendary && defOf(s, obj(s, id)).supertypes?.includes("Legendary"));
         // Demonlord Belzenlok: "exile cards ... until you exile a nonland card, then put that card into your hand. If the
         // card's mana value is 4 or greater, repeat this process." Exiled one at a time (rulings on Laelia); the land cards
         // stay exiled; it goes on until a nonland card with a lesser mana value, or no nonland card (rulings).
@@ -693,6 +698,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           suspendExiled(s, obj(s, hit), e.suspend ?? 0);
           return;
         }
+        if (e.then === "battlefieldOrHand") {
+          // Illuna: chosen after seeing the card (rulings); a permanent card only, so either can be done.
+          const name = defOf(s, obj(s, hit)).name;
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ["0", "1"], labels: [`Put ${name} onto the battlefield`, `Put ${name} into your hand`], prompt: "choose one" };
+          return "paused";
+        }
         if (e.then !== "castFree") {
           // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).
           const o = obj(s, hit);
@@ -706,6 +717,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (maxMv === undefined || maxMv >= 0) if (freeCastable(s, caster, hit)) return "paused";
         s.pending = null;
         log(s, `${defOf(s, obj(s, hit)).name} can't be cast${maxMv !== undefined ? ` (mana value ${maxMv < 0 ? "less than 0" : `${maxMv} or less`})` : ""}.`);
+      }
+      if (e.then === "battlefieldOrHand") {
+        const hit = sc.untilNonland.hit;
+        if (!hit || s.objects[hit]?.zone !== "exile") return;
+        const name = defOf(s, obj(s, hit)).name;
+        if (sc.either === 0) moveObject(s, hit, "battlefield", { controller: ctx.controller });
+        else moveObject(s, hit, "hand");
+        log(s, `${player(s, ctx.controller).name} puts ${name} ${sc.either === 0 ? "onto the battlefield" : "into their hand"}.`);
+        return;
       }
       // "If you don't, put that card into your hand": its owner's, from exile (Breaching Dragonstorm).
       const left = sc.untilNonland.hit;
@@ -791,6 +811,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "counterCause":
       return counterOnStack(s, ctx, ctx.cause, src);
+    case "causeToBottom":
+      return counterOnStack(s, ctx, ctx.cause, src, undefined, "libraryBottom", true);
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
@@ -1052,7 +1074,7 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
   return o && !o.faceDown ? defOf(s, o).name : undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield", bounce?: true): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice" | "battlefield" | "libraryBottom", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
@@ -1077,6 +1099,13 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
       const o = item.objectId ? s.objects[item.objectId] : undefined;
       if (o) moveObject(s, o.id, "library", { top: position === "top" });
       log(s, o && !o.spellCopy ? `${by}: ${player(s, o.owner).name} puts ${what} on the ${position} of their library.` : `${by} removes ${what} from the stack.`);
+      return;
+    }
+    // Neera, Wild Mage: on the bottom of its owner's library.
+    if (instead === "libraryBottom") {
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      if (o) moveObject(s, o.id, "library");
+      log(s, o && !o.spellCopy ? `${by}: ${player(s, o.owner).name} puts ${what} on the bottom of their library.` : `${by} removes ${what} from the stack.`);
       return;
     }
     // Commit: second from the top, or the only card of an empty library (rulings).

@@ -734,7 +734,7 @@ export function moveObject(
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
-    becomes?: { types: string[]; subtypes: string[] };
+    becomes?: { types: string[]; subtypes: string[]; name?: string; ability?: string };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
     entersAs?: Modification[];
     /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
@@ -1133,7 +1133,7 @@ export function moveObject(
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
-    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", types: opts.becomes.types, subtypes: opts.becomes.subtypes }, ...(opts.becomes.name ? [{ kind: "setName" as const, name: opts.becomes.name }] : []), ...(opts.becomes.ability ? [{ kind: "addAbility" as const, text: opts.becomes.ability }] : [])] });
   if (to === "battlefield" && opts.entersAs)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs });
   // The Volvers: kicked with that kicker, it enters with those abilities (CR 614.1c), from an effect as it enters.

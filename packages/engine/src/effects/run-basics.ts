@@ -38,6 +38,7 @@ function manaSourceOrigins(s: GameState, ctx: ResolveCtx): ManaOrigin[] {
   if (d.types.includes("Creature")) out.push("creature");
   if (d.supertypes?.includes("Snow")) out.push("snow");
   if (d.subtypes?.includes("Treasure")) out.push("treasure");
+  if (d.subtypes?.includes("Desert")) out.push("desert");
   return out;
 }
 

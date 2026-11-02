@@ -69,7 +69,7 @@ export type SpentMana = Partial<Record<ManaType, number>> & {
   /** How much of it a snow source made, by type (CR 107.4h). */
   snow?: Partial<Record<ManaType, number>>;
   /** How much of it a Treasure, a creature or an artifact made (CR 106.3). */
-  from?: Partial<Record<"treasure" | "creature" | "artifact", number>>;
+  from?: Partial<Record<"treasure" | "creature" | "artifact" | "desert", number>>;
 };
 
 export type PlayerId = number;
@@ -677,7 +677,8 @@ export interface CopyEffect {
  * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
  * from a creature", "mana from an artifact".
  */
-export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact";
+/** Where mana came from (CR 106.3): a snow source, a Treasure, a creature, an artifact, a Desert (Cataclysmic Prospecting). */
+export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact" | "desert";
 
 /**
  * `n` of the `mana` in a player's pool that's set apart from the rest (counted in manaPool too): it can only be spent

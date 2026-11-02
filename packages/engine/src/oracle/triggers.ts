@@ -1195,6 +1195,24 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // either zone, its power as it last existed on the battlefield (CR 603.10a).
   const whilePower = /^When ~ dies or is put into exile while its power is (\d+) or greater, (.+)$/.exec(line);
   const selfHad = whilePower ? ["", `if its power was ${whilePower[1]} or greater, ${whilePower[2]}`] : /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+|if it was (?:enchanted or equipped|enchanted|equipped), .+)$/.exec(line);
+  // Princess Yue: "When ~ dies, if ~ was a nonland creature, return ~ to the battlefield tapped under your control. She's a
+  // land named Moon. ~ gains "{T}: Add {C}."": an intervening if on ~ as it last existed (CR 603.4, 603.10a); it returns as
+  // a land only, still legendary (CR 205.1b, rulings), with its other abilities, named Moon (CR 201.4).
+  const yue = /^When ~ dies, if ~ was a nonland creature, return ~ to the battlefield tapped under your control\. (?:She|He|It)'s a land named ([A-Z][a-z]+)\. ~ gains "(\{T\}: Add \{C\}\.)"$/.exec(line);
+  if (yue) {
+    const t = parseDiesTrigger("When ~ or another nonland creature dies, draw a card.");
+    if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
+    const { orSelf: _, ...dies } = t.dies;
+    return {
+      ...t,
+      dies: { ...dies, self: true },
+      body: {
+        targets: [],
+        effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, tapped: true, becomes: { types: ["Land"], subtypes: [], name: yue[1]!, ability: yue[2]! } }],
+        text: `If ~ was a nonland creature, return ~ to the battlefield tapped under your control. It's a land named ${yue[1]}. ~ gains "${yue[2]}"`,
+      },
+    };
+  }
   // Infernal Vessel: "When ~ dies, if it wasn't a Demon, ...": the same, its creature types as it last existed.
   const selfWasnt = /^When ~ dies, if it wasn't an? ([A-Z][a-z]+), (.+)$/.exec(line);
   if (selfWasnt && CREATURE_TYPES.has(selfWasnt[1]!)) {

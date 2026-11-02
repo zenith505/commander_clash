@@ -468,6 +468,8 @@ export type Count =
   | { kind: "discardedThisTurn"; who: PlayerRef }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
   | { kind: "treasureSpent"; /** "Spent to activate this ability": in an activated ability (compile checks). */ activated?: true }
+  /** "For each mana from a Desert spent to cast ~" (Cataclysmic Prospecting, CR 106.3): the resolving spell's, by its mana's sources. */
+  | { kind: "spentFrom"; origin: "desert" }
   /** "Equal to the result" (CR 706.2): the last roll's result, all its dice added up; in a "whenever you roll" trigger, the roll's. */
   | { kind: "rollResult" }
   /** "The other result" after "roll two dX and choose one result": the one not chosen. */
@@ -2697,7 +2699,7 @@ export type Effect =
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"); "They're 2/2 Cyberman artifact creatures" (The Cyber-Controller): "cyberman". */
       faceDown?: "forest" | "cyberman";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
-      becomes?: { types: string[]; subtypes: string[] };
+      becomes?: { types: string[]; subtypes: string[]; /** Princess Yue: "She's a land named Moon": its new name (CR 201.4). */ name?: string; /** Princess Yue: "~ gains "{T}: Add {C}."" for as long as it's that object. */ ability?: string };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
       haste?: "endOfTurn" | "game";
       /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
@@ -3129,7 +3131,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "Put that card onto the battlefield or into your hand" (Illuna, Apex of Wishes): its controller chooses after seeing it; the other cards stay exiled. */ "battlefieldOrHand" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -3149,6 +3151,10 @@ export type Effect =
       orHand?: true;
       /** "Until you reveal a nonland card with mana value 3 or less" (Treasure Keeper): only one like this stops it. */
       untilMv?: number;
+      /** "A nonlegendary, nonland card" (Plargg, Dean of Chaos): a legendary card doesn't stop it. */
+      untilNonlegendary?: true;
+      /** With `untilTypes`: "a nonland permanent card" (Illuna): one of those types that isn't also a land (an artifact land doesn't stop it). */
+      untilNonlandType?: true;
       /** "Until you reveal a nonland card with mana value 3 or greater" (Sibylline Soothsayer): only one like this stops it. */
       untilMvAtLeast?: number;
       /** With `reveal`: "You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your library in a random order." (Treasure Keeper): the cards stay in the library, revealed, and the found card is cast from there; then the rest go to the bottom. */
@@ -3715,6 +3721,8 @@ export type Effect =
   | { type: "counterUnlessPays"; unless: UnlessPays; ward?: boolean }
   /** "Counter that spell or ability": the one that made this trigger (Glyph Keeper's "becomes the target"). */
   | { type: "counterCause" }
+  /** "You may put it on the bottom of its owner's library" in a cast trigger (Neera, Wild Mage): the spell that triggered it, removed from the stack (not countered); a copy ceases to exist (CR 707.10a). */
+  | { type: "causeToBottom" }
   /**
    * "You may [do something]": the controller chooses as it resolves whether to do it
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).

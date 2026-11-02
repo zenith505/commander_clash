@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
@@ -199,6 +199,7 @@ export function continueResolution(s: GameState): Resolution {
   s.leftTogether = undefined;
   s.resolving = null;
   if (r.endTurn) return endTheTurn(s, item), "done";
+  if (r.endCombat) return endTheCombatPhase(s, item), "done";
   // Narci, Fable Singer: it has finished resolving and left the stack (rulings).
   if (item.finalChapter !== undefined) fireEvent(s, { type: "finalChapterResolved", player: item.controller, amount: item.finalChapter });
   if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId, item);
@@ -1044,6 +1045,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "bite":
     case "extraTurn":
     case "endTurn":
+    case "endCombatPhase":
     case "controlPlayer":
     case "skip":
     case "addPhases":

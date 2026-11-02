@@ -1,7 +1,7 @@
 # Roadmap
 
-29,191 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,362 of
+29,209 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,371 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1635,6 +1635,27 @@ line blocks.
    spell is countered this way, put that card onto the battlefield under your control instead" (Desertion); "Choose
    target creature you don't control. Each creature you control deals damage equal to its power to that creature"
    (Kamahl's Will). +14 (29,142 of 31,936 with B78+B79; 29,176 with B80+B81).
+   Round 246 (earlier rounds' skip lists, from the top: everything near the top of the list had been looked at): "~
+   costs {U}{U}{U} less to cast if an opponent has drawn four or more cards this turn" (Even the Score); "~ has flash as
+   long as you control a Desert" on a permanent (Colossal Rattlewurm: flashIf for the spell plus the keyword on the
+   battlefield); "You can't play lands" (Aggressive Mining: CompiledCard.youCantPlayLands); "for each other Zombie you
+   control and each Zombie card in your graveyard" (Unbreathing Horde); "target permanent not named ~" (Clever Conjurer);
+   "loses all landwalk abilities" (Hammerheim: removeKeywords "Landwalk"); "When ~ dies, if it dealt combat damage to a
+   player this turn" (Wave of Rats: TriggeredAbility.ifDealtCombatDamage); "End the combat phase" (Mandate of Peace:
+   Effect endCombatPhase, game.ts endTheCombatPhase, CR 724.2; bots cast it only against an attack on them); "if you
+   controlled a Faerie / a modified creature / a Mount as you cast this spell" (Faerie Fencing, Flame Discharge, Steer
+   Clear: SpellCondition amountNow on an asCast count); "Destroy all creatures and all permanents attached to creatures"
+   (End Hostilities); "Prevent all combat damage that would be dealt by creatures other than target creature this turn"
+   (Terrifying Presence: DamageRule by.notTarget); "the artifact's mana value" (Viashino Heretic); "Sacrifice any number of
+   creatures. ~ deals that much damage to any target" (Last-Ditch Effort) and "Sacrifice any number of artifacts,
+   creatures, and/or lands. Draw a card for each permanent sacrificed this way" (Reprocess); "a creature of their choice
+   other than enchanted creature" (Sporogenic Infection: pickOptions honors notSourceHost); "That Vehicle" in a mode of
+   an attack trigger (Kitsune Ace). +18 (29,194 of 31,936 with B80+B81).
+   Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
+   "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg ("loses first
+   strike or swampwalk", one of the two chosen as it resolves, rulings); Consume Spirit ("Spend only black mana on X":
+   autopay has no restriction on the mana for X); Catastrophe ("Destroy all lands or all creatures", chosen as it
+   resolves); Muraganda Petroglyphs ("creatures with no abilities", a layer dependency on ability-adding effects).
    Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and

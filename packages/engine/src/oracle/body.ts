@@ -1873,6 +1873,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
+  // Sporogenic Infection: "target player sacrifices a creature of their choice other than enchanted creature": the same
+  // as "a creature other than enchanted creature of their choice".
+  text = text.replace(/\b(sacrifices a creature) of their choice (other than enchanted creature)\./, "$1 $2 of their choice.");
+  // Viashino Heretic: "~ deals damage to that artifact's controller equal to the artifact's mana value": that artifact's.
+  text = text.replace(/^(Destroy target artifact\. ~ deals damage to that artifact's controller equal to) the artifact's mana value\.$/, "$1 that artifact's mana value.");
+  // Steer Clear: "~ deals 4 damage to that creature instead if you controlled a Mount as you cast ~"; Faerie Fencing:
+  // "That creature gets an additional -3/-3 until end of turn if you controlled a Faerie as you cast ~": the condition
+  // first, as with "If ~ was kicked, ..." (read below).
+  text = text
+    .replace(/(^|\. )(~ deals \d+ damage to that creature) instead if (you controlled an? [A-Za-z ]+ as you cast ~)\./, (_, lead: string, what: string, cond: string) => `${lead}If ${cond}, ${what} instead.`)
+    .replace(/(^|\. )That creature gets an additional ([+-]\d+\/[+-]\d+ until end of turn) if (you controlled an? [A-Za-z ]+ as you cast ~)\./, "$1If $3, that creature gets $2.");
   // Cinder Strike: "It deals 4 damage to that creature instead if this spell's additional cost was paid" (read as kicked):
   // the same as "If ~ was kicked, it deals 4 damage instead".
   text = text.replace(/^(~ deals \d+ damage to target creature\. )It deals (\d+) damage to that creature instead if ~ was kicked\.$/, "$1If ~ was kicked, it deals $2 damage instead.");
@@ -4105,9 +4116,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Landslide: "Sacrifice any number of Mountains. ~ deals that much damage to target player or planeswalker.": one
     // damage for each Mountain sacrificed, as it resolves (rulings).
-    const slide = /^Sacrifice any number of ([A-Z][a-z]+)$/.exec(s);
+    // Last-Ditch Effort: "Sacrifice any number of creatures. ~ deals that much damage to any target." The same.
+    const slide = /^Sacrifice any number of ([A-Z][a-z]+|creatures)$/.exec(s);
     const slideNext = sentences[si + 1]?.replace(/\.$/, "") ?? "";
-    if (slide && /^~ deals that much damage to target [a-z ]+$/.test(slideNext)) {
+    if (slide && /^~ deals that much damage to (?:target [a-z ]+|any target)$/.test(slideNext)) {
       const filter = pickFilter(slide[1]!);
       const fx = filter && parseOne(slideNext.replace("that much", "X"), ctx);
       if (!filter || filter.kind !== "object" || fx?.length !== 1 || fx[0]!.type !== "damage") return null;
@@ -4123,6 +4135,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(renounce[1]!);
       if (filter?.kind !== "object") return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice", anyNumber: true }, { type: "gainLife", who: { ref: "you" }, n: { count: { kind: "sacrificedThisWayCount" }, times: Number(lifeEach[1]) } });
+      si++;
+      continue;
+    }
+    // Reprocess: "Sacrifice any number of artifacts, creatures, and/or lands. Draw a card for each permanent sacrificed this
+    // way": any mix of those, chosen as it resolves (CR 701.21a), then one card for each.
+    if (/^Sacrifice any number of artifacts, creatures, and\/or lands$/.test(s) && /^Draw a card for each permanent sacrificed this way\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], text: "artifact, creature, or land" };
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice", anyNumber: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "sacrificedThisWayCount" } } });
       si++;
       continue;
     }
@@ -9667,6 +9687,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "state", cond }, effects: [hard, ...rest], otherwise: [last] });
       continue;
     }
+    // "If you controlled a modified creature as you cast ~, it deals X plus 2 damage instead" (Flame Discharge), "If you
+    // controlled a Faerie as you cast ~, that creature gets -3/-3 until end of turn" (Faerie Fencing): whether you
+    // controlled one as you finished casting it (CR 601.2i), counted then and kept however things change before it
+    // resolves (rulings), copies included (CR 707.10, StackItem.asCast).
+    const controlledCast = ctx.spell ? /^If you controlled an? ([A-Za-z ]+?) as you cast ~, (.+)$/.exec(s) : null;
+    if (controlledCast) {
+      const spec = parseTargetPhrase(controlledCast[1]!);
+      if (spec?.kind !== "object" || spec.controller) return null;
+      const filter = { ...spec, controller: "you" as const, text: `${controlledCast[1]} you control` };
+      const cond: SpellCondition = { kind: "amountNow", amount: { count: { kind: "asCast", of: { kind: "permanents", filter } } }, min: 1 };
+      const fx = parseKicked(controlledCast[2]!, effects.slice(prevStart), ctx, false);
+      if (!fx || ctx.targets.length !== curTargets) return null;
+      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond, effects: fx.effects });
+      continue;
+    }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
@@ -14244,11 +14280,13 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     return { effects: [...first, ...second], instead };
   }
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
-  const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|that permanent or player|it))?$/.exec(t);
+  // Flame Discharge: "it deals X plus 2 damage instead": X paid as it was cast, plus 2.
+  const more = /^(?:It|~) deals (\d+|X|X plus \d+) damage(?: to (?:that creature|that player|that permanent or player|it))?$/.exec(t);
   if (more && instead) {
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;
-    return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
+    if (/^X plus/.test(more[1]!) && !ctx.spell) return null;
+    return { effects: [{ ...prev, amount: /^X plus/.test(more[1]!) ? { count: { kind: "x" as const }, plus: Number(more[1]!.slice(7)) } : amt(more[1]!) }], instead };
   }
   // Dispelling Exhale: "Counter target spell unless its controller pays {2}. If a Dragon was beheld, counter that spell
   // unless its controller pays {4} instead" (beheld read as kicked): the same counter, a bigger payment.

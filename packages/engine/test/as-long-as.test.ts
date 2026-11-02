@@ -35,9 +35,10 @@ const toGraveyard = (s: GameState, pid: PlayerId, def: CardDef) => {
 describe("as long as", () => {
   it("parses the common forms", () => {
     supported(ape, metal, deli, descend, scythe, beebles, cat, gargoyle, knight, kin, wurm);
-    // Flash matters in your hand, where a permanent's static ability doesn't work ("This spell has flash as long as ..."
-    // does: Crashing Tide, Supernatural Rescue).
-    unsupported(creature("Flash Test", "This creature has flash as long as you control a Merfolk."));
+    // "This creature has flash as long as ..." works in your hand too: an ability that modifies how the object can be cast
+    // functions in any zone it could be cast from (CR 113.6e; rulings on Colossal Rattlewurm), and on the battlefield
+    // the permanent has the keyword (round 246).
+    supported(creature("Flash Test", "This creature has flash as long as you control a Merfolk."));
     // Each attacking creature has its own defending player.
     unsupported(creature("Tangle Test", "Each creature you control can't be blocked as long as defending player controls an artifact land."));
   });

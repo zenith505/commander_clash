@@ -1877,6 +1877,13 @@ export interface StaticAbility {
  * artifacts", delirium's "four or more card types among cards in your graveyard", and so on.
  */
 export type StaticCondition =
+  /**
+   * Wiitigo: "if it has blocked or been blocked since your last upkeep"; Shape of the Wiitigo: "if enchanted creature
+   * attacked or blocked since your last upkeep": this object (or the creature it's attached to) was declared as an
+   * attacker (`attacked`) or a blocker (`blocked`), or became blocked (`wasBlocked`), in your previous upkeep's turn or
+   * later (combat always comes after the upkeep), as this object (CR 400.7).
+   */
+  | { kind: "combatSinceYourLastUpkeep"; of: "self" | "attached"; attacked?: true; blocked?: true; wasBlocked?: true }
   | { kind: "graveyardAtLeast"; n: number; /** So Tiny: "its controller has seven or more cards in their graveyard", the enchanted creature's controller. */ who?: "attached" }
   /** "If you haven't added mana with this ability this turn" (Carpet of Flowers): the source's addMana with `markSource` this turn. */
   | { kind: "addedManaThisTurn"; not?: true }
@@ -2707,6 +2714,8 @@ export type Effect =
       alsoModsWhileCounter?: string;
       /** Tune Up: "If it's a Vehicle, it becomes an artifact creature": `alsoMods` only for a permanent with this subtype as it enters. */
       alsoModsIfSubtype?: string;
+      /** Lim-Dûl the Necromancer: "If it's a creature, it's a Zombie in addition to its other creature types": `alsoMods` only for a permanent that's a creature as it enters. */
+      alsoModsIfCreature?: true;
       /** "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): they enter that way (rulings) when the X is at least `x`. */
       entersAs?: { mods: Modification[]; x: number };
       /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
@@ -2757,7 +2766,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at`: "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true; /** "Exile it and up to one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed): this ability's source too, if it's still the object it was (CR 400.7), exiled and returned with them. */ withSelf?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at`: "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true; /** "Exile it and up to one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed): this ability's source too, if it's still the object it was (CR 400.7), exiled and returned with them. */ withSelf?: true; /** With `at`: "At the beginning of the next end step, you may pay {3}{B}. If you don't, return that card" (Koya, Death from Above): the delayed trigger's controller may pay this instead, as it resolves. */ unlessPay?: string }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -4989,7 +4998,7 @@ export interface TriggeredAbility {
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. */ revealed?: "land" | "nonland" };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" };
   /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
   eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**
@@ -5059,6 +5068,8 @@ export interface TriggeredAbility {
   sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** With `minAttackers`: "When you attack with exactly two creatures" (Alluring Suitor): that many, no more. */
+  exactAttackers?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): the attackers' powers as they were declared add up to at least this. */
   minTotalPower?: number;
   /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */

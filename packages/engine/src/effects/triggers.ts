@@ -1526,10 +1526,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
-        if (hit.length < (t.minAttackers ?? 1)) continue;
+        if (hit.length < (t.minAttackers ?? 1) || (t.exactAttackers && hit.length !== t.minAttackers)) continue;
         if (t.minTotalPower && hit.reduce((n, [x]) => n + power(s, obj(s, x)), 0) < t.minTotalPower) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
@@ -2278,7 +2278,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Keranos: the card revealed as it was drawn, a land or not (as it is in the hand).
         if (t.draws.revealed) {
           const c = ev.card !== undefined ? s.objects[ev.card] : undefined;
-          if (!c || c.zone !== "hand" || objIsType(s, c, "Land") !== (t.draws.revealed === "land")) return false;
+          if (!c || c.zone !== "hand") return false;
+          const kind = t.draws.revealed;
+          // Rowen: "a basic land card" (CR 205.4a), Primitive Etchings: "a creature card", as it is in the hand.
+          const fits = kind === "basicLand" ? objIsType(s, c, "Land") && characteristics(s, c).supertypes.includes("Basic") : kind === "creature" ? objIsType(s, c, "Creature") : objIsType(s, c, "Land") === (kind === "land");
+          if (!fits) return false;
         }
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;

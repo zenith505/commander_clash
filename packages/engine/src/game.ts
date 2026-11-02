@@ -2715,7 +2715,8 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
   if (firstInDrawStep) p.drewInDrawStep = s.turn;
   // Keranos, God of Storms: "Reveal the first card you draw on each of your turns" (a static ability: revealed as it's drawn).
-  if (p.draws.n === 1 && s.activePlayer === pid && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed)))
+  // Rowen, Primitive Etchings: "Reveal the first card you draw each turn", on any player's turn.
+  if (p.draws.n === 1 && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed && (!t.draws.ownTurn || s.activePlayer === pid))))
     log(s, `${p.name} reveals ${defOf(s, drawnCard).name}, the first card they drew this turn.`);
   fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}), card: top });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast

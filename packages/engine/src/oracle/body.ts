@@ -1910,6 +1910,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Rite of the Raging Storm: "creates a 5/1 red Elemental creature token named Lightning Rager. It has trample, haste, and
   // "..."": what the token has, as one instruction.
   text = text.replace(/(creature token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\. It has ((?:[^."]|"[^"]*")+?)(\.|(?<="))(?=\s|$)/, "$1 with $2$3");
+  // Dragonbroods' Relic: "... token named Reliquary Dragon that's all colors. It has flying, lifelink, and "..."": the same,
+  // all colors (CR 105.1) said as its colors, since a quoted ability has to end the sentence.
+  text = text.replace(/\b([Cc]reate an? \d+\/\d+) ((?:[A-Z][a-z]+ )+creature token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*) that's all colors\. It has ((?:[^."]|"[^"]*")+?)(\.|(?<="))(?=\s|$)/, "$1 white, blue, black, red, and green $2 with $3$4");
   // Orzhov Advokist: "If a player does" is about the "may" of the sentence before: one instruction.
   text = text.replace(/(each player may put (?:two|three) \S+ counters on a creature they control)\. If a player does, (creatures that player controls can't attack you or planeswalkers you control until your next turn)\./i, "$1; if a player does, $2.");
   // Stinging Study: "where X is the mana value of a commander you own on the battlefield or in the command zone": one of
@@ -10237,6 +10240,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter }, effects: [{ type: "continuous", what: { ref: "target", index: pumpPrev.to.index }, mods: [{ kind: "modifyPT", power: Number(dealtPump[1]), toughness: Number(dealtPump[2]) }], duration: "endOfTurn" }] });
       continue;
     }
+    // Ballista Wielder: "~ deals 1 damage to any target. A creature dealt damage this way can't block this turn": the target,
+    // only if it's a creature that was dealt damage (none if it was all prevented).
+    if (/^A creature dealt damage this way can't block this turn$/.test(s) && pumpPrev?.type === "damage" && "ref" in pumpPrev.to && pumpPrev.to.ref === "anyTarget" && ctx.targets[pumpPrev.to.index]?.kind === "any" && !ctx.targets[pumpPrev.to.index]!.many) {
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter }, effects: [{ type: "continuous", what: { ref: "target", index: pumpPrev.to.index }, mods: [{ kind: "cantBlock" }], duration: "endOfTurn" }] });
+      continue;
+    }
     // Redcap Melee: "If a nonred permanent is dealt damage this way, you sacrifice a land".
     // Pathway Arrows' granted "~ deals 1 damage to target creature. If a colorless creature is dealt damage this way, tap
     // it.": that target, tapped only if it was dealt damage and is colorless as this resolves.
@@ -10486,6 +10496,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const ex = effects[at];
       if (ex?.type !== "exile" || Object.keys(ex).length !== 2 || ex.what.ref !== "target" || (ex.what.n !== undefined && ex.what.n !== 1) || effects[at + 1]?.type !== "draw") return null;
       effects[at] = { type: "flicker", what: ex.what, under: "owner", at: "yourNextUpkeep", thenDiscardToughness: true };
+      si++;
+      continue;
+    }
+    // Koya, Death from Above: "Exile up to one other target creature. At the beginning of the next end step, you may pay
+    // {3}{B}. If you don't, return that card to the battlefield under its owner's control": one delayed trigger (CR 603.7)
+    // that asks for the payment as it resolves, whether or not Koya is still around (rulings).
+    const payOrBack = /^At the beginning of the next end step, you may pay ((?:\{[0-9WUBRGC]\})+)$/.exec(s);
+    if (payOrBack && /^If you don't, return that card to the battlefield under its owner's control\.?$/.test(sentences[si + 1] ?? "")) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "exile" || Object.keys(prev).length !== 2 || prev.what.ref !== "target" || (prev.what.n !== undefined && prev.what.n !== 1)) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: "owner", at: "nextEndStep", unlessPay: payOrBack[1]! };
       si++;
       continue;
     }
@@ -12229,6 +12250,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.alsoModsIfSubtype = "Vehicle";
       continue;
     }
+    // Lim-Dûl the Necromancer: "you may pay {1}{B}. If you do, return that card to the battlefield under your control. If
+    // it's a creature, it's a Zombie in addition to its other creature types": the permanent it became, from then on, if
+    // it's a creature as it enters (a creature type only goes with the creature type, CR 205.3d).
+    const zombieIf = /^If it's a creature, it's an? ([A-Z][a-z]+) in addition to its other creature types$/.exec(s);
+    if (zombieIf) {
+      const prev = effects.at(-1);
+      const put = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
+      if (put?.type !== "putOntoBattlefield" || (put.what.ref !== "subjectCard" && !(put.what.ref === "target" && !put.what.n)) || put.alsoMods || !CREATURE_TYPES.has(zombieIf[1]!)) return null;
+      put.alsoMods = [{ kind: "addTypes", types: [], subtypes: [zombieIf[1]!] }];
+      put.alsoModsIfCreature = true;
+      continue;
+    }
     // Retched Wretch: "return it to the battlefield under its owner's control and it loses all abilities": the permanent
     // it becomes, from then on (CR 611.2c).
     if (/^It loses all abilities$/.test(s)) {
@@ -13492,11 +13525,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    if (until && sentences[si + 1]?.replace(/\.$/, "") === "Put that card onto the battlefield, then shuffle the rest into your library" && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+    // Thicket Elemental: "you may reveal cards ... until you reveal a creature card. If you do, put that card onto the
+    // battlefield and shuffle all other cards revealed this way into your library": the whole process, if you choose; "if
+    // you do" is choosing to reveal, so you shuffle even with no creature card found (rulings).
+    const thenShuffle = /^(?:If you do, p|P)ut that card onto the battlefield(?:, then shuffle the rest| and shuffle all other cards revealed this way) into your library$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (until && thenShuffle && (!mayUntil) === !/^If you do/.test(thenShuffle[0]) && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
       const filter = parseSearchFilter(until[1]!);
-      if (filter?.kind !== "card" || filter.types?.length !== 1 || filter.types[0] !== "Creature" || filter.anyOf || mayUntil) return null;
-      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "shuffle", remember: true });
+      if (filter?.kind !== "card" || filter.types?.length !== 1 || filter.types[0] !== "Creature" || filter.anyOf || sharesM) return null;
+      const reveal: Effect = { type: "revealUntil", filter, found: "battlefield", rest: "shuffle", remember: true };
+      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!} is revealed` } : reveal);
       si++;
+      if (mayUntil) continue;
       const demon = /^If that creature is an? ([A-Z][a-z]+), it deals damage equal to its power to each opponent\.?$/.exec(sentences[si + 1] ?? "");
       if (demon && CREATURE_TYPES.has(demon[1]!)) {
         const is: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [demon[1]!], text: demon[1]! };

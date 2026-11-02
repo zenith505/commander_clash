@@ -675,6 +675,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
+    case "combatSinceYourLastUpkeep": {
+      const o = cond.of === "attached" ? (src.attachedTo !== undefined ? s.objects[src.attachedTo] : undefined) : src;
+      if (!o || o.zone !== "battlefield") return false;
+      // The turn of your previous upkeep: the one before this upkeep if it's yours now, else your latest (none yet: any).
+      const p = s.players[you];
+      const since = (p?.upkeepTurn === s.turn && s.step === "upkeep" ? p.lastUpkeepTurn : p?.upkeepTurn) ?? 0;
+      const turns = [...(cond.attacked ? [o.attackedTurns?.at(-1)] : []), ...(cond.blocked ? [o.blockedTurn] : []), ...(cond.wasBlocked ? [o.becameBlockedTurn] : [])];
+      return turns.some((t) => t !== undefined && t >= since);
+    }
     case "selfInCommand":
       return src.zone === "command";
     case "selfDamagedCreature":

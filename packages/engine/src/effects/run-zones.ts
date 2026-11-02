@@ -2353,7 +2353,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.resolving?.created?.push(o.id);
           // Craft: "the exiled cards used to craft it" are the cards the cost exiled, while they stay exiled (CR 702.167c).
           if (e.linkCostExiled && s.resolving?.item.costExiled?.length) (s.linkedExile ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] = [...s.resolving.item.costExiled];
-          if (e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype))) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) });
+          if (e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature"))) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) });
           // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
           if (e.attachSelf) {
             const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -2933,10 +2933,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
+          const back: Effect = { type: "returnExiled", under: e.under, ...(e.thenDiscardToughness ? { toughnessThisWay: true as const } : {}), ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(e.landsTapped ? { landsTapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) };
+          // Koya, Death from Above: "you may pay {3}{B}. If you don't, return that card ...": the payment asked as the delayed
+          // trigger resolves, even if Koya is gone by then (rulings).
+          const backs: Effect[] = e.unlessPay ? [{ type: "may", effects: [], pay: { mana: e.unlessPay }, otherwise: [back], text: `pay ${e.unlessPay} to keep ${names} in exile` }] : [back];
           addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : e.at === "nextBeginCombat" ? "nextBeginCombat" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.thenDiscardToughness ? { toughnessThisWay: true as const } : {}), ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(e.landsTapped ? { landsTapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }, ...(e.thenDiscardToughness ? [{ type: "discard" as const, who: { ref: "you" as const }, n: { count: { kind: "returnedToughness" as const } } }] : [])],
-            text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control${e.thenDiscardToughness ? ", then discard cards equal to its toughness" : ""}.`,
+            effects: [...backs, ...(e.thenDiscardToughness ? [{ type: "discard" as const, who: { ref: "you" as const }, n: { count: { kind: "returnedToughness" as const } } }] : [])],
+            text: `${e.unlessPay ? `You may pay ${e.unlessPay}. If you don't, return` : "Return"} ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control${e.thenDiscardToughness ? ", then discard cards equal to its toughness" : ""}.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
       }

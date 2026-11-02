@@ -5310,6 +5310,16 @@ export function compile(d: CardDef): CompiledCard {
       else for (const t of ts) out.triggers.push(bindThisAbility(t!, line));
       continue;
     }
+    // Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card
+    // this way, draw a card.": the same on any turn, one trigger, for the first card drawn each turn (rulings: the reveal is
+    // a static ability as the card is drawn; the trigger waits until the whole draw has finished).
+    const revealEach = /^Reveal the first card you draw each turn\. Whenever you reveal an? (basic land|creature) card this way, (.+\.)$/.exec(line);
+    if (revealEach) {
+      const t = parseTrigger(`Whenever you draw your first card each turn, ${revealEach[2]!}`);
+      if (!t || t === "fail" || t.event !== "playerDraws" || !t.draws || t.ifCond) out.unsupported.push(raw);
+      else out.triggers.push(bindThisAbility({ ...t, draws: { ...t.draws, revealed: revealEach[1] === "creature" ? "creature" : "basicLand" } }, line));
+      continue;
+    }
     const trig = parseTrigger(line);
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);

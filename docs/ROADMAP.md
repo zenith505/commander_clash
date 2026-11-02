@@ -1,7 +1,7 @@
 # Roadmap
 
-29,359 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,953 of 4,988 (99%), top 10,000: 9,424 of
+29,398 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,425 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4773,7 +4773,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Rayne, Academy Chancellor, two cards if enchanted; Leovold, Emissary of Trest's draw now compiles too, though
   Leovold is banned in Commander); "Spells that target ~ cost {2} more to cast" on an instant or sorcery (Kaervek's
   Torch); "~ costs 3 life more to cast for each target" (Phyrexian Purge, paid as it's cast and not given back); hourglass counters (Temporal Distortion). +12 legal
-  (29,358 of 31,936 with B86, B87 and rounds 248 and 249).
+  (29,358 of 31,936 with B86, B87 and rounds 248 and 249; 29,398 with B88 and rounds 250 to 253).
 - Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave

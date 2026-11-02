@@ -249,6 +249,11 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       ((s.turnLog ??= {}).creatureCounterPutters ??= []).push(by);
       invalidateCharacteristics(s);
     }
+    // "During any turn you put a lore counter on ~" (Summon: Brynhildr): who put one on which object.
+    if (kind === "lore" && o.zone === "battlefield") {
+      const key = `${by}:${o.id}@${o.zoneChanges ?? 0}`;
+      if (!(s.turnLog?.lorePut ?? []).includes(key)) ((s.turnLog ??= {}).lorePut ??= []).push(key);
+    }
     if (kind === "+1/+1" && o.zone === "battlefield") {
       ((s.turnLog ??= {}).plusOnes ??= []).push({ by, controller: controllerOf(s, o), creature: characteristics(s, o).types.includes("Creature"), id: o.id, zc: o.zoneChanges ?? 0, n: m });
       invalidateCharacteristics(s); // "as long as you've put one or more +1/+1 counters on a creature this turn"

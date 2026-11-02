@@ -53,7 +53,8 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // each (a search may find less, CR 701.23b), a dual land being either one but not both.
   // Axgard Armory: "an Aura card and/or an Equipment card": the same, up to one of each.
   // Invent: "an instant card and/or a sorcery card" likewise.
-  const pair = /^((?:basic )?(?:[A-Z][a-z]+|instant|sorcery|artifact|enchantment) card) and(?:\/or)? an? ((?:basic )?(?:[A-Z][a-z]+|instant|sorcery|artifact|enchantment) card)$/.exec(m[3]!);
+  // Aang's Journey: "a basic land card and a Shrine card".
+  const pair = /^((?:basic )?(?:[A-Z][a-z]+|instant|sorcery|artifact|enchantment|land) card) and(?:\/or)? an? ((?:basic )?(?:[A-Z][a-z]+|instant|sorcery|artifact|enchantment|land) card)$/.exec(m[3]!);
   if (pair && n === 1 && !m[1]) {
     const r = new RegExp(`^(?:reveal them, )?put (?:them|those cards) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
     const specs = [pair[1]!, pair[2]!].map((p) => parseSearchFilter(p));

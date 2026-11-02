@@ -213,6 +213,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors, types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${text}\nEquip ${m[4]!}` };
     return compileQuoted(text) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
   }
+  // Tamiyo, Compleated Sage: "Create Tamiyo's Notebook, a legendary colorless Book artifact token with "Spells you cast cost
+  // {2} less to cast" and "{T}: Draw a card."": a named legendary noncreature token with its abilities (CR 111.4, 205.4d).
+  if ((m = /^(?:You )?[Cc]reate ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*), a legendary colorless (Book )?artifact token with "([^"]+)"(?: and "([^"]+)")?$/.exec(s))) {
+    const texts = [m[3]!, ...(m[4] ? [m[4]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors: [], types: ["Artifact"], subtypes: m[2] ? ["Book"] : [], keywords: [], abilities: texts.join("\n") };
+    return texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
+  }
   // Nahiri, the Lithomancer: "Create a colorless Equipment artifact token named Stoneforged Blade. It has indestructible,
   // "Equipped creature gets +5/+5 and has double strike," and equip {0}." (joined into one sentence by parseBody): a named
   // Equipment token with a keyword, a quoted ability and equip (CR 111.4, 702.6a).

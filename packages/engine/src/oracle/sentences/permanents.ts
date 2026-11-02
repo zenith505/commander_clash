@@ -168,7 +168,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
   // control" (Guild Summit): chosen as it resolves, none allowed, so "you may" changes nothing (CR 608.2d). Followed by
   // "for each creature tapped this way" or "When you do, ... the number of creatures tapped this way".
-  if ((m = /^(?:[Yy]ou may )?[Tt]ap any number of untapped ((?:[A-Z][a-z]+ )?(?:creatures|artifacts|Gates|Humans)) you control$/.exec(s))) {
+  // Augusta, Dean of Order: "then tap any number of creatures you control": only an untapped one can be tapped (CR 701.26a),
+  // so the same.
+  if ((m = /^(?:[Yy]ou may )?[Tt]ap any number of (?:untapped )?((?:[A-Z][a-z]+ )?(?:creatures|artifacts|Gates|Humans)) you control$/.exec(s))) {
     // A land type isn't read as a plural by parseGroup, but "each Gate you control" is the same group.
     const g = m[1] === "Gates" ? parseGroup("each Gate you control") : parseGroup(`${m[1]!} you control`);
     if (!g || g.other) return null;

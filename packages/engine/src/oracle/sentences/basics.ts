@@ -159,6 +159,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
     return filter ? [{ type: "search", who: { ref: "eachPlayer" }, filter, n: { count: { kind: "behindMost", filter: land, who: { ref: "eachOne" } } }, perPlayerN: true, upTo: true, reveal: false, dest: { zone: "battlefield", tapped: true } }] : null;
   }
+  // Tales of the Ancestors: "Each player with fewer cards in hand than the player with the most cards in hand draws cards
+  // equal to the difference": each one's difference, all worked out before anyone draws.
+  if (/^[Ee]ach player with fewer cards in hand than the player with the most cards in hand draws cards equal to the difference$/.test(s))
+    return [{ type: "draw", who: { ref: "eachPlayer" }, n: { count: { kind: "behindMost", filter: { kind: "card", text: "card" }, who: { ref: "eachOne" }, hand: true } } }];
   // An opponent choosing among the cards found or revealed (Gifts Ungiven, Murmurs from Beyond), as parseBody rewrites them.
   const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
   const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);

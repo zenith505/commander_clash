@@ -415,7 +415,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.yours) return o && o.zone === "graveyard" && o.owner === ctx.controller && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : []), ...foundWith(s, ctx.lki, ctx.sourceId)];
   }
-  if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
+  if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc && (!ref.filter || printedMatches(ref.filter, defOf(s, s.objects[c.id]!))) ? [s.objects[c.id]!] : []));
   if (ref.ref === "subjectCard") {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
     if (ref.zone === "public") return o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
@@ -1287,6 +1287,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ripple":
     case "counterUnlessPays":
     case "counterCause":
+    case "causeToBottom":
     case "counterSpell":
     case "spellUncounterable":
     case "spellEntersWith":

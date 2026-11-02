@@ -1197,6 +1197,24 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // either zone, its power as it last existed on the battlefield (CR 603.10a).
   const whilePower = /^When ~ dies or is put into exile while its power is (\d+) or greater, (.+)$/.exec(line);
   const selfHad = whilePower ? ["", `if its power was ${whilePower[1]} or greater, ${whilePower[2]}`] : /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+|if it was (?:enchanted or equipped|enchanted|equipped), .+)$/.exec(line);
+  // Princess Yue: "When ~ dies, if ~ was a nonland creature, return ~ to the battlefield tapped under your control. She's a
+  // land named Moon. ~ gains "{T}: Add {C}."": an intervening if on ~ as it last existed (CR 603.4, 603.10a); it returns as
+  // a land only, still legendary (CR 205.1b, rulings), with its other abilities, named Moon (CR 201.4).
+  const yue = /^When ~ dies, if ~ was a nonland creature, return ~ to the battlefield tapped under your control\. (?:She|He|It)'s a land named ([A-Z][a-z]+)\. ~ gains "(\{T\}: Add \{C\}\.)"$/.exec(line);
+  if (yue) {
+    const t = parseDiesTrigger("When ~ or another nonland creature dies, draw a card.");
+    if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
+    const { orSelf: _, ...dies } = t.dies;
+    return {
+      ...t,
+      dies: { ...dies, self: true },
+      body: {
+        targets: [],
+        effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, tapped: true, becomes: { types: ["Land"], subtypes: [], name: yue[1]!, ability: yue[2]! } }],
+        text: `If ~ was a nonland creature, return ~ to the battlefield tapped under your control. It's a land named ${yue[1]}. ~ gains "${yue[2]}"`,
+      },
+    };
+  }
   // Infernal Vessel: "When ~ dies, if it wasn't a Demon, ...": the same, its creature types as it last existed.
   const selfWasnt = /^When ~ dies, if it wasn't an? ([A-Z][a-z]+), (.+)$/.exec(line);
   if (selfWasnt && CREATURE_TYPES.has(selfWasnt[1]!)) {
@@ -3490,7 +3508,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const activeMore = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
   // "Whenever ~ attacks, if defending player controls more lands than you" (Aerial Surveyor): the player it attacks, or
   // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
-  const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  // Robber of the Rich: "if defending player has more cards in hand than you": the same, cards in hand.
+  const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player (?:controls more (lands|creatures)|has more cards in (hand)) than you$/.exec(intervening[2]!) : null;
   // Septic Rats: "Whenever ~ attacks, if defending player is poisoned": the player it attacks (or the planeswalker's
   // controller, CR 506.2), as it triggers and resolves.
   const poisonedCond: StaticCondition | null = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) && intervening[2] === "defending player is poisoned" ? { kind: "eventPlayerPoisoned" } : null;
@@ -3499,7 +3518,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // player's spells, as it triggers and resolves (CR 603.4).
   const activeCast = intervening && /^At the beginning of each (?:opponent|player)'s end step$/.test(intervening[1]!) ? /^that player didn't cast an? (creature )?spell this turn$/.exec(intervening[2]!) : null;
   const castCond: StaticCondition | null = activeCast ? { kind: "castCount", n: 1, filter: activeCast[1] ? parseSearchFilter("creature card")! : { kind: "card", text: "spell" }, not: true, activePlayer: true } : null;
-  const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
+  const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: (defMore[1] ?? defMore[2]) as "lands" | "creatures" | "hand", eventPlayer: true } : null;
   // Deathbringer Regent: "When ~ enters, if you cast it from your hand and there are five or more other creatures on the
   // battlefield": both, the first about how it entered (see ifCastFromHand).
   const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;
@@ -4336,7 +4355,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const spentIf = new RegExp(`^if ${SPENT} was spent to cast it, (.+)$`, "i").exec(body0);
       if (spentIf) {
         const req = parseSpentReq(spentIf[1]!);
-        if (event !== "selfEnters" || !req) return "fail" as const;
+        // Drowner of Truth: "When you cast ~, if {C} was spent to cast it, ...": the same, as the spell is cast.
+        if ((event !== "selfEnters" && event !== "selfCast") || !req) return "fail" as const;
         ifSpent = req;
         body0 = spentIf[2]!;
       }

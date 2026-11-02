@@ -772,6 +772,9 @@ function boundCount(ctx: Ctx): (text: string) => AmountExpr | null {
     // Sundering Archaic: "with mana value less than or equal to the number of colors of mana spent to cast ~" in an enters
     // trigger: fixed as it was cast (CR 702.69a converge, 601.2h), so known as the trigger's targets are chosen.
     if (a?.count.kind === "colorsSpent" && !a.count.of && ctx.targets.length === before && !ctx.spell && !ctx.activated && ctx.selfEntered) return a;
+    // Astelli Reclaimer: "where X is the amount of mana spent to cast ~" in an enters trigger: the same, all the mana spent
+    // on the spell it was (rulings), carried by the enters event.
+    if (a?.count.kind === "manaSpent" && ctx.targets.length === before && !ctx.spell && !ctx.activated && ctx.selfEntered) return a;
     if (a && ctx.targets.length === before && boundAtTargeting(a)) return a;
     ctx.targets.length = before;
     return null;

@@ -1325,6 +1325,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("that card", ctx);
     return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
   }
+  // Neera, Wild Mage: "Whenever you cast a spell, you may put it on the bottom of its owner's library": the spell that
+  // triggered it, if it's still on the stack; not a counter, so one that can't be countered goes too (CR 701.6a).
+  if (/^[Pp]ut it on the bottom of its owner's library$/.test(s) && ctx.castSpell && !ctx.subjectLeft) return [{ type: "causeToBottom" }];
   // The Cauldron of Eternity: "Whenever a creature you control dies, put it on the bottom of its owner's library": the card,
   // if it's still in the graveyard (CR 400.7).
   if ((m = /^[Pp]ut (it|that card) on (top|the bottom) of its owner's library$/.exec(s)) && ctx.subjectLeft) {
@@ -1455,8 +1458,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Underworld Sentinel: "When ~ dies, put all cards exiled with it onto the battlefield": under the control of the
     // ability's controller, who puts them there (its rulings).
     if (/^Put all cards exiled with (?:it|~) onto the battlefield$/i.test(s) && ctx.selfCard) return [{ type: "moveLinked", dest: "battlefield" }];
-    if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?$/i.exec(s)))
-      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}) }];
+    if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?( as face-down 2\/2 Cyberman artifact creatures)?$/i.exec(s)))
+      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}), ...(m[5] ? { faceDown: "cyberman" as const } : {}) }];
     // Safe Haven: "return each card exiled with ~ to the battlefield under its owner's control", all at once and whatever
     // they are now (rulings).
     if (/^Return each card exiled with ~ to the battlefield under its owner's control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", ownersControl: true }];
@@ -1877,6 +1880,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) exiles? a creature with the greatest power among creatures (?:they control|that player controls)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
+  }
+  // Fall of the Impostor: "Exile a creature with the greatest power among creatures target opponent controls": not a target
+  // (rulings); you choose among those that player controls tied for the greatest power.
+  if ((m = /^[Ee]xile a creature with the greatest power among creatures (target opponent) controls$/.exec(s))) {
+    const among = parsePlayer(m[1]!, ctx);
+    return among?.ref === "target" ? [{ type: "pick", who: { ref: "you" }, among, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
   }
   // Blot Out: "Target opponent exiles a creature or planeswalker they control with the greatest mana value among creatures
   // and planeswalkers they control": that player chooses among those tied.

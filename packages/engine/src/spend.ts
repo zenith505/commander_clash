@@ -55,6 +55,8 @@ export function manaOriginsOf(s: GameState, o: GameObject): ManaOrigin[] {
   if (here && c.types.includes("Creature")) out.push("creature");
   if (c.supertypes.includes("Snow") && (here || o.zone === "stack")) out.push("snow");
   if (here && c.subtypes.includes("Treasure")) out.push("treasure");
+  // Cataclysmic Prospecting: "for each mana from a Desert spent to cast ~" (CR 106.3), a Desert as it made the mana.
+  if (here && c.subtypes.includes("Desert")) out.push("desert");
   return out;
 }
 
@@ -172,7 +174,7 @@ export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, u
 }
 
 /** What spending mana from these sources counts as (CR 106.3): "mana from a Treasure", "from creatures", "from an artifact". */
-export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
+export type SpentFrom = Record<"treasure" | "creature" | "artifact" | "desert", number>;
 
 /**
  * Pay this from `pid`'s pool for `use`. Returns the payment (with the mana spent by type, and how much of it each kind
@@ -191,7 +193,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   const lots = usableLots(s, pid, use);
   const plain = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
   const spent = emptyPool();
-  const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0 };
+  const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0, desert: 0 };
   let uncounterable = false;
   const spentTriggers: ManaSpentTrigger[] = [];
   let haste: "endOfTurn" | "game" | undefined;

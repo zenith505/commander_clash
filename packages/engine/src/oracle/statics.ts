@@ -1099,8 +1099,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
   // (the traps): attacking creatures, anyone's.
   if ((m = new RegExp(`^(?:${NUM} or more|(exactly one)|an?) (.+?) (?:is|are) attacking$`).exec(text))) {
+    // Sanwell, Avenger Ace: "as long as an artifact creature you control is attacking": yours only.
     const spec = parseTargetPhrase(`attacking ${m[3]!.replace(/\bcreatures\b/, "creature")}`);
-    if (spec?.kind !== "object" || spec.controller) return null;
+    if (spec?.kind !== "object" || (spec.controller && !(spec.controller === "you" && / you control$/.test(m[3]!) && !m[1] && !m[2]))) return null;
     const n = m[2] ? 1 : m[1] ? num(m[1]) : 1;
     return { kind: "onBattlefield", filter: { ...spec, text: `attacking ${m[3]}` }, min: n, ...(m[2] ? { max: 1 } : {}) };
   }
@@ -1460,6 +1461,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
   if (/^one or more cards were put into exile this turn$/.test(text)) return { kind: "cardExiledThisTurn" };
   if (/^you've played a land or cast a spell this turn from anywhere other than your hand$/.test(text)) return { kind: "playedOrCastNotFromHand" };
+  // Visions of Phyrexia: "if you didn't play a card from exile this turn".
+  if (/^you didn't play a card from exile this turn$/.test(text)) return { kind: "not", cond: { kind: "playedFromExile" } };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   // Sandstalker Moloch: "if an opponent cast a blue and/or black spell this turn", a spell of either color or both.

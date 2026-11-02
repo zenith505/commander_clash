@@ -840,7 +840,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const amassedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "power" && t.bound.amount.count.of.ref === "amassed";
   // Sundering Archaic: "the number of colors of mana spent to cast ~" in its enters trigger, as it was cast.
   const colorsBound = (t: TargetSpec) => t.bound?.amount.count.kind === "colorsSpent" && !t.bound.amount.count.of;
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t);
+  // Astelli Reclaimer: "where X is the amount of mana spent to cast ~" in its enters trigger, as it was cast.
+  const spentBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaSpent";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t) || spentBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -859,6 +861,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     if (colorsBound(t)) {
       const n = bindBound(s, t, ctx);
       t = { ...n, text: n.text.replace(/ less than or equal to the number of colors of mana spent to cast .+$/, ` ${ctx.colorsSpent ?? 0} or less`) };
+    }
+    if (spentBound(t)) {
+      const n = bindBound(s, t, { ...ctx, manaSpent: ctx.event?.manaSpent ?? 0 });
+      t = { ...n, text: n.text.replace(/ mana value x or less\b/i, ` mana value ${ctx.event?.manaSpent ?? 0} or less`) };
     }
     if (subjectBound(t)) {
       // Lesser than 0 is nothing (rulings: a mana value can't be less than 0).

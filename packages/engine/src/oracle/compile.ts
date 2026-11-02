@@ -361,6 +361,9 @@ export function normalizeSelf(d: CardDef): string {
   // creature token named Kobolds of Kher Keep").
   const tokenNames: string[] = [];
   t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Tamiyo, Compleated Sage: "Create Tamiyo's Notebook, a legendary colorless Book artifact token": the same.
+  // Only when the text never names the token again (Volo's Journal is named later, so it stays "~'s Journal" throughout).
+  t = t.replace(/(\b[Cc]reate )([A-Z][\w'-]*'s(?: [A-Z][\w'-]*)+)(?=, a legendary )/g, (m: string, a: string, n: string) => t.split(n).length !== 2 ? m : `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
@@ -2429,6 +2432,14 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "You may cast spells from among cards exiled with ~.") {
       if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
       else (out.playLinkedWhile = { kind: "allOf", conds: [] }), (out.playLinkedCastOnly = true);
+      continue;
+    }
+    // Azula, Cunning Usurper: "During your turn, you may cast cards exiled with ~ and you may cast them as though they had
+    // flash. Mana of any type can be spent to cast those spells." Spells only, during your turn, at instant speed (CR
+    // 702.8a), any type of mana (CR 609.4b), its other costs paid as usual (rulings).
+    if (line === "During your turn, you may cast cards exiled with ~ and you may cast them as though they had flash. Mana of any type can be spent to cast those spells.") {
+      if (out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else (out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }] }), (out.playLinkedCastOnly = true), (out.playLinkedFlash = true), (out.playLinkedAnyType = true);
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -5818,7 +5829,9 @@ function linkExile(out: CompiledCard) {
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "you" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong");
-    if (others || out.spell || tops.length + exiles.length === 0) out.unsupported.push("(casts cards exiled with it that it can't link to its exile abilities)");
+    // Azula, Cunning Usurper: a player's own pick of what to exile, linked as it was parsed.
+    const picked = all.filter((e) => (e.type === "pick" && e.action === "exile" && e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.linked));
+    if (others || out.spell || tops.length + exiles.length + picked.length === 0) out.unsupported.push("(casts cards exiled with it that it can't link to its exile abilities)");
     else for (const e of [...tops, ...exiles]) e.linked = true;
   } else if (out.playLinkedWhile) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
@@ -5900,6 +5913,9 @@ function linkExile(out: CompiledCard) {
     else if (permanentTops) for (const e of [...exiles, ...tops]) e.linked = true;
     else if (tops.length) out.unsupported.push("(refers to cards exiled with it that it can't link to its exile abilities)");
     else if (!others && exiles.length === 1) exiles[0]!.linked = true;
+    // Death in Heaven: "I, II — ... exiles their graveyard" is two chapter abilities (CR 714.2d) printed on it, each an
+    // exile instruction linked to its "cards exiled with ~" (CR 607.2a).
+    else if (!others && exiles.length > 1 && ((texts) => texts.length === exiles.length && new Set(texts).size === 1)(out.triggers.filter((t) => t.event === "chapter" && allEffects(t.body.effects).some((e) => (exiles as Effect[]).includes(e))).map((t) => t.body.text))) for (const e of exiles) e.linked = true;
     else if (!others && !exiles.length && searches.length === 1 && !all.some((e) => e.type === "search" && e !== searches[0])) searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // Clone Shell, Summoner's Egg: "turn the exiled card face up" is about the one card its imprint exiled face down as it

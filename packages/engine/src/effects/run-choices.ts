@@ -1037,6 +1037,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "draw" && cantDraw(s, ctx.controller)) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    // Neera, Wild Mage: "you may put it on the bottom of its owner's library. If you do": only while the spell is still on the stack.
+    if (e.type === "causeToBottom" && !s.stack.some((x) => x.id === ctx.cause && x.kind === "spell")) return false;
     // "You may mill three cards" (Druidic Ritual): not with fewer cards in your library (CR 701.17b, rulings).
     if (e.type === "mill" && e.who.ref === "you" && typeof e.n === "number" && player(s, ctx.controller).library.length < e.n) return false;
     // "You may discard a card or sacrifice a land" (Highway Robbery): only with one of them possible (rulings).
@@ -1066,6 +1068,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "untap" && e.what.ref === "target" && effects.length === 1 && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    // Jolted Awake: "If you do, return it from your graveyard to the battlefield", with no target chosen ("up to one"):
+    // nothing to return, so nothing to pay for.
+    if (e.type === "putOntoBattlefield" && e.what.ref === "target" && !objects(s, e.what, ctx).length) return false;
     // Iroh, Tea Master: "have target opponent gain control of ...": only with that player still a legal target, in the game.
     if (e.type === "continuous" && e.giveTo && !players(s, e.giveTo, ctx).some((p) => !player(s, p).lost)) return false;
     if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;

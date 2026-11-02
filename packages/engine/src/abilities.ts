@@ -2509,7 +2509,7 @@ export type Effect =
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
    */
-  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true }
+  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true; /** "You may cast the exiled card" (Smirking Spelljacker): cast only, never played as a land. */ castOnly?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
   /**
@@ -3662,6 +3662,8 @@ export type Effect =
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
       plot?: true;
+      /** With `exileSpell`: the card exiled is linked to this source (CR 607.2a), "the exiled card" of its other ability (Smirking Spelljacker). */
+      linked?: true;
       /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
       ownerMayCost?: string;
       /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
@@ -6792,6 +6794,10 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /** Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else" (game.ts castProblem). */
+  castOnlyFromGraveyard?: true;
+  /** Liesa, Shroud of Dusk: its commander tax is paid as 2 life for each previous cast from the command zone, not {2} (game.ts commanderTaxLife). */
+  commanderTaxAsLife?: true;
   /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */
   attackPowerCapHand?: true;
   /** "Your maximum hand size is eight", "... is increased by one", "Each opponent's maximum hand size is reduced by seven" (CR 402.2). */
@@ -7140,9 +7146,10 @@ export interface CompiledCard {
     if?: StaticCondition;
     /**
      * Only cards put into the graveyard this turn from a library (Kagha, Shadow Archdruid: GameObject.fromLibraryTurn), or
-     * from anywhere other than the battlefield (Banon, the Returners' Leader: toGraveyardTurn without fromBattlefieldTurn).
+     * from anywhere other than the battlefield (Banon, the Returners' Leader: toGraveyardTurn without fromBattlefieldTurn),
+     * or milled this turn (Raul, Trouble Shooter: GameObject.milledTurn).
      */
-    arrived?: "fromLibrary" | "notFromBattlefield";
+    arrived?: "fromLibrary" | "notFromBattlefield" | "milled";
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. "shared": the same use as its once-each-turn spell permission (Serra Paragon's "a land ... or a permanent spell"). */
   landFromGraveyardOnce?: true | "shared";

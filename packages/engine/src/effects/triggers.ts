@@ -2359,7 +2359,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           continue;
         }
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
+        // the group, alone.
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };
@@ -2369,6 +2371,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn" (CR 603.7b).
     fromFloating((src, ctrl, triggers) => batchWatch(src, ctrl, triggers, false));
+    // Tamiyo, the Moon Sage's emblem: an emblem's triggered ability works in the command zone (CR 114.4).
+    for (const e of liveEmblems(s)) batchWatch(e, e.owner, compileCard(defOf(s, e)).triggers, false);
     // Infesting Radroach: a card's ability that works in its owner's graveyard, there after the event, even if it was
     // milled in the same event (rulings).
     fromGraveyards((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));

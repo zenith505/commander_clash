@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { abilitiesOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -234,7 +234,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       return;
     case "turnFaceUp":
-      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src, ctx.controller);
+      for (const o of objects(s, e.what, ctx)) {
+        // Hauntwoods Shrieker: reveal it (CR 701.20a), then turn it face up only if the card is a creature card as printed
+        // (rulings: effects on the permanent don't count; a double-faced card's front face).
+        if (e.revealOnly) {
+          if (o.zone === "battlefield" && o.faceDown) log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals a face-down permanent: it's ${realDefOf(s, o).name}.`);
+          continue;
+        }
+        if (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) continue;
+        turnFaceUpByEffect(s, o, src, ctx.controller);
+      }
       return;
     case "tap":
     case "untap": {

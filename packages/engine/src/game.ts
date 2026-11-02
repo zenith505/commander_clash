@@ -10,7 +10,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -4790,7 +4790,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; flashbackFromGraveyard?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; flashbackFromGraveyard?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -7515,7 +7515,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}), ...(ch.types.includes("Land") ? { couldProduce: landCouldProduce(s, o) } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true, cost: true, ...(emergeSpell ? { emerged: true as const } : {}) });
       }
@@ -7722,7 +7722,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
     if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : used === 2 ? "two loyalty abilities" : `${used} loyalty abilities`} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
-    const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
+    const remove = -loyaltyChange(s, o, pid, ab, x);
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
@@ -8019,6 +8019,19 @@ function opponentsTargetTax(s: GameState, pid: PlayerId, targets?: TargetChoice[
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */
+/**
+ * The loyalty counters a loyalty ability's cost puts on (positive) or removes (negative) (CR 606.4), its cost changed by
+ * Carth the Lion's "cost an additional [+1]" for each such permanent the activating player controls (a planeswalker's
+ * loyalty ability only), all worked out before any counter moves (rulings).
+ */
+export function loyaltyChange(s: GameState, o: GameObject, pid: PlayerId, ab: ActivatedAbility, x?: number): number {
+  const base = ab.loyaltyX ? -(x ?? 0) : (ab.loyalty ?? 0);
+  if (!objIsType(s, o, "Planeswalker")) return base;
+  let more = 0;
+  for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid) more += abilitiesOf(s, obj(s, id)).loyaltyCostMore ?? 0;
+  return base + more;
+}
+
 function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: ActivatedAbility): number {
   let n = 0;
   for (const id of s.battlefield) {
@@ -8139,7 +8152,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // A loyalty cost puts on or removes loyalty counters (CR 606.4); counters put on as a cost aren't doubled (rulings).
   let loyaltyRemoved: number | undefined;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
-    const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+    const change = loyaltyChange(s, o, p.id, ab, x);
     loyaltyRemoved = Math.max(0, -change);
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
     (o.activatedThisTurn ??= []).push(LOYALTY_USED);

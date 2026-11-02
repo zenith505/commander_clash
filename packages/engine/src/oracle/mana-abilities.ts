@@ -448,6 +448,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
     return { spells: { kind: "spell", anyOf: [{ kind: "spell", subtypes: ["Assassin"], text: "Assassin spell" }, { kind: "spell", keywords: ["Freerunning"], text: "spell that has freerunning" }], text: "Assassin spells or spells that have freerunning" }, abilities: { kind: "object", subtypes: ["Assassin"], text: "Assassin source" }, anyZone: true, text: sentence };
   // Altar of the Lost: "Spend this mana only to cast spells with flashback from a graveyard" (CR 106.6, 702.34a).
   if (sentence === "Spend this mana only to cast spells with flashback from a graveyard.") return { spells: { kind: "spell", text: "spells with flashback from a graveyard" }, flashbackFromGraveyard: true, text: sentence };
+  // Interdimensional Web Watch: "Spend this mana only to cast spells from exile" (CR 106.6): any spell cast from exile.
+  if (sentence === "Spend this mana only to cast spells from exile.") return { spells: { kind: "spell", text: "spells from exile" }, fromExile: true, text: sentence };
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand": on anything else (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells from your hand.") return { spells: { kind: "spell", text: "spells" }, notFromHand: true, abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).

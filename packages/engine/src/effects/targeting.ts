@@ -190,6 +190,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
   if (spec.faceDown && !o.faceDown) return false;
+  if (spec.faceDown === false && o.faceDown) return false;
   if (spec.powerAboveBase && !(c.types.includes("Creature") && power(s, o) > basePowerNow(s, o))) return false;
   if (spec.basePtEither !== undefined) {
     // Its base power and toughness (see basePowerNow), from the characteristics as they are, or as the layers have them

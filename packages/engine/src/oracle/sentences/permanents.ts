@@ -38,6 +38,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
   }
+  // Hauntwoods Shrieker: "Reveal target face-down permanent. If it's a creature card, you may turn it face up" (as parseBody
+  // joins it): revealed to all (CR 701.20a), then turned face up with no cost paid only if the card is a creature card as
+  // printed (rulings); otherwise it stays face down.
+  if ((fu = /^[Rr]eveal (target face-down permanent) and you may turn it face up if it's a creature card$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what, revealOnly: true }, { type: "may", effects: [{ type: "turnFaceUp", what, ifCreatureCard: true }], text: "turn it face up" }] : null;
+  }
   // Showstopping Surprise: "Choose target creature you control. Turn it face up if it's face down": the target, turned face
   // up with no cost paid (CR 708.8) if it's face down; a face-up one stays as it is.
   if (/^[Tt]urn it face up if it's face down$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many) return [{ type: "turnFaceUp", what: { ref: "target", index: ctx.lastObjectTarget } }];

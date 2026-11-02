@@ -601,8 +601,8 @@ export interface TargetSpec {
   nonManaActivated?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
-  /** "A face-down creature you control" (Ugin's Mastery, CR 708.2): a face-down permanent. */
-  faceDown?: true;
+  /** "A face-down creature you control" (Ugin's Mastery, CR 708.2): a face-down permanent; false: "face-up nontoken creatures you control" (Whisperwood Elemental), not one. */
+  faceDown?: boolean;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
   powerAboveBase?: true;
   /** "With base power or toughness 1" (Sword of the Squeak): a creature whose base power or base toughness is this (see basePowerNow). */
@@ -2761,7 +2761,12 @@ export type Effect =
   | { type: "handToBottomDraw"; who: PlayerRef }
   | { type: "tap"; what: ObjRef; /** "Where X is the number of Islands tapped this way" follows (Monsoon): how many it tapped (Count "tappedThisWay"). */ noteTapped?: true; /** Breaking Wave: "Simultaneously untap all tapped creatures and tap all untapped creatures": each of `what` that's tapped untaps and each untapped one taps, at once. */ swap?: true }
   /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
-  | { type: "turnFaceUp"; what: ObjRef }
+  /**
+   * Turn a face-down permanent face up (CR 708.8). Hauntwoods Shrieker: "Reveal target face-down permanent. If it's a creature
+   * card, you may turn it face up": `revealOnly` reveals it (nothing turns), then `ifCreatureCard` turns it only if the card
+   * is a creature card as printed (rulings: effects on the permanent don't count).
+   */
+  | { type: "turnFaceUp"; what: ObjRef; revealOnly?: true; ifCreatureCard?: true }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Amy Pond: "choose a suspended card you own and remove that many time counters from it", chosen as it resolves. */
@@ -3578,6 +3583,8 @@ export type Effect =
       anyColors?: true;
       /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
       markSource?: true;
+      /** Squandered Resources: "Add one mana of any type the sacrificed land could produce": a type its cost's sacrificed land could make as it last existed (LastKnown.couldProduce, CR 106.7), chosen as it resolves; none if none (rulings). */
+      sacrificedType?: true;
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -5778,6 +5785,8 @@ export interface ManaSpend {
   disturb?: true;
   /** "This mana can't be spent to cast spells from your hand" (Karolina Dean): not on a spell cast from a hand (ManaUse.fromHand). */
   notFromHand?: true;
+  /** "Spend this mana only to cast spells from exile" (Interdimensional Web Watch): only on a spell cast from exile (ManaUse.fromExile). */
+  fromExile?: true;
   /** "Spend this mana only to cast spells you don't own" (Thieving Varmint): only on a spell another player owns (ManaUse.owner, CR 108.3). */
   notOwnSpells?: true;
   /** "Spend this mana only to cast spells with flashback from a graveyard" (Altar of the Lost): ManaUse.flashbackFromGraveyard. */
@@ -6544,6 +6553,8 @@ export interface CompiledCard {
    * of sources with the chosen name cost {2} more ..." (Anointed Peacekeeper): generic mana added to the ability's cost
    * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
    */
+  /** Carth the Lion: "Planeswalkers' loyalty abilities you activate cost an additional [+1] to activate": this much added to the loyalty cost of each loyalty ability of a planeswalker its controller activates (game.ts loyaltyChange). */
+  loyaltyCostMore?: number;
   activationTaxes?: { filter?: TargetSpec; n: number; text: string; /** Only abilities its controller's opponents activate (Tithe Taker). */ opponents?: true; /** Only during its controller's turn. */ yourTurn?: true; /** Only loyalty abilities of planeswalkers (Eidolon of Obstruction). */ loyalty?: true }[];
   /**
    * The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). Gemstone

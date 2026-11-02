@@ -244,6 +244,7 @@ export type TriggerSourceEvent =
   | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
+  | { type: "echoPaid"; id: ObjectId }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
@@ -1614,6 +1615,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     causedBy = null;
+  } else if (ev.type === "echoPaid") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfEchoPaid");
   } else if (ev.type === "timeCountersRemovedExiled") {
     // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
     // owner controlling it (CR 113.8), once for each counter.

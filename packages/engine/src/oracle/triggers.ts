@@ -163,11 +163,13 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
+  // Shah of Naar Isle: "When ~'s echo cost is paid" (CR 702.30a): as its echo trigger resolves and the cost is paid.
+  [/^When ~'s echo cost is paid, (.+)$/, "selfEchoPaid"],
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -678,6 +680,14 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const unless = { cost: mariner[2]! };
     const onlyYou = mariner[1] === "become";
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
+  }
+  // Dormant Gomazoa: "Whenever you become the target of a spell, you may untap ~": any player's spell, not an ability, once
+  // for each spell however many of its targets are you (rulings).
+  const youSpell = /^Whenever you become the target of a spell, (.+)$/.exec(line);
+  if (youSpell) {
+    if (/\b(?:that player|that spell|its controller)\b/.test(youSpell[1]!)) return "fail";
+    const body = parseBody(youSpell[1]!, {});
+    return body ? { event: "permanentBecomesTarget", targeted: { spell: true, orYou: true, onlyYou: true }, body } : "fail";
   }
   // Leyline of Combustion: "Whenever you and/or at least one permanent you control becomes the target of a spell or
   // ability an opponent controls, ~ deals 2 damage to that player": once for each spell or ability, however many of its

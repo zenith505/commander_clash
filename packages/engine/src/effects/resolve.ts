@@ -1055,6 +1055,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runBasicsEffect(s, e, ctx, src);
     case "damageRule":
       return runPreventionEffect(s, e, ctx, src);
+    case "echoPaid": {
+      // "When ~'s echo cost is paid" (Shah of Naar Isle): the permanent whose echo it is, still that object (CR 400.7).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc)) fireEvent(s, { type: "echoPaid", id: me.id });
+      return;
+    }
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":

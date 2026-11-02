@@ -85,6 +85,13 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = base && m[3] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
+  // Mind Extraction: "Target player reveals their hand and discards all cards of each of the sacrificed creature's colors":
+  // every card sharing a color with the creature its cost sacrificed, as it last existed (CR 608.2h); none for a colorless one
+  // (rulings). compile() checks there's such a cost.
+  if ((m = /^(Target player|Target opponent) reveals their hand and discards all cards of each of the sacrificed creature's colors$/.exec(s)) && ctx.spell) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], sharesColorWithSacrificed: true, text: "card that shares a color with the sacrificed creature" } }] : null;
+  }
   // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the color chosen
   // as it resolves, every card of it there (no choice).
   // Crosis, the Purger: "that player" (the one dealt combat damage).

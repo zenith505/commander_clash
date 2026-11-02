@@ -850,7 +850,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (equipment.length) (lki as LastKnown).equipment = equipment;
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
-      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0));
+      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0)) && !(d.notSacrificed && ev.sacrificed);
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
         add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
@@ -2814,7 +2814,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "exiledFromGraveyardsOrBattlefield") return m.to === "exile" && (m.from === "battlefield" || m.from === "graveyard");
-  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
+  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

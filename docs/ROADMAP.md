@@ -1,6 +1,6 @@
 # Roadmap
 
-29,069 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,085 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,332 of
 9,979 (93%).
 
@@ -4401,7 +4401,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by enchanted creature" (Armament of Nyx); a search of that player's library that shuffles it once (Rootwater Thief);
   "until your next upkeep" (Xenic Poltergeist); "You may play that card for as long as you control ~" (Victor Mancha,
   Runaway); "counters equal to half that card's mana value, rounded up" of a card exiled from your graveyard (Torrent
-  Sculptor). No new prompt. +16 (29,048 of 31,936).
+  Sculptor). No new prompt. +16 (29,085 of 31,936 with rounds 240 to 242).
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
   batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (the
   creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion ("Sacrifice enchanted creature" as

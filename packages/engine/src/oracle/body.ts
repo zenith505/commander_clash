@@ -3048,6 +3048,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Clone Shell, Summoner's Egg: "turn the exiled card face up. If it's a creature card, put it onto the battlefield under
   // your control." One instruction about the card its imprint exiled face down.
   text = text.replace(/^turn the exiled card face up\. If it's a creature card, put it onto the battlefield under your control\.$/, "Turn the exiled card face up and put it onto the battlefield under your control if it's a creature card.");
+  // Hauntwoods Shrieker: "Reveal target face-down permanent. If it's a creature card, you may turn it face up." One
+  // instruction about the target (sentences/permanents.ts).
+  text = text.replace(/^Reveal target face-down permanent\. If it's a creature card, you may turn it face up\.$/, "Reveal target face-down permanent and you may turn it face up if it's a creature card.");
   // Tolarian Contempt: "for each opponent, choose up to one target creature they control with a rejection counter on it.
   // That creature's owner puts it on their choice of the top or bottom of their library." One instruction for each
   // opponent's creature.
@@ -5930,8 +5933,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Rundvelt Hordemaster: "Exile the top card of your library. If it's a Goblin creature card, you may cast that card
     // until the end of your next turn." Vance's Blasting Cannons: "If it's a nonland card, you may cast that card this
     // turn." The card as it is in exile, face up (CR 406.3); only a card like that gets the permission.
-    const castIfIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If it's an? (.+? card), you may cast (?:that card|it) (this turn|until the end of your next turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Chandra, Dressed to Kill: "If it's red, you may cast it this turn": the card's color in exile (rulings: either face of
+    // a red modal double-faced card may be cast).
+    const castIfIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If it's (?:an? (.+? card)|(white|blue|black|red|green)), you may cast (?:that card|it) (this turn|until the end of your next turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
     if (castIfIs) {
+      castIfIs.splice(1, 2, castIfIs[1] ?? `${castIfIs[2]} card`);
       const castFilter = parseSearchFilter(castIfIs[1]!);
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: 1, until: castIfIs[2] === "this turn" ? "thisTurn" : "nextTurn", castOnly: true, castFilter });
@@ -6005,6 +6011,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (castAmongKind) {
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, castFilter });
+      si++;
+      continue;
+    }
+    // Chandra, Dressed to Kill: "Exile the top five cards of your library. You may cast red spells from among them this
+    // turn." Spells that are red as they're cast, whatever the card in exile (rulings: not a blue back face of a red card),
+    // paying their costs, with their normal timing.
+    const castColorAmong = exTop && exTop[1] && !exEqual && !impulseIf ? /^You may cast (white|blue|black|red|green) spells from among them this turn$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (castColorAmong) {
+      const spellFilter = parseSearchFilter(`${castColorAmong[1]} card`);
+      if (!spellFilter) return null;
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, spellFilter });
       si++;
       continue;
     }
@@ -6839,6 +6856,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "getEnergy", who: { ref: "you" }, n: joltGet[1]!.length / 3 });
       effects.push({ type: "may", effects: [{ type: "putOntoBattlefield", what }], pay: {}, payEnergy: { count: { kind: "manaValue", of: what } }, text: "pay an amount of {E} equal to that card's mana value. If you do, return it from your graveyard to the battlefield" });
       si += 3;
+      continue;
+    }
+    // Horde of Notions: "You may play target Elemental card from your graveyard without paying its mana cost": cast as the
+    // ability resolves (CR 608.2g), or not; no alternative cost like evoke (rulings). An Elemental card is never a land (land
+    // subtypes are land types, CR 205.3i), so playing it is casting it; it goes where it would after.
+    const playType = /^[Yy]ou may play (target ([A-Z][a-z]+) card from your graveyard) without paying its mana cost$/.exec(s);
+    if (playType && CREATURE_TYPES.has(playType[2]!)) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(playType[1]!, ctx, "you");
+      const t = ctx.targets[before];
+      if (!what || ctx.targets.length !== before + 1 || t?.kind !== "card" || t.owner !== "you" || t.types?.length || !t.subtypes?.includes(playType[2]!)) return null;
+      effects.push({ type: "castTargetFree", what });
       continue;
     }
     // Wrexial, the Risen Deep: "from that player's graveyard", the player it dealt combat damage to; "If that spell would be

@@ -2286,6 +2286,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(rest, { discardBatch: true });
     return body ? { event: "batch", batch, body } : "fail";
   }
+  // Tamiyo, the Moon Sage's emblem: "Whenever a card is put into your graveyard from anywhere, you may return it to your
+  // hand": that card, once for each (CR 603.2c), while it's still in the graveyard (CR 400.7; rulings: whether or not it
+  // was ever in your hand).
+  if (batch.each && batch.what === "toGraveyard" && batch.whose === "you" && !batch.from && !batch.other && !batch.filter && !yourTurn && /^you may return it to your hand\.?$/.test(rest))
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "eventGroup" } }], text: "return it to your hand" }], text: rest.replace(/\.$/, "") } };
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
@@ -4299,6 +4304,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (selfMin) {
     const t = parseTrigger(`Whenever ~ deals damage, ${selfMin[2]}`);
     return !t || t === "fail" || t.event !== "selfDealsDamage" || t.minDamage ? "fail" : { ...t, minDamage: num(selfMin[1]!) };
+  }
+  // Zariel, Archduke of Avernus's emblem: "At the end of the first combat phase on your turn": end of combat (CR 511.2) of
+  // the turn's first combat phase only (CR 506.1), not of an additional one.
+  const firstEndCombat = /^At the end of the first combat phase on your turn, (.+)$/.exec(line);
+  if (firstEndCombat) {
+    const t = parseTrigger(`At end of combat on your turn, ${firstEndCombat[1]}`);
+    return !t || t === "fail" || t.event !== "yourEndCombat" || t.activeIf ? "fail" : { ...t, activeIf: { kind: "phase", phase: "combat", first: true, yours: true } };
   }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);

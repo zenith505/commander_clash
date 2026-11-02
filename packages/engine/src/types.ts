@@ -1177,6 +1177,8 @@ export interface LastKnown {
   legendary?: true;
   /** Its colors as it last existed: "if the sacrificed creature was red" (Lyzolda). */
   colors?: Color[];
+  /** A land: the types of mana it could produce as it last existed (CR 106.7), for Squandered Resources' "of any type the sacrificed land could produce". */
+  couldProduce?: ManaType[];
   /** It was a commander: "if the sacrificed permanent was a commander" (Tevesh Szat, CR 903.3). */
   commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */

@@ -386,7 +386,11 @@ export function emblemAbilityOk(text: string): boolean {
   // (CR 702.81a), read from emblems too (game.ts grantedWays).
   if (graveyardGrants?.some((g) => (g.way.kind !== "permission" && g.way.kind !== "grantedRetrace") || g.once || g.yourTurn || g.if)) return false;
   if (noMaxHandSize === "all") return false;
-  if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && (!t.ifCond || t.ifCond.kind === "eventPlayerLifeLost") && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
+  // Zariel, Archduke of Avernus's: "At the end of the first combat phase on your turn" (activeIf "phase", about the turn,
+  // not the emblem). Tamiyo, the Moon Sage's: "Whenever a card is put into your graveyard from anywhere, ...", once for each card
+  // (fireEvent's batch event looks at emblems too).
+  const eachToYard = (t: (typeof triggers)[number]) => t.event === "batch" && t.batch?.what === "toGraveyard" && !!t.batch.each && t.batch.whose === "you";
+  if (!triggers.every((t) => (EMBLEM_EVENTS.has(t.event) || eachToYard(t)) && !t.host && !t.zone && (!t.activeIf || t.activeIf.kind === "phase") && (!t.ifCond || t.ifCond.kind === "eventPlayerLifeLost") && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
   // A damage replacement about you and what you control (Ajani Steadfast's), not about the emblem itself.
   const damageMod = (st: (typeof statics)[number]) => st.affects.kind === "self" && !st.condition && st.mods.every((m) => m.kind === "damageMod" && !m.mod.by?.self && !m.mod.by?.other && !m.mod.to?.self && !m.mod.to?.other);
   if (!statics.every((st) => damageMod(st) || (st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted"))) return false;

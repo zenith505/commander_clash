@@ -608,6 +608,26 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
+      if (e.sacrificedType) {
+        // Squandered Resources: a type the sacrificed land could produce as it last existed (CR 106.7, 608.2h), chosen as
+        // it resolves (CR 605.3b); one that could produce none adds nothing (rulings).
+        const could = ctx.sacrificed?.[0]?.couldProduce ?? [];
+        const sc = (s.resolving!.scratch ??= {});
+        if (!could.length) {
+          log(s, `${src}: the sacrificed land couldn't produce mana, so no mana is added.`);
+          return;
+        }
+        if (could.length > 1 && sc.either === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: could.map((_, i) => String(i)), labels: could.map((m) => `Add {${m}}`), prompt: "choose the type of mana" };
+          return "paused";
+        }
+        const made = could[could.length > 1 ? Math.max(0, Math.min(could.length - 1, sc.either!)) : 0]!;
+        delete sc.either;
+        const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
+        addMana(s, p.id, [made], { from });
+        log(s, `${p.name} adds {${made}}.`);
+        return;
+      }
       if (e.split) {
         // How many of the first color, the rest the second, chosen as it resolves (CR 608.2d).
         const n = amountNow(s, e.times ?? 1, ctx);

@@ -321,7 +321,8 @@ export function parseCostKeyword(
       trigger: {
         event: "yourUpkeep",
         ifEcho: true,
-        body: { targets: [], effects: [{ type: "may", effects: [], pay: { mana: cost }, otherwise: [sacrificeSelf], keep: true, text: `Pay echo ${cost} to keep ~` }], text },
+        // Paying it is what "When ~'s echo cost is paid" triggers on (Shah of Naar Isle).
+        body: { targets: [], effects: [{ type: "may", effects: [{ type: "echoPaid" }], pay: { mana: cost }, otherwise: [sacrificeSelf], keep: true, text: `Pay echo ${cost} to keep ~` }], text },
       },
     };
   }

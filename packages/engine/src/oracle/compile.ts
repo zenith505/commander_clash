@@ -290,6 +290,16 @@ export function spellTargetSpecs(d: CardDef, modes?: number[], how?: CastHow): T
   return c.enchant ? [c.enchant] : [];
 }
 
+/**
+ * The targets as the spell is cast (CR 601.2c): its targets, with rules about choosing them that don't apply later, when
+ * the spell resolves (CR 608.2b) or its target is changed. Dream Leash: "You can't choose an untapped permanent as this
+ * spell's target as you cast it."
+ */
+export function castTimeTargets(d: CardDef, specs: TargetSpec[]): TargetSpec[] {
+  if (!compileCard(d).castTargetTapped || !specs[0]) return specs;
+  return [{ ...specs[0], tapped: true, text: `tapped ${specs[0].text ?? ""}`.trim() }, ...specs.slice(1)];
+}
+
 /** What a mutating creature spell targets (CR 702.140a): a non-Human creature with the same owner as the spell. */
 export const mutateTarget = (owner: PlayerId): TargetSpec => ({ kind: "object", types: ["Creature"], notSubtypes: ["Human"], ownerIs: owner, text: "target non-Human creature with the same owner" });
 
@@ -550,6 +560,12 @@ export function compile(d: CardDef): CompiledCard {
       // Hawkeye, Avenging Archer: "Whenever a creature an opponent controls dies, if ~ dealt damage to it this turn": the
       // same as "a creature an opponent controls dealt damage by ~ this turn" (Sengir Vampire), checked as it dies.
       .replace(/^Whenever (a creature an opponent controls) dies, if ~ dealt damage to it this turn, /m, "Whenever $1 dealt damage by ~ this turn dies, ")
+      // Meldweb Strider: "Remove an oil counter from this Vehicle: It becomes an artifact creature until end of turn": "it"
+      // is the Vehicle, the only object named.
+      .replace(/^(Remove an? [a-z]+ counter from ~): It becomes /m, "$1: ~ becomes ")
+      // Caught in the Brights: "When a Vehicle you control attacks, exile enchanted creature": "when" and "whenever" both
+      // trigger each time the event happens (CR 603.2).
+      .replace(/^When (an? [A-Z][a-z]+ you control) attacks, (exile enchanted creature\.)$/m, "Whenever $1 attacks, $2")
       // Evin, Waterdeep Opportunist: "Whenever one or more players sacrifice one or more creatures, ... This ability
       // triggers only once each turn.": at most once a turn either way, on the first sacrifice of a creature (CR 603.2h).
       .replace(/^Whenever one or more players sacrifice one or more creatures, ([^\n]+ This ability triggers only once each turn\.)$/m, "Whenever a player sacrifices a creature, $1")
@@ -1942,6 +1958,14 @@ export function compile(d: CardDef): CompiledCard {
     // addition to its other types.": it keeps its Gate type and gets the chosen one, with that type's mana ability (CR
     // 305.6, rulings). With no type chosen, it gets none (rulings).
     // Realmwright: the same choice on a creature, for "Lands you control are the chosen type in addition to their other types."
+    // Dream Leash, Enthralling Hold: "You can't choose an untapped permanent (creature) as this spell's target as you cast
+    // it." Only the choice as it's cast (CR 601.2c): it still resolves if the target untaps, and an Aura put onto the
+    // battlefield or moved needn't go on a tapped one (rulings, CR 303.4f).
+    const leash = /^You can't choose an untapped (permanent|creature) as ~'s target as you cast it\.$/.exec(line);
+    if (leash && d.subtypes.includes("Aura") && new RegExp(`^Enchant ${leash[1]}$`, "m").test(d.oracleText ?? "")) {
+      out.castTargetTapped = true;
+      continue;
+    }
     // Convincing Mirage, Phantasmal Terrain: the same choice on an Aura, for "Enchanted land is the chosen type."
     if (line === "As ~ enters, choose a basic land type." && (d.types.includes("Land") || lines.includes("Lands you control are the chosen type in addition to their other types.") || (d.subtypes.includes("Aura") && lines.includes("Enchanted land is the chosen type."))) && !out.entersChoose?.length) {
       out.entersChoose = [{ what: "basicLandType" }];
@@ -3141,6 +3165,13 @@ export function compile(d: CardDef): CompiledCard {
     const ownEquipLess = /^~'s equip abilities cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ownEquipLess) {
       (out.equipLess ??= []).push({ n: Number(ownEquipLess[1]), self: true });
+      continue;
+    }
+    // Ghostfire Blade: "This Equipment's equip ability costs {2} less to activate if it targets a colorless creature."
+    // Its own equip ability only, and only once the target is chosen (CR 601.2f via 602.2b: the cost is set after targets).
+    const colorlessEquipLess = /^~'s equip ability costs \{(\d+)\} less to activate if it targets a colorless creature\.$/.exec(line);
+    if (colorlessEquipLess) {
+      (out.equipLess ??= []).push({ n: Number(colorlessEquipLess[1]), self: true, targetColorless: true });
       continue;
     }
     // "Aura spells you cast that target enchanted creature cost {3} less to cast." (Strong Back)

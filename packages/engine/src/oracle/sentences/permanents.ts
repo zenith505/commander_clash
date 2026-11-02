@@ -1456,8 +1456,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
   }
   // "Enchanted creature gets +1/-1 or -1/+1 until end of turn" (Pemmin's Aura): which one is chosen as it resolves
-  // (CR 608.2d), like the above.
-  if ((m = /^(enchanted creature|~) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
+  // (CR 608.2d), like the above. Shaper Parasite: "target creature gets +2/-2 or -2/+2 until end of turn", the target
+  // chosen as the trigger is put on the stack, the bonus as it resolves (rulings).
+  if ((m = /^(enchanted creature|~|target creature) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!.toLowerCase() === "~" ? "~" : m[1]!.toLowerCase(), ctx);
     const a = parseChanges(`gets ${m[2]}`);
     const b = parseChanges(`gets ${m[3]}`);

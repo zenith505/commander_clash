@@ -1515,6 +1515,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(\. If you do, put an? [^.]+ counters? on ~) and it gains ([a-z]+) until end of turn\./, "$1 and ~ gains $2 until end of turn.");
   // First Day of Class: "put a +1/+1 counter on it and it gains haste until end of turn": the same, about "it".
   text = text.replace(/^(put a \+1\/\+1 counter on it) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
+  // Maelstrom Djinn: "put two time counters on it and it gains vanishing", with no duration: for as long as it's on the
+  // battlefield (CR 611.2a, 611.2c).
+  text = text.replace(/^(put (?:a|an|one|two|three) [a-z]+ counters? on it) and it gains ([a-z]+)\.$/, "$1. It gains $2.");
   // Spore Cloud: "Each attacking creature and each blocking creature doesn't untap during its controller's next untap
   // step": both groups as it resolves (CR 611.2c), as two instructions.
   text = text.replace(/\bEach attacking creature and each blocking creature doesn't untap during its controller's next untap step\./, "Each attacking creature doesn't untap during its controller's next untap step. Each blocking creature doesn't untap during its controller's next untap step.");
@@ -1582,6 +1585,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Case of the Gateway Express: "choose target creature you don't control. Each creature you control deals 1 damage to
   // that creature.": each of them a source of its own damage, all at once (CR 120.3), to that target.
   text = text.replace(/^[Cc]hoose (target creature you don't control)\. (Each creature you control) deals (\d+) damage to that creature\.$/, "$2 deals $3 damage to $1.");
+  // Burrog Barrage: "Target creature you control gets +1/+0 until end of turn if you've cast another instant or sorcery
+  // spell this turn. Then it deals damage ...": the target is chosen either way (CR 601.2c), the condition read as it
+  // resolves.
+  text = text.replace(/^Target (creature you control) gets ([+-]\d+\/[+-]\d+) until end of turn if (you've cast another [a-z ]+ spell this turn)\. Then it /, "Choose target $1. If $3, it gets $2 until end of turn. Then it ");
   // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
   // resolves (CR 608.2c).
   text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
@@ -5107,7 +5114,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // you may play those cards. If you cast a spell this way, mana of any type can be spent to cast it." Face up (CR
     // 406.3), the permission yours; a land is played as your land play, a spell with mana of any type (CR 609.4b).
     const tgtExile = !theyExile ? new RegExp(`^(Target opponent|Target player) exiles the top (card|${NUMX} cards) of their library$`).exec(s) : null;
-    const tgtPlay = tgtExile && /^(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Ornate Kanzashi: "You may play that card this turn" is the same as "Until end of turn, you may play that card".
+    const tgtPlay = tgtExile && /^(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards)$/.exec((sentences[si + 1]?.replace(/\.$/, "") ?? "").replace(/^You may play (that card|those cards) this turn$/, "Until end of turn, you may play $1"));
     if (tgtExile && tgtPlay && (tgtExile[2] === "card") === /that card/.test(sentences[si + 1]!)) {
       const any = /^(?:If you cast a spell this way, mana of any type can be spent to cast it|Mana of any type can be spent to cast (?:those spells|them))$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "");
       const who = parsePlayer(tgtExile[1]!, ctx);
@@ -8715,6 +8723,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.lastPlayerTarget = index;
       effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "graveyard", rest: "keep", reveal: false, library: { ref: "target", index } });
       si++;
+      continue;
+    }
+    // Wand of Denial: "Look at the top card of target player's library. If it's a nonland card, you may pay 2 life. If you
+    // do, put it into that player's graveyard.": you look, and only a nonland card can be paid for and put there.
+    const paidMill = oneLook && /^If it's a nonland card, you may pay (\d+) life\.?$/.exec(sentences[si + 1] ?? "");
+    if (paidMill && /^If you do, put it into (?:their|that player's) graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: oneLook[1] === "target opponent", text: oneLook[1]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "graveyard", rest: "keep", reveal: false, library: { ref: "target", index }, filter: { kind: "card", notTypes: ["Land"], text: "nonland card" }, payLife: Number(paidMill[1]) });
+      si += 2;
       continue;
     }
     if (yourLook && yourPut) {

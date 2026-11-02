@@ -2917,6 +2917,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fbb0f73b-5e30-4632-99c1-e49582e41f8d",
+  "name": "Cadaverous Bloom",
+  "manaCost": "{3}{B}{G}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile a card from your hand: Add {B}{B} or {G}{G}.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2031bc31-81cc-407a-8615-29832f586bbc",
   "name": "Calciform Pools",
   "manaCost": "",
@@ -22413,6 +22445,28 @@
   "set": "ulg",
   "releasedAt": "1999-02-15",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d32da71-60e5-4eb3-97ca-ae76e2f5df57",
+  "name": "Wand of Denial",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Look at the top card of target player's library. If it's a nonland card, you may pay 2 life. If you do, put it into that player's graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

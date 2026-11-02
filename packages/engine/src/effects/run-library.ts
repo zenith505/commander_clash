@@ -1575,7 +1575,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const yardHas = (f: TargetSpec) => player(s, ctx.controller).graveyard.some((id) => printedMatches(f, defOf(s, obj(s, id))));
         const count = e.countAll ? sc.looked.length : e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.count;
-        const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
+        // Wand of Denial: each card taken is paid for with life, so no more than can be paid (CR 119.4).
+        const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0), e.payLife ? Math.floor(payableLife(s, pid) / e.payLife) : Infinity));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         // Getaway Barrel: a random one of those that match, no choice (rng.ts).
@@ -1590,7 +1591,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : to, rest, ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : e.payLife ? `${to} (you pay ${e.payLife} life for each)` : to, rest, ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}), ...(e.payLife ? { payLife: e.payLife } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
         // Nothing to choose: all of them, or (one for each) as many as fit.
@@ -1598,6 +1599,16 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       }
       const looked = sc.looked;
       let found = (sc.found ?? []).filter((id) => looked.includes(id));
+      // Wand of Denial: the life for the cards taken, paid now (CR 119.4); none taken, none paid.
+      if (e.payLife && found.length && !sc.digPaidLife) {
+        found = found.slice(0, Math.floor(payableLife(s, pid) / e.payLife));
+        sc.found = found;
+        sc.digPaidLife = true;
+        if (found.length) {
+          log(s, `${p.name} pays ${e.payLife * found.length} life.`);
+          payLife(s, pid, e.payLife * found.length);
+        }
+      }
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
       const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
       // The Key to the Vault: the exiled card cast (or not) as this resolves, after the rest went to the bottom (CR 608.2g).

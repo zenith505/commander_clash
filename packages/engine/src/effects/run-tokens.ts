@@ -401,8 +401,22 @@ function eventDefender(s: GameState, ctx: ResolveCtx, pid: PlayerId): PlayerId |
   return them !== undefined && inCombat(s) && s.activePlayer === pid && !player(s, them).lost && opponents(s, pid).includes(them) ? them : undefined;
 }
 
+/**
+ * Volrath's Laboratory: "a creature token of the chosen color and type", named after the type (rulings: "Bird Token";
+ * the " Token" is added as tokens are made),
+ * with what was chosen as the source entered, or as it last existed if it's gone (CR 608.2h).
+ */
+function chosenColorTypeToken(s: GameState, token: TokenSpec, ctx: ResolveCtx): TokenSpec {
+  const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+  const lki = lk && lk.zc === ctx.sourceZc ? lk : undefined;
+  const color = ctx.chosen?.color ?? lki?.chosenColor;
+  const type = ctx.chosen?.type ?? lki?.chosenType;
+  return { ...token, name: type ?? "Creature", colors: color ? [color] : [], subtypes: type ? [type] : [] };
+}
+
 /** "Create N ... tokens" for each player it names. */
-function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string, /** What each attacking one attacks, as chosen (attackChoices). */ attackAt?: ReturnType<typeof attackChoices>) {
+function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string, /** What each attacking one attacks, as chosen (attackChoices). */ attackAt?: ReturnType<typeof attackChoices>) {
+  const e0 = e00.chosenColorType ? { ...e00, token: chosenColorTypeToken(s, e00.token, ctx) } : e00;
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
   const t = e0.ptToughness !== undefined ? amountNow(s, e0.ptToughness, ctx) : undefined;

@@ -8160,6 +8160,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b881abd7-1fe7-4404-b9ba-fb64869126fc",
+  "name": "Glamer Spinners",
+  "manaCost": "{4}{W/U}",
+  "cmc": 5,
+  "typeLine": "Creature — Faerie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Wizard"
+  ],
+  "oracleText": "Flash\nFlying\nWhen this creature enters, attach all Auras enchanting target permanent to another permanent with the same controller.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "97febf6b-302c-4c41-8838-eef7c7353bdc",
   "name": "Glen Elendra Guardian",
   "manaCost": "{2}{U}",
@@ -17657,6 +17693,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f71d55f5-f220-4cb0-9468-b8d339ab8535",
+  "name": "Sarpadian Empires, Vol. VII",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "As this artifact enters, choose white Citizen, blue Camarid, black Thrull, red Goblin, or green Saproling.\n{3}, {T}: Create a 1/1 creature token of the chosen color and type.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ed1d21ba-ddfe-4f82-9e37-93f9e2c7ba33",
   "name": "Satoru Umezawa",
   "manaCost": "{1}{U}{B}",
@@ -18691,6 +18751,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8b70d296-2756-4bda-b51e-f93be395fce7",
+  "name": "Simic Guildmage",
+  "manaCost": "{G/U}{G/U}",
+  "cmc": 2,
+  "typeLine": "Creature — Elf Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Wizard"
+  ],
+  "oracleText": "({G/U} can be paid with either {G} or {U}.)\n{1}{G}: Move a +1/+1 counter from target creature onto another target creature with the same controller.\n{1}{U}: Attach target Aura attached to a permanent to another permanent with the same controller.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aee82122-d13e-4175-b499-9dde718e4da9",
   "name": "Siphon Insight",
   "manaCost": "{U}{B}",
@@ -19404,6 +19497,38 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2021-08-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "690df8d2-9538-4c51-b730-cee09ad0ef1c",
+  "name": "Sphinx of the Chimes",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nDiscard two nonland cards with the same name: Draw four cards.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
+import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runFlipClashEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -105,9 +105,9 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc));
   checkTotals(s, body.targets, targets, legal);
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
-  // Together), "in that player's graveyard" (Goblin Welder).
+  // Together), "with the same controller" (Simic Guildmage), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
   });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -560,7 +560,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return here ? [subj!, ...others] : others;
   }
   if (ref.ref === "each") {
-    const filter0 = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    // Hakim, Loreweaver: "all Auras attached to ~", the source (a filter with `attachedTo.objectId` "~").
+    const filter0 = bindAttachedToSource(bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx)), ctx.sourceId);
     // "Named ~" (Gruff Triplets): its name now, or as it last existed (CR 201.5, 608.2h).
     const me0 = filter0.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const filter1 = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;

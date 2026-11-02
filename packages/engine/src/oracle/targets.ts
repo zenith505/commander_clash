@@ -126,6 +126,12 @@ export function pickFilter(phrase: string): TargetSpec | null {
     const anyOf = [...list[1]!.split(", ").filter(Boolean), list[2]!].map((w) => pickFilter(w));
     return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
   }
+  // Devouring Sugarmaw: "an artifact, enchantment, or token": one permanent that's any of them.
+  const orList = /^((?:[a-z]+, )+)or ([a-z]+)$/.exec(phrase.trim());
+  if (orList && /\btoken$/.test(phrase.trim())) {
+    const anyOf = [...orList[1]!.split(", ").filter(Boolean), orList[2]!].map((w) => pickFilter(w));
+    return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // Jungle Patrol: "Sacrifice a token named Wood": a permanent with that name (CR 201.2), here the token it makes.
   const named = /^(token|creature|artifact|permanent) named ([A-Z][A-Za-z' -]*)$/.exec(phrase.trim());
   if (named) {
@@ -597,6 +603,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       : { kind: "object", subtypes: ["Aura", "Equipment"], text: "Aura or Equipment" };
     return { ...t, attachedToo: { filter, only: true } };
   }
+  // Hakim, Loreweaver: "{U}{U}, {T}: Destroy all Auras attached to ~": the Auras on the source as it resolves (none once it
+  // has left the battlefield); the "~" in `attachedTo.objectId` is made into the source's id then (bindAttachedToSource).
+  const attachedSelf = !cards && !ctx.spell ? /^all (Auras|Equipment) attached to ~$/.exec(x) : null;
+  if (attachedSelf) {
+    const filter: TargetSpec = attachedSelf[1] === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
+    return { ref: "each", filter: { ...filter, attachedTo: { kind: "object", objectId: "~", text: "~" }, text: `${filter.text} attached to ~` } };
+  }
   // Treefolk Mystic: "Whenever ~ blocks or becomes blocked by a creature, destroy all Auras attached to that creature": the
   // Auras on the trigger's creature as it resolves.
   if (attachedThat && !cards && ctx.subject && !ctx.targets.length) {
@@ -624,7 +637,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // controller.
   const of = /^(.+?) (target player|target opponent|that player|defending player|its controller) (controls|owns)\b(.*)$/i.exec(x);
   const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) && (of[3] === "controls" || (/^all /i.test(of[1]!) && !of[4])) ? parseGroup(`${of[1]}${of[4]}`, true, of[4] ? (t) => parseBoundCount(t, ctx) : undefined) : null;
-  if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller && !ofGroup.filter.owner) {
+  // Splinter & Leo, Father & Son: "Put a +1/+1 counter on each other creature target player controls": other than ~ (an
+  // ability's source; a spell has none to be other than).
+  if (of && ofGroup && (!ofGroup.other || (!ctx.spell && of[3] === "controls")) && !ofGroup.filter.controller && !ofGroup.filter.owner) {
     const who = of[2]!.toLowerCase();
     let whose: PlayerRef | null = null;
     if (who.startsWith("target ")) {
@@ -634,7 +649,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     } else if (who === "its controller") whose = ctx.subject && !ctx.spell && ctx.lastObjectTarget === undefined && of[3] === "controls" ? { ref: "subjectController" } : null;
     else whose = parsePlayer(who === "defending player" ? who : "that player", ctx);
     if (!whose || (whose.ref === "target" && whose.n)) return null;
-    return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose, ...(of[3] === "owns" ? { ofOwner: true as const } : {}) };
+    return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose, ...(of[3] === "owns" ? { ofOwner: true as const } : {}), ...(ofGroup.other ? { other: true as const } : {}) };
   }
   // "Put a +1/+1 counter on that creature and each other creature you control that shares a creature type with it"
   // (Holy Frazzle-Cannon): the trigger's creature, and the others as this resolves.
@@ -888,6 +903,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const shareCard = n > 1 && !many && / that share a card type$/.test(mine0);
   // Rivals' Duel: "two target creatures that share no creature types": each sharing none with the other.
   const shareNone = n > 1 && !many && / that share no creature types$/.test(mine0);
+  // Simic Guildmage: "another target creature with the same controller": controlled by whoever controls the targets before
+  // it, as they're chosen and as it resolves (rulings: the ability does nothing if they no longer share a controller).
+  const sameCtl = !!another && !many && n === 1 && !cards && / with the same controller$/.test(mine0);
   // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
@@ -897,7 +915,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Any number of target creatures with equal toughness" (V.A.T.S.).
   const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that share no creature types$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
+  const mine = mine0.replace(/ with the same controller$/, "").replace(/ controlled by different players$/, "").replace(/ that share a card type$/, "").replace(/ that share no creature types$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
   // "Up to three target creatures with toughness X or less" (Finale of Eternity): each one, with the spell's X.
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
@@ -949,6 +967,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...(single && k ? { sameGraveyardAs: group } : {}),
       ...(share && k ? { sharesCreatureTypeWith: group } : {}),
       ...(differ && k ? { differentNameFrom: group } : {}),
+      ...(sameCtl ? { sameControllerAs: before, text: `${spec.text} with the same controller` } : {}),
       ...(diffCtl ? { differentControllerFrom: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
       ...(shareCard ? { sharesCardTypeWith: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
       ...(shareNone ? { sharesNoCreatureTypeWith: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
@@ -1028,6 +1047,12 @@ const SAME_PLURAL = new Set(["Merfolk", "Treefolk", "Moonfolk", "Kithkin", "Samu
  * ability's subject, "Creatures of the chosen type get +1/+1").
  */
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
+  // Wirefly Hive: "destroy all permanents named Wirefly": every permanent with that name (CR 201.2), whoever controls it.
+  const namedAll = /^all (permanents|creatures|tokens) named ([A-Z][A-Za-z' -]*)$/.exec(phrase.trim());
+  if (namedAll) {
+    const noun = pickFilter(namedAll[1]!.replace(/s$/, ""));
+    return noun ? { filter: { ...noun, named: namedAll[2]!, text: phrase.trim().toLowerCase() }, other: false } : null;
+  }
   // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
   let p = phrase.trim().replace(/\b(non-?[a-z]+), (?=non-?[a-z]+ )/gi, "$1 ");
   // "Each other Merfolk and/or Knight you control" (Vodalian Wave-Knight): each that's either one, or both.
@@ -1629,9 +1654,10 @@ export function parseTargetPhrase(
   // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
   // "Each Aura you control that's attached to a creature" (Sage's Reverie).
   // Savaen Elves: "target Aura attached to a land".
-  const attached = / (?:that's |that are )?attached to an? (creature|permanent|land)( you control)?$/.exec(p);
+  // Enchantment Alteration: "target Aura attached to a creature or land": either one.
+  const attached = / (?:that's |that are )?attached to an? (creature or land|creature|permanent|land)( you control)?$/.exec(p);
   if (attached) {
-    extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : attached[1] === "land" ? { types: ["Land"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
+    extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : attached[1] === "land" ? { types: ["Land"] } : attached[1] === "creature or land" ? { types: ["Creature", "Land"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);
   }
   // "creature an opponent controls that was dealt damage this turn"; Giant Shark: "a creature that has been dealt damage this
@@ -1653,7 +1679,8 @@ export function parseTargetPhrase(
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
   // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // Temporal Distortion: "each permanent with an hourglass counter on it".
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom|hourglass) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom|hourglass) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

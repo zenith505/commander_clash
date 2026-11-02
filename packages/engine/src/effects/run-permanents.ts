@@ -1793,12 +1793,41 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "attachElsewhere": {
       // "Attach target Aura attached to a creature to another creature" (Crown of the Ages): the creature is chosen as
       // it resolves, not targeted (rulings), among those the Aura could enchant (CR 303.4d, 702.16c).
-      const me = objects(s, e.source, ctx)[0];
-      if (!me || me.zone !== "battlefield" || !characteristics(s, me).subtypes.includes("Aura")) return;
       const sc = (s.resolving!.scratch ??= {});
       const hosts = (sc.auraHosts ??= {});
+      if (e.aurasOn) {
+        // Glamer Spinners: the Auras on that permanent now, all to one other permanent its controller controls that each
+        // of them could enchant (CR 303.4d, 702.16c); none move if there's no such permanent (rulings).
+        const from = objects(s, e.source, ctx)[0];
+        if (!from || from.zone !== "battlefield") return;
+        const auras = s.battlefield.map((id) => obj(s, id)).filter((a) => a.attachedTo === from.id && characteristics(s, a).subtypes.includes("Aura"));
+        if (!auras.length) return;
+        const key = auras[0]!.id;
+        if (hosts[key] === undefined) {
+          const options = s.battlefield.filter((id) => id !== from.id && controllerOf(s, obj(s, id)) === controllerOf(s, from) && auras.every((a) => canAttachTo(s, a, obj(s, id))));
+          if (!options.length) return;
+          if (options.length > 1) {
+            sc.auraAsking = key;
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels: auraHostLabels(s, options.map((id) => ({ attachTo: id }))), prompt: `choose the permanent to attach the Auras on ${characteristics(s, from).name} to` };
+            return "paused";
+          }
+          hosts[key] = options[0]!;
+        }
+        const host = s.objects[hosts[key]!];
+        if (host) for (const a of auras) attachTo(s, a, host);
+        return;
+      }
+      const me = objects(s, e.source, ctx)[0];
+      if (!me || me.zone !== "battlefield" || !characteristics(s, me).subtypes.includes("Aura")) return;
       if (hosts[me.id] === undefined) {
-        const options = auraHostOptions(s, me, controllerOf(s, me)).flatMap((h) => ("attachTo" in h && h.attachTo !== me.attachedTo && objIsType(s, obj(s, h.attachTo), "Creature") ? [h] : []));
+        // Simic Guildmage: controlled by the controller of the permanent it's attached to; Enchantment Alteration: sharing a
+        // type, creature or land, with it, as it is now. Neither if it isn't attached to a permanent now.
+        const was = me.attachedTo ? s.objects[me.attachedTo] : undefined;
+        if (e.host && was?.zone !== "battlefield") return;
+        const wasTypes = e.host === "sameType" ? (["Creature", "Land"] as const).filter((t) => objIsType(s, was!, t)) : [];
+        const fits = (h: GameObject) =>
+          e.host === "sameController" ? controllerOf(s, h) === controllerOf(s, was!) : e.host === "sameType" ? wasTypes.some((t) => objIsType(s, h, t)) : objIsType(s, h, "Creature");
+        const options = auraHostOptions(s, me, controllerOf(s, me)).flatMap((h) => ("attachTo" in h && h.attachTo !== me.attachedTo && fits(obj(s, h.attachTo)) ? [h] : []));
         if (!options.length) return;
         if (options.length > 1) {
           sc.auraAsking = me.id;

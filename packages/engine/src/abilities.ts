@@ -1436,7 +1436,7 @@ export interface DamageRuleSpec {
   /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
   to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
   /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
-  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true };
+  by?: { filter?: TargetSpec; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number };
   /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
   n?: Amount;
   /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
@@ -3003,6 +3003,8 @@ export type Effect =
   | { type: "counterOfKindOnIt"; what: ObjRef; /** "Choose a counter on target permanent or player. Give that permanent or player another counter of that kind." (Animation Module): this target, which may be a player. */ host?: number; /** "For each kind of counter on target permanent or player, give that permanent or player another counter of that kind" (Maulfist Revolutionary): one of each kind, no choice (rulings). */ eachKind?: true }
   /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
   | { type: "endTurn" }
+  /** "End the combat phase." (CR 724.2, Mandate of Peace): its last instruction; the rest happens as it finishes resolving. */
+  | { type: "endCombatPhase" }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade"; legendary?: true }
   /**
@@ -5083,6 +5085,8 @@ export interface TriggeredAbility {
   ifDiesInCombat?: true;
   /** Fyndhorn Druid: "When ~ dies, if it was blocked this turn": it became blocked this turn as that object (CR 509.1h, 603.10a). */
   ifBlockedThisTurn?: true;
+  /** Wave of Rats: "When ~ dies, if it dealt combat damage to a player this turn": that object did, to anyone (CR 603.4, 603.10a). */
+  ifDealtCombatDamage?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
   ownGraveyard?: true;
   /**
@@ -6539,6 +6543,8 @@ export interface CompiledCard {
   playersCantSearch?: true;
   /** "Players can't play lands." (Territorial Dispute): no land plays for anyone, whatever lets them (CR 305.2, 101.2). */
   playersCantPlayLands?: true;
+  /** "You can't play lands." (Aggressive Mining): no land plays for its controller (CR 305.2, 101.2). */
+  youCantPlayLands?: true;
   /**
    * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
    * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).

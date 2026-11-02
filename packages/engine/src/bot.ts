@@ -1218,6 +1218,13 @@ function forageChoice(s: GameState, pid: PlayerId, o: GameObject, busy: ObjectId
   return cards.length >= 3 ? { exileCards: cards.slice(0, 3) } : null;
 }
 
+/** Ending this combat phase (Mandate of Peace) is worth it: an opponent's attack on us, of at least 4 power (or our life), before its damage. */
+function endCombatWorth(s: GameState, pid: PlayerId): boolean {
+  if (s.activePlayer === pid || !["declareAttackers", "declareBlockers"].includes(s.step)) return false;
+  const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  return coming >= Math.min(4, player(s, pid).life);
+}
+
 /** "End the turn" and nothing more (Time Stop, Discontinuity, Sundial of the Infinite). */
 function endsTurnOnly(body: AbilityBody): boolean {
   return !body.targets.length && !body.modal && body.effects.length > 0 && body.effects.every((e) => e.type === "endTurn");
@@ -2199,6 +2206,10 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
+  // Aggressive Mining: "You can't play lands" only once we have enough of them.
+  if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
+  // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endCombatPhase") && !endCombatWorth(s, pid)) return null;
   if (lifeSwapHurts(s, pid, compileCard(d).spell?.effects ?? [])) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";

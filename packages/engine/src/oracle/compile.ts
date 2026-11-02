@@ -4211,6 +4211,12 @@ export function compile(d: CardDef): CompiledCard {
       out.playersCantPlayLands = true;
       continue;
     }
+    // Aggressive Mining: "You can't play lands.": its controller, the special action only; lands put onto the battlefield
+    // by spells and abilities still arrive (rulings, CR 305.1, 101.2).
+    if (line === "You can't play lands." && !isSpell) {
+      out.youCantPlayLands = true;
+      continue;
+    }
     if (line === "Players can't search libraries.") {
       out.playersCantSearch = true;
       continue;
@@ -4396,7 +4402,14 @@ export function compile(d: CardDef): CompiledCard {
       // Swift Reckoning: "two or more instant and/or sorcery cards in your graveyard", a count of your graveyard's cards.
       const yardCount = cond?.kind === "amount" && typeof cond.amount === "object" && "count" in cond.amount && cond.amount.count.kind === "cardsInGraveyard" && cond.amount.count.who?.ref === "you" && cond.max === undefined;
       const aboutPlayer = !!cond && (FLASH_IF.includes(cond.kind) || yardCount) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
-      if (!aboutPlayer || permanentHas || out.flashIf) out.unsupported.push(raw);
+      // Colossal Rattlewurm: "~ has flash as long as you control a Desert": while it's a spell, castable at instant speed
+      // when you control one (rulings: checked before costs are paid, CR 601.3); on the battlefield the same condition
+      // gives the permanent the keyword (CR 702.8a), a conditional static like "~ has flying as long as ...".
+      const onBattlefield = permanentHas && aboutPlayer && cond!.kind === "control" ? parseConditionalStatic(`~ has flying as long as ${flashIf[1]!}.`) : null;
+      if (onBattlefield && !out.flashIf) {
+        out.flashIf = cond!;
+        out.statics.push({ ...onBattlefield, mods: [{ kind: "addKeywords", keywords: ["Flash"] }], text: line });
+      } else if (!aboutPlayer || permanentHas || out.flashIf) out.unsupported.push(raw);
       else out.flashIf = cond!;
       continue;
     }
@@ -4441,6 +4454,17 @@ export function compile(d: CardDef): CompiledCard {
       const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
       if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(ewcTwo[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
+      continue;
+    }
+    // Unbreathing Horde: "~ enters with a +1/+1 counter on it for each other Zombie you control and each Zombie card in
+    // your graveyard": both counts added up, counted as it enters (CR 614.1c).
+    const ewcEach = new RegExp(`^~ enters with an? ${COUNTER} counter on it for each (.+? you control) and each (.+? card in your graveyard)\\.$`).exec(line);
+    if (ewcEach) {
+      const a = parseCount(ewcEach[2]!, null, true);
+      const b = parseCount(ewcEach[3]!, null, true);
+      const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
+      if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(ewcEach[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
       continue;
     }
     // Dust Animus: "If you control five or more untapped lands, ~ enters with two +1/+1 counters and a lifelink counter on

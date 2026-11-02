@@ -1446,8 +1446,9 @@ export function parseTargetPhrase(
     extra.notNamed = "~";
     p = p.replace(/ not named ~(?= from )/, "");
   }
-  // Dutiful Replicator: "target token you control not named ~": a permanent with any other name.
-  if (opts.target && /^[a-z ]*token you control not named ~$/.test(p)) {
+  // Dutiful Replicator: "target token you control not named ~": a permanent with any other name. Clever Conjurer:
+  // "target permanent not named ~" (CR 201.5: its own name, so another one with that name can't be untapped either).
+  if (opts.target && /^(?:[a-z ]*token you control|permanent) not named ~$/.test(p)) {
     extra.notNamed = "~";
     p = p.replace(/ not named ~$/, "");
   }

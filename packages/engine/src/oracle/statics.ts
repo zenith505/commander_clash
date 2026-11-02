@@ -92,6 +92,14 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     const st = parseConditionalStatic0(`As long as ${aloneHost[1]!.toLowerCase()} creature is attacking alone, it can't be blocked.`);
     return st && { ...st, text: line };
   }
+  // Tanglewalker: "Each creature you control can't be blocked as long as defending player controls an artifact land": the
+  // player each of those creatures is attacking (CR 506.2), as blockers are declared (CR 509.1b), not ~'s.
+  const eachUnblockable = /^Each creature you control can't be blocked as long as defending player controls an? ([a-z]+ [a-z]+|[A-Z][a-z]+)\.$/.exec(line);
+  if (eachUnblockable) {
+    const filter = parseTargetPhrase(eachUnblockable[1]!);
+    if (filter?.kind !== "object" || filter.controller) return null;
+    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "each creature you control" } }, mods: [{ kind: "cantBeBlockedIfDefendingControls", filter: { ...filter, text: eachUnblockable[1]! } }], text: line };
+  }
   // Zhao, the Moon Slayer: "As long as ~ has a conqueror counter on him, ...": "him" (normalized to ~) is it.
   const onSelf = /^(As long as ~ has an? [a-z]+ counter on) ~(, .+)$/.exec(line);
   if (onSelf) return parseConditionalStatic0(`${onSelf[1]} it${onSelf[2]}`);

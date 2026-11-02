@@ -8095,6 +8095,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b881abd7-1fe7-4404-b9ba-fb64869126fc",
+  "name": "Glamer Spinners",
+  "manaCost": "{4}{W/U}",
+  "cmc": 5,
+  "typeLine": "Creature — Faerie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Wizard"
+  ],
+  "oracleText": "Flash\nFlying\nWhen this creature enters, attach all Auras enchanting target permanent to another permanent with the same controller.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "97febf6b-302c-4c41-8838-eef7c7353bdc",
   "name": "Glen Elendra Guardian",
   "manaCost": "{2}{U}",
@@ -18433,6 +18469,39 @@
   "set": "tsr",
   "releasedAt": "2021-03-19",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8b70d296-2756-4bda-b51e-f93be395fce7",
+  "name": "Simic Guildmage",
+  "manaCost": "{G/U}{G/U}",
+  "cmc": 2,
+  "typeLine": "Creature — Elf Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Wizard"
+  ],
+  "oracleText": "({G/U} can be paid with either {G} or {U}.)\n{1}{G}: Move a +1/+1 counter from target creature onto another target creature with the same controller.\n{1}{U}: Attach target Aura attached to a permanent to another permanent with the same controller.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

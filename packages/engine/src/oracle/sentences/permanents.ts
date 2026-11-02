@@ -960,6 +960,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("all permanents", ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
   }
+  // Temporal Distortion: "At the beginning of each player's upkeep, remove all hourglass counters from permanents that
+  // player controls": the upkeep's player's permanents, every one of that kind from each.
+  if ((m = new RegExp(`^Remove all ${COUNTER} counters from permanents that player controls$`, "i").exec(s))) {
+    const what = parseObject("each permanent that player controls", ctx);
+    return what?.ref === "each" && what.of ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
+  }
   // Heartmender: "remove a -1/-1 counter from each creature you control": one from each that has one.
   if ((m = new RegExp(`^Remove (a|all) ${COUNTER} counters? from (each creature you control)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);

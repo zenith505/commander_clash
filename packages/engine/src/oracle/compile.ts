@@ -4722,6 +4722,13 @@ export function compile(d: CardDef): CompiledCard {
       out.strive = strive[1]!;
       continue;
     }
+    // Phyrexian Purge: "This spell costs 3 life more to cast for each target": an additional cost, paid as it's cast (CR
+    // 601.2f-h, with its targets chosen in 601.2c), none of it given back if it's countered (rulings).
+    const lifePerTarget = /^(?:~|This spell) costs (\d+) life more to cast for each target\.$/.exec(line);
+    if (lifePerTarget && (d.types.includes("Instant") || d.types.includes("Sorcery"))) {
+      out.additionalCosts = [...(out.additionalCosts ?? []), { kind: "payLife", n: Number(lifePerTarget[1]), perTarget: true }];
+      continue;
+    }
     // "Enchantment spells you cast have affinity for Auras" (Pearl-Ear): each such spell costs {1} less to cast for each
     // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
     // "Creature and planeswalker spells you cast have affinity for artifacts" (Tezzeret, Master of the Bridge), "Artifact
@@ -4758,6 +4765,14 @@ export function compile(d: CardDef): CompiledCard {
     if (costWhile) {
       const cond = parseStaticCondition(costWhile[2]!, { affects: { kind: "self" }, mods: [], text: "" });
       if (!cond || !conditionalAbility(d, `${costWhile[1]}.`, out, cond)) out.unsupported.push(raw);
+      continue;
+    }
+    // Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast": each spell targeting
+    // it (or a copy of it) on the stack, once however often it targets it, worked out after its targets are chosen (CR
+    // 601.2c, 601.2f).
+    const stackTax = /^As long as ~ is on the stack, spells that target it cost \{(\d+)\} more to cast\.$/.exec(line);
+    if (stackTax && (d.types.includes("Instant") || d.types.includes("Sorcery"))) {
+      out.stackTargetTax = Number(stackTax[1]);
       continue;
     }
     // Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target" (CR 601.2f, with the targets chosen in

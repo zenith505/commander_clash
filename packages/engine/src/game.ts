@@ -5233,6 +5233,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
     if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
   }
+  // Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast": each such spell once.
+  for (const sid of new Set((how.targets ?? []).flatMap((t) => (t.kind === "stack" ? [t.id] : [])))) {
+    const item = s.stack.find((x) => x.id === sid);
+    const card = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+    if (card) mods.more += compileCard(defOf(s, card)).stackTargetTax ?? 0;
+  }
   // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
   const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
   if (playersTargeted.size && !how.faceDown)
@@ -6926,8 +6932,10 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
+  // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
+  const targetCount = (choices?.targets ?? []).filter((t) => t.kind !== "none").length;
   return costs.map((c) =>
-    xCost(c) ? { ...c, n: x } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
+    xCost(c) ? { ...c, n: x } : c.kind === "payLife" && c.perTarget ? { kind: "payLife", n: c.n * targetCount } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
   );
 }
 
@@ -10575,6 +10583,8 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (b.cantBlockGreaterPower && a.power > b.power) return `${b.name} can't block creatures with greater power`; // CR 509.1b
   if (b.cantBlockPowerAtLeastToughness && a.power >= b.toughness) return `${b.name} can't block creatures with power equal to or greater than its toughness`; // CR 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
+  // Tanglewalker: while the player it's attacking controls such a permanent (CR 506.2, 509.1b).
+  for (const f of a.cantBeBlockedIfDefending ?? []) if (defender !== undefined && s.battlefield.some((id) => { const x = obj(s, id); return controllerOf(s, x) === defender && objectMatches(s, f, x, defender, false); })) return `${a.name} can't be blocked while defending player controls ${f.text.startsWith("a") ? "an" : "a"} ${f.text}`;
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b

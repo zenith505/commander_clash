@@ -4680,6 +4680,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature you control"), Spatial Binding ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
   Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
   reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
+- Round B89 (one-line templates from the bottom of the list): Aura moves, "Attach target Aura attached to a creature to
+  another creature" (any controller's, Enchantment Alteration's "a creature or land" to one of the same type), "with the
+  same controller" (Simic Guildmage, also its "Move a +1/+1 counter from target creature onto another target creature
+  with the same controller", checked again as it resolves, CR 608.2b), "attach all Auras enchanting target permanent to
+  another permanent with the same controller" (Glamer Spinners: one permanent that can take every Aura, or none move);
+  the destination is picked as it resolves, with browser tests; "Return target Aura card from your graveyard attached to
+  ~" during your upkeep and "Destroy all Auras attached to ~" (Hakim, Loreweaver); "flip a coin. If you win, create a
+  token named X. If you lose, destroy all permanents named X" (Wirefly Hive); "flip a coin at the beginning of the next
+  end step. If you lose the flip, sacrifice that creature" (Goblin Kites); "Each creature you control can't be blocked
+  as long as defending player controls an artifact land" (Tanglewalker, checked against each defender); "you may reveal
+  that many cards. Put an artifact card revealed this way into your hand and the rest into your graveyard" (Glint
+  Raker); "Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls"
+  (Rayne, Academy Chancellor, two cards if enchanted; Leovold, Emissary of Trest's draw now compiles too, though Leovold is banned in Commander); "Spells
+  that target ~ cost {2} more to cast" on an instant or sorcery (Kaervek's Torch); "~ costs 3 life more to cast for each
+  target" (Phyrexian Purge, paid as it's cast and not given back); hourglass counters (Temporal Distortion). +12 legal
+  (29,358 of 31,936 with B86, B87 and rounds 248 and 249).
+- Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
+  by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
+  and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
+  with their source), Sengir Nosferatu (a token's ability returns an exiled card named ~), Splintering Wind,
+  Negative Zone Portal, Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds.
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until

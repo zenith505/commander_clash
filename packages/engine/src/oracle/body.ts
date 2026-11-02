@@ -897,6 +897,15 @@ const LIVING_DEATH = /^Each player exiles all (creature|artifact) cards from the
 function revealPutAll(count: string, next: string): Effect | null | undefined {
   // Marina Vendrell: "Put all enchantment cards from among them into your hand and the rest ..." the same.
   const putAll = /^Put all (.+?) cards (?:revealed this way|from among them) into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(next.replace(/\.$/, ""));
+  // Glint Raker: "Put an artifact card revealed this way into your hand and the rest into your graveyard": one of them, the
+  // player's pick if there are several (none if there's none).
+  const putOne = !putAll ? /^Put an? ([a-z]+) card revealed this way into your hand and the rest into your graveyard$/.exec(next.replace(/\.$/, "")) : null;
+  if (putOne) {
+    const filter = parseSearchFilter(`${putOne[1]} card`);
+    const n = count === "X" ? X : num(count);
+    if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
+    return { type: "dig", n, count: 1, upTo: false, filter, into: "hand", rest: "graveyard", reveal: true, required: true };
+  }
   if (!putAll) return undefined;
   const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
   const n = count === "X" ? X : num(count);
@@ -3989,6 +3998,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...d, effects: [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], combat: "attackedThisTurn", text: "permanent that attacked this turn" } }, effects: d.effects }], text: "Destroy that creature if it attacked this turn" });
       continue;
     }
+    // Goblin Kites: "Flip a coin at the beginning of the next end step. If you lose the flip, sacrifice that creature.": a
+    // delayed trigger that flips then (CR 603.7, 705), and sacrifices the creature only if you lose that flip.
+    if (s === "Flip a coin at the beginning of the next end step" && sentences[si + 1]?.replace(/\.$/, "") === "If you lose the flip, sacrifice that creature") {
+      const later = parseOne("Sacrifice that creature at the beginning of the next end step", ctx);
+      const d = later?.length === 1 && later[0]!.type === "delayed" ? later[0]! : undefined;
+      if (!d || d.type !== "delayed") return null;
+      effects.push({ ...d, effects: [{ type: "flipCoin" }, { type: "if", cond: { kind: "wonFlip", lost: true }, effects: d.effects }], text: "Flip a coin. If you lose the flip, sacrifice that creature" });
+      si++;
+      continue;
+    }
     // Kav Landseeker: "At the beginning of the end step on your next turn, sacrifice that token": yours, on a later turn.
     const onNext = /^At the beginning of the end step on your next turn, (sacrifice that token)$/.exec(s);
     if (onNext) s = "Sacrifice that token at the beginning of the end step on your next turn";
@@ -6035,11 +6054,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
-    const putAll = revealN ? revealPutAll(revealN[1]!, sentences[si + 1] ?? "") : undefined;
+    const revealN = new RegExp(`^(You may )?Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
+    const putAll = revealN ? revealPutAll(revealN[2]!, sentences[si + 1] ?? "") : undefined;
     if (putAll === null) return null;
     if (putAll) {
-      effects.push(putAll);
+      // Glint Raker: "you may reveal that many cards from the top of your library. Put ...": both only if you reveal them.
+      effects.push(revealN![1] ? { type: "may", effects: [putAll], text: `${s}. ${sentences[si + 1]!.replace(/\.$/, "")}` } : putAll);
       si++;
       continue;
     }

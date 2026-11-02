@@ -715,6 +715,17 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const onlyYou = mariner[1] === "become";
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true, ...(onlyYou ? { onlyYou: true as const } : {}) }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[2]}.` } };
   }
+  // Rayne, Academy Chancellor: "Whenever you or a permanent you control becomes the target of a spell or ability an
+  // opponent controls, you may draw a card. You may draw an additional card if ~ is enchanted.": once for you and once for
+  // each permanent it targets (rulings), whether ~ is enchanted checked as it resolves (rulings: the "if" is no intervening
+  // "if"). Nothing in it about that spell or its controller.
+  const youOrYours = /^Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls, (.+)$/.exec(line);
+  if (youOrYours) {
+    const text = youOrYours[1]!.replace(/\. You may draw an additional card if ~ is enchanted\.$/, ". If ~ is enchanted, you may draw a card.");
+    if (/\b(?:it|its|that player|that spell|that permanent|that spell or ability)\b/.test(text)) return "fail";
+    const body = parseBody(text, {});
+    return body ? { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body } : "fail";
+  }
   // Dormant Gomazoa: "Whenever you become the target of a spell, you may untap ~": any player's spell, not an ability, once
   // for each spell however many of its targets are you (rulings).
   const youSpell = /^Whenever you become the target of a spell, (.+)$/.exec(line);

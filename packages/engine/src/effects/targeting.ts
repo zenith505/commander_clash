@@ -985,7 +985,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -1010,6 +1010,8 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   // Run Away Together).
   const ctl = (x: GameObject) => (x.zone === "battlefield" ? controllerOf(s, x) : (s.lastKnown?.[x.id]?.controller ?? x.owner));
   if (o.zone === "battlefield" && others(spec.differentControllerFrom).some((x) => ctl(x) === controllerOf(s, o))) return false;
+  // Simic Guildmage: the same controller as those targets (one that has left: as it last existed).
+  if (others(spec.sameControllerAs).some((x) => o.zone !== "battlefield" || ctl(x) !== controllerOf(s, o))) return false;
   if (others(spec.differentNameFrom).some((x) => sameName(defOf(s, x).name, defOf(s, o).name))) return false;
   if (others(spec.differentManaValueFrom).some((x) => defMv(defOf(s, x)) === defMv(defOf(s, o)))) return false;
   // Shifting Loyalties: a card type in common, as they are now (CR 205.2a).
@@ -1128,7 +1130,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

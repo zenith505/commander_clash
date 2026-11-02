@@ -867,6 +867,8 @@ export interface TargetSpec {
   controlledByTarget?: number;
   /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
   differentControllerFrom?: number[];
+  /** "Another target creature with the same controller" (Simic Guildmage): controlled by the controller of these targets. */
+  sameControllerAs?: number[];
   /**
    * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
    * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
@@ -1644,6 +1646,8 @@ export type Modification =
   /** "~ can't be attacked" (The Aetherspark): no creature may be declared as attacking it (CR 508.1b); one already attacking it goes on attacking it (rulings). */
   | { kind: "cantBeAttacked" }
   | { kind: "cantBeBlocked" }
+  /** "Can't be blocked as long as defending player controls an artifact land" (Tanglewalker, for each creature you control): the player that creature is attacking (CR 506.2, 509.1b). */
+  | { kind: "cantBeBlockedIfDefendingControls"; filter: TargetSpec }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   /** Layer 6: "~ loses this ability" (a Licid): its printed activated ability with this index (in CompiledCard.activated). */
@@ -3230,7 +3234,7 @@ export type Effect =
    */
   | { type: "attachEquipmentTo"; what: ObjRef }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
-  | { type: "attachElsewhere"; source: ObjRef }
+  | { type: "attachElsewhere"; source: ObjRef; /** Where to (default: another creature, Crown of the Ages): "another permanent with the same controller" as the permanent it's attached to (Simic Guildmage), "another permanent of that type", creature or land (Enchantment Alteration). */ host?: "sameController" | "sameType"; /** "Attach all Auras enchanting target permanent to another permanent with the same controller" (Glamer Spinners): `source` is that permanent, and every Aura on it goes to one permanent they could all enchant. */ aurasOn?: true }
   /**
    * "Attach ~ to another one of your opponents chosen at random" (Maddening Hex): a Curse moves to one of its controller's
    * opponents other than the player it enchants, at random; with no other one, it stays (rulings).
@@ -5845,7 +5849,7 @@ export type AdditionalCost =
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true }
-  | { kind: "payLife"; n: number; x?: true }
+  | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }
   /** Nissa, Worldsoul Speaker's alternative cost: "pay eight {E}" (CR 107.14: lose that many energy counters). */
   | { kind: "payEnergy"; n: number }
   /**
@@ -7189,6 +7193,8 @@ export interface CompiledCard {
   commanderTargetTax?: number;
   /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
   perTargetCost?: { opponents: boolean; n: number }[];
+  /** Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast" (CR 601.2f, with the targets chosen in 601.2c): this much more for each spell like it a spell targets. */
+  stackTargetTax?: number;
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
   opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true; /** Monastery Siege: "that target you or a permanent you control": targeting this permanent's controller counts too. */ you?: true; /** Only while this holds (a Siege's anchor word, CR 614.12b). */ if?: StaticCondition }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */

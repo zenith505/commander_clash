@@ -160,6 +160,8 @@ export interface Characteristics {
   mustAttackMostLife?: true;
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
+  /** Tanglewalker: "can't be blocked as long as defending player controls an artifact land" (CR 506.2, 509.1b). */
+  cantBeBlockedIfDefending?: TargetSpec[];
   /**
    * "Can't be the target of spells or abilities your opponents control" and the like. `of`: whose opponents, the
    * controller of the ability saying it (an Aura's controller, not the enchanted creature's: rulings on Canopy Cover).
@@ -1749,6 +1751,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "cantBeBlockedIfDefendingControls":
+      c.cantBeBlockedIfDefending = [...(c.cantBeBlockedIfDefending ?? []), m.filter];
       return;
     case "untargetable":
       c.untargetable = [...(c.untargetable ?? []), { ...m.by, of: e.controller ?? (e.sourceId ? chars.get(e.sourceId)?.controller : undefined) ?? c.controller }];

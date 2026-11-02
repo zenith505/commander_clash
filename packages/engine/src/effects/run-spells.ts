@@ -34,7 +34,7 @@ function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract
   if (eo.toSource) return me && me !== first.id && s.objects[me]?.zone === "battlefield" && (ctx.sourceZc === undefined || (s.objects[me]!.zoneChanges ?? 0) === ctx.sourceZc) && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id: me }, ctx.controller, src)) ? [me] : [];
   return s.battlefield.filter((id) => {
     if (id === first.id || (eo.self && id === me)) return false;
-    if (!objectMatchesFor(s, eo.among, id, ctx.controller)) return false;
+    if (!objectMatchesFor(s, eo.among, id, eo.casterControls ? orig.controller : ctx.controller)) return false;
     return chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id }, orig.controller, src));
   });
 }
@@ -689,7 +689,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             break;
           }
         }
-        sc.cascade = { exiled, ...(hit ? { hit } : {}) };
+        sc.cascade = { exiled, ...(hit ? { hit } : {}), n };
         // The discovered card (CR 701.57c), cast or not: "the discovered card's mana value" (Hit the Mother Lode).
         if (hit) s.resolving!.discovered = { id: hit, mv: defMv(defOf(s, obj(s, hit))) };
         log(s, `${p.name} discovers ${n}: exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, finding ${defOf(s, obj(s, hit)).name}` : ", finding nothing"}.`);
@@ -710,6 +710,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       shuffle(s, rest);
       for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
       if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      // "Whenever you discover" (Curator of Sun's Creation): once the whole process is done, even if parts of it were
+      // impossible (rulings), with its value.
+      fireEvent(s, { type: "discovered", player: p.id, amount: sc.cascade.n ?? 0 });
       return;
     }
     case "ripple": {

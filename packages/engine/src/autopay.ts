@@ -830,14 +830,16 @@ export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 
 }
 
 /** Tap mana for a card's suspend cost, then suspend it (CR 702.62a), or null if that can't be done now. */
-export function planSuspend(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+export function planSuspend(s: GameState, pid: PlayerId, id: ObjectId, x?: number): Action[] | null {
   const o = s.objects[id];
   const sus = o && compileCard(defOf(s, o)).suspend;
   if (!sus) return null;
-  const problem = suspendProblem(s, pid, id);
+  // "Suspend X": X is 1 unless chosen (X can't be 0).
+  const n = sus.x ? (x ?? 1) : undefined;
+  const problem = suspendProblem(s, pid, id, n);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const taps = problem ? planMana(s, pid, parseManaCost(sus.cost)) : [];
-  return taps ? [...taps, { type: "suspend", player: pid, objectId: id }] : null;
+  const taps = problem ? planMana(s, pid, parseManaCost(sus.cost), n ?? 0) : [];
+  return taps ? [...taps, { type: "suspend", player: pid, objectId: id, ...(n !== undefined ? { x: n } : {}) }] : null;
 }
 
 /** Tap mana for {2}, then foretell the card (CR 702.143a), or null if that can't be done now. */
@@ -855,7 +857,7 @@ export function planUnlock(s: GameState, pid: PlayerId, id: ObjectId, door: numb
   if (cost === undefined) return null;
   const problem = unlockProblem(s, pid, id, door);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const taps = problem ? planMana(s, pid, parseManaCost(cost)) : [];
+  const taps = problem ? planMana(s, pid, parseManaCost(cost), 0, undefined, [], { ability: o!, unlock: true }) : [];
   return taps ? [...taps, { type: "unlockDoor", player: pid, objectId: id, door }] : null;
 }
 

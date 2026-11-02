@@ -189,7 +189,7 @@ export function parseCostKeyword(
   madness?: string;
   madnessLife?: number;
   miracle?: string;
-  suspend?: { n: number; cost: string };
+  suspend?: { n: number; cost: string; x?: true };
   plot?: string;
   foretell?: string;
   casualty?: number;
@@ -275,8 +275,10 @@ export function parseCostKeyword(
     const cost = pay ? pay[2]!.repeat(num(pay[1]!)) : life ? life[1]! : m[1]!;
     return /^(\{[^}]+\})+$/.test(cost) && plainMana(cost) ? { madness: cost, ...(life ? { madnessLife: Number(life[2]) } : {}) } : "fail";
   }
-  // Suspend N—[cost] (CR 702.62a); "Suspend X—{X}{U}. X can't be 0." isn't modeled.
+  // Suspend N—[cost] (CR 702.62a).
   if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";
+  // "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X time counters, the X paid in the suspend cost (CR 107.3).
+  if ((m = /^Suspend X—(\{X\}(?:\{[^}X]+\})+)\. X can't be 0\.$/.exec(line))) return plainMana(m[1]!.replace("{X}", "")) ? { suspend: { n: 0, cost: m[1]!, x: true } } : "fail";
   if (/^Suspend\b/.test(line)) return "fail";
   // Casualty N (CR 702.153a): an optional additional cost, and "when you cast this spell, if a casualty cost was paid
   // for it, copy it. If the spell has any targets, you may choose new targets for the copy."

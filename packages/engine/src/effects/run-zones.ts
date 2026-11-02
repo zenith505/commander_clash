@@ -1453,6 +1453,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (left > 0) o.counters.time = left;
       else delete o.counters.time;
       log(s, `${defOf(s, o).name} loses a time counter${left ? ` (${left} left)` : ""}.`);
+      fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
     }
@@ -2547,7 +2548,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           : count === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
             : e.upTo && count >= 99
-            ? `any number of ${kind.replace(/\bcard\b/, "cards")}`
+            ? `any number of ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`
             : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
         // Realmbreaker: you choose from their graveyard. O-Kagachi Made Manifest: another player chooses from yours, for you.
         const chooser = e.chooser ? players(s, e.chooser, ctx).find((pid) => !player(s, pid).lost) : undefined;

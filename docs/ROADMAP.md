@@ -1,7 +1,7 @@
 # Roadmap
 
-29,086 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,324 of
+29,102 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,332 of
 9,979 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1596,6 +1596,34 @@ line blocks.
    "attach any number of target Equipment you control to target creature you control. When one or more Equipment become
    attached to that creature this way, ..." (Thorin, Mountain-king: reflexive about.attachedThisWay; expandMany no
    longer rewrites a reflexive trigger's own target references). +11 (29,053 of 31,936 with B71-B77).
+   Round 242 (top of the list, now done): "you may pay {X}. When you do, put any number of target creature cards with
+   total mana value X or less from that player's graveyard onto the battlefield under your control" (Fire Lord Sozin:
+   the reflexive body's own X); "return any number of artifact creature cards with total mana value 6 or less"
+   (Technomancer) and "up to three target creature cards with total mana value 8 or less ... They're artifacts" (The
+   War in Heaven III); "Whenever you discover, discover again for the same value" (Curator of Sun's Creation: trigger
+   youDiscover, event discovered); "Whenever you activate an ability that targets a creature or player, copy that
+   ability" (Ertha Jo, Frontier Mentor: activates targetsCreatureOrPlayer); "that player copies that spell for each other
+   creature they control" (Mirrorwing Dragon: copySpell eachOther casterControls, the caster's creatures and copies,
+   rulings); a Room "that doesn't have the same name as a Room you control" (Central Elevator: unlocked doors' names
+   only, rulings), "eight or more different names among unlocked doors" (Promising Stairs: Count unlockedDoors names),
+   "Spend this mana only to cast Room spells and unlock doors" (Smoky Lounge: ManaSpend unlockDoors, ManaUse unlock);
+   The Hunger Tide Rises IV (sacrifice any number of creatures, then a creature card with mana value up to that many
+   from the library and/or graveyard); "For each color pair, choose a card that's exactly those colors from among them"
+   (Niv-Mizzet Reborn: a dig with oneOfEach, as many as there are pairs among the ten); "Suspend X—{X}{3}{U}. X can't be
+   0." (Aeon Chronicler, Benalish Commander, Detritivore, Fungal Behemoth: suspend x, the X picker in the hand menu,
+   browser test; the bot tries X from 4 down) and "Whenever a time counter is removed from this card while it's exiled"
+   (also Dinosaurs on a Spaceship: trigger selfTimeCounterRemovedExiled, from suspend's upkeep trigger and time travel),
+   "When the last time counter is removed from this card while it's exiled" (Veiling Oddity). +16 (29,069 of 31,936 with
+   B71-B77).
+   Out after round 242 (looked at, not done): Frontline Heroism (the copy must target the token it created; with a
+   token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
+   bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
+   batch triggers); Saving Grace (redirecting damage to itself); Volcanic Offering (a target an opponent chooses);
+   Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (its
+   characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
+   which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
+   Kennerüd, Confusion in the Ranks, Imodane, Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
+   Fabrication Foundry (looked at, not done this round).
    Out after round 241 (looked at, not done): Nuka-Nuke Launcher ("until the end of defending player's next turn, that
    player gets two rad counters whenever they cast a spell": a floating trigger lasting until another player's turn
    ends); Psionic Ritual, Exterminate! and Reiterating Bolt (replicate with a cost that isn't mana, paid any number of
@@ -4388,7 +4416,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Shah of Naar Isle, mana echo only); "You may play that card this turn" after an opponent exiles their top card
   (Ornate Kanzashi); "Remove an oil counter from ~: It becomes a 5/5" (Meldweb Strider); "Whenever you become the target
   of a spell" (Dormant Gomazoa). UI fix: a look at another player's library is headed "The top of Ana's library", not
-  "your library". +17 (29,065 of 31,936; 29,086 with rounds 240 and 241).
+  "your library". +17 (29,065 of 31,936; 29,102 with rounds 240 to 242).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,

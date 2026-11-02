@@ -180,6 +180,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Rise of the Deathbringer: "Draw cards equal to ... You lose life equal to the number of cards drawn this way": those
   // really drawn (a replaced draw isn't one, CR 121.6).
   if (!each && /^the number of cards drawn this way$/i.test(p)) return { count: { kind: "drawnThisWay" } };
+  if (!each && /^the number of unlocked doors among Rooms you control$/.test(p)) return { count: { kind: "unlockedDoors" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
   if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };

@@ -2214,6 +2214,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(yard[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "you", inYourGraveyard: true, mana: true }, body } : "fail";
   }
+  // Ertha Jo, Frontier Mentor: "Whenever you activate an ability that targets a creature or player": a mana ability can't
+  // target (CR 605.1a), so it's never one.
+  const targeting = /^Whenever you activate an ability that targets a creature or player, (.+)$/.exec(line);
+  if (targeting) {
+    const body = parseBody(targeting[1]!, { activatedAbility: true });
+    return body ? { event: "abilityActivated", activates: { by: "you", targetsCreatureOrPlayer: true }, body } : "fail";
+  }
   // Elrond, Moon-Reader: "Whenever you activate an ability of a creature, ..." with nothing about mana abilities: mana
   // abilities too (rulings).
   const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent), (?!if it isn't a mana ability)(.+)$/.exec(line);
@@ -2839,6 +2846,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(capital(finalTriggers[1]!));
     return body ? { event: "youFinalChapterTriggers", body } : "fail";
   }
+  // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled, ...": it works in exile (CR 113.6),
+  // controlled by the card's owner (CR 113.8), once for each counter removed.
+  // Riftmarked Knight: "When the last time counter is removed from ~ while it's exiled, ...": the same, for the last one.
+  const timeExiled = /^(Whenever a|When the last) time counter is removed from ~ while it's exiled, (.+)$/.exec(line);
+  if (timeExiled) {
+    const body = parseBody(capital(timeExiled[2]!));
+    return body ? { event: timeExiled[1] === "When the last" ? "selfLastTimeCounterRemovedExiled" : "selfTimeCounterRemovedExiled", zone: "exile", body } : "fail";
+  }
+  // Curator of Sun's Creation: "Whenever you discover, discover again for the same value": the value of the discover that
+  // triggered it (CR 701.57a; you discover once the whole process is done, rulings).
+  if (/^Whenever you discover, discover again for the same value\.?$/.test(line)) return { event: "youDiscover", body: { targets: [], effects: [{ type: "discover", n: { count: { kind: "eventAmount" } } }], text: "Discover again for the same value." } };
   const finalChapter = /^Whenever the final chapter ability of a Saga you control resolves, (.+?)(, where X is that Saga's mana value)?\.$/.exec(line);
   if (finalChapter) {
     if (/\bthat Saga\b/.test(finalChapter[1]!) || /\bX\b/.test(finalChapter[1]!) !== !!finalChapter[2]) return "fail";

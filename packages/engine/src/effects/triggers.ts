@@ -178,6 +178,10 @@ export type TriggerSourceEvent =
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   | { type: "gaveGift"; player: PlayerId }
+  /** `n` time counters were removed from this card in exile (Aeon Chronicler: once for each, CR 113.6). */
+  | { type: "timeCountersRemovedExiled"; id: ObjectId; n: number }
+  /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
+  | { type: "discovered"; player: PlayerId; amount: number }
   | { type: "cumulativeUpkeepPaid"; id: ObjectId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
@@ -1090,6 +1094,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGiveGift", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "discovered") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youDiscover", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
   } else if (ev.type === "investigated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1609,8 +1618,29 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "echoPaid") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfEchoPaid");
+  } else if (ev.type === "timeCountersRemovedExiled") {
+    // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
+    // owner controlling it (CR 113.8), once for each counter.
+    const o = s.objects[ev.id];
+    if (o?.zone === "exile" && !o.faceDown) {
+      fromExile = true;
+      try {
+        for (let i = 0; i < ev.n; i++) add(o, o.owner, (e) => e === "selfTimeCounterRemovedExiled", compileCard(defOf(s, o)).triggers);
+      } finally {
+        fromExile = false;
+      }
+    }
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
+    // Riftmarked Knight: "When the last time counter is removed from ~ while it's exiled" (CR 113.6).
+    if (o?.zone === "exile" && !o.faceDown && ev.counter === "time") {
+      fromExile = true;
+      try {
+        add(o, o.owner, (e) => e === "selfLastTimeCounterRemovedExiled", compileCard(defOf(s, o)).triggers);
+      } finally {
+        fromExile = false;
+      }
+    }
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
@@ -2172,6 +2202,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
         // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
         if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;
+        // Ertha Jo: "an ability that targets a creature or player": its targets as it was activated (CR 602.2i, 115.1).
+        if (a.targetsCreatureOrPlayer) {
+          const item = ev.stackId ? s.castItems?.[ev.stackId] : undefined;
+          if (!item?.targets?.some((t) => t.kind === "player" || (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, s.objects[t.id]!, "Creature")))) return false;
+        }
         // Herald of Anafenza: "Whenever you activate ~'s outlast ability": this object's own.
         if (a.ownOutlast && (!ev.outlast || ev.source?.snapshot.id !== o.id || (ev.source.snapshot.zoneChanges ?? 0) !== (o.zoneChanges ?? 0))) return false;
         if (a.equipped) {

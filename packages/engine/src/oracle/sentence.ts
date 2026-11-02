@@ -68,6 +68,14 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: `${m[1]}and/or ${m[2]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if (/^For each color pair, choose a card that's exactly those colors from among them$/.test(s)) {
+      // Niv-Mizzet Reborn: one card for each of the ten color pairs (exactly two colors, CR 105.1), as many as you can
+      // (rulings); a card fits only its own pair, so that's one for each pair among them. "Put the chosen cards into your
+      // hand" follows.
+      const C: [string, string][] = [["W", "white"], ["U", "blue"], ["B", "black"], ["R", "red"], ["G", "green"]];
+      const anyOf: TargetSpec[] = C.flatMap(([a, an], i) => C.slice(i + 1).map(([b, bn]) => ({ kind: "card" as const, bothColors: [a, b] as Color[], colorCount: "two" as const, text: `${an}-${bn} card` })));
+      Object.assign(dig, { count: anyOf.length, upTo: false, required: true, filter: { kind: "card", anyOf, text: "card that's exactly two colors" }, oneOfEach: anyOf, into: "hand" });
+      return "more";
     } else if (/^For each card type, you may put a card of that type from among (?:them|the revealed cards) into your hand$/.test(s)) {
       // Atraxa, Grand Unifier: up to one card for each card type (CR 205.2a), a card with more than one type taken as any
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).
@@ -180,6 +188,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     Object.assign(dig, { countersIfMv: { max: Number(m[1]), counter: "+1/+1", n: m[2] === "an" ? 1 : num(m[2]!) } });
     return "more";
   }
+  // Niv-Mizzet Reborn: "Put the chosen cards into your hand and the rest on the bottom of your library in a random order."
+  if (dig.oneOfEach && dig.required && dig.into === "hand" && (m = new RegExp(`^Put the chosen cards into your hand and the rest ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   if ((m = new RegExp(`^Put (?:the rest(?: of (?:those|the) cards)?|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   // "Exile the rest" (Devourer of Destiny): face up (CR 406.3).
   if (/^Exile the rest$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "exile" };

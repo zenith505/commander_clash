@@ -1,7 +1,7 @@
 # Roadmap
 
-29,407 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,434 of
+29,417 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,444 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -118,8 +118,7 @@ line blocks.
    Out after round 167: Dinosaurs on a Spaceship and Deep-Sea Kraken (abilities that work while the card is exiled,
    triggered by a time counter coming off or by "if ~ is suspended"; the many ways counters are removed don't send such
    events yet), The Infamous Cruelclaw ("cast that card by discarding a card rather than paying its mana cost", a new
-   alternative cost with its own prompt and bot), Squandered Resources (mana of a type the sacrificed land could
-   produce: which land is sacrificed decides the color, and autopay picks colors before costs), Greymond, Avacyn's
+   alternative cost with its own prompt and bot), Greymond, Avacyn's
    Stalwart (two abilities chosen as it enters; only one chosen keyword is kept), Shelinda, Yevon Acolyte ("put a
    counter on that creature if ... Otherwise, put a counter on ~"), Gaea's Blessing ("put into your graveyard from your
    library" triggers). Round 167 went down the list to Accumulate Wisdom (rank 5,595).
@@ -145,7 +144,7 @@ line blocks.
    may), Endurance Bobblehead (up to X targets with X counted as it's activated), Esix, Fractal Bloom (a token
    replacement that copies a creature you choose). Round 169 went down the list to Venser, the Sojourner (rank 6,376),
    skipping over the cards still listed by `npm run popular`.
-   Out after round 170: Carth the Lion (a loyalty cost raised for planeswalkers you control), Scorched Ruins and Lotus
+   Out after round 170: Scorched Ruins and Lotus
    Vale (sacrifice two untapped lands as they enter), Hooded Blightfang (its second ability needs a "deals damage to a
    planeswalker" trigger; the first parses now), Cosmic Rebirth ("if you don't put it onto the battlefield" after a may), Bane's Contingency ("if that
    spell targets a commander you control ... instead"), Killer Service (pay mana and sacrifice as one "may" cost),
@@ -408,8 +407,7 @@ line blocks.
    Campfire (commanders from the command zone and graveyard to hand), Radiant Destiny, Lifecraft Engine (crewed
    Vehicles are the chosen type), Nicanzil ("explores a land card" / "a nonland card"), Mayael's Aria (each condition
    after its instruction, checked in turn), Commodore Guff, Sigarda's Summons, Prismatic Undercurrents.
-   Out after round 186 (looked at, not done): Interdimensional Web Watch (mana spendable only on spells cast from
-   exile: a spell's ManaUse doesn't know its zone, as for Mm'menon), Barrow-Blade ("that creature loses all abilities" for a blocker or
+   Out after round 186 (looked at, not done): Barrow-Blade ("that creature loses all abilities" for a blocker or
    blocked creature), Ironsoul Enforcer ("~ or a commander you control attacks alone"), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
    Schemes ("an exiled card with flashback you own" as a target), Archon of Coronation (damage that doesn't cause life loss).
    Round 187 went on from the top: "the greatest mana value of a commander you own on the battlefield or in the command
@@ -517,7 +515,7 @@ line blocks.
    miracle), Coram, Brimaz, Mindleech Mass, Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
-   graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
+   graveyard"), Undead Alchemist, Auntie Ool (ward—blight),
    Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
    Round 193 went on from the top: "whenever you cast a spell this turn" as a Saga chapter (Showdown of the Skalds,
    Origin of Thor: "deals damage equal to its power to each opponent" too), "if you do, it becomes plotted" (Kellan
@@ -594,8 +592,7 @@ line blocks.
    of turn, you may have ~ become an X/X ..." (Ebony Fly), "that's still a planeswalker" (Gideon, Ally of Zendikar and
    Gideon, Martial Paragon) and Equipment tokens named Stoneforged Blade / "Return it to your hand at the beginning of the
    next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
-   Out after round 196 (looked at, not done): Tamiyo, the Moon Sage (emblem returns each card put into your graveyard),
-   Proteus Staff ("the rest on the bottom in any order"),
+   Out after round 196 (looked at, not done): Proteus Staff ("the rest on the bottom in any order"),
    Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
@@ -627,8 +624,7 @@ line blocks.
    Out after round 198 (looked at, not done): Mirror of the Forebears (a copy keeps the type chosen for its source:
    copiable values don't include the choice, so its "of the chosen type" would need the copy's own), Font of Agonies
    (no "whenever you pay life" event: life is paid in many places), Callous Oppressor (an opponent chooses the type),
-   Caustic Bronco (no "saddled" condition on a trigger's life loss), Squandered Resources (mana of a type the
-   sacrificed land could produce), Sigarda's Splendor ("note your life total"), Back for Seconds (bargained: one of the
+   Caustic Bronco (no "saddled" condition on a trigger's life loss), Sigarda's Splendor ("note your life total"), Back for Seconds (bargained: one of the
    returned cards onto the battlefield instead), Phyrexian Soulgorger (cumulative upkeep that sacrifices creatures), Mariposa Military Base
    (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion, Countersculpt,
    Kindle the Inner Flame, Molten Exhale and Theorist's Sanctum (behold as a cost or a replacement) are still out.
@@ -777,8 +773,7 @@ line blocks.
    Trebuchet's token got "Ballistic Boulder that's tapped and attacking" as its name and entered untapped. No new prompts.
    +21, 20 of them legal (27,472 of 31,936 with rounds 202 to 204 and Lane B rounds B27 to B34).
    Out after round 205 (looked at, not done): Brimaz, Blight of Oreskos (which spells it means), Osgir, the Reconstructor
-   (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Chandra, Dressed to Kill
-   (a loyalty ability that adds mana, an emblem counting mana spent), Sigurd, Jarl of Ravensthorpe ("whenever you put a
+   (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Sigurd, Jarl of Ravensthorpe ("whenever you put a
    lore counter on a Saga"), Ruxa, Patient Professor ("creatures with no abilities"), The Ruinous Powers ("When you cast
    a spell this way"), Curse of Hospitality ("creatures attacking enchanted player").
    Round 206 went on from the top: "the next spell you cast this turn costs {1} less to cast" (Hardened Berserker,
@@ -1525,8 +1520,7 @@ line blocks.
    of any color to cast planeswalker spells" (Oath of Nissa, CR 609.4b). +15 (28,964 of 31,936 with B71-B74).
    Out after round 239 (looked at, not done): Omnath, Locus of All ("If you would lose unspent mana, that mana becomes
    black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (protection that doesn't
-   remove your own Auras and Equipment already attached, an exception to CR 702.16); Tamiyo, the Moon Sage (an emblem
-   that returns every card put into your graveyard from anywhere); Scion of the Ur-Dragon (becomes a copy of a card in
+   remove your own Auras and Equipment already attached, an exception to CR 702.16); Scion of the Ur-Dragon (becomes a copy of a card in
    your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
    mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
    Round 240 (top of the list, now done): "Until end of turn, you may look at the top card of your library any time,
@@ -1755,6 +1749,25 @@ line blocks.
    spells from your graveyard (Haakon, Stromgald Scourge: not from the command zone either, rulings); "exile target
    spell an opponent controls ... you may cast the exiled card without paying its mana cost" (Smirking Spelljacker:
    the exiled card is linked to the enters ability, CR 607.2a). +9 (29,407 of 31,936 with B84 to B89).
+   Round 255 (the top of the list and earlier skip lists): "+1: Add {R}. ~ deals 1 damage to up to one target player or
+   planeswalker", "If it's red, you may cast it this turn", "You may cast red spells from among them this turn" and an
+   emblem dealing the mana spent on a red spell (Chandra, Dressed to Kill: either face of a red card, rulings); an emblem
+   with "Whenever a card is put into your graveyard from anywhere, you may return it to your hand" (Tamiyo, the Moon Sage:
+   emblems watch "each card" batch triggers now); "At the end of the first combat phase on your turn, untap target
+   creature you control. After this phase, there is an additional combat phase" as an emblem (Zariel, Archduke of
+   Avernus); "When you next cast a creature spell this turn, search your library for a creature card with lesser mana
+   value" (Vivien, Monsters' Advocate: less than the spell's mana value as cast); "Reveal target face-down permanent. If
+   it's a creature card, you may turn it face up" (Hauntwoods Shrieker, with a browser test); "face-up nontoken creatures
+   you control" (Whisperwood Elemental); "Sacrifice a land: Add one mana of any type the sacrificed land could produce"
+   (Squandered Resources: the sacrificed land's mana abilities as it last existed, {C} included, a choice when there are
+   two or more types, with a browser test); "Spend this mana only to cast spells from exile" (Interdimensional Web Watch);
+   "You may play target Elemental card from your graveyard without paying its mana cost" (Horde of Notions: no land card
+   is an Elemental, so it's always a cast as it resolves); "Whenever ~ enters or a planeswalker you control dies" and
+   "Planeswalkers' loyalty abilities you activate cost an additional [+1] to activate" (Carth the Lion: a [−2] costs [−1],
+   so it can be activated with one loyalty, rulings; CR 606.6). +10 (29,417 of 31,936 with B84 to B89).
+   Out after round 255 (looked at, not done): Benevolent Blessing (protection that doesn't remove Auras and Equipment
+   already attached when the effect began: no record of what was attached then); Overgrown Zealot (mana spendable only to
+   turn permanents face up: no ManaUse for a turn-face-up cost).
    Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
    a memory counter); Arna Kennerüd, Skycaptain (token copies of the Auras and Equipment attached to a creature, entering
    attached to it); Imodane, the Pyrohammer ("an instant or sorcery spell you control that targets only a single creature
@@ -1795,8 +1808,7 @@ line blocks.
    Out after round 247 (looked at, not done): Hushbringer (see round 156); Endless Detour ("target spell, nonland
    permanent, or card in a graveyard": one target across three zones); Jaws, Relentless Predator ("Whenever one or more
    ... are sacrificed or destroyed": no event for that pair); Wall of Shards (cumulative upkeep "an opponent gains 1
-   life", an opponent chosen for each age counter); Squandered Resources ("Sacrifice a land: Add one mana of any type that
-   land could produce": a sacrifice cost inside a mana ability and "could produce"); Night Soil ("Exile two creature cards
+   life", an opponent chosen for each age counter); Night Soil ("Exile two creature cards
    from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity ("target face-up card in
    exile": no exile-card targets yet).
    Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
@@ -1861,8 +1873,7 @@ line blocks.
    Foremost, Goliath Hatchery (other lines, not started).
    Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
    the dead creature's +1/+1 counters).
-   Out after round 235 (looked at, not done): Squandered Resources (mana of a type the sacrificed land could produce);
-   Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
+   Out after round 235 (looked at, not done): Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
    players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
    Radiant Lotus (sacrifice one or more artifacts, another player adds the
    mana).
@@ -1903,13 +1914,13 @@ line blocks.
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
-   Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
+   Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
    Dream-Thief's Bandana, Chandra, Legacy of Fire, Theoretical Duplication,
-   Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Crystalline Giant,
+   Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,
    Kaervek, the Punisher, Obsessive Pursuit,
    Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
-   Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft
-   Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of
+   Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
+   Engine, Agatha of the Vile Cauldron, The Ancient One, Erdwal Illuminator, Sigarda, Host of
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
    Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
@@ -5055,7 +5066,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent").
 - Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix.
 - "Mana a land could produce" for Gates (Gond Gate, Plaza of Harmony), "basic land" (Star Compass), "that land"
-  (Benthic Explorers, Squandered Resources), Incubation Druid's "three mana of that type instead".
+  (Benthic Explorers), Incubation Druid's "three mana of that type instead".
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
   Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each

@@ -144,7 +144,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
@@ -201,7 +201,7 @@ export type TriggerSourceEvent =
   | { type: "coinFlipped"; player: PlayerId; won: boolean }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
-  | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true; /** The player an effect had tap it (see tapPermanent). */ by?: PlayerId }
+  | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true; /** The player an effect had tap it (see tapPermanent). */ by?: PlayerId; /** Tapped to pay a teamwork cost (Agent Maria Hill). */ teamwork?: true }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
@@ -303,7 +303,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -911,7 +911,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // triggering for its own controller, "that player" being the one who sacrificed it.
       const byOk = (by: "any" | "opponent" | undefined, watcher: PlayerId) => (watcher === ev.controller ? by !== "opponent" : by === "any" || (by === "opponent" && opponents(s, watcher).includes(ev.controller)));
       const consider = (src: GameObject, watcher: PlayerId, triggers?: TriggeredAbility[]) =>
-        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && (!t.sacrifices.self || src.id === ev.id) && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && (!t.sacrifices.self || src.id === ev.id) && (!t.sacrifices.emerge || !!ev.emerged) && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
       for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
@@ -1240,8 +1240,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // "For the first time during each of your turns" (Tale of Katara and Toph): its first tap this turn.
     const firstTap = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === (o.zoneChanges ?? 0) && o.tapsThisTurn.n === 1;
-    add(o, controllerOf(s, o), (e, t) => e === "selfBecomesTapped" && (!t.firstEachTurn || firstTap));
-    addHosted(o, (e, t) => e === "selfBecomesTapped" && !t.firstEachTurn);
+    add(o, controllerOf(s, o), (e, t) => e === "selfBecomesTapped" && (!t.firstEachTurn || firstTap) && (!t.forTeamwork || !!ev.teamwork));
+    addHosted(o, (e, t) => e === "selfBecomesTapped" && !t.firstEachTurn && !t.forTeamwork);
     // "Whenever you tap an untapped creature an opponent controls" (Hylda of the Icy Crown): only one an effect had you tap.
     const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
@@ -1363,6 +1363,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFullyUnlockRoom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "solved") {
+    // Case File Auditor: "whenever you solve a Case": its "to solve" ability resolved, controlled by the Case's controller
+    // (CR 719.3a-b, rulings).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "youSolveCase", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.controller });
     }
   } else if (ev.type === "becameLevel") {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
@@ -1975,7 +1982,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
-    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
+    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)) && (!t.castFromHand || spell.castFrom === "hand"), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
     // Conspire a permanent gave the spell (Raiding Schemes): the spell's own "if its conspire cost was paid, copy it" (CR 702.78a).
     // Only if it still has conspire as it becomes cast: sacrificing Wort to cast it takes it away (rulings).
     // Each instance paid copies it (CR 702.78b): its printed one first (its own trigger above), then one for each grant
@@ -2249,7 +2256,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
+        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.embalm && !ev.embalm) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
         // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
         // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
         if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;

@@ -569,6 +569,7 @@ export function parseCostKeyword(
     return {
       activated: {
         manaCost: cost,
+        keyword: embalm ? "Embalm" : "Eternalize",
         tap: false,
         ...(extra ? { costs: [extra] } : {}),
         sacrificeSelf: false,

@@ -117,6 +117,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever a spell you've cast is countered, (.+)$/, "yourSpellCountered"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you fully unlock a Room, (.+)$/, "youFullyUnlockRoom"],
+  // Case File Auditor: "whenever you solve a Case": one of your Cases becomes solved (CR 719.3b, rulings).
+  [/^Whenever you solve a Case, (.+)$/, "youSolveCase"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
@@ -1708,6 +1710,26 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
   // one who sacrificed it, its controller (CR 701.21a).
   // "When you sacrifice ~" (Heaped Harvest): ~ itself, wherever it went.
+  // Banish into Fable: "When you cast this spell from your hand, ...": only a spell cast from its owner's hand (CR 601.2a).
+  const castHand = /^When you cast (?:this spell|~) from your hand, (.+)$/.exec(line);
+  if (castHand) {
+    const t = parseTrigger(`When you cast ~, ${castHand[1]!}`);
+    return t && t !== "fail" && t.event === "selfCast" ? { ...t, castFromHand: true } : "fail";
+  }
+  // Agent Maria Hill: "Whenever ~ becomes tapped to pay a teamwork cost": tapped as a spell's teamwork cost is paid (CR
+  // 601.2h), not any other tap.
+  const teamworkTap = /^Whenever ~ becomes tapped to pay a teamwork cost, (.+)$/.exec(line);
+  if (teamworkTap) {
+    const body = parseBody(teamworkTap[1]!);
+    return body ? { event: "selfBecomesTapped", forTeamwork: true, body } : "fail";
+  }
+  // Foul Emissary: "When you sacrifice ~ while casting a spell with emerge": as a cost of that spell, for any reason
+  // (rulings), whether or not it's cast for its emerge cost. Mana abilities are activated before a spell is cast here.
+  const emerge = /^When you sacrifice ~ while casting a spell with emerge, (.+)$/.exec(line);
+  if (emerge) {
+    const body = parseBody(emerge[1]!);
+    return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true, emerge: true }, body } : "fail";
+  }
   const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
   if (self) {
     // "When you sacrifice ~, it deals 3 damage to any target" (Ordeal of Purphoros): ~ as it last existed (CR 608.2h).
@@ -2312,6 +2334,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (boast) {
     const body = parseBody(boast[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", boast: true }, body } : "fail";
+  }
+  // Vizier of the Anointed: "Whenever you activate an eternalize or embalm ability" (CR 702.128a, 702.129a): it resolves
+  // before that ability, after its costs are paid (rulings).
+  const embalm = /^Whenever you activate an eternalize or embalm ability, (.+)$/.exec(line);
+  if (embalm) {
+    const body = parseBody(embalm[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", embalm: true }, body } : "fail";
   }
   // Afterburner Expert: "Whenever you activate an exhaust ability" (CR 702.177a), a mana ability too.
   const exhaust = /^Whenever you activate an exhaust ability, (.+)$/.exec(line);

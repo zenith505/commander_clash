@@ -180,6 +180,8 @@ export const CHOSEN_TYPE = "(the chosen creature type)";
 export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
 /** "Gains your choice of menace or lifelink": filled in with the keyword chosen as it resolved. */
 export const CHOSEN_KEYWORD = "(the chosen keyword)";
+/** "Gains landwalk of the chosen type" (Giant Slug): filled in with the landwalk of the basic land type chosen as it resolved (CR 702.14a). */
+export const CHOSEN_LANDWALK = "(landwalk of the chosen type)";
 /** "Have each of the chosen abilities" (Greymond, Avacyn's Stalwart): the keywords chosen as the source entered (Chosen.keywords). */
 export const CHOSEN_KEYWORDS = "(the chosen keywords)";
 /** "Protection from each of your opponents" (CR 702.16i, 702.16k): from each player who is an opponent of its controller. */

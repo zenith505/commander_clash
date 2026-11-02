@@ -727,6 +727,11 @@ export function compile(d: CardDef): CompiledCard {
     // Ascendant Acolyte: "~ enters with a +1/+1 counter on it for each +1/+1 counter among other creatures you control":
     // counted as it enters, when it isn't on the battlefield yet (CR 614.1c), so the same as "among creatures you control".
     line = line.replace(/^(~ enters with a \+1\/\+1 counter on it for each \+1\/\+1 counter among) other (creatures you control\.)$/, "$1 $2");
+    // Magnanimous Magistrate: "Whenever another nontoken creature you control dies, if its mana value was 1 or greater, you
+    // may remove that many reprieve counters from ~. If you do, return that card ...": the intervening if (CR 603.4) on the
+    // creature as it last existed, which it still is as the ability resolves (CR 603.10a), is the trigger's filter; "that
+    // many" is that mana value.
+    line = line.replace(/^Whenever another nontoken creature you control dies, if its mana value was (\d+) or greater, you may remove that many ([a-z]+) counters from ~\. (If you do, return that card to the battlefield under its owner's control\.)$/, "Whenever another nontoken creature you control with mana value $1 or greater dies, you may remove a number of $2 counters equal to its mana value from ~. $3");
     // An ability word (CR 207.2c) or a flavor word (Khârn's "Berzerker — ", CR 207.2d) before a static or replacement
     // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
     // 714.2b) or a modal choice.
@@ -3075,6 +3080,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] === " from your hand" ? { fromHand: true as const } : payZero[3] ? { fromExile: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
       continue;
     }
+    // Omnipresence: "You may cast spells with mana value less than or equal to the number of creatures you control from your
+    // hand without paying their mana costs": an alternative cost of nothing (CR 118.9), X at 0 (107.3b, rulings), the count
+    // taken as each spell is cast; normal timing (rulings).
+    const omni = /^You may cast spells with mana value less than or equal to (the number of creatures you control) from your hand without paying their mana costs\.$/.exec(line);
+    if (omni) {
+      const n = parseCount(omni[1]!, null);
+      if (!n || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { fromHand: true, maxMvCount: n };
+      continue;
+    }
     // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
     // once for each such permanent (a new object again, rulings), during your turn, following the normal timing rules.
     // Demon of Fate's Design: "Once during each of your turns, you may cast an enchantment spell by paying life equal to its
@@ -3101,6 +3116,15 @@ export function compile(d: CardDef): CompiledCard {
       const spec = parseTargetPhrase(`${genericAlt[1]} card from a graveyard`);
       if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${genericAlt[1]} spell` }))(spec), genericMv: true };
+      continue;
+    }
+    // Runeforge Champion: "You may pay {1} rather than pay the mana cost for Rune spells you cast": an alternative cost of
+    // that much generic mana (CR 118.9), X at 0 in it (CR 107.3, 601.2b); the spell's mana value doesn't change (rulings).
+    const fixedAlt = /^You may pay \{(\d+)\} rather than pay the mana cost for ([A-Z][a-z]+) spells you cast\.$/.exec(line);
+    if (fixedAlt && fixedAlt[1] !== "0") {
+      const spec = parseTargetPhrase(`${fixedAlt[2]} card from a graveyard`);
+      if (spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${fixedAlt[2]} spell` }))(spec), genericMv: true, generic: Number(fixedAlt[1]) };
       continue;
     }
     // Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast": an
@@ -3619,6 +3643,12 @@ export function compile(d: CardDef): CompiledCard {
     // Oath of Nissa (CR 609.4b): colored symbols of its controller's planeswalker spells paid with mana of any color.
     if (line === "You may spend mana as though it were mana of any color to cast planeswalker spells.") {
       out.spendAnyColorPlaneswalkerSpells = true;
+      continue;
+    }
+    // Case File Auditor: "... to cast Case spells": the same for spells with that subtype.
+    const anyColorSub = /^You may spend mana as though it were mana of any color to cast (Case|Aura|Equipment|Vehicle|Saga|Room|Class) spells\.$/.exec(line);
+    if (anyColorSub) {
+      out.spendAnyColorSubtypeSpells = anyColorSub[1]!;
       continue;
     }
     if (line === "You can spend mana of any type to cast creature spells.") {
@@ -5652,6 +5682,15 @@ export function compile(d: CardDef): CompiledCard {
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled; "attached to
   // target creature" (Gryff's Boon) needs none.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield" && e.attachToTarget === undefined))) out.unsupported.push("(an Aura returning itself to the battlefield)");
+  // Yavimaya Kavu: "~'s power is equal to ..." and "~'s toughness is equal to ..." on two lines are two
+  // characteristic-defining abilities, both applied in layer 7a (CR 604.3, 613.4a): one static defining both.
+  const cdas = out.statics.filter((st) => st.affects.kind === "self" && !st.condition && st.mods.length === 1 && st.mods[0]!.kind === "definePT");
+  const cdaPower = cdas.find((st) => (st.mods[0] as { power?: unknown }).power !== undefined && (st.mods[0] as { toughness?: unknown }).toughness === undefined);
+  const cdaToughness = cdas.find((st) => (st.mods[0] as { power?: unknown }).power === undefined && (st.mods[0] as { toughness?: unknown }).toughness !== undefined);
+  if (cdas.length === 2 && cdaPower && cdaToughness) {
+    const merged = { ...cdaPower, mods: [{ ...cdaPower.mods[0]!, ...cdaToughness.mods[0]! } as typeof cdaPower.mods[0]] };
+    out.statics = out.statics.flatMap((st) => (st === cdaPower ? [merged] : st === cdaToughness ? [] : [st]));
+  }
   const json = JSON.stringify(out);
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;

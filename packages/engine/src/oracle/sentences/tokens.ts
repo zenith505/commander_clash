@@ -27,6 +27,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return mod?.what === "tokens" && mod.who === "you" && (mod.op === "double" || mod.op === "triple") ? [{ type: "countModThisTurn", mod }] : null;
   }
 
+  // Volrath's Laboratory, Riptide Replicator, Sarpadian Empires, Vol. VII: "Create a 2/2 creature token of the chosen color
+  // and type": the color and the creature type chosen as the source entered (CR 607.2a), as the token is created.
+  if ((m = /^Create an? (\d+|X)\/(\d+|X) creature token of the chosen color and type$/.exec(s)) && (m[1] === "X") === (m[2] === "X")) {
+    const token: TokenSpec = { name: "Creature", colors: [], types: ["Creature"], subtypes: [], keywords: [], ...(m[1] === "X" ? {} : { power: Number(m[1]), toughness: Number(m[2]) }) };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token, chosenColorType: true, ...(m[1] === "X" ? { pt: X } : {}) }];
+  }
   // "Create twice X 1/1 black and green Pest creature tokens" (Pest Infestation): 2X of them (X counting 0 off the stack,
   // CR 107.3).
   if ((m = /^Create twice X (.+ tokens?(?: with .+)?)$/.exec(s))) {

@@ -5247,6 +5247,20 @@ function Controls({
         ))}
       </div>
     );
+  // Sarpadian Empires, Vol. VII: "choose white Citizen, blue Camarid, ...": a color and a creature type at once.
+  if (pending?.kind === "chooseOption" && pending.what === "colorAndType" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> choose a color and creature type
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            <ManaCost cost={`{${({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as Record<string, string>)[o.split(" ")[0]!] ?? "C"}}`} size="sm" /> {o.charAt(0).toUpperCase() + o.slice(1)}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "colors" && pending.player === HUMAN) return <ColorsPick key={pending.source} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
     return (

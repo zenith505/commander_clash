@@ -4660,6 +4660,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   blocked since your last upkeep", a +1/+1 counter, otherwise one removed (Wiitigo, Shape of the Wiitigo); "Return a creature card with mana value 1, 2, and 3 each" (Gruesome Menagerie); "Discard two
   nonland cards with the same name" as an activation cost (Sphinx of the Chimes, with a picker that only takes a
   same-name pair and a browser test). +14 (29,333 of 31,936 with B86 and rounds 248 and 249).
+- Round B88 (one-line templates from the bottom of the list): "When ~ enters, choose one or both. Each mode must target
+  a different player." (Splinter & Leo, Father & Son; Donnie & April, Adorkable Duo; Mikey & Mona, Mutant Sitters, whose
+  "target player chooses a creature they control and puts two +1/+1 counters on it" is that player's pick and putting;
+  Casey & Raph, Hotheads, whose "target player exiles the top card of their library. Until that player's next end step,
+  they may play that card without paying its mana cost" gives that player the permission); "put a +1/+1 counter on each
+  other creature target player controls" (other than ~); "Whenever ~ attacks or dies" (Balor, now with all three of its
+  modes); "you may sacrifice an artifact, enchantment, or token. If you don't, tap ~" (Devouring Sugarmaw // Have for
+  Dinner); delirium's "If there are four or more card types among cards in your graveyard, exile the top card of your
+  library. You may play it until the end of your next turn" (Impossible Inferno); "Creature spells you cast that share a
+  creature type with ~ cost {1} less" (Mistform Warchief, with its types as they are now); "a creature token of the chosen
+  color and type" (Volrath's Laboratory, Riptide Replicator, named after the type per the rulings, and with what was
+  chosen as it last existed if the source is gone, CR 608.2h); "As ~ enters, choose white Citizen, blue Camarid, black
+  Thrull, red Goblin, or green Saproling" (Sarpadian Empires, Vol. VII: a color and a creature type picked together, with
+  a browser test); "Sacrifice an Equipment/Aura attached to ~" as an activation cost (Ronin, Shadow Stalker; Faunsbane
+  Troll). +13 (29,346 of 31,936 with B86, B87 and rounds 248 and 249).
+- Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast
+  (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord ("as ~ enters, choose another
+  creature you control"), Spatial Binding ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
+  Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
+  reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until

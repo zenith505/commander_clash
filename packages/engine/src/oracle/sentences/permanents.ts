@@ -823,6 +823,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[1]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }];
   }
+  // Mikey & Mona, Mutant Sitters: "Target player chooses a creature they control and puts two +1/+1 counters on it": that
+  // player picks one as this resolves (not targeted) and is the one putting the counters (Hapatra's "whenever you put").
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) chooses a creature they control and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = pickFilter("creature");
+    return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }, { type: "counters", what: { ref: "created" }, counter: "+1/+1", n: m[2] === "a" ? 1 : m[2] === "two" ? 2 : 3, by: who }] : null;
+  }
   // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": that player picks as it
   // resolves (not targeted); "that creature" is the one picked.
   if ((m = /^([Tt]arget opponent|[Tt]arget player) chooses (an? [a-z]+) they control$/.exec(s))) {

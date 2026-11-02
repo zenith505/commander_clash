@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { reselectOptions, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -3860,6 +3860,12 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length + player(s, pid).hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
     return lands < 5 ? "land" : "nonland";
   }
+  // Sarpadian Empires, Vol. VII: the creature type most of its creatures have (a tribal payoff), else the first pair.
+  if (what === "colorAndType") {
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
+    const score = (opt: string) => mine.filter((o) => characteristics(s, o).subtypes.includes(opt.split(" ")[1]!)).length;
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
@@ -4942,7 +4948,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   for (const c0 of ab.costs) {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
-    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
+    const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
+    // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id) } : c1;
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;

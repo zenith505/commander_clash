@@ -13,7 +13,7 @@ import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCos
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -952,7 +952,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -5420,6 +5420,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.notOwned && o.owner === pid) continue;
       // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
       if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
+      // Mistform Warchief: a creature type the spell (the face cast) shares with the source as it is now (CR 205.3m).
+      if (m.sharesCreatureTypeWithSelf && !shareCreatureType(creatureTypesOf(s, src), everyCreatureType(d) ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t))))) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, power: pw, toughnessAbovePower: tough, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
@@ -6935,7 +6937,8 @@ const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
-    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
+    const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
     return xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
@@ -8776,6 +8779,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       o.chosen = { ...o.chosen, keywords: [...(o.chosen?.keywords ?? []), choice] };
       log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
     } else {
+      if (pend.what === "colorAndType" && !pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
       o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
       // Banner of Kinship: "~ enters with a fellowship counter on it for each creature you control of the chosen type",

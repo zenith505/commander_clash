@@ -132,6 +132,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
       removeCounters = rc;
+    } else if ((c = /^Sacrifice an? (Aura|Equipment) attached to ~$/.exec(part))) {
+      // Ronin, Shadow Stalker: "Sacrifice an Equipment attached to ~"; Faunsbane Troll: "an Aura": one attached to this
+      // permanent as the cost is paid ("~" bound to its id then, see bindAttachedToSource).
+      const filter = pickFilter(c[1]!);
+      if (filter?.kind !== "object") return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, attachedTo: { kind: "object", objectId: "~", text: "~" }, text: `${c[1]} attached to ~` }, n: 1 });
     } else if ((c = new RegExp(`^Sacrifice ~ and ${NUM} (.+)$`).exec(part))) {
       // Mount Doom: "Sacrifice ~ and a legendary artifact": this permanent and another one (CR 602.2b). Glass-Cast Heart:
       // "Sacrifice this artifact and thirteen Blood tokens", each one another permanent (rulings).

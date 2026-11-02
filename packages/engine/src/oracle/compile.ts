@@ -1487,6 +1487,15 @@ export function compile(d: CardDef): CompiledCard {
       else for (let i = 0; i < n; i++) (out.entersChoose ??= []).push({ what: "keyword", options: kws as string[], many: true });
       continue;
     }
+    // Sarpadian Empires, Vol. VII: "As ~ enters, choose white Citizen, blue Camarid, black Thrull, red Goblin, or green
+    // Saproling." (CR 614.12): one color and creature type pair, both chosen at once.
+    const asColorTypeList = /^As ~ enters, choose ((?:(?:white|blue|black|red|green) [A-Z][a-z]+, )+or (?:white|blue|black|red|green) [A-Z][a-z]+)\.$/.exec(line);
+    if (asColorTypeList) {
+      const pairs = asColorTypeList[1]!.split(/, (?:or )?/);
+      if (!pairs.every((p) => CREATURE_TYPES.has(p.split(" ")[1]!)) || out.entersChoose?.length) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "colorAndType", options: pairs });
+      continue;
+    }
     // "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk." (Eclipsed Realms,
     // CR 614.12): one of these creature types.
     const asTypeList = /^As (?:~|it) enters, choose ((?:[A-Z][a-z]+, )+or [A-Z][a-z]+)\.$/.exec(line);
@@ -5184,6 +5193,8 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
       // Park Heights Maverick: "Whenever ~ deals combat damage to a player or dies, proliferate": the same.
       /^Whenever ~ deals combat damage to a player or dies, (.+)$/.exec(line) ??
+      // Balor: "Whenever ~ attacks or dies, ...": an attack and a death are never one event.
+      /^Whenever ~ attacks or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
@@ -5275,6 +5286,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : /^Whenever an equipped creature you control other than ~ attacks or dies, /.test(line)
               ? [`Whenever another equipped creature you control attacks, ${effect}`, `Whenever another equipped creature you control dies, ${effect}`]
+            : /^Whenever ~ attacks or dies, /.test(line)
+              ? [`Whenever ~ attacks, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ deals combat damage to a player or dies, /.test(line)
               ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
@@ -5987,6 +6000,9 @@ function checkCastingLinks(out: CompiledCard) {
     // "Each of the chosen abilities" (Greymond): only with "as ~ enters, choose two abilities from among ...".
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_KEYWORDS) && !out.entersChoose?.some((c) => c.what === "keyword" && c.many)) bad = true;
     if (o.ref === "selfChosenPlayer" && !out.entersChoosePlayer) bad = true;
+    // Volrath's Laboratory: "a creature token of the chosen color and type": both chosen as it entered, or one pair
+    // (Sarpadian Empires, Vol. VII's "choose white Citizen, ...").
+    if (o.type === "createToken" && o.chosenColorType) needs.add(out.entersChoose?.some((c) => c.what === "colorAndType") ? "colorAndType" : "color").add(out.entersChoose?.some((c) => c.what === "colorAndType") ? "colorAndType" : "creatureType");
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     // Lobotomy: a card chosen from a revealed hand gives the name (Effect takeFromHand "name").
     if (o.type === "takeFromHand" && o.action === "name") choices.add("cardName");
@@ -6234,7 +6250,7 @@ function joinModes(lines0: string[]): string[] {
     // Glorfindel, Dauntless Rescuer: "..., choose one and ~ gets +1/+1 until end of turn." too.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random(?:\. If [^.]+, you choose one instead)?|\. If [^.]+, (?:you may )?choose both instead| and ~ gets [+-]\d+\/[+-]\d+ until end of turn)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
-    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more|choose one or both)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   close();

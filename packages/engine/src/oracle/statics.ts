@@ -739,6 +739,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // still takes off {2} (rulings); the exiled card is the one its imprint ability exiled (linked in compile.ts).
   if ((m = /^Spells you cast that share a card type with the exiled card cost \{(\d+)\} less to cast$/.exec(text)))
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
+  // Mistform Warchief: "Creature spells you cast that share a creature type with ~ cost {1} less to cast."
+  if ((m = /^Creature spells you cast that share a creature type with ~ cost \{(\d+)\} less to cast$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", types: ["Creature"], text: "creature spells that share a creature type with ~" }, n: -Number(m[1]), sharesCreatureTypeWithSelf: true, text: line } };
   // "Spells your opponents cast during your turn cost {1} more to cast" (Paladin Class): "During your turn, ...".
   text = text.replace(/^(\S.*? (?:you|your opponents) cast) during your turn (?=costs? \{\d+\} (?:less|more) to cast$)/, "During your turn, $1 ");
   const ofChosen = / of the chosen type costs? \{/.test(text);

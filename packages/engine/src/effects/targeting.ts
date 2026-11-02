@@ -315,6 +315,14 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
  * A filter with "the chosen type" / "the chosen color" filled in from what was chosen. With nothing
  * chosen it's left as it is, and then matches nothing (or, for "not of the chosen type", anything).
  */
+/**
+ * Ronin, Shadow Stalker: "Sacrifice an Equipment attached to ~": the cost's filter names its source as "~" (the
+ * `attachedTo.objectId` the parser leaves, which matches nothing), made into the source's id as the cost is paid.
+ */
+export function bindAttachedToSource(spec: TargetSpec, sourceId: ObjectId | undefined): TargetSpec {
+  return spec.attachedTo?.objectId === "~" && sourceId ? { ...spec, attachedTo: { ...spec.attachedTo, objectId: sourceId } } : spec;
+}
+
 export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): TargetSpec {
   if (!spec.chosen) return spec;
   const { chosen: kind, ...rest } = spec;
@@ -363,6 +371,12 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "number") return { ...chosen, number: Number(choice) };
   if (what === "parity") return { ...chosen, parity: choice === "odd" ? "odd" : "even" };
   if (what === "landOrNonland") return { ...chosen, landOrNonland: choice === "land" ? "land" : "nonland" };
+  // "White Citizen": the color and the creature type.
+  if (what === "colorAndType") {
+    const [word, type] = choice.split(" ");
+    const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c].toLowerCase() === word?.toLowerCase());
+    return { ...chosen, ...(color ? { color } : {}), ...(type ? { type } : {}) };
+  }
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   // "The color or colors of your choice": the colors named, "White,Blue", in WUBRG order.
   if (what === "colors") return { ...chosen, colors: (Object.keys(COLOR_NAMES) as Color[]).filter((c) => choice.split(",").includes(COLOR_NAMES[c])) };

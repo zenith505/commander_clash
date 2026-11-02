@@ -1182,9 +1182,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   }
   // Vindictive Lich: "choose one or more. Each mode must target a different player." (a triggered ability's): no more
   // modes than there are players to target, but at least one if any can be (rulings, CR 115.3).
-  const oneOrMore = /^[Cc]hoose one or more\. Each mode must target a different player\.\s*((?:•[^•]+)+)$/.exec(text.trim());
+  // The TMNT pairs (Splinter & Leo, Donnie & April, Mikey & Mona): "choose one or both. Each mode must target a different
+  // player." with two modes: the same as "one or more" of two.
+  const oneOrMore = /^[Cc]hoose one or (more|both)\. Each mode must target a different player\.\s*((?:•[^•]+)+)$/.exec(text.trim());
   if (oneOrMore && !opts.spell && !opts.activated) {
-    const body = parseModal("one or more", oneOrMore[1]!, text.trim(), opts);
+    const body = parseModal(oneOrMore[1] === "both" ? "one or both" : "one or more", oneOrMore[2]!, text.trim(), opts);
     if (!body || !body.modal!.modes.every((m) => m.targets.length === 1 && m.targets[0]!.kind === "player")) return null;
     return { ...body, modal: { ...body.modal!, distinctTargets: true } };
   }
@@ -5339,7 +5341,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // the top card of your library. You may play that card until the end of your next turn."), both sentences are.
     // Outlaws' Fury: "If you control an outlaw, exile the top card of your library. Until the end of your next turn, you may
     // play that card.": whether you control one as it resolves.
-    const controlIf = /^If (you control an? [^,]+), (exile the top .+)$/.exec(s);
+    // Impossible Inferno: "If there are four or more card types among cards in your graveyard, exile the top card ...": the
+    // same, checked as it resolves.
+    const controlIf = /^If (you control an? [^,]+|there are (?:four|five|six|seven) or more card types among cards in your graveyard), (exile the top .+)$/.exec(s);
     const controlCond = controlIf ? parseStaticCondition(controlIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? (parseHowCast(s, ctx) ?? (controlCond ? { cond: { kind: "state" as const, cond: controlCond }, not: false, text: controlIf![2]! } : null)) : null;
     // "Exile cards from the top of your library equal to the excess damage dealt to that creature this way" (Archaic's
@@ -5409,6 +5413,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const spellFilter = parseSearchFilter("instant or sorcery card");
       if (!spellFilter) return null;
       effects.push({ type: "impulse", n: 1, until: "yourNextTurn", castOnly: true, spellFilter });
+      si++;
+      continue;
+    }
+    // Casey & Raph, Hotheads: "Target player exiles the top card of their library. Until that player's next end step, they
+    // may play that card without paying its mana cost.": that player's card, that player's permission, ending as that
+    // player's next end step begins.
+    if (!impulseIf && /^[Tt]arget player exiles the top card of their library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Until that player's next end step, they may play that card without paying its mana cost") {
+      const who = parsePlayer("target player", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "impulse", n: 1, until: "yourNextEndStep", who, theyPlay: true, free: true });
       si++;
       continue;
     }

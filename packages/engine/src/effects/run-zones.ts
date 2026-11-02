@@ -3313,8 +3313,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "impulse": {
-      // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
-      const p = player(s, ctx.controller);
+      // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7). Casey & Raph: the player whose
+      // library it is plays it.
+      const p = player(s, e.theyPlay && e.who ? (players(s, e.who, ctx)[0] ?? ctx.controller) : ctx.controller);
       // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
       // "Exile the top card of each opponent's library" (Brainstealer Dragon, Stolen Strategy): the same, opponents only.
       // "Each of those opponents' libraries" (Breeches, Brazen Plunderer): the opponents dealt damage.

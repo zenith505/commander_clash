@@ -976,6 +976,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
   }
+  // Magnanimous Magistrate (as compile.ts reads "that many"): "remove a number of reprieve counters equal to its
+  // mana value from ~" (its mana value: the card's as it last existed).
+  if ((m = new RegExp(`^[Rr]emove a number of ${COUNTER} counters equal to (its mana value) from ~$`).exec(s))) {
+    const n = parseCount(m[2]!, ctx, true);
+    return n ? [{ type: "removeCounters", what: { ref: "self" }, counter: counterKind(m[1]!), n }] : null;
+  }
   // Descendant of Masumaro: "then remove a +1/+1 counter from ~ for each card in target opponent's hand": as many as there
   // are (all of them if fewer, rulings), counted as it resolves.
   if ((m = new RegExp(`^(?:Then )?[Rr]emove an? ${COUNTER} counter from ~ for each (.+)$`).exec(s))) {

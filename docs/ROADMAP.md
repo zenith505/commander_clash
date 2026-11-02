@@ -4696,6 +4696,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   that target ~ cost {2} more to cast" on an instant or sorcery (Kaervek's Torch); "~ costs 3 life more to cast for each
   target" (Phyrexian Purge, paid as it's cast and not given back); hourglass counters (Temporal Distortion). +12 legal
   (29,358 of 31,936 with B86, B87 and rounds 248 and 249).
+- Round B90 (one-line templates from the bottom of the list): "~'s power is equal to ..." and "~'s toughness is equal
+  to ..." on two lines, two characteristic-defining abilities read as one (Yavimaya Kavu, CR 604.3); "When you sacrifice ~
+  while casting a spell with emerge" (Foul Emissary: any sacrifice paying that spell's costs, per the rulings; mana
+  abilities are activated before a spell is cast here, so a sacrifice for mana before casting doesn't count); "You may pay
+  {1} rather than pay the mana cost for Rune spells you cast" and a search of the library and/or graveyard for a Rune card
+  (Runeforge Champion; Rune and Case are subtypes the target parser knows now); "whenever you solve a Case" and "You may
+  spend mana as though it were mana of any color to cast Case spells" (Case File Auditor); "a creature card with
+  eternalize or embalm" and "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed: embalm and
+  eternalize abilities carry their keyword now); "if its mana value was 1 or greater, you may remove that many reprieve
+  counters from ~. If you do, return that card" (Magnanimous Magistrate); "Whenever ~ becomes tapped to pay a teamwork
+  cost" (Agent Maria Hill); "At the beginning of your next upkeep, choose a basic land type. ~ gains landwalk of the
+  chosen type until the end of that turn" (Giant Slug); "When you cast this spell from your hand, copy it if you control
+  an artifact, then copy it if you control an enchantment" (Banish into Fable); "You may cast spells with mana value less
+  than or equal to the number of creatures you control from your hand without paying their mana costs" (Omnipresence).
+  +10 (29,368 of 31,936 with B86 to B89 and rounds 248 and 249).
+- Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
+  names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
+  (targeting any card in exile), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
+  anything, once per instruction), Shorecrasher Elemental and Skittish Valesk (returning or turning a permanent face
+  down), Preferred Selection, Scrying Glass, Hedron Alignment, Ertai's Familiar, Death-Mask Duplicant, Relive the Past.
 - Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
   by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
   and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave

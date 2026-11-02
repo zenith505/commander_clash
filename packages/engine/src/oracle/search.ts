@@ -165,6 +165,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const base = parseSearchFilter(noAb[1]!, count);
     return base && !base.noAbilities ? { ...base, noAbilities: true, text: p } : null;
   }
+  // Vizier of the Anointed: "a creature card with eternalize or embalm": either printed keyword (CR 702.128a, 702.129a).
+  const embalm = /^(.+ card) with eternalize or embalm$/.exec(p);
+  if (embalm) {
+    const base = parseSearchFilter(embalm[1]!, count);
+    if (!base || base.anyOf) return null;
+    return { ...base, anyOf: ["Eternalize", "Embalm"].map((k) => ({ kind: "card" as const, keywords: [k], text: k.toLowerCase() })), text: p };
+  }
   // Rootless Yew: "a creature card with power or toughness 6 or greater": either one (anyOf).
   const pOrT = /^(.+ card) with power or toughness (\d+) or greater$/.exec(p);
   if (pOrT) {

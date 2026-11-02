@@ -1076,7 +1076,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "attach" && e.what.ref === "target" && !e.source && ((me) => !me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !characteristics(s, me).subtypes.includes("Equipment") || !objects(s, e.what, ctx).some((h) => h.zone === "battlefield" && h.id !== me.id))(ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) return false;
-    if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
+    // Magnanimous Magistrate: "you may remove that many reprieve counters": a number counted as it resolves.
+    if (e.type === "removeCounters" && typeof e.n !== "string" && ((n) => !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= n))(amountNow(s, e.n, ctx))) return false;
     if (e.type === "removeAnyCounters" && typeof e.n === "number" && !e.upTo && !objects(s, e.what, ctx).some((o) => Object.values(o.counters).reduce((a, b) => a + Math.max(0, b ?? 0), 0) >= (e.n as number))) return false;
     // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
     if (e.type === "processExile" && processCandidates(s, ctx.controller).length < e.n) return false;

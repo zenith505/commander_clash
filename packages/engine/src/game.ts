@@ -731,6 +731,8 @@ export function moveObject(
     exploitedBy?: { id: ObjectId; zc: number };
     /** Exiled as a material while its controller activates a craft ability (CR 702.167a): Market Gnome. */
     crafted?: true;
+    /** Sacrificed to pay a cost of a spell with emerge as its controller casts it (Foul Emissary, rulings). */
+    emerged?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1273,7 +1275,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -2114,13 +2116,14 @@ export function tapPermanent(
    * (Hylda of the Icy Crown; rulings: not when your ability has an opponent tap their own creature).
    */
   by?: PlayerId,
+  /** Tapped to pay a teamwork cost (Agent Maria Hill). */ teamwork?: true,
 ) {
   if (o.tapped) return;
   o.tapped = true;
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
   o.tapsThisTurn = { turn: s.turn, zc, n: before + 1 };
-  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}) });
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}), ...(teamwork ? { teamwork } : {}) });
 }
 
 /**
@@ -5672,9 +5675,15 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     return { kind: "lifeForMv", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
   }
   // Kentaro, the Smiling Cat: generic mana equal to the spell's mana value; castProblem checks it covers this spell.
+  // Runeforge Champion: a fixed amount of generic mana; with both, the least of the ones covering this spell.
   if (alt === "genericMv") {
-    if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.genericMv && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
-    return { kind: "genericMv", mana: `{${manaValue(parseManaCost(d.manaCost))}}` };
+    if (!s || pid === undefined) return undefined;
+    const amounts = s.battlefield.flatMap((id) => {
+      const z = compileCard(defOf(s, obj(s, id))).payZero;
+      return controllerOf(s, obj(s, id)) === pid && z?.genericMv && characteristics(s, obj(s, id)).hasPrintedAbilities && (!z.filter || printedMatches(z.filter, d)) ? [z.generic ?? manaValue(parseManaCost(d.manaCost))] : [];
+    });
+    if (!amounts.length) return undefined;
+    return { kind: "genericMv", mana: `{${Math.min(...amounts)}}` };
   }
   // Nissa, Worldsoul Speaker: that many {E} (CR 107.14); castProblem checks it covers this spell.
   if (alt === "energyForSpell") {
@@ -5825,6 +5834,7 @@ function payZeroSources(s: GameState, pid: PlayerId, o: GameObject, life: boolea
     if (z.yourTurn && s.activePlayer !== pid) return false;
     if (z.fromHandOrTop && o.zone !== "hand" && !(o.zone === "library" && player(s, pid).library[0] === o.id)) return false;
     if (z.filter && !printedMatches(z.filter, d)) return false;
+    if (z.maxMvCount && defMv(d) > evalAmount(s, z.maxMvCount, { controller: controllerOf(s, p), sourceId: p.id })) return false;
     return z.maxMvCounters === undefined || defMv(d) <= (p.counters[z.maxMvCounters] ?? 0);
   });
   return ok;
@@ -6203,7 +6213,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const returned: LastKnown = {};
   const discarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge"));
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
@@ -6244,7 +6254,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Teamwork: "you may tap any number of creatures you control with total power N or more".
   if (choices.teamwork?.length) {
-    for (const c of choices.teamwork) tapPermanent(s, obj(s, c));
+    for (const c of choices.teamwork) tapPermanent(s, obj(s, c), undefined, undefined, true);
     log(s, `${p.name} taps ${choices.teamwork.map((c) => nameOf(s, c)).join(", ")} (teamwork).`);
     o.teamwork = true;
   }
@@ -7349,7 +7359,7 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
  */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[], exiled?: { id: ObjectId; zc: number }[]) {
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[], exiled?: { id: ObjectId; zc: number }[], /** Paying for a spell with emerge as it's cast (Foul Emissary). */ emergeSpell?: boolean) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
     if (c.kind === "exileFromGraveyard" && c.process) {
@@ -7450,7 +7460,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         const ch = characteristics(s, o);
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
-        moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+        moveObject(s, id, "graveyard", { sacrificed: true, cost: true, ...(emergeSpell ? { emerged: true as const } : {}) });
       }
     } else if (c.kind === "discard" && c.random) {
       // Chosen by the game as the cost is paid (CR 701.9b); a spell being cast is on the stack already (CR 601.2a).
@@ -8194,7 +8204,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

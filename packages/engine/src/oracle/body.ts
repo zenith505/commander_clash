@@ -2,7 +2,7 @@ import { parseFromTop } from "./compile";
 import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseChanges, parseDig, parseSentence } from "./sentence";
@@ -470,6 +470,8 @@ const checkableMay = (e: Effect): boolean =>
   e.type === "removeExiledCounter" ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
   (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
+  // Magnanimous Magistrate: "you may remove that many reprieve counters from ~. If you do, ...": that card's mana value.
+  (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "manaValue") ||
   // Leatherhead, Swamp Stalker: "you may remove a counter from her. When you do, ...": only with a counter of any kind on it.
   (e.type === "removeAnyCounters" && e.what.ref === "self" && typeof e.n === "number" && e.n > 0 && !e.upTo && !e.moveTo && !e.kinds) ||
   // "You may mill that many cards. If you do, you may put a creature card from among them into your hand" (Barrowgoyf):
@@ -2760,6 +2762,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Mentor's Guidance: "When you cast this spell, copy it if you control a planeswalker, Cleric, ...": checked as the
   // ability resolves, not as it triggers (rulings), the same as "If you control ..., copy it".
   text = text.replace(/^copy it if (you control [^.]+)\.$/, "If $1, copy it.");
+  // Banish into Fable: "copy it if you control an artifact, then copy it if you control an enchantment": each checked as the
+  // ability resolves (rulings), one copy for each.
+  text = text.replace(/^copy it if (you control an? [a-z]+), then copy it if (you control an? [a-z]+)\. (?=You may choose new targets for the copies\.$)/, "If $1, copy it. If $2, copy it. ");
   // Atomic Microsizer: "That creature can't be blocked this turn and has base power and toughness 1/1 until end of turn":
   // two effects on the same creature.
   text = text.replace(/\bThat creature can't be blocked this turn and has base power and toughness (\d+)\/(\d+) until end of turn\./g, "That creature can't be blocked this turn. That creature has base power and toughness $1/$2 until end of turn.");
@@ -10774,6 +10779,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev?.type === "may" && (!prev.pay || prev.effects[0]?.type === "copySpell") && prev.effects.length === 1 ? prev.effects[0] : prev;
       // "Copy it. If you've completed a dungeon, copy that spell twice instead. You may choose new targets for the
       // copies" (Tomb of Horrors Adventurer): the copies either way.
+      // Banish into Fable: "If you control an artifact, copy it. If you control an enchantment, copy it. You may choose new
+      // targets for the copies": the copy each of them makes.
+      const pair = /copies$/i.test(s) ? effects.slice(-2) : [];
+      if (pair.length === 2 && pair.every((e) => e.type === "if" && !e.otherwise && e.effects.length === 1 && e.effects[0]!.type === "copySpell")) {
+        for (const e of pair) if (e.type === "if" && e.effects[0]!.type === "copySpell") e.effects[0]!.newTargets = true;
+        continue;
+      }
       const both = prev?.type === "if" ? [...prev.effects, ...(prev.otherwise ?? [])] : [];
       if (both.length === 2 && both.every((e) => e.type === "copySpell")) {
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
@@ -14046,6 +14058,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1 || last.noPowerUp) return null;
       last.noPowerUp = true;
+      continue;
+    }
+    // Giant Slug: "At the beginning of your next upkeep, choose a basic land type. ~ gains landwalk of the chosen type until
+    // the end of that turn.": a delayed trigger (CR 603.7a) whose controller chooses the type as it resolves (rulings), and
+    // the landwalk of that type (CR 702.14a) lasts that turn.
+    if (/^At the beginning of your next upkeep, choose a basic land type$/.test(s) && sentences[si + 1] === "~ gains landwalk of the chosen type until the end of that turn" && si + 2 === sentences.length) {
+      const text = "choose a basic land type; ~ gains landwalk of that type this turn";
+      effects.push({ type: "delayed", when: "yourNextUpkeep", effects: [{ type: "choose", choice: "basicLandType" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "addKeywords", keywords: [CHOSEN_LANDWALK] }], duration: "endOfTurn" }], text });
+      si++;
       continue;
     }
     // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger

@@ -4783,6 +4783,7 @@ export type TriggerEvent =
   | "yourSpellCountered"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
+  | "youSolveCase" // "Whenever you solve a Case" (Case File Auditor): a Case you control becomes solved (CR 719.3b)
   | "youFullyUnlockRoom" // "Whenever you fully unlock a Room" (CR 709.5i): one of your Rooms gets its second unlocked designation
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
   | "youCommitCrime"
@@ -4930,6 +4931,8 @@ export interface TriggeredAbility {
    * For "selfBecomesCrewed": "becomes crewed for the first time each turn" (Mighty Servant of Leuk-o).
    * For "selfBecomesTapped": "becomes tapped for the first time during each of your turns" (Tale of Katara and Toph), with activeIf yourTurn. */
   firstEachTurn?: true;
+  /** "Whenever ~ becomes tapped to pay a teamwork cost" (Agent Maria Hill): only a tap paying a spell's teamwork cost. */
+  forTeamwork?: true;
   /** For "selfBecomesCrewed": "if it was crewed by exactly two creatures" (an intervening if about the crewing, CR 603.4). */
   crewedBy?: number;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
@@ -5036,7 +5039,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed, CR 702.128a, 702.129a). */ embalm?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -5148,7 +5151,8 @@ export interface TriggeredAbility {
    */
   /** `by`: "whenever a player sacrifices" (any), "whenever an opponent sacrifices" (opponent); otherwise "whenever you sacrifice". */
   /** `self`: "When you sacrifice ~" (Heaped Harvest), only ~ itself. */
-  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; self?: true; by?: "any" | "opponent" };
+  /** `emerge`: "while casting a spell with emerge" (Foul Emissary): sacrificed paying that spell's costs (rulings). */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; self?: true; by?: "any" | "opponent"; emerge?: true };
   /**
    * For "permanentDestroyed": a permanent a spell or ability destroyed (CR 701.8a), as it last existed on the battlefield
    * (CR 603.10a), this one too; `by` "opponent": the spell's or ability's controller is an opponent, the event player.
@@ -5273,6 +5277,8 @@ export interface TriggeredAbility {
   ifTributeUnpaid?: boolean;
   /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
   ifConspired?: boolean;
+  /** For "selfCast": "When you cast this spell from your hand" (Banish into Fable): only when it was cast from its owner's hand. */
+  castFromHand?: true;
   /** Gift on a permanent: "When this permanent enters, if its gift cost was paid" (CR 702.174b), and "if the gift was promised". */
   ifGift?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
@@ -5441,7 +5447,7 @@ export interface ActivatedAbility {
    * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
-  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft" | "Forecast";
+  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft" | "Forecast" | "Embalm" | "Eternalize";
   /** An outlast ability (CR 702.107a), for "whenever you activate ~'s outlast ability" (Herald of Anafenza). */
   outlast?: true;
   /** "Activate no more than twice each turn" (CR 602.5b). */
@@ -6791,6 +6797,8 @@ export interface CompiledCard {
   spendAnyColorCreatureAbilities?: true;
   /** Oath of Nissa: "You may spend mana as though it were mana of any color to cast planeswalker spells" (CR 609.4b), its controller's. */
   spendAnyColorPlaneswalkerSpells?: true;
+  /** Case File Auditor: "You may spend mana as though it were mana of any color to cast Case spells" (CR 609.4b): spells with this subtype. */
+  spendAnyColorSubtypeSpells?: string;
   /** Vizier of the Menagerie: "You can spend mana of any type to cast creature spells" (CR 609.4b), its controller's. */
   spendAnyTypeCreatureSpells?: true;
   /**
@@ -6988,6 +6996,8 @@ export interface CompiledCard {
     fromExile?: true;
     once?: true;
     maxMvCounters?: string;
+    /** Omnipresence: "with mana value less than or equal to the number of creatures you control", counted as the spell is cast. */
+    maxMvCount?: AmountExpr;
     /** One with the Multiverse: "once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost". */
     yourTurn?: true;
     fromHandOrTop?: true;
@@ -6995,6 +7005,8 @@ export interface CompiledCard {
     life?: true;
     /** Kentaro, the Smiling Cat: generic mana equal to the spell's mana value rather than {0} (AltCostKind "genericMv"). */
     genericMv?: true;
+    /** With `genericMv`, Runeforge Champion: this much generic mana instead of the spell's mana value. */
+    generic?: number;
     /** Nissa, Worldsoul Speaker: this many {E} rather than {0} (AltCostKind "energyForSpell"). */
     energy?: number;
     /** Weftwalking: "The first spell each player casts during each of their turns may be cast without paying its mana cost": any player's, during their own turn, while they haven't cast a spell this turn. */

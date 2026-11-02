@@ -1223,7 +1223,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
   // Last Laugh: "Whenever a permanent other than ~ is put into a graveyard from the battlefield" is "another permanent".
-  line = line.replace(/^Whenever a permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another permanent is put into a graveyard from the battlefield, ");
+  // Yomiji, Who Bars the Way: "Whenever a legendary permanent other than ~ ..." likewise "another legendary permanent".
+  line = line.replace(/^Whenever an? ((?:legendary |nontoken )?)permanent other than ~ is put into a graveyard from the battlefield, /, "Whenever another $1permanent is put into a graveyard from the battlefield, ");
   // Stormfront Riders: "Whenever ~ or another creature is returned to your hand from the battlefield": one you own goes to
   // its owner's hand (CR 404.2), a token too before it ceases to exist (rulings). Justice, Vance Astrovik: "Whenever another
   // nonland permanent you control is returned to its owner's hand": from the battlefield, the only place a permanent is.
@@ -2032,6 +2033,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   } else if ((m = /^Whenever one or more cards are put into exile from graveyards and\/or the battlefield( during your turn)?, (.+)$/.exec(line))) {
     // Ketramose, the New Dawn: cards (not tokens) of anyone's, for any reason, in one event.
     batch = { what: "exiledFromGraveyardsOrBattlefield" };
+    yourTurn = !!m[1];
+    rest = m[2]!;
+  } else if ((m = /^Whenever one or more cards are put into exile( during your turn)?, (.+)$/.exec(line))) {
+    // Stonebinder's Familiar: cards (not tokens, CR 111.1) from anywhere, anyone's, in one event (rulings).
+    batch = { what: "exiled" };
     yourTurn = !!m[1];
     rest = m[2]!;
   } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
@@ -2906,6 +2912,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // they're put on, only the first each turn doing anything (rulings: one card however many).
     const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever one or more (\+1\/\+1 )?counters are put on one or more ([A-Z][a-z]+)s you control, /, (x, k: string | undefined, type: string) => (CREATURE_TYPES.has(type) ? `Whenever one or more ${k ?? ""}counters are put on ${/^[AEIOU]/.test(type) ? "an" : "a"} ${type} you control, ` : x)).replace(/^Whenever you put a (\+1\/\+1 )?counter on (a creature you control|another creature you control|another creature|a creature), /, "Whenever you put one or more $1counters on $2, ").replace(/^Whenever you tap one or more untapped creatures your opponents control, /, "Whenever you tap an untapped creature an opponent controls, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
+  }
+  // Acrobatic Cheerleader: "This ability triggers only once.": never again for this object, even if it's countered
+  // (rulings).
+  const onceEver = /^(.+?) This ability triggers only once\.$/.exec(line);
+  if (onceEver) {
+    const t = parseTrigger(onceEver[1]!);
+    return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, onceEver: true } : "fail";
   }
   // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only
   // while you're the active player.

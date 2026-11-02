@@ -1161,7 +1161,8 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
-  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (fromZone === "library" && to === "exile"))
+  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere.
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile"))
     (s.zoneBatch ??= []).push({
       id,
       zc: o.zoneChanges,

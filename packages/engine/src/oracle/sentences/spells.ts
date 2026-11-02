@@ -926,6 +926,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Spellskite: "Change a target of target spell or ability to ~" (rulings: any one of its targets, chosen as it resolves).
   if (/^Change a target of target spell or ability to ~$/i.test(s))
     return [{ type: "changeTarget", index: addTarget(ctx, { ...stackSpec("spell or ability"), text: "target spell or ability" }), toSelf: true, anyOne: true }];
+  // Torchling: "Change the target of target spell that targets only ~"; Silver Wyvern: "... target spell or ability that
+  // targets only ~"; Rebound: "... target spell that targets only a player" (TargetSpec.targetsOnly). Every target naming
+  // that one thing changes to the same new one (rulings on Torchling). "The new target must be ..." follows (body.ts).
+  if ((m = /^Change the target of target spell( or ability)? that targets only (~|a player)$/.exec(s)) && (m[2] === "a player" || ctx.activated)) {
+    const base = m[1] ? stackSpec("spell or ability") : { kind: "spell" as const, text: "target spell" };
+    const only = m[2] === "~" ? { targetsSource: true as const } : { targetsWhat: { kind: "player" as const, text: "a player" } };
+    return [{ type: "changeTarget", index: addTarget(ctx, { ...base, ...only, targetsOnly: true, text: `target spell${m[1] ?? ""} that targets only ${m[2]}` }), all: true }];
+  }
   if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (unless === null) return null;

@@ -2084,6 +2084,18 @@ function chooseSpellskite(s: GameState, pid: PlayerId, top: StackItem): Action[]
     if (controllerOf(s, me) !== pid) continue;
     const abilities = abilitiesOf(s, me).activated;
     for (let i = 0; i < abilities.length; i++) {
+      // Torchling, Silver Wyvern: "change the target of target spell that targets only ~", when it's aimed only at this one
+      // and could go to one of theirs instead.
+      const away = abilities[i]!.body.effects.find((x) => x.type === "changeTarget" && x.all);
+      if (away?.type === "changeTarget") {
+        const chosen = (top.targets ?? []).filter((c) => c.kind !== "none");
+        const j = (top.targets ?? []).findIndex((c) => c.kind !== "none");
+        const aimedHere = chosen.length > 0 && chosen.every((c) => c.kind === "object" && c.id === id) && harm[j] && !!body.targets[j];
+        const elsewhere = aimedHere && changeTargetOptions(s, top, body.targets[j]!, chosen[0]!).some((t) => t.kind !== "none" && !isMine(s, pid, t) && (away.mustBe !== "player" || t.kind === "player") && (away.mustBe !== "creature" || (t.kind === "object" && objIsType(s, obj(s, t.id), "Creature"))));
+        const plan = elsewhere ? planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }]) : null;
+        if (plan) return plan;
+        continue;
+      }
       const e = abilities[i]!.body.effects.find((x) => x.type === "changeTarget" && x.anyOne);
       if (!e) continue;
       const specs = body.targets;

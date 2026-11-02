@@ -480,11 +480,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const nth = t.oncePerTurn ? (instance.get(`${t.event}|${onceKey}`) ?? 0) : 0;
       if (t.oncePerTurn) instance.set(`${t.event}|${onceKey}`, nth + 1);
       if (t.oncePerTurn && onceUsed(o, t.zone, onceKey, nth)) return;
+      const everKey = `${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.event}|${onceKey}`;
+      if (t.onceEver && o.triggeredEver?.includes(everKey)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if ((once?.type === "castNow" || once?.type === "castFromAmong") && once.once && onceUsed(o, t.zone, "do:castNow")) return;
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
+        if (t.onceEver) (o.triggeredEver ??= []).push(everKey);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
@@ -995,6 +998,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
+          // Zombie Boa: "Whenever ~ becomes blocked by a creature of that color this turn": a delayed trigger about ~ (CR 603.7b).
+          if (bl) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlockedByCreature" && fits(t, bl, ctrl), triggers, undefined, bl), o);
           if (bl) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, bl, w), undefined, bl, { player: o.attacking, group: [o, bl].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
           // "Whenever equipped creature becomes blocked by a creature" (Infiltration Lens): once for each blocker (rulings).
           if (bl) addHosted(o, (e) => e === "selfBlockedByCreature", undefined, bl, { player: o.attacking });
@@ -1724,17 +1729,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
     // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.
     const fromPermanent = o?.zone === "battlefield" ? o : undefined;
+    const fits = (t: TriggeredAbility) => {
+      const d = t.damagesYou;
+      if (!d || (d.combat && !ev.combat)) return false;
+      if (d.by) return d.by === "any" || (d.by === "you") === (ev.by === ev.player);
+      return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
+    };
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.player) continue;
-      const fits = (t: TriggeredAbility) => {
-        const d = t.damagesYou;
-        if (!d || (d.combat && !ev.combat)) return false;
-        if (d.by) return d.by === "any" || (d.by === "you") === (ev.by === ev.player);
-        return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
-      };
       add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
     }
+    // Harsh Justice: "This turn, whenever an attacking creature deals combat damage to you, ...": a delayed trigger of the
+    // damaged player's (CR 603.7b).
+    fromFloating((src, ctrl, triggers) => ctrl === ev.player && add(src, ctrl, (e, t) => e === "dealsDamageToYou" && fits(t), triggers, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount }));
   } else if (ev.type === "sourceDealtDamage") {
     // "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): its
     // controller's permanents, once for each source and recipient (rulings); the permanent is the subject.
@@ -2830,6 +2838,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "exiledFromGraveyardsOrBattlefield") return m.to === "exile" && (m.from === "battlefield" || m.from === "graveyard");
+  if (b.what === "exiled") return m.to === "exile" && m.from !== "exile";
   if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }

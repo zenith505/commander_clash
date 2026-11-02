@@ -590,6 +590,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "lifeGainedThisTurn":
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
+    case "resolvedThisTurn":
+      return s.resolving?.nth ?? 0;
     case "energyLostThisTurn":
       return s.turnLog?.energyLost?.[ctx.controller] ?? 0;
     case "descendedThisTurn":

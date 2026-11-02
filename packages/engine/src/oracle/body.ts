@@ -260,6 +260,15 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: that[2] === "combat" ? "endOfCombat" : "endOfTurn", about: ctx!.lastObjectTarget! };
   }
+  // Vigorous Charge: "Whenever that creature deals combat damage this turn, if this spell was kicked, you gain life equal to
+  // that damage": a delayed trigger about the target (CR 603.7b-c), to a player or a creature, each time; whether the spell
+  // was kicked is fixed as it's cast (CR 702.33d), so the trigger is made only if it was.
+  const charge = ctx?.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !after.length ? /^Whenever that creature deals combat damage this turn, if (?:~|this spell) was kicked, you gain life equal to that damage$/.exec(s) : null;
+  if (charge) {
+    const trigger = parseTrigger("Whenever ~ deals combat damage, you gain that much life.");
+    if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamage" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "if", cond: { kind: "kicked" }, effects: [{ type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! }] };
+  }
   // Jaya, Fiery Negotiator: "Choose target creature an opponent controls. Whenever you attack this turn, ~ deals damage
   // equal to the number of attacking creatures to that creature.": a delayed trigger about that creature (CR 603.7b-c), as
   // the object it was (CR 400.7), the number counted as it resolves.
@@ -1058,6 +1067,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Touch of the Eternal: "count the number of permanents you control. Your life total becomes that number.": the number
     // counted as it resolves (CR 119.5).
     .replace(/^count the number of permanents you control\. Your life total becomes that number\.$/, "Your life total becomes the number of permanents you control.");
+  // Fell Shepherd: "return to your hand all creature cards that were put into your graveyard from the battlefield this
+  // turn": the same cards, still in your graveyard (rulings: not ones put there from another zone).
+  text = text.replace(/\b([Rr]eturn to your hand all creature cards) that were put into your graveyard from the battlefield this turn\./, "$1 in your graveyard that were put there from the battlefield this turn.");
   // Revivify: "1—14 | Return all creature cards in your graveyard that were put there from the battlefield this turn to
   // your hand. 15+ | Return those cards from your graveyard to the battlefield.": the same cards either way, read as
   // the result is known (CR 706.2).
@@ -1274,6 +1286,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Greven, Predator Captain: "If you do, you draw cards equal to that creature's power and you lose life equal to that
   // creature's toughness": one instruction after the other, both about the sacrificed creature as it last existed.
   text = text.replace(/\bIf you do, you draw cards equal to that creature's power and (you lose life equal to that creature's toughness)\./, "If you do, you draw cards equal to that creature's power, then $1.");
+  // Ayesha Tanaka: "unless that ability's controller pays {W}": its controller, the one who activated it (CR 113.8).
+  text = text.replace(/^(Counter target activated ability[^.]*) unless that ability's controller pays /, "$1 unless its controller pays ");
+  // Ouphe Vandals: "Counter target activated ability from an artifact source and destroy that artifact if it's on the
+  // battlefield": two instructions, the second about the ability's source.
+  text = text.replace(/^(Counter target activated ability from an artifact source) and destroy that artifact if it's on the battlefield\./, "$1. Destroy the source of that ability if it's on the battlefield.");
   // Mercy Killing: "Target creature's controller sacrifices it, then creates X 1/1 ... tokens, where X is that creature's
   // power": that player, and its power as it last existed on the battlefield (CR 608.2h).
   text = text.replace(/^(Target creature's controller sacrifices it), then creates /, "$1. Its controller creates ");
@@ -1454,6 +1471,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|, )until end of turn, (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+) and (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+)(?=, where X is |\.)/, "$1$2 gets $3 until end of turn and $4 gets $5 until end of turn");
   // Profane Procession: "Then if there are three or more cards exiled with ~, transform it": "it" is ~.
   text = text.replace(/(\. Then if there are \w+ or more cards exiled with ~, transform) it\.$/, "$1 ~.");
+  // Heretic's Punishment: "Choose any target, then mill three cards. ~ deals damage to that permanent or player equal to
+  // the greatest mana value among the milled cards": a target (rulings: illegal, nothing is milled), then the mill.
+  text = text.replace(/^Choose any target, then (mill (?:two|three|four|five) cards)\. ~ deals damage to that permanent or player equal to (the greatest mana value among the milled cards)\.$/, (_, mill: string, amt: string) => `${capital(mill)}. ~ deals damage equal to ${amt} to any target.`);
+  // Corrosion: "Then destroy each artifact with ... rust counters on it. Artifacts destroyed this way can't be regenerated."
+  text = text.replace(/(\bdestroy each artifact with mana value less than or equal to the number of [a-z]+ counters on it\.) Artifacts destroyed this way can't be regenerated\./, "$1 They can't be regenerated.");
+  // Civilized Scholar: "If a creature card is discarded this way, untap ~, then transform it": "it" is ~, both done before
+  // anyone gets priority (rulings).
+  text = text.replace(/(\. If an? [a-z]+ card is discarded this way, untap ~, then transform) it\.$/, "$1 ~.");
   // All Suns' Dawn: "For each color, return up to one target card of that color from your graveyard to your hand": five
   // targets, each chosen as a card of its color and checked as that color as it resolves (rulings), and the one word
   // "target" can't name the same card twice (CR 115.3).
@@ -1483,6 +1508,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // life and scry X" too.
   // "Untap it and all Samurai you control" (Godo, Bandit Warlord): two untaps, nothing in between.
   text = text.replace(/(^|\. )([Uu])ntap (it|~) and all ([^.]+)\./, "$1$2ntap $3. Untap all $4.");
+  // Stunning Strike: "tap enchanted creature and remove it from combat": both, to that creature.
+  text = text.replace(/^([Tt])ap enchanted creature and remove it from combat\.$/, "$1ap enchanted creature. Remove enchanted creature from combat.");
   // "~ deals damage to each opponent equal to the number of tapped creatures that opponent controls" (Mjölnir, Storm
   // Hammer): each opponent's own count.
   text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
@@ -2822,6 +2849,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // The Incredible Hulk: "If he's attacking, untap ~ and there is an additional combat phase after this phase": both only
   // while it's attacking (untapping it doesn't change that, CR 506.4).
   text = text.replace(/(^|\. )If ~ is attacking, untap ~ and there is an additional combat phase after this phase\./, "$1If ~ is attacking, untap ~. If ~ is attacking, there is an additional combat phase after this phase.");
+  // Shape Anew: "The controller of target artifact sacrifices it, then reveals cards from the top of their library until
+  // they reveal an artifact card. That player puts that card ...": the same player (the target's controller) throughout.
+  text = text.replace(/^The controller of target artifact sacrifices it, then reveals cards from the top of their library until they reveal an artifact card\. /, "Target artifact's controller sacrifices it. Its controller reveals cards from the top of their library until they reveal an artifact card. ");
   // Mass Polymorph: "Exile all creatures you control, then reveal cards from the top of your library until you reveal that
   // many creature cards. Put all creature cards revealed this way onto the battlefield, then shuffle the rest ...": that
   // many being the creatures exiled (tokens too); the creature cards enter at the same time (rulings).
@@ -3713,7 +3743,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
     // for that card, paying its costs and following the normal timing (rulings).
-    const yardTarget = /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    // Sins of the Past: "Until end of turn, you may cast target instant or sorcery card from your graveyard without paying
+    // its mana cost. If that spell would be put into your graveyard, exile it instead.": the same permission, free (CR
+    // 118.9: no alternative cost, X is 0), the card exiled however it would go to the graveyard (rulings).
+    const sins = /^Until end of turn, you may cast (target .+? card) from your graveyard without paying its mana cost$/.exec(s.replace(/\.$/, ""));
+    const yardTarget = sins ?? /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardTarget) {
       const before = ctx.targets.length;
       const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");
@@ -3721,7 +3755,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
       // Vohar, Vodalian Desecrator: "... this turn. If that spell would be put into your graveyard, exile it instead."
       const rider = sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
-      effects.push({ type: "mayCastFromGraveyard", what, ...(rider ? { exileAfter: true as const } : {}) });
+      if (sins && !rider) return null;
+      effects.push({ type: "mayCastFromGraveyard", what, ...(rider ? { exileAfter: true as const } : {}), ...(sins ? { free: true as const } : {}) });
       if (rider) si++;
       continue;
     }
@@ -5561,6 +5596,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // Bioplasm: "Exile the top card of your library. If it's a creature card, ~ gets +X/+Y until end of turn, where X is the
+    // exiled creature card's power and Y is its toughness": that card's, as it is in exile (CR 406.3; abilities defining
+    // its power apply there too, rulings), read as this resolves.
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && /^If it's a creature card, ~ gets \+X\/\+Y until end of turn, where X is the exiled creature card's power and Y is its toughness\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter = parseSearchFilter("creature card");
+      if (!filter) return null;
+      const pt = (k: "power" | "toughness") => ({ count: { kind: k, of: { ref: "exiledTop" as const } } });
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 1 }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: pt("power"), toughness: pt("toughness") }], duration: "endOfTurn" }] });
+      si++;
+      continue;
+    }
     // Chaos Harlequin: "Exile the top card of your library. If that card is a land card, ~ gets -4/-0 until end of turn.
     // Otherwise, ~ gets +2/+0 until end of turn.": the card as it is in exile, face up (CR 406.3); nothing more about it.
     const exiledIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
@@ -8777,6 +8823,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.exiledFromHand = !!(choose[3] || (typeof then !== "string" && /^(?:That player exiles|Exile) that card$/.test(then[0]))) && !until;
       continue;
     }
+    // Breaking Wave: "Simultaneously untap all tapped creatures and tap all untapped creatures.": which ones are which is
+    // fixed first, then both happen at once.
+    if (/^Simultaneously untap all tapped creatures and tap all untapped creatures$/.test(s)) {
+      effects.push({ type: "tap", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, swap: true });
+      continue;
+    }
+    // Check for Traps: "Exile that card. If an instant card or a card with flash is exiled this way, they lose 1 life.
+    // Otherwise, you lose 1 life.": the card just exiled from that hand, by its characteristics in exile (CR 608.2h);
+    // with nothing exiled (no nonland card there), "otherwise".
+    const exiledHandIf = ctx.exiledFromHand && effects.at(-1)?.type === "takeFromHand" ? /^If (an? [a-z]+ card(?: or an? [a-z]+ card| or a card with [a-z]+)?) is exiled this way, (.+)$/.exec(s) : null;
+    if (exiledHandIf) {
+      const parts = exiledHandIf[1]!.split(" or ").map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      if (parts.some((f) => !f)) return null;
+      const filter: TargetSpec = parts.length === 1 ? parts[0]! : { kind: "card", anyOf: parts as TargetSpec[], text: exiledHandIf[1]!.replace(/^an? /, "") };
+      // "They" is that player (the one whose hand it was).
+      const thenText = exiledHandIf[2]!.replace(/^they lose /, "that player loses ");
+      const then = parseOne(thenText.charAt(0).toUpperCase() + thenText.slice(1), ctx);
+      const other = /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+      const otherwise = other ? parseOne(other[1]!.charAt(0).toUpperCase() + other[1]!.slice(1), ctx) : undefined;
+      if (!then || then.some((e) => pauses(e)) || otherwise === null || otherwise?.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter }, effects: then, ...(otherwise ? { otherwise } : {}) });
+      if (other) si++;
+      continue;
+    }
     // "Look at the top twenty cards of your library, put any number of land cards from among them onto the battlefield
     // tapped, then shuffle" (Through the Forest Gate): the same as three sentences.
     const joined = new RegExp(`^((?:Look at|Reveal) the top ${NUMX} cards of your library), (put .+ from among them .+), then shuffle$`).exec(s);
@@ -8862,6 +8932,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (!dig && /^[Tt]hat player reveals the top two cards of their library$/.test(s) && /^You choose one of those cards and put it into their graveyard\.?$/.test(sentences[si + 1] ?? "") && ctx.eventPlayer && !ctx.spell) {
       effects.push({ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "graveyard", rest: "keep", reveal: true, library: { ref: "eventPlayer" } });
       si++;
+      continue;
+    }
+    // Bamboozle: "Target player reveals the top four cards of their library. You choose two of those cards and put them into
+    // that player's graveyard. Put the rest on top of their library in any order.": the cards are revealed, you pick the
+    // ones milled and (as the spell's controller, CR 608.2c) the order of the rest.
+    const bambooPick = !dig ? new RegExp(`^(Target player|Target opponent) reveals the top ${NUM} cards of their library$`).exec(s) : null;
+    const bambooPut = bambooPick && new RegExp(`^You choose ${NUM} of those cards and put them into (?:their|that player's) graveyard\\.?$`).exec(sentences[si + 1] ?? "");
+    if (bambooPick && bambooPut && /^Put the rest on top of their library in any order\.?$/.test(sentences[si + 2] ?? "")) {
+      const n = num(bambooPick[2]!);
+      const count = num(bambooPut[1]!);
+      if (count >= n) return null;
+      const index = addTarget(ctx, { kind: "player", opponent: bambooPick[1] === "Target opponent", text: bambooPick[1]!.toLowerCase() });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n, count, upTo: false, required: true, into: "graveyard", rest: "keep", reveal: true, library: { ref: "target", index } }, { type: "orderTop", who: { ref: "target", index }, n: n - count, digRest: true });
+      si += 2;
       continue;
     }
     // Ransack: "Look at the top five cards of target player's library. Put any number of them on the bottom of that library
@@ -10991,7 +11076,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Sparring Dummy: "You gain 2 life if a Lesson card is milled this way": the same as "If a Lesson card is milled this
     // way, you gain 2 life", after the pick from the milled cards too.
     const gainIfMilled = /^(You gain \d+ life) if (an? [A-Za-z]+ card) is milled this way$/.exec(s);
-    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If (?:an?|at least one) ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s) ?? (gainIfMilled ? /^If an? ([A-Za-z]+ card) is milled this way, (.+)$/.exec(`If ${gainIfMilled[2]} is milled this way, ${gainIfMilled[1]!.toLowerCase()}`) : null);
+    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If (?:an?|at least one) ((?:[A-Za-z]+, )?(?:[A-Za-z]+ or )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s) ?? (gainIfMilled ? /^If an? ([A-Za-z]+ card) is milled this way, (.+)$/.exec(`If ${gainIfMilled[2]} is milled this way, ${gainIfMilled[1]!.toLowerCase()}`) : null);
     if (ifMilled) {
       const then = ifMilled[ifMilled.length - 1]!;
       const filter: TargetSpec | null = ifMilled.length === 2 ? { kind: "card", chosen: "name", text: "card with the chosen name" } : (parseSearchFilter(ifMilled[1]!.replace(/, (?=non)/, " ")) ?? null);
@@ -11823,6 +11908,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (ctx.spell || prev?.type !== "counterSpell" || prev.unless || !ctx.targets[prev.index]?.noSpells) return null;
       const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Planeswalker"], notTypes: [], notColors: [], text: "artifact, creature, or planeswalker" };
       effects.push({ type: "continuous", what: { ref: "counteredSource", filter }, mods: [{ kind: "loseAllAbilities" }], duration: "whileControlled", whileOnBattlefield: true });
+      continue;
+    }
+    // Ouphe Vandals (rewritten above): the source of the targeted ability, still that permanent on the battlefield (CR
+    // 400.7), whether or not the ability could be countered; it isn't targeted, so protection doesn't stop it (rulings).
+    if (/^Destroy the source of that ability if it's on the battlefield$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || prev?.type !== "counterSpell" || prev.unless || !ctx.targets[prev.index]?.noSpells || effects.length !== 1) return null;
+      effects.push({ type: "destroy", what: { ref: "counteredSource", filter: { kind: "object", text: "permanent" }, targeted: true } });
       continue;
     }
     // Pulse of the Forge: "~ deals 4 damage to target player or planeswalker. Then if that player or that planeswalker's
@@ -13021,6 +13114,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Skyserpent Seeker: "... until you reveal two land cards. Put those land cards ..." the same with a number.
     const untilN = /^[Rr]eveal cards from the top of your library until you reveal (two|three|four|five) land cards$/.exec(s);
     const untilX = (untilN || /^[Rr]eveal cards from the top of your library until you reveal X land cards$/.test(s)) && /^Put those land cards onto the battlefield tapped and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Fathom Trawl: "Reveal cards from the top of your library until you reveal three nonland cards. Put the nonland cards
+    // revealed this way into your hand, then put the rest of the revealed cards on the bottom of your library in any
+    // order.": all of them with fewer (rulings), the rest in an order you choose (CR 401.4).
+    const trawl = new RegExp(`^[Rr]eveal cards from the top of your library until you reveal (two|three|four|five) nonland cards$`).exec(s);
+    // (The sentences are split at ", then".)
+    if (trawl && sentences[si + 1] === "Put the nonland cards revealed this way into your hand" && /^(?:[Tt]hen )?[Pp]ut the rest of the revealed cards on the bottom of your library in any order\.?$/.test(sentences[si + 2] ?? "")) {
+      const filter = parseSearchFilter("nonland card");
+      if (!filter) return null;
+      effects.push({ type: "revealUntil", filter, found: "hand", rest: "bottomOrder", n: num(trawl[1]!) });
+      si += 2;
+      continue;
+    }
     // Kindred Summons: "Choose a creature type. Reveal cards from the top of your library until you reveal X creature cards
     // of the chosen type, where X is the number of creatures you control of that type. Put those cards onto the
     // battlefield, then shuffle the rest of the revealed cards into your library." X counted as it resolves; all of them
@@ -13146,7 +13251,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // controller chooses (CR 303.4f).
       const permanent = theirs[3] && theirs[2] === "permanent card";
       const creature = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Creature" && !filter.anyOf;
-      if (!permanent && !creature) return null;
+      // Shape Anew: "an artifact card" (no artifact card is an Aura, so none needs a choice as it enters).
+      const artifact = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Artifact" && !filter.anyOf && !filter.subtypes?.length;
+      if (!permanent && !creature && !artifact) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
       si++;
       continue;
@@ -13194,6 +13301,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Aspiring Champion: "Put that card onto the battlefield, then shuffle the rest into your library. If that creature is a
     // Demon, it deals damage equal to its power to each opponent": the permanent it put there, as it is now (CR 608.2c).
+    // Riptide Shapeshifter: "Choose a creature type. Reveal cards from the top of your library until you reveal a creature
+    // card of that type. Put that card onto the battlefield and shuffle the rest into your library.": the type chosen as it
+    // resolves (a Changeling card has every creature type, CR 702.73a); with none, the whole library is revealed and
+    // shuffled (CR 701.20a).
+    const prevChoose = effects.at(-1);
+    if (/^Reveal cards from the top of your library until you reveal a creature card of (?:that|the chosen) type$/.test(s) && prevChoose?.type === "choose" && prevChoose.choice === "creatureType" && /^Put that card onto the battlefield(?:,)? (?:and|then) shuffle the rest into your library\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], chosen: "type", text: "creature card of the chosen type" }, found: "battlefield", rest: "shuffle" });
+      si++;
+      continue;
+    }
     if (until && sentences[si + 1]?.replace(/\.$/, "") === "Put that card onto the battlefield, then shuffle the rest into your library" && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
       const filter = parseSearchFilter(until[1]!);
       if (filter?.kind !== "card" || filter.types?.length !== 1 || filter.types[0] !== "Creature" || filter.anyOf || mayUntil) return null;
@@ -13210,8 +13327,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Hermit Druid: "Put that card into your hand and all other cards revealed this way into your graveyard."
     // Raph & Mikey: "Put that card onto the battlefield tapped and attacking and the rest ..." (CR 508.4).
     // Gamekeeper: "... onto the battlefield and put all other cards revealed this way into your graveyard."
+    // Avenging Druid: "you may reveal cards ... until you reveal a land card. If you do, put that card onto the battlefield
+    // and put all other cards revealed this way into your graveyard": the whole process, if you choose.
     // Sacred Guide: "Put that card into your hand and exile all other cards revealed this way" (as Demonic Consultation).
-    const untilPut = /^Put that card (into your hand|onto the battlefield( tapped(?: and attacking)?)?) and (the rest on the bottom of your library in a random order|(?:put )?all other cards revealed this way into your graveyard|the rest into your graveyard|exile all other cards revealed this way)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const untilPut = /^Put that card (into your hand|onto the battlefield( tapped(?: and attacking)?)?) and (the rest on the bottom of your library in a random order|(?:put )?all other cards revealed this way into your graveyard|the rest into your graveyard|exile all other cards revealed this way)$/.exec((mayUntil ? sentences[si + 1]?.replace(/^If you do, put /, "Put ") : sentences[si + 1])?.replace(/\.$/, "") ?? "");
     if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
       const filter = parseSearchFilter(until[1]!);
       if (!filter || filter.kind !== "card") return null;

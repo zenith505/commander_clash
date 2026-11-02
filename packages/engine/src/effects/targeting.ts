@@ -126,6 +126,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
+  if (spec.mvAtMostCounters && defMv(defOf(s, o)) > (o.counters[spec.mvAtMostCounters] ?? 0)) return false;
   if (spec.controllersGraveyardAtLeast !== undefined && (s.players[c.controller]?.graveyard.length ?? 0) < spec.controllersGraveyardAtLeast) return false;
   if (spec.controllersLandsAtMost !== undefined && s.battlefield.filter((id) => { const x = view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!); return x.controller === c.controller && x.types.includes("Land"); }).length > spec.controllersLandsAtMost) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
@@ -1197,6 +1198,13 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const tied = all.filter((id) => stat(id) === min);
     const can = e.destroyable ? tied.filter((id) => !objHasKeyword(s, obj(s, id), "Indestructible")) : tied;
     return can;
+  }
+  // Unnatural Hunger: "unless they sacrifice another creature": not the one the source is attached to.
+  if (e.filter.notSourceHost) {
+    const { notSourceHost: _, ...filter } = e.filter;
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const host = me?.zone === "battlefield" ? me.attachedTo : undefined;
+    return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => id !== host);
   }
   // Curse Artifact: "unless they sacrifice that artifact": the one the source is attached to.
   if (e.filter.sourceHost) {

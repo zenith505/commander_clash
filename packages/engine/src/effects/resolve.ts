@@ -435,7 +435,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return (s.linkedExile?.[key] ?? []).flatMap((l) => (s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc ? [s.objects[l.id]!] : []));
   }
   if (ref.ref === "counteredSource") {
-    const c = s.resolving?.counteredSource;
+    const c = ref.targeted ? s.resolving?.targetedAbilitySource : s.resolving?.counteredSource;
     const o = c && s.objects[c.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && objectMatches(s, ref.filter, o, ctx.controller, false) ? [o] : [];
   }

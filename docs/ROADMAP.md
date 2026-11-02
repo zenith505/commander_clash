@@ -1,6 +1,6 @@
 # Roadmap
 
-29,142 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,176 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,362 of
 9,979 (93%).
 
@@ -1634,7 +1634,7 @@ line blocks.
    creatures attack this turn, create that many ... tapped and attacking" (Basri Ket's −2); "If an artifact or creature
    spell is countered this way, put that card onto the battlefield under your control instead" (Desertion); "Choose
    target creature you don't control. Each creature you control deals damage equal to its power to that creature"
-   (Kamahl's Will). +14 (29,142 of 31,936 with B78+B79).
+   (Kamahl's Will). +14 (29,142 of 31,936 with B78+B79; 29,176 with B80+B81).
    Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
@@ -4453,6 +4453,52 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Ornate Kanzashi); "Remove an oil counter from ~: It becomes a 5/5" (Meldweb Strider); "Whenever you become the target
   of a spell" (Dormant Gomazoa). UI fix: a look at another player's library is headed "The top of Ana's library", not
   "your library". +17 (29,065 of 31,936; 29,102 with rounds 240 to 242).
+- Round B80 (one-line templates from the bottom of the list): "Whenever ~ becomes blocked by a creature, the blocking
+  creature gets -1/-1" (Order of the Alabaster Host); "becomes blocked by a nonartifact, non-Dragon creature, that
+  creature gets -X/-0, where X is half the creature's power" (Catacomb Dragon); "becomes blocked by a non-Wall creature,
+  that creature's controller sacrifices it at end of combat. If the player does, they create" (Basalt Golem); "Whenever
+  a creature blocking ~ dies" (Baneblade Scoundrel // Baneclaw Marauder, read from last known blocking); "Counter target
+  activated ability from an artifact source unless its controller pays {W}" (Ayesha Tanaka); "Counter target activated
+  ability from an artifact source and destroy that artifact if it's on the battlefield" (Ouphe Vandals: the source is
+  destroyed even if the ability can't be countered); "Creatures don't untap during target player's next untap step"
+  (Blinding Beam, all creatures that player's untap step would untap, Seedborn Muse too, per the ruling); exile the top
+  card and get +X/+X of its power and toughness (Bioplasm); draw, discard, "if a creature card is discarded this way,
+  transform ~" (Civilized Scholar); put a rust counter on each artifact target opponent controls, then destroy each
+  artifact with mana value at most its rust counters (Corrosion, read literally: a 0-mana-value artifact with no rust
+  counters is destroyed too); reveal until three nonland cards, those to hand and "the rest on the bottom of your library
+  in any order" (Fathom Trawl: new bottom-order pick after the reveal; browser test); "creature cards that were put into
+  your graveyard from the battlefield this turn" (Fell Shepherd); "if there is a colorless creature card in your
+  graveyard" (Grizzled Angler); "the greatest mana value among the milled cards" (Heretic's Punishment); "Copy target
+  instant or sorcery spell that targets you" (Mirror Sheen); "unless they sacrifice another creature of their choice"
+  (Unnatural Hunger: not the enchanted creature); "Whenever that creature deals combat damage this turn, if this spell
+  was kicked" (Vigorous Charge); "power less than 0" (Wasp, Shrinking Savior). +18 (29,120 of 31,936; 29,146 with rounds
+  243 and 244).
+- Round B81 (one-line templates from the bottom of the list): "If an instant or sorcery card is milled this way,
+  transform ~" (Aberrant Researcher); target player reveals the top four, "You choose two of those cards and put them
+  into their graveyard. Put the rest on top of their library in any order" (Bamboozle); "If an instant card or a card
+  with flash is exiled this way, they lose 1 life. Otherwise, you lose 1 life" after exiling a card from their hand
+  (Check for Traps); "Simultaneously untap all tapped creatures and tap all untapped creatures" (Breaking Wave); "Exile
+  all creature cards in all graveyards that were put there from the battlefield this turn" (Cry of the Carnarium); a
+  graveyard trigger with a "sacrifice a Swamp" cost (Akuta, Born of Ash); "sacrifice ~ unless you put a card from your
+  graveyard on the bottom of your library" (Anurid Scavenger: new graveyard pick; browser test); "The controller of
+  target artifact sacrifices it, then reveals ... until an artifact card" (Shape Anew); reveal until "a creature card of
+  the chosen type" onto the battlefield, the rest shuffled (Riptide Shapeshifter); "you may reveal ... until a land. If
+  you do, put" (Avenging Druid); "Whenever an enchanted creature you control becomes blocked" (Beastmaster's
+  Magemark); "each Aura attached to a creature deals 2 damage to the creature it's attached to" (Aura Barbs); "you may
+  cast target instant or sorcery card from your graveyard without paying its mana cost" this turn (Sins of the Past: X
+  is 0, no alternative costs, CR 118.9, 107.3b); "Tap enchanted creature and remove it from combat" and "As long as
+  enchanted creature isn't legendary, it doesn't untap" (Stunning Strike); "Exile it until ~ leaves the battlefield"
+  (Hixus, Prison Warden); "If a source would deal 4 or more damage to a permanent or player, that source deals 3 damage
+  to that permanent or player instead" (Divine Presence). Rules bug fixed: a static "As long as enchanted/equipped
+  creature ..., it ..." applied "it" to the Aura or Equipment itself instead of the creature (no other card's
+  compilation changed). +16 (29,136 of 31,936; 29,162 with rounds 243 and 244).
+- Out after round B81 (looked at, not done): Kaervek's Spite (an additional cost of sacrificing all permanents and
+  discarding your hand), Ignorant Bliss, Turn the Tables, Angry Mob, Time to Reflect (not attempted this round).
+- Out after round B80 (looked at, not done): Gloom Surgeon (prevent combat damage and exile that many cards: a
+  prevention with a follow-up action), Marvel Boy, Noh-Varr ("whenever you activate a power-up ability"), Ms. Marvel,
+  Elastic Ally ("power greater than its base power"), Whirlwind, Killer Cyclone ("one or more creatures that entered
+  this turn attack a player": a batch attack trigger naming the player), Titania, Rugged Rumbler (an "or" additional
+  cost and an "or" ward cost).
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,

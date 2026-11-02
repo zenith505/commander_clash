@@ -874,6 +874,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8d4d70c4-0490-4239-ac8f-dd1d1a008f08",
+  "name": "Anurid Scavenger",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Frog Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Frog",
+   "Beast"
+  ],
+  "oracleText": "Protection from black\nAt the beginning of your upkeep, sacrifice this creature unless you put a card from your graveyard on the bottom of your library.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Protection"
+  ],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "697ac261-263b-4879-bf45-6d10d23312ae",
   "name": "Ao, the Dawn Sky",
   "manaCost": "{3}{W}{W}",
@@ -6903,6 +6936,32 @@
   "commanderLegal": "legal",
   "set": "fic",
   "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7b002cae-ee7d-400d-af9c-445eb10f1f0c",
+  "name": "Fathom Trawl",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal cards from the top of your library until you reveal three nonland cards. Put the nonland cards revealed this way into your hand, then put the rest of the revealed cards on the bottom of your library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

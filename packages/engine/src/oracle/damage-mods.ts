@@ -173,6 +173,14 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: "setTo", amount: Number(setTo[4]), atLeast: Number(setTo[2]), text: line, ...(byP.by ? { by: byP.by } : {}), to };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Divine Presence: "If a source would deal 4 or more damage to a permanent or player, that source deals 3 damage to that
+  // permanent or player instead": the same, any source to anything (a replacement, not prevention, rulings).
+  const setToAny = /^If (a source) would deal (\d+) or more damage to a permanent or player, that source deals (\d+) damage to that permanent or player instead$/.exec(text);
+  if (setToAny) {
+    if (Number(setToAny[3]) >= Number(setToAny[2])) return null;
+    const mod: DamageMod = { op: "setTo", amount: Number(setToAny[3]), atLeast: Number(setToAny[2]), text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
   const m = new RegExp(
     `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,

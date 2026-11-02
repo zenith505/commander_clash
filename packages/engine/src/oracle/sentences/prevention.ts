@@ -194,6 +194,9 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   // sources and red sources would deal this turn" (Luminesce).
   // Radiant Kavu: "Prevent all combat damage blue creatures and black creatures would deal this turn", without "that".
   s = s.replace(/^(Prevent all (?:combat )?damage) ((?:white|blue|black|red|green) creatures and (?:white|blue|black|red|green) creatures would deal this turn)$/, "$1 that $2");
+  // Frontline Strategist: "prevent all combat damage non-Soldier creatures would deal this turn", without "that" either:
+  // the creature's type as the damage would be dealt (rulings).
+  s = s.replace(/^([Pp]revent all (?:combat )?damage) (non-[A-Z][a-z]+ creatures would deal this turn)$/, "$1 that $2");
   if ((m = /^Prevent all (combat )?damage that (.+?) would deal(?: to (.+?))? this turn$/i.exec(s))) {
     if (/^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(m[2]!)) return undefined;
     // Haze Frog: "Prevent all combat damage that other creatures would deal this turn": all creatures but its source as it

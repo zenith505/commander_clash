@@ -378,6 +378,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const mvs = (s.resolving?.revealedFromHandIds ?? []).filter((id) => !!s.objects[id]).map((id) => defMv(defOf(s, s.objects[id]!)));
       return mvs.filter((v, i) => mvs.some((w, j) => j !== i && w === v)).length;
     }
+    case "yardChosenMv":
+      return (s.resolving?.yardChosen ?? []).filter((id) => s.objects[id]?.zone === "exile").reduce((n, id) => n + defMv(defOf(s, s.objects[id]!)), 0);
     case "yardChosenThisWay":
       return (s.resolving?.yardChosen ?? []).filter((id) => !!s.objects[id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "discardedThisWay": {
@@ -1160,6 +1162,8 @@ function describeCount(c: Count): string {
       return "#revealed cards sharing a mana value with another";
     case "yardChosenThisWay":
       return `#${c.filter?.text ?? "card"}s exiled this way`;
+    case "yardChosenMv":
+      return "the exiled card's mana value";
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "discardedManaValue":

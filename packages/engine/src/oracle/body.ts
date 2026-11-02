@@ -1351,6 +1351,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Midnight Oil: "At the beginning of your draw step, draw an additional card and remove two hour counters from ~": two
   // instructions, in that order (CR 608.2c); counters are removed only as many as there are (rulings).
   text = text.replace(/^(draw an additional card) and (remove (?:a|an|one|two|three) [a-z]+ counters? from ~\.?)$/, (_, a: string, b: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}`);
+  // Rootwater Thief: "search that player's library for a card and exile it, then the player shuffles": the search shuffles
+  // the library it searched (CR 701.23a).
+  text = text.replace(/\b(search that player's library for an? (?:[a-z]+ )?card and exile it), then the player shuffles\./g, "$1.");
   // Sadistic Sacrament: "Search target player's library for up to three cards, exile them, then that player shuffles. If
   // ~ was kicked, instead search that player's library for up to fifteen cards, exile them, then that player shuffles.":
   // Denying Wind's search, for more cards when kicked (CR 702.33e).
@@ -1522,6 +1525,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(\. If you do, put an? [^.]+ counters? on ~) and it gains ([a-z]+) until end of turn\./, "$1 and ~ gains $2 until end of turn.");
   // First Day of Class: "put a +1/+1 counter on it and it gains haste until end of turn": the same, about "it".
   text = text.replace(/^(put a \+1\/\+1 counter on it) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
+  // Maelstrom Djinn: "put two time counters on it and it gains vanishing", with no duration: for as long as it's on the
+  // battlefield (CR 611.2a, 611.2c).
+  text = text.replace(/^(put (?:a|an|one|two|three) [a-z]+ counters? on it) and it gains ([a-z]+)\.$/, "$1. It gains $2.");
   // Spore Cloud: "Each attacking creature and each blocking creature doesn't untap during its controller's next untap
   // step": both groups as it resolves (CR 611.2c), as two instructions.
   text = text.replace(/\bEach attacking creature and each blocking creature doesn't untap during its controller's next untap step\./, "Each attacking creature doesn't untap during its controller's next untap step. Each blocking creature doesn't untap during its controller's next untap step.");
@@ -1589,6 +1595,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Case of the Gateway Express: "choose target creature you don't control. Each creature you control deals 1 damage to
   // that creature.": each of them a source of its own damage, all at once (CR 120.3), to that target.
   text = text.replace(/^[Cc]hoose (target creature you don't control)\. (Each creature you control) deals (\d+) damage to that creature\.$/, "$2 deals $3 damage to $1.");
+  // Burrog Barrage: "Target creature you control gets +1/+0 until end of turn if you've cast another instant or sorcery
+  // spell this turn. Then it deals damage ...": the target is chosen either way (CR 601.2c), the condition read as it
+  // resolves.
+  text = text.replace(/^Target (creature you control) gets ([+-]\d+\/[+-]\d+) until end of turn if (you've cast another [a-z ]+ spell this turn)\. Then it /, "Choose target $1. If $3, it gets $2 until end of turn. Then it ");
   // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
   // resolves (CR 608.2c).
   text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
@@ -2073,6 +2083,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Geth, Lord of the Vault: "Put target ... card ... from an opponent's graveyard onto the battlefield ... Then that player
   // mills X cards": that player is the card's owner.
   text = text.replace(/^(Put target [^.]+ card[^.]* from an opponent's graveyard onto the battlefield[^.]*)\. Then that player mills/, "$1. Its owner mills");
+  // Hellcat, Undying Vigilante: "return her to the battlefield under her owner's control with a +1/+1 counter on her. She loses
+  // all abilities and gains haste" (each "her" and "she" is ~ here): the card that died, as "it".
+  text = text.replace(/^return ~ to the battlefield under ~'s owner's control with a \+1\/\+1 counter on ~\. ~ loses all abilities and gains haste\.$/, "return it to the battlefield under its owner's control with a +1/+1 counter on it. It loses all abilities and gains haste.");
   // Sorin of House Markov: "exile ~, then return ~ to the battlefield transformed under ~'s owner's control" ("him").
   // Nicol Bolas, the Ravager: "{4}{U}{B}{R}: Exile ~, then return ~ ...", the same at the start of an ability.
   text = text.replace(/\b([Ee])xile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "$1xile ~, then return it to the battlefield transformed under its owner's control");
@@ -4722,7 +4735,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Scholar of Combustion: "You may cast that card until the end of your next turn": the same.
     const untilNext = /^Until the end of your next turn, you may (cast|play) that card( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(s.replace(/^You may (cast|play) that card until the end of your next turn$/, "Until the end of your next turn, you may $1 that card"));
-    const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", untilNext[2]] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn|for as long as you control ~)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
     const youCast = youCast0 && (youCast0[2] !== "this turn" || effects[effects.length - 1]?.type === "exile") && (youCast0[1] === "cast" || (youCast0[2] !== "this turn" && !youCast0[3] && effects[effects.length - 1]?.type === "exile")) ? youCast0 : null;
     // Mazzy, Truesword Paladin: "exile it. Until the end of your next turn, you may cast that card.": the card the Aura that
@@ -4738,9 +4751,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const thisTurn = youCast[2] === "this turn";
       const nextTurn = youCast[2] === "until the end of your next turn";
       const play = youCast[1] === "play";
+      // Victor Mancha, Runaway: "You may play it for as long as you control ~": a card from a graveyard, an ability's.
+      const whileYou = youCast[2] === "for as long as you control ~";
+      if (whileYou && (ctx.spell || youCast[3] || ctx.targets[prev.what.index]?.kind !== "card")) return null;
       const exileAfter = !play && sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into a graveyard, exile it instead";
       if ((thisTurn || nextTurn || play) && ctx.targets[prev.what.index]?.kind !== "card" && !(untilNext?.[2] && !play && ctx.targets[prev.what.index]?.kind === "object")) return null;
-      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(nextTurn ? { nextTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
+      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(whileYou ? { whileControlled: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(nextTurn ? { nextTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
       if (exileAfter) si++;
       continue;
     }
@@ -5191,7 +5207,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // you may play those cards. If you cast a spell this way, mana of any type can be spent to cast it." Face up (CR
     // 406.3), the permission yours; a land is played as your land play, a spell with mana of any type (CR 609.4b).
     const tgtExile = !theyExile ? new RegExp(`^(Target opponent|Target player) exiles the top (card|${NUMX} cards) of their library$`).exec(s) : null;
-    const tgtPlay = tgtExile && /^(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Ornate Kanzashi: "You may play that card this turn" is the same as "Until end of turn, you may play that card".
+    const tgtPlay = tgtExile && /^(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards)$/.exec((sentences[si + 1]?.replace(/\.$/, "") ?? "").replace(/^You may play (that card|those cards) this turn$/, "Until end of turn, you may play $1"));
     if (tgtExile && tgtPlay && (tgtExile[2] === "card") === /that card/.test(sentences[si + 1]!)) {
       const any = /^(?:If you cast a spell this way, mana of any type can be spent to cast it|Mana of any type can be spent to cast (?:those spells|them))$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "");
       const who = parsePlayer(tgtExile[1]!, ctx);
@@ -8064,6 +8081,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [typeInstead[1]!], text: typeInstead[1]! } }, effects: other, otherwise: [last] };
       continue;
     }
+    // Regent's Authority: "Target creature gets +2/+2 until end of turn. If it's an enchantment creature or legendary
+    // creature, instead put a +1/+1 counter on it and it gets +1/+1 until end of turn.": one or the other, by the
+    // creature's types as this resolves (CR 608.2c).
+    const regent = /^If it's an enchantment creature or legendary creature, instead put an? \+1\/\+1 counter on it and it gets ([+-]\d+)\/([+-]\d+) until end of turn$/.exec(s);
+    if (regent) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "continuous" || last.what.ref !== "target" || last.what.n || last.duration !== "endOfTurn" || ctx.lastObjectTarget !== last.what.index || ctx.targets[last.what.index]?.optional) return null;
+      const index = last.what.index;
+      const filter: TargetSpec = {
+        kind: "object", types: [], notTypes: [], notColors: [], text: "an enchantment creature or legendary creature",
+        anyOf: [
+          { kind: "object", types: [], notTypes: [], notColors: [], allTypes: ["Enchantment", "Creature"], text: "enchantment creature" },
+          { kind: "object", types: ["Creature"], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary creature" },
+        ],
+      };
+      const pump: Effect = { ...structuredClone(last), mods: [{ kind: "modifyPT", power: Number(regent[1]), toughness: Number(regent[2]) }] };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index, filter }, effects: [{ type: "counters", what: { ref: "target", index }, counter: "+1/+1", n: 1 }, pump], otherwise: [last] };
+      continue;
+    }
     // Jace's Mindseeker: "target opponent mills five cards. You may cast an instant or sorcery spell from among them without
     // paying its mana cost.": one of those cards, not any card in that graveyard (rulings).
     const millCast = effects[effects.length - 1]?.type === "mill" ? /^You may cast an? ([a-z ]+?) spell from among them without paying its mana cost$/.exec(s) : null;
@@ -8780,6 +8816,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.lastPlayerTarget = index;
       effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "graveyard", rest: "keep", reveal: false, library: { ref: "target", index } });
       si++;
+      continue;
+    }
+    // Wand of Denial: "Look at the top card of target player's library. If it's a nonland card, you may pay 2 life. If you
+    // do, put it into that player's graveyard.": you look, and only a nonland card can be paid for and put there.
+    const paidMill = oneLook && /^If it's a nonland card, you may pay (\d+) life\.?$/.exec(sentences[si + 1] ?? "");
+    if (paidMill && /^If you do, put it into (?:their|that player's) graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: oneLook[1] === "target opponent", text: oneLook[1]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "graveyard", rest: "keep", reveal: false, library: { ref: "target", index }, filter: { kind: "card", notTypes: ["Land"], text: "nonland card" }, payLife: Number(paidMill[1]) });
+      si += 2;
       continue;
     }
     if (yourLook && yourPut) {
@@ -11853,6 +11899,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "putOntoBattlefield" || prev.what.ref !== "target" || prev.what.n || prev.alsoMods || !CREATURE_TYPES.has(noAbilities[1]!)) return null;
       prev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [noAbilities[1]!] }, { kind: "loseAllAbilities" }];
+      continue;
+    }
+    // Hellcat, Undying Vigilante: "When ~ dies, return it to the battlefield ... with a +1/+1 counter on it. It loses all
+    // abilities and gains haste": the permanent the card became, from then on (CR 611.2c, 400.7), in that order in layer 6
+    // (CR 613.7), so it keeps haste.
+    const losesPrev = effects[effects.length - 1];
+    if (/^It loses all abilities and gains haste$/.test(s) && losesPrev?.type === "putOntoBattlefield" && losesPrev.what.ref === "selfCard" && !losesPrev.alsoMods && !ctx.spell) {
+      losesPrev.alsoMods = [{ kind: "loseAllAbilities" }, { kind: "addKeywords", keywords: ["Haste"] }];
+      continue;
+    }
+    // Otherworldly Escort: "When ~ dies, if it's not a Spirit, return it to the battlefield ... with four charge counters on
+    // it. It's a Spirit Detective. (It's no longer a Human.)": its creature types become those, from then on (CR 205.1a,
+    // 611.2c).
+    const itsTypes = /^It's an? ([A-Z][a-z]+(?: [A-Z][a-z]+)*)$/.exec(s);
+    const itsPrev = effects[effects.length - 1];
+    if (itsTypes && itsTypes[1]!.split(" ").every((w) => CREATURE_TYPES.has(w)) && itsPrev?.type === "putOntoBattlefield" && itsPrev.what.ref === "selfCard" && !itsPrev.alsoMods && !ctx.spell) {
+      itsPrev.alsoMods = [{ kind: "setSubtypes", subtypes: itsTypes[1]!.split(" ") }];
+      continue;
+    }
+    // Torrent Sculptor: "When ~ enters, exile an instant or sorcery card from your graveyard. Put a number of +1/+1 counters on
+    // ~ equal to half that card's mana value, rounded up.": the card chosen and exiled as it resolves (rulings), none with no
+    // card to exile (CR 107.1a).
+    const halfMv = /^Put a number of \+1\/\+1 counters on ~ equal to half that card's mana value, rounded (up|down)$/.exec(s);
+    const yardPrev = effects[effects.length - 1];
+    if (halfMv && yardPrev?.type === "chooseFromGraveyard" && yardPrev.dest === "exile" && yardPrev.n === 1 && !yardPrev.upTo && !yardPrev.who && !yardPrev.anyGraveyard && !ctx.spell) {
+      effects.push({ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "yardChosenMv" }, half: halfMv[1] as "up" | "down" } });
       continue;
     }
     // Valkyrie's Call: "It has flying and is an Angel in addition to its other types": the same as "It's an Angel with

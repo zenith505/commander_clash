@@ -595,6 +595,11 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
   }
+  // Lullmage's Domination: "~ costs {3} less to cast if it targets a creature whose controller has eight or more cards in
+  // their graveyard": the target's controller as the cost is set, after targets (CR 601.2c, 601.2f; rulings).
+  if ((m = new RegExp(`^~ costs \\{(\\d+)\\} less to cast if it targets a creature whose controller has (${NUM}) or more cards in their graveyard$`).exec(text))) {
+    return { lessIfTargets: { n: Number(m[1]), filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controllersGraveyardAtLeast: num(m[2]!), text: `creature whose controller has ${m[2]} or more cards in their graveyard` } } };
+  }
   // Vanish into Eternity: "~ costs {3} more to cast if it targets a creature": an increase, with the targets chosen
   // before the total cost is (CR 601.2c, 601.2f).
   // Dragon's Prey: "~ costs {2} more to cast if it targets a Dragon": a permanent with that subtype.
@@ -850,6 +855,8 @@ export function parseUntargetable(t: string): Untargetable | null {
   if (/^spells(?: your opponents control)?$/.test(t)) return { spells: true, ...opp };
   if (/^abilities(?: your opponents control)?$/.test(t)) return { abilities: true, ...opp };
   if (/^Aura spells$/.test(t)) return { spells: true, subtype: "Aura" };
+  // Artifact Ward: "abilities from artifact sources": the source's types as the ability targets (CR 113.7, 115.4).
+  if (/^abilities from artifact sources$/.test(t)) return { abilities: true, sourceTypes: ["Artifact"] };
   if ((m = new RegExp(`^${COLOR}(?: or ${COLOR})? spells(?: your opponents control)?$`).exec(t))) return { spells: true, colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])], ...opp };
   if ((m = new RegExp(`^${COLOR} spells or abilities from ${COLOR} sources$`).exec(t)) && m[1] === m[2]) return { colors: [COLOR_WORDS[m[1]!]!] };
   if ((m = new RegExp(`^non${COLOR} spells(?: your opponents control)? or abilities from non${COLOR} sources(?: your opponents control)?$`).exec(t)) && m[1] === m[2]) {
@@ -991,6 +998,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you control a Desert or there is a Desert card in your graveyard$/.test(text)) {
     const a = parseStaticCondition("you control a Desert", st);
     const b = parseStaticCondition("there is a Desert card in your graveyard", st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
+  }
+  // Earth Rumble Wrestlers: "as long as you control a land creature or a land entered the battlefield under your control
+  // this turn": either one.
+  if (/^you control a land creature or a land entered the battlefield under your control this turn$/.test(text)) {
+    const a = parseStaticCondition("you control a land creature", st);
+    const b = parseStaticCondition("a land entered the battlefield under your control this turn", st);
     return a && b ? { kind: "anyOf", conds: [a, b] } : null;
   }
   // Swimmer in Nightmares: "as long as there are ten or more cards in a single graveyard": any player's.
@@ -1150,6 +1164,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };
   // Soul Reap: "if you've cast another black spell this turn": as it resolves, other than itself (rulings).
   if ((m = /^you've cast another (white|blue|black|red|green) spell this turn$/.exec(text))) return { kind: "castAnother", resolving: true, color: COLOR_WORDS[m[1]!]! };
+  // Burrog Barrage: "if you've cast another instant or sorcery spell this turn": as it resolves, other than itself.
+  if (text === "you've cast another instant or sorcery spell this turn") return { kind: "castAnother", resolving: true, types: ["Instant", "Sorcery"] };
   // Stella Lee, Wild Card: "if you've cast three or more spells this turn": of any kind.
   if ((m = new RegExp(`^you've cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "castCount", n: num(m[1]!), filter: { kind: "card", text: "spell" } };
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {

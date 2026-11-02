@@ -124,7 +124,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
-import { castingBody, compileCard } from "./oracle";
+import { castingBody, castTimeTargets, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
@@ -471,6 +471,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.away) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, pend.min) }];
     // Search for Blex: each card taken costs life; at most two, keeping 10 life.
     if (pend.kind === "searchLibrary" && pend.dig?.lifeEach) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, 2, Math.floor((player(s, pid).life - 10) / pend.dig.lifeEach)))) }];
+    // Wand of Denial: pay life to mill an opponent's nonland card, keeping 10 life; never its own.
+    if (pend.kind === "searchLibrary" && pend.dig?.payLife) {
+      const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid);
+      return [{ type: "searchLibrary", player: pid, found: player(s, pid).life - pend.dig.payLife >= 10 ? theirs.slice(0, pend.max) : [] }];
+    }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
@@ -2756,7 +2761,9 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const must = (kind: SpellCondition["kind"]) => (gate && gate.conds.some((c) => c.kind === kind) ? gate.paid : undefined);
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
   const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : {}) };
-  const body = printed && gateBody(withModes(printed, modes), how);
+  const gated = printed && gateBody(withModes(printed, modes), how);
+  // Rules about choosing its targets as it's cast (Dream Leash: a tapped permanent only).
+  const body = gated && { ...gated, targets: castTimeTargets(castDef(s, id, alt), gated.targets) };
   const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
   if (specs.length && !targets) return null;

@@ -244,6 +244,7 @@ export type TriggerSourceEvent =
   | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
+  | { type: "echoPaid"; id: ObjectId }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
@@ -698,7 +699,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEscaped || !!entering.escaped) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -799,7 +800,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) =>
-        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
+        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotSubtype && !!ev.chars?.subtypes.includes(t.ifNotSubtype)) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
         (e === "selfExiledCrafting" && ev.to === "exile" && !!ev.crafted) ||
         e === "selfLeaves" ||
@@ -933,7 +934,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
     for (const w of watchers) {
       const you = controllerOf(s, w);
-      if (s.battlefield.some((id) => obj(s, id).attacking !== undefined && !!obj(s, id).blockedBy?.length && controllerOf(s, obj(s, id)) === you)) add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+      if (s.battlefield.some((id) => obj(s, id).attacking !== undefined && !!obj(s, id).blockedBy?.length && controllerOf(s, obj(s, id)) === you)) {
+        add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+        add(w, you, (e) => e === "yourCreaturesBecomeBlocked");
+      }
     }
     // "Whenever one or more creatures an opponent controls attack you and aren't blocked" (Coveted Jewel): for each such
     // opponent (rulings), whoever controls the watcher now.
@@ -1611,6 +1615,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     causedBy = null;
+  } else if (ev.type === "echoPaid") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfEchoPaid");
   } else if (ev.type === "timeCountersRemovedExiled") {
     // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
     // owner controlling it (CR 113.8), once for each counter.

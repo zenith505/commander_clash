@@ -21,7 +21,7 @@ import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, SPARES_AURAS, type Characteristics } from "./layers";
-import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
+import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
@@ -4989,7 +4989,7 @@ export function castProblem(
   }
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
   // Before targets are chosen, "with mana value X" asks for none in particular: X is announced as it's cast (601.2b).
-  let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
+  let specs = settleDivided(s, { targets: castTimeTargets(d, spellTargetSpecs(d, modes, castHow(choices))), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
     const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x));
@@ -5005,7 +5005,7 @@ export function castProblem(
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
-    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, sq));
+    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, castTimeTargets(d, spellTargetSpecs(d, modes, ALL_PAID)), pid, sq));
     const tp = targets ? targetProblem(s, specs, targets, pid, sq) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
@@ -5794,7 +5794,7 @@ function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, co
 }
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
-export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => spellTargetSpecs(castDef(s, id, alt), modes, how));
+export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => { const d = castDef(s, id, alt); return castTimeTargets(d, spellTargetSpecs(d, modes, how)); });
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
 export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face">): CastHow => ({
@@ -7798,6 +7798,9 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
       if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;
       // "That target enchanted creature" (Strong Back): the creature it's attached to (CR 601.2f, after targets).
       if (m.targetEnchanted && (!src.attachedTo || (targets ? target !== src.attachedTo : !s.objects[src.attachedTo] || controllerOf(s, obj(s, src.attachedTo)) !== pid))) continue;
+      // "If it targets a colorless creature" (Ghostfire Blade): the chosen target's colors as the cost is set (CR 601.2f via
+      // 602.2b, 105.2c). Before targets are chosen: whether any creature you control could be that target.
+      if (m.targetColorless && (targets ? !target || !s.objects[target] || characteristics(s, obj(s, target)).colors.length > 0 : !s.battlefield.some((cid) => cid !== src.id && controllerOf(s, obj(s, cid)) === pid && objIsType(s, obj(s, cid), "Creature") && characteristics(s, obj(s, cid)).colors.length === 0))) continue;
       less += m.n;
     }
   }

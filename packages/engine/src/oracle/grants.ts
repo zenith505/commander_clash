@@ -254,6 +254,13 @@ export function parseGrants(text: string): Modification[] | null {
       kws.push("Rampage");
       continue;
     }
+    // Vanishing with no number (CR 702.63b): its two triggers, no time counters as it enters. "It gains vanishing" (Maelstrom
+    // Djinn): each instance triggers on its own (rulings). Also a keyword, for "has vanishing".
+    if (/^vanishing$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Vanishing" });
+      kws.push("Vanishing");
+      continue;
+    }
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
     if (/^(?:persist|undying)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });

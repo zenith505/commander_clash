@@ -221,6 +221,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Flockchaser Phantom: "Whenever ~ attacks, the next spell you cast this turn has convoke": the same, in a trigger.
   if (/^[Tt]he next spell you cast this turn has convoke$/.test(s)) return [{ type: "nextSpellImprovise", convoke: true }];
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
+  // Elbrus, the Binding Blade: "unattach ~" in a trigger (CR 701.3d): it stays on the battlefield, attached to nothing.
+  if (/^[Uu]nattach ~$/.test(s)) return [{ type: "unattachSelf" }];
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
   // control", "up to one other target double-faced artifact you control" (The Golden-Gear Colossus): a permanent that

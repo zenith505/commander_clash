@@ -449,8 +449,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
   // Jadelight Spelunker: "When ~ enters, it explores X times": X explores one after another (CR 701.44), X as it was cast.
   if (/^(?:~|it) explores X times$/i.test(s) && (ctx.selfIt || /^~/.test(s)) && !ctx.spell) return [{ type: "repeat", n: X, effects: [{ type: "explore" }] }];
-  // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.
-  if ((m = /^(target creature you control|it|that creature) explores$/i.exec(s))) {
+  // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you. Subterranean Schooner:
+  // "target creature that crewed it this turn explores" (CR 702.122d), one you tapped to crew it, so yours too.
+  if ((m = /^(target creature you control|target creature that crewed (?:it|~) this turn|it|that creature) explores$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && what.ref !== "self" ? [{ type: "explore", what }] : what?.ref === "self" ? [{ type: "explore" }] : null;
   }

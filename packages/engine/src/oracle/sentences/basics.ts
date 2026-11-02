@@ -747,6 +747,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // damage even if you can't sacrifice it any more (rulings), dealt by it as it last existed.
   if ((m = /^[Aa]t end of combat, sacrifice it and it deals (\d+) damage to you$/.exec(s)) && ctx.selfIt && ctx.lastObjectTarget === undefined && !ctx.targets.length)
     return [{ type: "delayed", when: "endOfCombat", effects: [{ type: "sacrifice", what: { ref: "subject" } }, { type: "damage", amount: Number(m[1]), to: { ref: "you" }, by: "subject" }], text: `sacrifice it and it deals ${m[1]} damage to you` }];
+  // Fortune, Loyal Steed: "at end of combat, exile it and up to one creature that saddled it this turn, then return those
+  // cards to the battlefield under their owner's control": a delayed trigger (CR 603.7) that triggers even if ~ has left
+  // (rulings); the creature is chosen as it resolves, not targeted, among those tapped for ~'s saddle cost this turn
+  // (CR 702.171c), and they're exiled and returned together; a token doesn't come back (CR 111.7).
+  if (/^[Aa]t end of combat, exile it and up to one creature that saddled it this turn and return those cards to the battlefield under their owner's control$/.test(s) && ctx.selfIt && !ctx.spell && ctx.lastObjectTarget === undefined && !ctx.targets.length) {
+    const filter = pickFilter("creature that saddled it this turn");
+    if (!filter || filter.kind !== "object" || !filter.saddledSource) return null;
+    return [{ type: "delayed", when: "endOfCombat", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, upTo: true, action: "flicker" }, { type: "flicker", what: { ref: "created" }, under: "owner", withSelf: true }], text: "exile ~ and up to one creature that saddled it this turn, then return those cards to the battlefield under their owner's control" }];
+  }
   // Contempt: "When enchanted creature attacks, return it and ~ to their owners' hands at end of combat": one delayed
   // trigger about both as they are now (CR 603.7c, 400.7); either one that left stays where it went.
   if (/^[Rr]eturn it and ~ to their owners' hands at end of combat$/.test(s) && !ctx.targets.length && ctx.lastObjectTarget === undefined) {

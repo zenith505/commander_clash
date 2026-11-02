@@ -432,6 +432,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const o = e.about === "created" ? objects(s, { ref: "created" }, ctx)[0] : objects(s, { ref: "target", index: e.about.target }, ctx).find((x) => x.zone === "battlefield");
         if (!o) return;
         if (typeof e.about === "object" && e.about.attached && !(s.resolving!.created ?? []).some((id) => s.objects[id]?.attachedTo === o.id)) return;
+        if (typeof e.about === "object" && e.about.attachedThisWay && !(s.resolving!.attachedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && s.objects[id]!.attachedTo === o.id && characteristics(s, s.objects[id]!).subtypes.includes("Equipment"))) return;
         about = { id: o.id, zc: o.zoneChanges ?? 0 };
       }
       const subject = about ?? item.subject;
@@ -1056,6 +1057,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "untap" && e.what.ref === "target" && effects.length === 1 && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    // Iroh, Tea Master: "have target opponent gain control of ...": only with that player still a legal target, in the game.
+    if (e.type === "continuous" && e.giveTo && !players(s, e.giveTo, ctx).some((p) => !player(s, p).lost)) return false;
     if (e.type === "counters" && (e.what.ref === "target" || (e.what.ref === "self" && effects.length === 1)) && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
     // longer control ~ (CR 611.2b), so it can't be done.

@@ -466,7 +466,9 @@ type XPick =
   | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string }
   /** Turning a face-down permanent face up for "Disguise {X}{3}{W}" (CR 107.3d). */
-  | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string };
+  | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string }
+  /** "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X time counters, `min` 1 (CR 702.62a). */
+  | { mode: "suspend"; objectId: string; label: string; cost: string; max: number; value: number; extra?: string; min: number };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
@@ -1007,7 +1009,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
-      if (c.kind === "payLife" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "payEnergy" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
       // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
       if (c.kind === "collectEvidence") {
         if (d.collect !== undefined) continue;
@@ -1147,6 +1149,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setXPick(null);
     if (!pick) return;
     if (pick.mode === "cast") continueCast({ ...pick.draft, x: pick.value });
+    else if (pick.mode === "suspend") dispatch(planSuspend(s!, HUMAN, pick.objectId, pick.value) ?? [{ type: "suspend", player: HUMAN, objectId: pick.objectId, x: pick.value }]);
     else if (pick.mode === "faceUp") dispatch(planTurnFaceUp(s!, HUMAN, pick.objectId, pick.way, pick.value) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: pick.objectId, ...(pick.way ? { way: pick.way } : {}), ...(pick.value ? { x: pick.value } : {}) }]);
     else useAbility(pick.objectId, pick.index, pick.modes, pick.value);
   }
@@ -1676,6 +1679,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               }}
               onSuspend={() => {
                 setMenu(null);
+                // "Suspend X—{X}{3}{U}. X can't be 0." (Aeon Chronicler): X first, as many time counters (CR 702.62a).
+                const sus = compileCard(cardOf(s, menu)).suspend;
+                if (sus?.x) {
+                  const max = Math.max(1, maxX((n) => planSuspend(s, HUMAN, menu, Math.max(1, n))));
+                  return setXPick({ mode: "suspend", objectId: menu, label: `Suspend ${cardOf(s, menu).name}`, cost: sus.cost, max, value: Math.min(max, 1), min: 1 });
+                }
                 dispatch(planSuspend(s, HUMAN, menu) ?? [{ type: "suspend", player: HUMAN, objectId: menu }]);
               }}
               onPlot={() => {
@@ -2040,12 +2049,13 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
   lifeForMv: "life equal to its mana value instead of its mana cost, once during each of your turns (Demon of Fate's Design); X is 0",
   genericMv: "generic mana equal to its mana value instead of its mana cost (Kentaro, the Smiling Cat); X is 0",
+  energyForSpell: "energy instead of its mana cost (Nissa, Worldsoul Speaker); X is 0",
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
@@ -2093,6 +2103,7 @@ function counterOnWhat(c: Extract<AdditionalCost, { kind: "putCounter" }>): stri
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${plural(what)}`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
+  if (c.kind === "payEnergy") return `pay ${c.n} energy`;
   if (c.kind === "forage") return "forage (exile three cards from your graveyard or sacrifice a Food)";
   if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${c.oneOfEach ? `a ${c.filter.text}` : n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
@@ -2235,7 +2246,7 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
 
 /** The bar shown while announcing X. */
 function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange: (x: number) => void; onDone: () => void; onCancel: () => void }) {
-  const min = pick.mode === "cast" ? (pick.min ?? 0) : 0;
+  const min = pick.mode === "cast" || pick.mode === "suspend" ? (pick.min ?? 0) : 0;
   const set = (n: number) => onChange(Math.max(min, Math.min(pick.max, Math.floor(n) || 0)));
   return (
     <div className="targeting x-pick">
@@ -4433,8 +4444,8 @@ function AbilityMenu({
             </button>
           ))}
       {suspend && (
-        <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
-          Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.x ? "X" : suspend.n} time counter${suspend.n === 1 ? "" : "s"}${suspend.x ? " (you choose X, at least 1)" : ""}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
+          Suspend {suspend.x ? "X" : suspend.n} <ManaCost cost={suspend.cost} size="sm" />
         </button>
       )}
       {foretell && (

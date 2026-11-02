@@ -453,6 +453,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter?.kind !== "card" || !parseManaCost(m[2]!).supported) return null;
     return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]} card in your graveyard` }, escape: { mana: m[2]!, exile: num(m[3]!) } }];
   }
+  // Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end
+  // of turn": the cards there now (CR 611.2c), each with a permission to cast it from there (game.ts grantedWays).
+  if ((m = /^([A-Z][a-z]+) cards in your graveyard gain "You may cast (?:~|this card) from your graveyard\.?" until end of turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]!.toLowerCase()} card from your graveyard`);
+    if (filter?.kind !== "card") return null;
+    return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]!.toLowerCase()} card in your graveyard` }, cast: true }];
+  }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
   if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {
@@ -708,7 +715,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: amt("X"), dest: "battlefield", filter }] : null;
   }
-  if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
+  if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two|any number of) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
     // as it resolves.
     const mvX = / with mana value X or less$/.exec(m[2]!);
@@ -719,11 +726,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const ofChosen = !mvX && !total && / cards? of the chosen type$/.test(m[2]!);
     const parsed = parseSearchFilter(m[2]!.slice(0, (mvX ?? total)?.index).replace(/ of the chosen type$/, "").replace(/ and\/or /g, " or "));
     const filter = parsed && ofChosen ? { ...parsed, chosen: "type" as const, text: `${parsed.text} of the chosen type` } : parsed;
-    const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
+    // Technomancer: "return any number of artifact creature cards with total mana value 6 or less": only with a total.
+    const anyNumber = m[1] === "any number of";
+    if (anyNumber && !total) return null;
+    const n = anyNumber ? 99 : num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     if (ofChosen && !filter?.types?.includes("Creature")) return null;
     if (total && (!filter || n < 2)) return null;
-    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(total ? { totalMv: Number(total[1]) } : {}), ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
+    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(anyNumber ? { upTo: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}), ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.
@@ -1081,6 +1091,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
   // Chorale of the Void: "onto the battlefield under your control tapped and attacking" is the same as "tapped and
   // attacking under your control": attacking what you choose (rulings, CR 508.4).
+  // Immortal Obligation: "Return target creature card from an opponent's graveyard to the battlefield under their control":
+  // "their" is that opponent, the card's owner, so the same as "under its owner's control".
+  if (/^Return target [a-z ]+ card from an opponent's graveyard to the battlefield under their control\b/.test(s)) s = s.replace(/ under their control\b/, " under its owner's control");
   if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature| attached to ~)?$`, "i").exec(s.replace(/ onto the battlefield under your control tapped and attacking$/, " onto the battlefield tapped and attacking under your control")))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
@@ -1459,7 +1472,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const source = parseObject(m[1]!, ctx);
     const what = hostFirst ?? (pronoun ? null : parseObject(m[2]!, ctx));
     const many = /^any number of /i.test(m[1]!);
-    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self")) return null;
+    // Thorin, Mountain-king: "any number of target Equipment you control to target creature you control", each to the
+    // one creature.
+    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self" && what.ref !== "target")) return null;
     return [{ type: "attach", what, source }];
   }
   // Inventory Management: "For each Aura and Equipment you control, you may attach it to a creature you control": each in

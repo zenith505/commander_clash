@@ -217,6 +217,11 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   // Flesh Duplicate: "except it has vanishing 3 if that creature doesn't have vanishing" (its copiable values, CR 707.2).
   const unless = /^it has (vanishing|fading) (\d+) if that creature doesn't have \1$/.exec(text);
   if (unless) return { text: [`${capital(unless[1]!)} ${unless[2]}`], unlessHas: capital(unless[1]!) };
+  // Moritte of the Frost: "it's legendary and snow in addition to its other types and, if it's a creature, it enters with
+  // two additional +1/+1 counters on it and has changeling": both supertypes (CR 205.4a), and the counters and changeling
+  // only if it's a creature as it enters (rulings).
+  if (/^it's legendary and snow in addition to its other types and, if it's a creature, it enters with two additional \+1\/\+1 counters on it and has changeling$/.test(text))
+    return { legendary: true, snow: true, enterCounters: [{ counter: "+1/+1", n: 2, ifType: "Creature" }], keywordsIfCreature: ["Changeling"] };
   if (/^their power is half that creature's power and their toughness is half that creature's toughness$/.test(text)) return round ? { halfPT: round } : null;
   // Imposter Mech: "except it's a Vehicle artifact with crew 3 and it loses all other card types": an artifact only, its
   // subtypes of other card types gone (CR 205.1a, rulings), and crew N its own (CR 702.122a).
@@ -237,6 +242,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
     if (/^(?:isn't|aren't|is not|are not|it's not|they're not) legendary$/.test(p)) out.notLegendary = true;
     // Jace, Mirror Mage: "except it's not legendary and its starting loyalty is 1" (a copiable value, CR 707.9b, 306.5b).
     else if ((m = /^its starting loyalty is (\d+)$/.exec(p))) out.loyalty = Number(m[1]);
+    // Hulking Metamorph: "its power and toughness are equal to this creature's power and toughness" (its own, see ptOwn).
+    else if (/^its power and toughness are equal to ~'s power and toughness$/.test(p)) out.ptOwn = true;
     // "Enters with an additional +1/+1 counter on it if it's a creature" (Spark Double), "... loyalty counter on it if it's
     // a planeswalker", "enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
     // Machine God's Effigy: "except it's an artifact": its only card type, keeping its supertypes and artifact subtypes,

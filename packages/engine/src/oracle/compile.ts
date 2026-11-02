@@ -375,8 +375,9 @@ export function normalizeSelf(d: CardDef): string {
   // "Shang-Chi" for "Shang-Chi and the Ten Rings".
   const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:and the|of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
-  // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated.
-  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
+  // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated; "Niv-Mizzet" for
+  // "Niv-Mizzet Reborn": the first one too.
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+(?:-[A-Z][a-z]+)?) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
@@ -1054,6 +1055,36 @@ export function compile(d: CardDef): CompiledCard {
     const kwLine = line.replace(/^(Hexproof) from (artifacts|creatures|enchantments|instants|planeswalkers|sorceries), (artifacts|creatures|enchantments|instants|planeswalkers|sorceries),? and (artifacts|creatures|enchantments|instants|planeswalkers|sorceries)$/, "$1 from $2, hexproof from $3, hexproof from $4").replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
+      continue;
+    }
+    // Zareth San, the Trickster: "{2}{U}{B}, Return an unblocked attacking Rogue you control to its owner's hand: Put ~ from
+    // your hand onto the battlefield tapped and attacking." Ninjutsu's shape (CR 702.49a) without being ninjutsu: it attacks
+    // what you choose (CR 508.4), never declared as an attacker (rulings); revealing it is part of activating it from hand.
+    const zareth = /^((?:\{(?:\d+|[WUBRGC])\})+), Return an unblocked attacking ([A-Z][a-z]+) you control to its owner's hand: Put ~ from your hand onto the battlefield tapped and attacking\.$/.exec(line);
+    if (zareth && CREATURE_TYPES.has(zareth[2]!) && d.types.includes("Creature")) {
+      out.activated.push({
+        manaCost: zareth[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        zone: "hand",
+        costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], subtypes: [zareth[2]!], controller: "you", text: `unblocked attacking ${zareth[2]} you control` }, n: 1, unblockedAttacker: true }],
+        body: { targets: [], effects: [{ type: "ninjutsu", chooseDefender: true }], text: "Put ~ from your hand onto the battlefield tapped and attacking." },
+        text: line,
+      });
+      continue;
+    }
+    // Luxurious Locomotive: "Crew 1. Activate only once each turn." (CR 702.122a, 602.5b): its crew ability, at most once
+    // each turn.
+    const crewOnce = /^(Crew \d+)\. Activate only once each turn\.$/.exec(line);
+    if (crewOnce && d.subtypes.includes("Vehicle")) {
+      const ck = keywordAbilities(crewOnce[1]!, d);
+      if (ck?.activated.length !== 1 || ck.triggers.length) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.activated.push({ ...ck.activated[0]!, oncePerTurn: true, text: line });
+      out.textKeywords.push(...textKeywords(crewOnce[1]!));
       continue;
     }
     const kw = keywordAbilities(kwLine, d);
@@ -2967,6 +2998,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${genericAlt[1]} spell` }))(spec), genericMv: true };
       continue;
     }
+    // Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast": an
+    // alternative cost (CR 118.9) of energy counters (CR 107.14), X at 0 in it (CR 107.3, 601.2b).
+    const energyAlt = new RegExp(`^You may pay ${NUM} \\{E\\} rather than pay the mana cost for permanent spells you cast\\.$`).exec(line);
+    if (energyAlt) {
+      const n = num(energyAlt[1]!);
+      const spec = parseTargetPhrase("permanent card from a graveyard");
+      if (!n || spec?.kind !== "card" || out.payZero) out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: "permanent spell" }))(spec), energy: n };
+      continue;
+    }
     // Zaffai and the Tempests: "Once during each of your turns, you may cast an instant or sorcery spell from your hand
     // without paying its mana cost": the same once-a-turn alternative cost of nothing, X at 0 (rulings).
     const onceFree = /^Once during each of your turns, you may cast an? ([a-z]+(?: or [a-z]+)?) spell from your hand without paying its mana cost\.$/.exec(line);
@@ -4629,19 +4670,22 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Zada, Hedron Grinder; Ink-Treader Nephilim; Precursor Golem (CR 707.10): a copy of the spell for each other creature
     // (or Golem) it could target, each copy targeting that one.
-    const eachOther = /^Whenever (you cast|a player casts) an instant or sorcery spell(?: that targets only (~|a single ([A-Z][a-z]+)))?(, if that spell targets only ~)?, (copy (?:that|the) spell|that player copies that spell) for each other (creature you control|creature|[A-Z][a-z]+) that (?:the )?spell could target\. Each copy targets a different one of those (?:creatures|[A-Z][a-z]+s)\.$/.exec(line);
+    const eachOther = /^Whenever (you cast|a player casts) an instant or sorcery spell(?: that targets only (~|a single ([A-Z][a-z]+)))?(, if that spell targets only ~)?, (copy (?:that|the) spell|that player copies that spell) for each other (creature you control|creature they control|creature|[A-Z][a-z]+) that (?:the )?spell could target\. Each copy targets a different one of those (?:creatures|[A-Z][a-z]+s)\.$/.exec(line);
     if (eachOther && !eachOther[2] !== !eachOther[4]) {
       const single = eachOther[3] ? parseTargetPhrase(eachOther[3]) : null;
-      const among = parseTargetPhrase(eachOther[6]!);
+      // Mirrorwing Dragon: "that player copies that spell for each other creature they control": the caster's creatures,
+      // the copies theirs (rulings).
+      const theyControl = eachOther[6] === "creature they control";
+      const among = parseTargetPhrase(theyControl ? "creature you control" : eachOther[6]!);
       const self = !eachOther[3];
-      if ((eachOther[3] && (single?.kind !== "object" || eachOther[6] !== eachOther[3])) || among?.kind !== "object" || (eachOther[5] === "that player copies that spell") !== !!eachOther[3]) {
+      if ((eachOther[3] && (single?.kind !== "object" || eachOther[6] !== eachOther[3])) || among?.kind !== "object" || (eachOther[5] === "that player copies that spell") !== (!!eachOther[3] || theyControl) || (theyControl && (eachOther[1] !== "a player casts" || eachOther[2] !== "~"))) {
         out.unsupported.push(raw);
         continue;
       }
       out.triggers.push({
         event: "castSpell",
         cast: { by: eachOther[1] === "you cast" ? "you" : "any", spell: { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery spell" }, targetsOnly: single ? { ...single, text: eachOther[3]! } : "self" },
-        body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: { ...among, text: eachOther[6]! }, ...(self ? { self: true as const } : {}), ...(eachOther[3] ? { caster: true as const } : {}), ...(eachOther[4] ? { onlySelf: true as const } : {}) } }], text: line.replace(/^Whenever [^,]+(?:, if that spell targets only ~)?, /, "") },
+        body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: { ...among, text: eachOther[6]! }, ...(self ? { self: true as const } : {}), ...(eachOther[3] || theyControl ? { caster: true as const } : {}), ...(theyControl ? { casterControls: true as const } : {}), ...(eachOther[4] ? { onlySelf: true as const } : {}) } }], text: line.replace(/^Whenever [^,]+(?:, if that spell targets only ~)?, /, "") },
       });
       continue;
     }

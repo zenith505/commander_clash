@@ -35,6 +35,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
   if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
+  // Luxurious Locomotive: "for each creature that crewed it this turn" (CR 702.122d), those gone since included (rulings).
+  if (each && ctx && !ctx.spell && /^creature that (crewed|saddled) (?:it|~) this turn$/.test(p)) return { count: { kind: "crewedSource", ...(/saddled/.test(p) ? { saddled: true as const } : {}) } };
   // Perrie, the Pulverizer: "the number of different kinds of counters among permanents you control"; each kind once, as
   // Hundred-Battle Veteran counts them.
   if (!each && (m = /^the number of different kinds of counters among (creatures|permanents) you control$/i.exec(p))) {
@@ -178,6 +180,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Rise of the Deathbringer: "Draw cards equal to ... You lose life equal to the number of cards drawn this way": those
   // really drawn (a replaced draw isn't one, CR 121.6).
   if (!each && /^the number of cards drawn this way$/i.test(p)) return { count: { kind: "drawnThisWay" } };
+  if (!each && /^the number of unlocked doors among Rooms you control$/.test(p)) return { count: { kind: "unlockedDoors" } };
   if (/^the number of poison counters lost this way$/.test(p)) return { count: { kind: "poisonLostThisWay" } };
   if (each && /^spell countered this way$/.test(p)) return { count: { kind: "spellsCounteredThisWay" } };
   if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };

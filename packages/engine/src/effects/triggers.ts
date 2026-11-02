@@ -144,7 +144,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
@@ -178,6 +178,10 @@ export type TriggerSourceEvent =
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   | { type: "gaveGift"; player: PlayerId }
+  /** `n` time counters were removed from this card in exile (Aeon Chronicler: once for each, CR 113.6). */
+  | { type: "timeCountersRemovedExiled"; id: ObjectId; n: number }
+  /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
+  | { type: "discovered"; player: PlayerId; amount: number }
   | { type: "cumulativeUpkeepPaid"; id: ObjectId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
@@ -797,6 +801,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       (e, t) =>
         (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotSubtype && !!ev.chars?.subtypes.includes(t.ifNotSubtype)) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
+        (e === "selfExiledCrafting" && ev.to === "exile" && !!ev.crafted) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
       lastAbilities,
@@ -1087,6 +1092,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGiveGift", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "discovered") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youDiscover", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
   } else if (ev.type === "investigated") {
     for (const id of s.battlefield) {
@@ -1604,8 +1614,29 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     causedBy = null;
+  } else if (ev.type === "timeCountersRemovedExiled") {
+    // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
+    // owner controlling it (CR 113.8), once for each counter.
+    const o = s.objects[ev.id];
+    if (o?.zone === "exile" && !o.faceDown) {
+      fromExile = true;
+      try {
+        for (let i = 0; i < ev.n; i++) add(o, o.owner, (e) => e === "selfTimeCounterRemovedExiled", compileCard(defOf(s, o)).triggers);
+      } finally {
+        fromExile = false;
+      }
+    }
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
+    // Riftmarked Knight: "When the last time counter is removed from ~ while it's exiled" (CR 113.6).
+    if (o?.zone === "exile" && !o.faceDown && ev.counter === "time") {
+      fromExile = true;
+      try {
+        add(o, o.owner, (e) => e === "selfLastTimeCounterRemovedExiled", compileCard(defOf(s, o)).triggers);
+      } finally {
+        fromExile = false;
+      }
+    }
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
@@ -2167,6 +2198,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
         // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
         if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;
+        // Ertha Jo: "an ability that targets a creature or player": its targets as it was activated (CR 602.2i, 115.1).
+        if (a.targetsCreatureOrPlayer) {
+          const item = ev.stackId ? s.castItems?.[ev.stackId] : undefined;
+          if (!item?.targets?.some((t) => t.kind === "player" || (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, s.objects[t.id]!, "Creature")))) return false;
+        }
         // Herald of Anafenza: "Whenever you activate ~'s outlast ability": this object's own.
         if (a.ownOutlast && (!ev.outlast || ev.source?.snapshot.id !== o.id || (ev.source.snapshot.zoneChanges ?? 0) !== (o.zoneChanges ?? 0))) return false;
         if (a.equipped) {

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,359 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,953 of 4,988 (99%), top 10,000: 9,424 of
+29,398 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,425 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4725,6 +4725,64 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   this way" (Holistic Wisdom); "if an opponent was dealt noncombat damage last turn" and counters on "each other
   Wizard token you control" (Command the Stage); "Enchanted creature can't be blocked as long as it's attacking
   alone" (Gutter Skulker // Gutter Shortcut). +16 (29,295 of 31,936 with B85; 29,319 with rounds 248 and 249).
+- Round B87 (one-line templates from the bottom of the list): "Reveal the first card you draw each turn. Whenever you
+  reveal a basic land card / creature card this way" (Rowen, Primitive Etchings); "When you attack with exactly two
+  creatures, transform this creature" (Alluring Suitor // Deadly Dancer); Daredevil Dragster's velocity counters
+  (its "it" read as ~); revealing until a creature card, "you may put it onto
+  the battlefield", then shuffling all other revealed cards (Thicket Elemental); "choose target creature card in your
+  graveyard with toughness less than ~'s toughness. Return that card" (Thunderkin Awakener); "If it's a creature, it's
+  a Zombie in addition to its other creature types" (Lim-Dûl the Necromancer); "Return it at the beginning of the next
+  end step unless you pay" (Koya, Death from Above: a "you may pay; if you don't" delayed trigger); a named token
+  "that's all colors" (Dragonbroods' Relic); "A creature dealt damage this way can't block this turn" (Ballista
+  Watcher // Ballista Wielder); "if it has blocked or been blocked since your last upkeep" / "if it attacked or
+  blocked since your last upkeep", a +1/+1 counter, otherwise one removed (Wiitigo, Shape of the Wiitigo); "Return a creature card with mana value 1, 2, and 3 each" (Gruesome Menagerie); "Discard two
+  nonland cards with the same name" as an activation cost (Sphinx of the Chimes, with a picker that only takes a
+  same-name pair and a browser test). +14 (29,333 of 31,936 with B86 and rounds 248 and 249; 29,364 with rounds 250 to 252).
+- Round B88 (one-line templates from the bottom of the list): "When ~ enters, choose one or both. Each mode must target
+  a different player." (Splinter & Leo, Father & Son; Donnie & April, Adorkable Duo; Mikey & Mona, Mutant Sitters, whose
+  "target player chooses a creature they control and puts two +1/+1 counters on it" is that player's pick and putting;
+  Casey & Raph, Hotheads, whose "target player exiles the top card of their library. Until that player's next end step,
+  they may play that card without paying its mana cost" gives that player the permission); "put a +1/+1 counter on each
+  other creature target player controls" (other than ~); "Whenever ~ attacks or dies" (Balor, now with all three of its
+  modes); "you may sacrifice an artifact, enchantment, or token. If you don't, tap ~" (Devouring Sugarmaw // Have for
+  Dinner); delirium's "If there are four or more card types among cards in your graveyard, exile the top card of your
+  library. You may play it until the end of your next turn" (Impossible Inferno); "Creature spells you cast that share a
+  creature type with ~ cost {1} less" (Mistform Warchief, with its types as they are now); "a creature token of the chosen
+  color and type" (Volrath's Laboratory, Riptide Replicator, named after the type per the rulings, and with what was
+  chosen as it last existed if the source is gone, CR 608.2h); "As ~ enters, choose white Citizen, blue Camarid, black
+  Thrull, red Goblin, or green Saproling" (Sarpadian Empires, Vol. VII: a color and a creature type picked together, with
+  a browser test); "Sacrifice an Equipment/Aura attached to ~" as an activation cost (Ronin, Shadow Stalker; Faunsbane
+  Troll). +13 (29,346 of 31,936 with B86, B87 and rounds 248 and 249).
+- Out after round B88 (looked at, not done): Psychic Rebuttal (copying a spell after it's been countered), Soulblast
+  (an additional cost of sacrificing all creatures you control), Tyrannical Pitlord ("as ~ enters, choose another
+  creature you control"), Spatial Binding ("can't phase out"), Batroc the Leaper (up to X targets, X the times kicked),
+  Miasma Demon (discard any number, then up to that many targets), Gorex, the Tombshell (an optional exile cost that
+  reduces the cost), Rasputin Dreamweaver ("if ~ started the turn untapped").
+- Round B89 (one-line templates from the bottom of the list): Aura moves, "Attach target Aura attached to a creature to
+  another creature" (any controller's, Enchantment Alteration's "a creature or land" to one of the same type), "with the
+  same controller" (Simic Guildmage, also its "Move a +1/+1 counter from target creature onto another target creature
+  with the same controller", checked again as it resolves, CR 608.2b), "attach all Auras enchanting target permanent to
+  another permanent with the same controller" (Glamer Spinners: one permanent that can take every Aura, or none move);
+  the destination is picked as it resolves, with browser tests; "Return target Aura card from your graveyard attached to
+  ~" during your upkeep and "Destroy all Auras attached to ~" (Hakim, Loreweaver); "flip a coin. If you win, create a
+  token named X. If you lose, destroy all permanents named X" (Wirefly Hive); "flip a coin at the beginning of the next
+  end step. If you lose the flip, sacrifice that creature" (Goblin Kites); "Each creature you control can't be blocked
+  as long as defending player controls an artifact land" (Tanglewalker, checked against each defender); "you may reveal
+  that many cards. Put an artifact card revealed this way into your hand and the rest into your graveyard" (Glint
+  Raker); "Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls"
+  (Rayne, Academy Chancellor, two cards if enchanted; Leovold, Emissary of Trest's draw now compiles too, though
+  Leovold is banned in Commander); "Spells that target ~ cost {2} more to cast" on an instant or sorcery (Kaervek's
+  Torch); "~ costs 3 life more to cast for each target" (Phyrexian Purge, paid as it's cast and not given back); hourglass counters (Temporal Distortion). +12 legal
+  (29,358 of 31,936 with B86, B87 and rounds 248 and 249; 29,398 with B88 and rounds 250 to 253).
+- Out after round B89 (looked at, not done): Barbed Foliage ("loses flanking": flanking is a triggered ability granted
+  by the keyword, not just a keyword to remove), Brothers Yamazaki (an exception to the legend rule), Rogue Skycaptain
+  and Rohgahh of Kher Keep ("an opponent gains control of ~"), Stangg and Dance of the Many (linked tokens that leave
+  with their source), Sengir Nosferatu (a token's ability returns an exiled card named ~), Splintering Wind,
+  Negative Zone Portal, Sol'Kanar the Tainted, Mystic Barrier, Covenant of Minds.
+- Out after round B87 (looked at, not done): Kodama of the Center Tree (soulshift X: a target bounded by a changing
+  number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
+  type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
+  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton, Dancing Sword, Elemental Resonance, Bat Colony.
 - Out after round B86 (looked at, not done): Goblin Maskmaker (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (a target chosen by another player), Glyph of Life, Mob Mentality,

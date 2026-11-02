@@ -7,7 +7,6 @@ import { act, addEffect, bear, card, passUntil, pt, putOnBattlefield, setup } fr
 import { characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.oracleText).toBe(true));
-const unsupported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.oracleText).toBe(false));
 const creature = (name: string, text: string, p = "2", t = "2") => card(name, "Creature — Beast", "{2}", { power: p, toughness: t, oracleText: text });
 const artifact = card("Bauble Test", "Artifact", "{1}");
 
@@ -39,8 +38,9 @@ describe("as long as", () => {
     // functions in any zone it could be cast from (CR 113.6e; rulings on Colossal Rattlewurm), and on the battlefield
     // the permanent has the keyword (round 246).
     supported(creature("Flash Test", "This creature has flash as long as you control a Merfolk."));
-    // Each attacking creature has its own defending player.
-    unsupported(creature("Tangle Test", "Each creature you control can't be blocked as long as defending player controls an artifact land."));
+    // Each attacking creature has its own defending player: checked per attacker against the player it attacks since
+    // round B89 (Tanglewalker).
+    supported(creature("Tangle Test", "Each creature you control can't be blocked as long as defending player controls an artifact land."));
   });
 
   it("you control a Forest", () => {

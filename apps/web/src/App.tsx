@@ -183,6 +183,7 @@ import {
   spellManaValue,
   blockWithoutCompany,
   showGrantSource,
+  sameName,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -440,6 +441,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   setsX?: true;
   /** Foil: one of the cards picked must be this. */
   oneOf?: TargetSpec;
+  /** Sphinx of the Chimes: the cards picked all have the same name. */
+  sameName?: true;
   /** Ormos, Archive Keeper: no two of the cards picked may share a name. */
   differentNames?: true;
   /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
@@ -854,8 +857,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
       // Ormos, Archive Keeper: "Discard three cards with different names".
-      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : ""}`;
-      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}) });
+      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}), ...(c.kind === "discard" && c.sameName ? { sameName: true as const } : {}) });
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}) };
     dispatch(
@@ -1954,7 +1957,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               chosen={costPick.chosen}
               n={costPick.n}
               {...(costPick.min !== undefined ? { min: costPick.min } : {})}
-              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen))}
+              valid={(!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))) && (!costPick.differentNames || namesDiffer(s, costPick.chosen)) && (!costPick.sameName || costPick.chosen.every((id) => sameName(cardOf(s, id).name, cardOf(s, costPick.chosen[0]!).name)))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -5240,6 +5243,20 @@ function Controls({
         {pending.options.map((o) => (
           <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             {o === "odd" ? "Odd" : "Even"}
+          </button>
+        ))}
+      </div>
+    );
+  // Sarpadian Empires, Vol. VII: "choose white Citizen, blue Camarid, ...": a color and a creature type at once.
+  if (pending?.kind === "chooseOption" && pending.what === "colorAndType" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> choose a color and creature type
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            <ManaCost cost={`{${({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as Record<string, string>)[o.split(" ")[0]!] ?? "C"}}`} size="sm" /> {o.charAt(0).toUpperCase() + o.slice(1)}
           </button>
         ))}
       </div>

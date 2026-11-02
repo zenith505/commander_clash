@@ -5,7 +5,7 @@ import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
-import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
@@ -13,7 +13,7 @@ import { abilitiesOf, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCos
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -952,7 +952,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -2733,7 +2733,8 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
   const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
   if (firstInDrawStep) p.drewInDrawStep = s.turn;
   // Keranos, God of Storms: "Reveal the first card you draw on each of your turns" (a static ability: revealed as it's drawn).
-  if (p.draws.n === 1 && s.activePlayer === pid && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed)))
+  // Rowen, Primitive Etchings: "Reveal the first card you draw each turn", on any player's turn.
+  if (p.draws.n === 1 && drawnCard.zone === "hand" && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.draws?.revealed && (!t.draws.ownTurn || s.activePlayer === pid))))
     log(s, `${p.name} reveals ${defOf(s, drawnCard).name}, the first card they drew this turn.`);
   fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}), card: top });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
@@ -5257,6 +5258,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
     if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
   }
+  // Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast": each such spell once.
+  for (const sid of new Set((how.targets ?? []).flatMap((t) => (t.kind === "stack" ? [t.id] : [])))) {
+    const item = s.stack.find((x) => x.id === sid);
+    const card = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+    if (card) mods.more += compileCard(defOf(s, card)).stackTargetTax ?? 0;
+  }
   // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
   const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
   if (playersTargeted.size && !how.faceDown)
@@ -5444,6 +5451,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.notOwned && o.owner === pid) continue;
       // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
       if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
+      // Mistform Warchief: a creature type the spell (the face cast) shares with the source as it is now (CR 205.3m).
+      if (m.sharesCreatureTypeWithSelf && !shareCreatureType(creatureTypesOf(s, src), everyCreatureType(d) ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t))))) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, power: pw, toughnessAbovePower: tough, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
@@ -6949,8 +6958,10 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
+  // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
+  const targetCount = (choices?.targets ?? []).filter((t) => t.kind !== "none").length;
   return costs.map((c) =>
-    xCost(c) ? { ...c, n: x } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
+    xCost(c) ? { ...c, n: x } : c.kind === "payLife" && c.perTarget ? { kind: "payLife", n: c.n * targetCount } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
   );
 }
 
@@ -6960,7 +6971,8 @@ const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
-    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
+    const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
     return xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
@@ -7166,7 +7178,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     // "Discard an Island card and another card" (Foil): one of them an Island card.
     const oneOf = c.kind === "discard" ? c.oneOf : undefined;
     const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
-    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
+    // Sphinx of the Chimes: "two nonland cards with the same name" (CR 201.2).
+    const alike = c.kind === "discard" && c.sameName;
+    const nameOf = (id: ObjectId) => defOf(s, obj(s, id)).name;
+    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : alike ? `${c.n} ${c.filter?.text ?? "card"}s with the same name` : what;
     // "You may exile any number of blue cards from your hand": none is fine.
     if (c.kind === "exileFromHand" && c.anyNumber) {
       if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
@@ -7176,11 +7191,13 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       // Untapping: also what can be tapped for mana first (Halo Fountain).
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
+      if (alike && !pool.some((id) => pool.filter((x) => sameName(nameOf(x), nameOf(id))).length >= c.n)) return `you need to ${verb} ${full} to ${doing}`;
       if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
+    if (alike && !chosen.every((id) => sameName(nameOf(id), nameOf(chosen[0]!)))) return `choose ${full} to ${verb}`;
     if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full}${c.kind === "discard" ? " with different names" : ""} to ${verb}`;
   }
   return null;
@@ -8796,6 +8813,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       o.chosen = { ...o.chosen, keywords: [...(o.chosen?.keywords ?? []), choice] };
       log(s, `${p.name} chooses ${choice.toLowerCase()} for ${pend.source}.`);
     } else {
+      if (pend.what === "colorAndType" && !pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(", ")}`);
       o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
       // Banner of Kinship: "~ enters with a fellowship counter on it for each creature you control of the chosen type",
@@ -10591,6 +10609,8 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (b.cantBlockGreaterPower && a.power > b.power) return `${b.name} can't block creatures with greater power`; // CR 509.1b
   if (b.cantBlockPowerAtLeastToughness && a.power >= b.toughness) return `${b.name} can't block creatures with power equal to or greater than its toughness`; // CR 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
+  // Tanglewalker: while the player it's attacking controls such a permanent (CR 506.2, 509.1b).
+  for (const f of a.cantBeBlockedIfDefending ?? []) if (defender !== undefined && s.battlefield.some((id) => { const x = obj(s, id); return controllerOf(s, x) === defender && objectMatches(s, f, x, defender, false); })) return `${a.name} can't be blocked while defending player controls ${f.text.startsWith("a") ? "an" : "a"} ${f.text}`;
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b

@@ -871,6 +871,8 @@ export interface TargetSpec {
   controlledByTarget?: number;
   /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
   differentControllerFrom?: number[];
+  /** "Another target creature with the same controller" (Simic Guildmage): controlled by the controller of these targets. */
+  sameControllerAs?: number[];
   /**
    * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
    * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
@@ -1648,6 +1650,8 @@ export type Modification =
   /** "~ can't be attacked" (The Aetherspark): no creature may be declared as attacking it (CR 508.1b); one already attacking it goes on attacking it (rulings). */
   | { kind: "cantBeAttacked" }
   | { kind: "cantBeBlocked" }
+  /** "Can't be blocked as long as defending player controls an artifact land" (Tanglewalker, for each creature you control): the player that creature is attacking (CR 506.2, 509.1b). */
+  | { kind: "cantBeBlockedIfDefendingControls"; filter: TargetSpec }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   /** Layer 6: "~ loses this ability" (a Licid): its printed activated ability with this index (in CompiledCard.activated). */
@@ -1885,6 +1889,13 @@ export interface StaticAbility {
  * artifacts", delirium's "four or more card types among cards in your graveyard", and so on.
  */
 export type StaticCondition =
+  /**
+   * Wiitigo: "if it has blocked or been blocked since your last upkeep"; Shape of the Wiitigo: "if enchanted creature
+   * attacked or blocked since your last upkeep": this object (or the creature it's attached to) was declared as an
+   * attacker (`attacked`) or a blocker (`blocked`), or became blocked (`wasBlocked`), in your previous upkeep's turn or
+   * later (combat always comes after the upkeep), as this object (CR 400.7).
+   */
+  | { kind: "combatSinceYourLastUpkeep"; of: "self" | "attached"; attacked?: true; blocked?: true; wasBlocked?: true }
   | { kind: "graveyardAtLeast"; n: number; /** So Tiny: "its controller has seven or more cards in their graveyard", the enchanted creature's controller. */ who?: "attached" }
   /** "If you haven't added mana with this ability this turn" (Carpet of Flowers): the source's addMana with `markSource` this turn. */
   | { kind: "addedManaThisTurn"; not?: true }
@@ -2717,6 +2728,8 @@ export type Effect =
       alsoModsWhileCounter?: string;
       /** Tune Up: "If it's a Vehicle, it becomes an artifact creature": `alsoMods` only for a permanent with this subtype as it enters. */
       alsoModsIfSubtype?: string;
+      /** Lim-Dûl the Necromancer: "If it's a creature, it's a Zombie in addition to its other creature types": `alsoMods` only for a permanent that's a creature as it enters. */
+      alsoModsIfCreature?: true;
       /** "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): they enter that way (rulings) when the X is at least `x`. */
       entersAs?: { mods: Modification[]; x: number };
       /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
@@ -2767,7 +2780,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at`: "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true; /** "Exile it and up to one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed): this ability's source too, if it's still the object it was (CR 400.7), exiled and returned with them. */ withSelf?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at`: "If a land enters this way, it enters tapped" (Silver Surfer, Cosmic Voyager). */ landsTapped?: true; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** With `at`: Vanish into Memory's "If you do, discard cards equal to that creature's toughness", in the delayed trigger after it returns. */ thenDiscardToughness?: true; /** Hallowed Respite: once back, a counter of this kind on each one that entered under this ability's controller's control, and each other one tapped. */ yoursCounterElseTap?: CounterKind; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true; /** With `tapped`: "tapped and attacking" (The Neutrinos), attacking what its controller chooses, in combat only (CR 508.4). */ attacking?: true; /** "Exile it and up to one creature that saddled it this turn, then return those cards" (Fortune, Loyal Steed): this ability's source too, if it's still the object it was (CR 400.7), exiled and returned with them. */ withSelf?: true; /** With `at`: "At the beginning of the next end step, you may pay {3}{B}. If you don't, return that card" (Koya, Death from Above): the delayed trigger's controller may pay this instead, as it resolves. */ unlessPay?: string }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -2973,7 +2986,7 @@ export type Effect =
   /** "Until end of turn, you may play a card exiled with ~" (Raphael): a GameState.linkedPlays grant (see there). */
   | { type: "playLinkedThisTurn"; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | /** "Until your next turn" (Nivix, Aerie of the Firemind): over as that turn begins. */ "yourNextTurn" | "exiled" | "yourNextEndStep" | /** "Until the beginning of your next upkeep" (Elkin Bottle). */ "yourNextUpkeep" | /** "During your next turn" (Galvanic Relay). */ "duringNextTurn" | /** "For as long as you control ~" (Lightning, Security Sergeant). */ "whileControlled"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** With `free`: "You may cast Equipment spells this way without paying their mana costs" (Nahiri, Forged in Fury): only cards like this are free. */ freeFor?: TargetSpec; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "During any turn you attacked with a commander" (Neriv, Crackling Vanguard): only then. */ attackedWithCommander?: true; /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared a creature of this type as an attacker. */ attackedWithType?: string; /** With `graveyards` and `choose` (Author of Shadows): "Choose a nonland card exiled this way": one card like this among all those exiled, chosen as it resolves; only it gets the permission. */ chooseAmong?: TargetSpec; /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on the source, as the object it is (GameObject.mayPlay.loreOn). */ loreOnSource?: true; /** "You may play it if you control a Kavu" (Possibility Technician): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */ ifControl?: TargetSpec; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** With `oneOf`: "You may play up to two of those cards" (March of Reckless Joy): this many of them. */ oneOfMax?: number; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** With `graveyards`: "all creature cards from target player's graveyard" (Shadow of the Enemy): only these. */ graveyardFilter?: TargetSpec; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true; /** Casey & Raph: "Target player exiles the top card of their library. Until that player's next end step, they may play that card": the `who` player has the permission, not you. */ theyPlay?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -3233,7 +3246,7 @@ export type Effect =
    */
   | { type: "attachEquipmentTo"; what: ObjRef }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
-  | { type: "attachElsewhere"; source: ObjRef }
+  | { type: "attachElsewhere"; source: ObjRef; /** Where to (default: another creature, Crown of the Ages): "another permanent with the same controller" as the permanent it's attached to (Simic Guildmage), "another permanent of that type", creature or land (Enchantment Alteration). */ host?: "sameController" | "sameType"; /** "Attach all Auras enchanting target permanent to another permanent with the same controller" (Glamer Spinners): `source` is that permanent, and every Aura on it goes to one permanent they could all enchant. */ aurasOn?: true }
   /**
    * "Attach ~ to another one of your opponents chosen at random" (Maddening Hex): a Curse moves to one of its controller's
    * opponents other than the player it enchants, at random; with no other one, it stays (rulings).
@@ -3314,6 +3327,8 @@ export type Effect =
        */
       attachTo?: ObjRef;
       /** Investigate (CR 701.16a): a Clue token, made by investigating `n` times, each time an event (youInvestigate). */
+      /** "A creature token of the chosen color and type" (Volrath's Laboratory): the source's chosen color and creature type (Chosen), named after the type (CR 111.4). */
+      chosenColorType?: true;
       investigate?: true;
     }
   /** Two kinds of tokens made by one instruction (Wurmcoil Engine): they enter at the same time (CR 608.2f). */
@@ -4177,7 +4192,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity" | /** "Choose land or nonland" (Abundant Harvest, Chosen.landOrNonland). */ "landOrNonland";
+export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity" | /** "Choose land or nonland" (Abundant Harvest, Chosen.landOrNonland). */ "landOrNonland" | /** "Choose white Citizen, blue Camarid, ..." (Sarpadian Empires, Vol. VII): a color and a creature type at once (Chosen.color and type), from `options`. */ "colorAndType";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
@@ -5027,7 +5042,7 @@ export interface TriggeredAbility {
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. */ revealed?: "land" | "nonland" };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" };
   /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
   eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**
@@ -5097,6 +5112,8 @@ export interface TriggeredAbility {
   sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** With `minAttackers`: "When you attack with exactly two creatures" (Alluring Suitor): that many, no more. */
+  exactAttackers?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): the attackers' powers as they were declared add up to at least this. */
   minTotalPower?: number;
   /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */
@@ -5795,6 +5812,8 @@ export interface CostMod {
   notOwned?: true;
   /** "Spells you cast that share a card type with the exiled card" (Semblance Anvil): with a card its imprint ability exiled (CR 607.2a). */
   sharesTypeWithLinked?: true;
+  /** "Creature spells you cast that share a creature type with ~" (Mistform Warchief): with the source's creature types now (changeling: all of them, CR 702.73a). */
+  sharesCreatureTypeWithSelf?: true;
   /** "Cost {1} less to cast for each card type they share with cards exiled with ~" (Cemetery Prowler): `n` once for each card type of the spell among them (rulings). */
   perTypeSharedWithLinked?: true;
   /** "Cost {1} less to cast for each card with the same name as that spell in your graveyard" (Locket of Yesterdays): `n` once for each such card in the caster's graveyard, the spell itself not counted (rulings). */
@@ -5843,8 +5862,8 @@ export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true }
-  | { kind: "payLife"; n: number; x?: true }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true }
+  | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }
   /** Nissa, Worldsoul Speaker's alternative cost: "pay eight {E}" (CR 107.14: lose that many energy counters). */
   | { kind: "payEnergy"; n: number }
   /**
@@ -7192,6 +7211,8 @@ export interface CompiledCard {
   commanderTargetTax?: number;
   /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
   perTargetCost?: { opponents: boolean; n: number }[];
+  /** Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast" (CR 601.2f, with the targets chosen in 601.2c): this much more for each spell like it a spell targets. */
+  stackTargetTax?: number;
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
   opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true; /** Monastery Siege: "that target you or a permanent you control": targeting this permanent's controller counts too. */ you?: true; /** Only while this holds (a Siege's anchor word, CR 614.12b). */ if?: StaticCondition }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */

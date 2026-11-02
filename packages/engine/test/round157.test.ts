@@ -79,7 +79,7 @@ const ogre = card("Test Ogre", "Creature — Ogre", "{3}{R}", { cmc: 4, power: "
 describe("round 157 cards", () => {
   it("are fully supported", () => supported(gilgamesh, satsuki, gilraen, rite, deathKiss, grist, freya, song, angel));
   it("and these, from the same pieces", () => supported(thunder, renegade, sorin, hunter));
-  it("but not Ronin, Shadow Stalker yet (its sacrifice-an-attached-Equipment cost)", () => expect(isFullySupported(ronin)).toBe(false));
+  it("and Ronin, Shadow Stalker since round B88 (its sacrifice-an-attached-Equipment cost)", () => expect(isFullySupported(ronin)).toBe(true));
 });
 
 describe("Gilgamesh, Master-at-Arms", () => {

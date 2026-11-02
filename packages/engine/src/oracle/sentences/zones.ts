@@ -673,6 +673,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 0, upTo: true, distinctManaValues: true, ...(filter ? { filter } : {}) }];
   }
+  // Gruesome Menagerie (rewritten in body.ts): one creature card of each mana value from 1 to 3 that's in your graveyard,
+  // as many as there are of those mana values (a card with {X} in its cost has mana value 0 there, rulings).
+  if (s === "Return a creature card with mana value 1, 2, and 3 each from your graveyard to the battlefield")
+    return [{ type: "chooseFromGraveyard", n: 3, distinctManaValues: true, dest: "battlefield", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], manaValue: { min: 1, max: 3 }, text: "creature card with mana value 1, 2 or 3" } }];
   // "Return any number of permanent cards with different names from your graveyard to the battlefield" (Eerie Ultimatum):
   // chosen as it resolves (rulings), one of each name; an Aura can't enchant another card entering with it (rulings).
   if ((m = /^[Rr]eturn any number of (.+?) with different names from your graveyard to the battlefield$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
@@ -1162,8 +1166,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // the creature if it's still on the battlefield and could be equipped, else unattached (rulings).
     const toSelf = m[8] === " attached to ~";
     // Iridescent Drake: "put target Aura card from a graveyard onto the battlefield under your control attached to ~": any
-    // graveyard's Aura, which stays there if it can't enchant ~ (rulings, CR 303.4g).
-    if (toSelf && !(spec?.subtypes?.length === 1 && (spec.subtypes[0] === "Equipment" || spec.subtypes[0] === "Aura") && !spec.types?.length && what?.ref === "target" && !what.n && ctx.selfIt)) return null;
+    // graveyard's Aura, which stays there if it can't enchant ~ (rulings, CR 303.4g). Hakim, Loreweaver: "{U}{U}: Return
+    // target Aura card from your graveyard to the battlefield attached to ~", in an activated ability likewise.
+    if (toSelf && !(spec?.subtypes?.length === 1 && (spec.subtypes[0] === "Equipment" || spec.subtypes[0] === "Aura") && !spec.types?.length && what?.ref === "target" && !what.n && (ctx.selfIt || ctx.activated))) return null;
     const before = ctx.targets[i - 1];
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
@@ -1510,9 +1515,21 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Attach target Equipment to target creature" (CR 701.3a). Either target illegal: the Equipment doesn't move (rulings).
   // "Attach target Aura attached to a creature to another creature" (Crown of the Ages, Autumn-Tail): moving an Aura to a
   // creature chosen as it resolves (rulings), not targeted.
-  if ((m = /^Attach (target Aura attached to a creature) to another creature$/.exec(s))) {
+  // Simic Guildmage: "Attach target Aura attached to a permanent to another permanent with the same controller": one
+  // controlled by whoever controls the permanent it's attached to as it resolves (rulings). Enchantment Alteration: "Attach
+  // target Aura attached to a creature or land to another permanent of that type": of a type (creature, land) the
+  // permanent it's attached to has as it resolves. Only the Aura is targeted (rulings).
+  if ((m = /^[Aa]ttach (target Aura attached to a (?:creature|permanent|creature or land)) to another (creature|permanent with the same controller|permanent of that type)$/.exec(s))) {
+    const host = m[2] === "creature" ? undefined : m[2] === "permanent of that type" ? ("sameType" as const) : ("sameController" as const);
+    if ((host === "sameType") !== m[1]!.endsWith("creature or land") || (host === "sameController") !== m[1]!.endsWith("permanent")) return null;
     const source = parseObject(m[1]!, ctx);
-    return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source }] : null;
+    return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source, ...(host ? { host } : {}) }] : null;
+  }
+  // Glamer Spinners: "attach all Auras enchanting target permanent to another permanent with the same controller": one
+  // permanent, chosen as it resolves, that every one of those Auras could enchant; none move if there's none (rulings).
+  if (/^[Aa]ttach all Auras enchanting target permanent to another permanent with the same controller$/.test(s)) {
+    const source = parseObject("target permanent", ctx);
+    return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source, host: "sameController", aurasOn: true }] : null;
   }
   // "Attach target Aura you control to target creature" (Aura Finesse), "target Aura or Equipment you control" (Codsworth).
   // Armory Automaton: "attach any number of target Equipment to it", all of them to the source (rulings).

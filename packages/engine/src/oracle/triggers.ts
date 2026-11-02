@@ -3889,8 +3889,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const text = attacksOpp[2]!;
     const oneOrMore = attacksOpp[1] === "one or more";
     // Combat Calligrapher: "that attacking player creates a tapped ... token ... that's attacking that opponent": theirs,
-    // attacking the opponent attacked (CR 508.4), never declared as an attacker.
-    const inkling = !oneOrMore && !/, if that opponent/.test(line) ? /^that attacking player creates a tapped (.+? token(?: with [a-z, ]+)?) that's attacking that opponent\.?$/.exec(text) : null;
+    // attacking the opponent attacked (CR 508.4), never declared as an attacker. Ellie, Brick Master: "... token named
+    // Cordyceps Infected that's attacking that opponent", the same with the token's name.
+    const inkling = !oneOrMore && !/, if that opponent/.test(line) ? /^that attacking player creates a tapped (.+? token(?: with [a-z, ]+)?(?: named [A-Z][A-Za-z' ]+?)?) that's attacking that opponent\.?$/.exec(text) : null;
     if (inkling) {
       const body = parseBody(`Create a ${inkling[1]} that's tapped and attacking that player.`, { eventPlayer: true });
       const e = body?.effects[0];

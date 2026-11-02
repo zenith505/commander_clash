@@ -56,11 +56,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Nahiri, Heir of the Ancients: "You may attach an Equipment you control to it", the token just created; Goldwardens'
   // Gambit: "For each of those tokens, you may attach an Equipment you control to it".
-  if ((fu = /^(?:For each of those tokens, y|Y)ou may attach an Equipment you control to (it|that creature)$/.exec(s))) {
+  // Unexpected Request: "... until the next end step" (as parseBody joins it): a
+  // delayed trigger about the Equipment attached this way (CR 603.7c), none if none was.
+  if ((fu = /^(?:For each of those tokens, y|Y)ou may attach an Equipment you control to (it|that creature)( until the next end step)?$/.exec(s))) {
     const each = /^For each /.test(s);
-    if (each && !ctx.lastCreatedAny) return null;
+    if (each && (!ctx.lastCreatedAny || fu[2])) return null;
     const what = each ? ({ ref: "created" } as ObjRef) : parseObject(fu[1]!, ctx);
-    return what && (what.ref !== "target" || !what.n) && what.ref !== "each" ? [{ type: "attachEquipmentTo", what }] : null;
+    if (!what || (what.ref === "target" && what.n) || what.ref === "each") return null;
+    return [{ type: "attachEquipmentTo", what }, ...(fu[2] ? [{ type: "delayed" as const, when: "nextEndStep" as const, each: "attachedThisWay" as const, effects: [{ type: "unattach" as const, what: { ref: "subject" as const } }], text: "unattach it" }] : [])];
   }
   // Beatrix, Loyal General: "you may attach any number of Equipment you control to target creature you control"; Battlefield
   // Improvisation: "... to it". Only those that can be attached to it (rulings; CR 301.5c).

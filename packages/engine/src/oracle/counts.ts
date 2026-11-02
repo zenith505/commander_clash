@@ -600,6 +600,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // battlefield under their control this turn".
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
+  // Azula, Ruthless Firebender: "for each player who discarded a card this turn": players still in the game who discarded
+  // one or more cards this turn (a discard as a cost too), counted as it resolves.
+  if (each && /^player who discarded a card this turn$/i.test(p)) return count({ kind: "players", discardedThisTurn: true });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
   // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".

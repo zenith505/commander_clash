@@ -201,6 +201,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
         return;
       }
+      if (e.each === "attachedThisWay") {
+        for (const t of s.resolving?.attachedThisWay ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? [])
           if (s.objects[t]?.zone === "battlefield") {
@@ -627,13 +631,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
         // Treasure Keeper: "a nonland card with mana value 3 or less", an {X} in its cost counting 0 there (CR 202.3e).
-        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv);
+        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land")) && (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) && (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast);
         const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;

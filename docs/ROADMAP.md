@@ -1,7 +1,7 @@
 # Roadmap
 
-29,277 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,394 of
+29,303 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,395 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1669,6 +1669,30 @@ line blocks.
    creature you control deals combat damage to a player or planeswalker this turn" (Flitterwing Nuisance); "Then you may
    pay one or more {E}. If you do, put that many +1/+1 counters on ~" (Rampaging Aetherhood); "... and isn't a Human"
    (Werewolf Pack Leader: loseTypes of a creature type). +14 (29,241 of 31,936; 29,277 with B83 and B84).
+   Round 249 (the top of the list and earlier skip lists): "a third of their life/cards/creatures/lands, rounded up"
+   (Pox: loseLife, discard and sacrifice `third`); "that attacking player creates a tapped ... token named ... that's
+   attacking that opponent" (Ellie, Brick Master); "for each player who discarded a card this turn" (Azula, Ruthless
+   Firebender: Count players discardedThisTurn); "reveal cards from the top of your library until you reveal a nonland card
+   with mana value 3 or greater. Exile that card with three time counters on it. If it doesn't have suspend, it gains
+   suspend" (Sibylline Soothsayer: exileUntilNonland untilMvAtLeast); "Put that card onto the battlefield and the rest on the bottom" after revealing until (Nissa, Leyline
+   Tamer); "each player who controls fewer lands than the player who controls the most lands searches their library for a
+   number of basic land cards less than or equal to the difference" (Scholarship Sponsor: Count behindMost, search
+   perPlayerN; one who isn't behind doesn't search or shuffle); "You may attach
+   an Equipment you control to that creature. If you do, unattach it at the beginning of the next end step" (Unexpected
+   Request: delayed unattach for each attachedThisWay); "you and target opponent each secretly choose a creature that
+   player controls" (Malik, Grim Manipulator: Effect secretChoose, a pickPermanents `secret` prompt, then both revealed
+   and sacrificed); "If you would draw a card while your library has no cards in it, instead put five +1/+1 counters on
+   ~" and "Discard three cards with different names" as a cost (Ormos, Archive Keeper: CompiledCard.drawEmptyCounters,
+   discard cost differentNames, checked in the UI's cost picker); "that player chooses a permanent card in your graveyard,
+   then you put it onto the battlefield under your control" (Neyam Shai Murad: chooseFromGraveyard `chooser`). +10
+   (29,268 of 31,936 with B83; 29,303 with B84 and B85).
+   Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
+   and the rulings' loss of non-Alien subtypes); Stitcher Geralf ("exile up to two creature cards put into graveyards
+   this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
+   and "one of each of those kinds of counters"); Fervent Mastery ("If the {2}{R}{R} cost was paid": which alternative
+   cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness ("Pay any amount of
+   life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (cards exiled this way gaining
+   "You may cast ~ from exile as long as you control a Lukka planeswalker").
    Out after round 248 (looked at, not done): Unidentified Hovership ("the exiled card's owner manifests dread": each
    owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver
    ("Return ~ to the battlefield under that player's control at the beginning of their next upkeep": no instruction yet
@@ -2089,7 +2113,7 @@ line blocks.
    only give away their own permanents), never use Lion's Eye Diamond (automatic payment doesn't either), and cast from
    Bolas's Citadel only while their life stays 15 or more. Round 88 leftovers still out: Ob Nixilis of the Black Oath
    and Karn, Living Legacy emblems, Karn, Scion of Urza, Toralf, Death Kiss, Burning-Rune Demon, Emergent Ultimatum,
-   Ecological Appreciation, Ormos. Bots never exile a Spirit Guide from their hand for mana (the player can, from the
+   Ecological Appreciation. Bots never exile a Spirit Guide from their hand for mana (the player can, from the
    hand-card menu; autopay doesn't use it either). Bots don't hold Teferi's Protection for anything but lethal combat
    damage or a board wipe of their own permanents worth 12+ mana value; bots only animate the biggest creature card
    with Animate Dead, and pay Sylvan Library's life only with 30 or more. To check: token creation by Jace-style
@@ -2135,7 +2159,7 @@ line blocks.
      on their own turn before combat, ones that could still attack.
    - "With different names" still out: Emergent Ultimatum and Ecological Appreciation (an opponent chooses cards to
      shuffle back, then casting or putting the rest), Burning-Rune Demon ("exactly two cards ... that have different
-     names"), discard costs (Ormos).
+     names"). Discard costs with different names came in round 249 (Ormos).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
    - Power-up still out: Kang (extra turn), Loki (short name), Quicksilver ("in your opening hand"), Stature and Viv

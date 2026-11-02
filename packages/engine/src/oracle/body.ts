@@ -1434,7 +1434,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   // Kamahl's Will: "Choose target creature you don't control. Each creature you control deals damage equal to its power to
   // that creature": the same as "... to target creature you don't control" (the target chosen as it's cast, CR 601.2c).
-  text = text.replace(/(^|\. |• )Choose (target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control deals damage equal to its power) to that creature\./, "$1$3 to $2.");
+  // Nissa's Judgment: "Choose up to one target creature an opponent controls. Each creature you control with a +1/+1
+  // counter on it deals damage equal to its power to that creature": the same, after its support (rulings).
+  text = text.replace(/(^|\. |• )Choose ((?:up to one )?target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control(?: with a \+1\/\+1 counter on it)? deals damage equal to its power) to that creature\./, "$1$3 to $2.");
   // Motivated Pony: "attacking creatures get +1/+1 until end of turn. If a Food entered the battlefield under your control
   // this turn, untap those creatures and they get an additional +2/+2 until end of turn": both under the condition (it
   // can't change in between), about the creatures the first effect affected (CR 611.2c).
@@ -14623,6 +14625,10 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   s = s.replace(/^(~ deals (?:\d+|X) damage to any target and (?:\d+|X) damage to) itself(?=$|, where X is )/, "$1 ~");
   // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
   s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
+  // The Fallen: "~ deals 1 damage to each opponent and planeswalker it has dealt damage to this game": as the object it is
+  // now, its controller's opponents only (rulings).
+  const fallen = /^~ deals (\d+) damage to each opponent and planeswalker it has dealt damage to this game$/.exec(s);
+  if (fallen && !ctx.spell) return [{ type: "damage", amount: num(fallen[1]!), to: { ref: "damagedBySelf" } }];
   // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.
   s = s.replace(/^((?:Untap|Tap) ~ and put .+ counters? on) it$/, "$1 ~");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.

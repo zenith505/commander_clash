@@ -778,6 +778,8 @@ export interface TargetSpec {
   combatDamagedBySource?: true;
   /** For players: "target player dealt damage by ~ this turn" (Wicked Akuba): any damage, by the source as the creature it is now (TurnLog.damagedBy). */
   damagedBySource?: true;
+  /** For players: "target opponent previously dealt damage by it" (Diseased Vermin): any damage, by the source as the object it is now (GameObject.damagedPlayers). */
+  damagedBySourceEver?: true;
   /** "A creature that fought this turn" (Boxing Ring): one that fought since it became this object (CR 701.14, 400.7). */
   foughtThisTurn?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
@@ -1433,7 +1435,13 @@ export type DamageRecipient =
    * "That player or a planeswalker that player controls" (Vial Smasher the Fierce, Curse of the Pierced Heart): not
    * targeted; the controller chooses one as it resolves (rulings), asked only when that player controls a planeswalker.
    */
-  | { ref: "playerOrPlaneswalker"; who: PlayerRef };
+  | { ref: "playerOrPlaneswalker"; who: PlayerRef }
+  /**
+   * The Fallen: "each opponent and planeswalker it has dealt damage to this game": the source's opponents and the
+   * planeswalkers it has dealt damage to as the object it is now (GameObject.damagedPlayers / damagedWalkers); once it has
+   * left the battlefield it remembers none (rulings).
+   */
+  | { ref: "damagedBySelf" };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -3159,7 +3167,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -4587,6 +4595,7 @@ export type TriggerEvent =
   | "anotherCreatureYouControlEnters"
   | "landYouControlEnters" // landfall: "Whenever a land you control enters"
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
+  | "creatureYouControlAttacksPlayerAlone" // Yuriko, Blade of the Mighty: the only creature attacking that player (not a planeswalker or battle)
   | "creatureYouControlAttacks" // "Whenever a creature you control attacks": each one as it's declared (CR 508.3a)
   | "yourUpkeep" // At the beginning of your upkeep
   | "yourEndStep" // At the beginning of your end step

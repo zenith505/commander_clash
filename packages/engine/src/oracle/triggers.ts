@@ -3047,6 +3047,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(selfOrCmdAlone[1]!, { defending: true });
     return body ? { event: "creatureYouControlAttacksAlone", body, subjectFilter: { kind: "object", types: ["Creature"], commander: true, text: "commander you control" }, subjectOrSelf: true } : "fail";
   }
+  // Yuriko, Blade of the Mighty and Jiang Yanggu, Alone: "Whenever a creature you control attacks a player alone": no other
+  // creature was declared as an attacker attacking that player; attackers of their planeswalkers or battles, or of other
+  // players, don't count (rulings, CR 506.5, 508.1). That creature is the subject, the player it attacks "that player".
+  const playerAlone = /^Whenever an? (.+?) you control attacks a player alone, (?!if )(.+)$/.exec(line);
+  if (playerAlone) {
+    const filter = playerAlone[1] === "creature" ? undefined : parseTargetPhrase(playerAlone[1]!);
+    if (filter === null || (filter && filter.kind !== "object")) return "fail";
+    const body = parseBody(playerAlone[2]!, { subjectIt: true, defending: true });
+    return body ? { event: "creatureYouControlAttacksPlayerAlone", body, ...(filter ? { subjectFilter: { ...filter, text: playerAlone[1]! } } : {}) } : "fail";
+  }
   // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
   const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);
   if (alone) {

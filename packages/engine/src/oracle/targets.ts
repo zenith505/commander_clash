@@ -331,6 +331,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // Diseased Vermin: "target opponent previously dealt damage by it": any damage, by ~ as the object it is now.
+  if (x === "target opponent previously dealt damage by it" && !ctx.spell) {
+    const index = addTarget(ctx, { kind: "player", opponent: true, damagedBySourceEver: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   // Fire and Brimstone: "target player who attacked this turn" (Player.attackedTurn).
   if (x === "target player who attacked this turn") {
     const index = addTarget(ctx, { kind: "player", attackedThisTurn: true, text: x });

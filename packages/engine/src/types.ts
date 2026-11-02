@@ -356,6 +356,10 @@ export interface GameObject {
   hasDealtDamage?: true;
   /** It has dealt combat damage since it became this object (Ruric Thar: "as long as they haven't dealt combat damage yet"). */
   hasDealtCombatDamage?: true;
+  /** The players it has dealt damage to since it became this object (Diseased Vermin: "target opponent previously dealt damage by it"). */
+  damagedPlayers?: PlayerId[];
+  /** The planeswalkers it has dealt damage to since it became this object, each while it's that object (The Fallen). */
+  damagedWalkers?: { id: ObjectId; zc: number }[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
@@ -1298,6 +1302,11 @@ export interface ContinuousEffect {
   whileControlled?: { id: ObjectId; zc: number; controller?: PlayerId };
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
+  /**
+   * "For as long as that creature is enchanted" (Rootwater Matriarch, CR 611.2b): over for a permanent once no Aura is
+   * attached to it (checked with the state-based actions), even if one is attached to it again later (rulings).
+   */
+  whileEnchanted?: true;
   /** "You may pay {W} to end this effect" (a Licid): `controller` may pay `cost` any time they have priority (CR 116.2c). */
   endable?: { cost: string };
   affected: ObjectId[];

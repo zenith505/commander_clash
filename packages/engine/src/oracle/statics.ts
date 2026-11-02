@@ -2684,6 +2684,18 @@ function parseStaticLine(line: string): StaticAbility | null {
     const spec: TargetSpec = ench ? { kind: "object", types: ["Enchantment"], notSubtypes: ["Aura"], text: "non-Aura enchantment" } : { kind: "object", types: ["Artifact"], notTypes: ["Creature"], text: "noncreature artifact" };
     return { affects: { kind: "filter", types: [ench ? "Enchantment" : "Artifact"], spec, ...(animate[2] ? { other: true } : {}), ...(animate[3] ? { controller: "you" as const } : {}) }, mods, text: line };
   }
+  // Spark Rupture: each planeswalker with a loyalty counter on it stops being a planeswalker: "is a creature" replaces its
+  // card types and its planeswalker subtypes (CR 205.1a, 205.3d; it keeps its supertypes), it loses all abilities (layer 6)
+  // and its base power and toughness are its loyalty counters, changing with them (layer 7b, rulings). The set is fixed in
+  // layer 4, so it's the same for 6 and 7b (CR 613.6); with no loyalty counters left it's a planeswalker again (rulings).
+  if (text === "Each planeswalker with one or more loyalty counters on it loses all abilities and is a creature with power and toughness each equal to the number of loyalty counters on it") {
+    const n = { count: { kind: "affectedCounters" as const, counter: "loyalty" } };
+    return {
+      affects: { kind: "filter", types: ["Planeswalker"], spec: { kind: "object", types: ["Planeswalker"], counter: "loyalty", text: "planeswalker with one or more loyalty counters on it" } },
+      mods: [{ kind: "setTypes", types: ["Creature"], subtypes: [] }, { kind: "loseAllAbilities" }, { kind: "setPT", power: n, toughness: n }],
+      text: line,
+    };
+  }
   // Bello, Bard of the Brambles: "each non-Equipment artifact and non-Aura enchantment you control with mana value 4 or
   // greater is a 4/4 Elemental creature in addition to its other types and has ...": the group as the effect applies in
   // layer 4, the same set for 6 and 7b (CR 613.6).

@@ -1038,6 +1038,8 @@ export function moveObject(
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
   o.hasDealtCombatDamage = undefined;
+  o.damagedPlayers = undefined;
+  o.damagedWalkers = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -2147,7 +2149,13 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0);
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileCounter && !e.affected.length));
+  // Rootwater Matriarch: "for as long as that creature is enchanted", the same once it has no Aura attached.
+  for (const e of s.effects) {
+    if (!e.whileEnchanted) continue;
+    const kept = e.affected.filter((id) => isEnchanted(s, id));
+    if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
+  }
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || ((e.whileCounter || e.whileEnchanted) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;
@@ -2155,6 +2163,12 @@ export function endWhileTapped(s: GameState): boolean {
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
+}
+
+/** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
+export function isEnchanted(s: GameState, id: ObjectId): boolean {
+  const o = s.objects[id];
+  return o?.zone === "battlefield" && s.battlefield.some((a) => s.objects[a]!.attachedTo === id && characteristics(s, obj(s, a)).subtypes.includes("Aura"));
 }
 
 export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
@@ -10189,6 +10203,12 @@ function finishAttacks(s: GameState) {
   for (const id of attacks) fireEvent(s, { type: "attacks", id }); // CR 508.3a
   if (attacks.length) fireEvent(s, { type: "groupAttack", controller: s.activePlayer, ids: attacks });
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]! }); // CR 506.5
+  // "Attacks a player alone": the only creature declared as an attacker attacking that player, not one of their
+  // planeswalkers or battles (Yuriko, Blade of the Mighty rulings).
+  for (const p of new Set(attacks.map((id) => s.objects[id]!.attacking))) {
+    const direct = attacks.filter((id) => s.objects[id]!.attacking === p && !s.objects[id]!.attackingPermanent);
+    if (p !== undefined && direct.length === 1) fireEvent(s, { type: "attacksPlayerAlone", id: direct[0]! });
+  }
   for (const [at, enlisted] of d.enlisted) fireEvent(s, { type: "enlists", id: at, enlisted });
   for (const id of d.exerted ?? []) fireEvent(s, { type: "exerted", id, attacking: true });
 }

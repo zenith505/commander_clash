@@ -1467,6 +1467,15 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     const o = s.objects[whom];
     return { objs: o?.zone === "battlefield" ? [o] : [], pids: [] };
   }
+  if (to.ref === "damagedBySelf") {
+    const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc)) return { objs: [], pids: [] };
+    const objs = (o.damagedWalkers ?? []).flatMap((w) => {
+      const pw = s.objects[w.id];
+      return pw?.zone === "battlefield" && (pw.zoneChanges ?? 0) === w.zc && objIsType(s, pw, "Planeswalker") ? [pw] : [];
+    });
+    return { objs, pids: opponents(s, ctx.controller).filter((p) => o.damagedPlayers?.includes(p)) };
+  }
   if (to.ref === "eventRecipient") return ctx.subject ? { objs: objects(s, { ref: "subject" }, ctx), pids: [] } : { objs: [], pids: players(s, { ref: "eventPlayer" }, ctx) };
   if (to.ref === "anyTarget") {
     const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };

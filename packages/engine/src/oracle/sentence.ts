@@ -211,6 +211,8 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // Summary Dismissal: "Exile all other spells and counter all abilities" (see Effect "dismissStack").
+  if (ctx.spell && /^Exile all other spells and counter all abilities$/.test(s)) return [{ type: "dismissStack" }];
   // An ability an Equipment gives that names it: "Blazing Torch deals 2 damage to any target" (Blazing Torch, Ninja's
   // Kunai): the Equipment is the source, as it last existed if the cost sacrificed it (CR 608.2h; the creature isn't).
   const sourceDeals = /^\u27easource\u27eb (deals \d+ damage to (?:any target|target [a-z ]+))$/.exec(s);

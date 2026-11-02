@@ -545,7 +545,7 @@ export interface GameObject {
   buyback?: boolean;
   /** A resolving spell's "return ~ to its owner's hand" (Cerebral Eruption): it goes there as it finishes resolving. */
   toHandOnResolve?: true;
-  /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
+  /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b; Shadow of the Grave, cycling included, CR 702.29a). */
   discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
   castAlt?: AltCostKind;
@@ -1028,7 +1028,8 @@ export interface DelayedTrigger {
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
+  /** `playersNextUpkeep`: at the beginning of `player`'s next upkeep (Phytotitan: the card's owner's). */
+  when: "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | "playersNextUpkeep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -1498,7 +1499,7 @@ export interface TurnLog {
    * Blocks declared this turn (CR 509.1), banding's included (CR 702.22h): each blocker and the attacker it blocked as
    * `id@zoneChanges` (Venomous Breath's "creatures that blocked or were blocked by it this turn").
    */
-  blocks?: { blocker: string; attacker: string }[];
+  blocks?: { blocker: string; attacker: string; /** The combat phase it was declared in (GameState.combatsThisTurn): Ride Down's "this combat". */ combat?: number }[];
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
   /** Times each player investigated this turn (Erdwal Illuminator's "for the first time each turn"). */
@@ -1531,6 +1532,8 @@ export interface TurnLog {
   leftGraveyard?: PlayerId[];
   /** How many cards left each player's graveyard this turn (Bonecache Overseer's "three or more cards"). */
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
+  /** The players a permanent was put into the hand of from the battlefield this turn, its owner's (CR 400.3), a token too (Barrin, Tolarian Archmage). */
+  permanentToHand?: PlayerId[];
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */
   creaturesToYard?: { owner: PlayerId; token?: true }[];
   /** The card types, as they last existed, of the permanents put into each owner's graveyard from the battlefield this turn (Kami of Transience). */

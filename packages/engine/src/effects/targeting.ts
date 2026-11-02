@@ -41,6 +41,15 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/** Mists of Lórien: the other permanents matching `group.filter` with `t`'s mana value now (CR 202.3; 0 face down, 708.2). */
+export function sameManaValued(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sameMv"]>, controller: PlayerId): GameObject[] {
+  if (t.zone !== "battlefield") return [];
+  const mv = characteristics(s, t).manaValue;
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => o.id !== t.id && characteristics(s, o).manaValue === mv && objectMatches(s, group.filter, o, controller, false));
+}
+
 /** Radiance: the other permanents matching `group.filter` that share at least one color with `t` now (CR 105.2). */
 export function sharingAColor(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sharesColor"]>, controller: PlayerId): GameObject[] {
   if (t.zone !== "battlefield") return [];

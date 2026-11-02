@@ -457,7 +457,7 @@ describe("Lane B round 85", () => {
     let s = s0;
     handOf(s, ap, []);
     const hz = toZone(s, ap, hazezon(), "hand");
-    s.players[ap]!.manaPool = { R: 1, G: 1, W: 1, C: 4 };
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, R: 1, G: 1, W: 1, C: 4 };
     s = castNow(s, ap, hz);
     s = settle(s);
     const lands = () => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === ap && characteristics(s, s.objects[id]!).types.includes("Land")).length;

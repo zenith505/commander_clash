@@ -919,6 +919,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const dealt = s.turnLog?.combatDamageTypesBy?.[you] ?? [];
       return dealt.some((t) => (t === "*" ? all || mine.length > 0 : all ? CREATURE_TYPES.has(t) : mine.includes(t)));
     }
+    case "permanentToYourHand":
+      return (s.turnLog?.permanentToHand ?? []).includes(you);
     case "cardLeftYourGraveyard":
       return cond.n ? (s.turnLog?.leftGraveyardCount?.[you] ?? 0) >= cond.n : (s.turnLog?.leftGraveyard ?? []).includes(you);
     case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)

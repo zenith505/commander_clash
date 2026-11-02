@@ -3645,7 +3645,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const firstOn = !youPut && !firstTime ? (/^(Whenever one or more \+1\/\+1 counters are put on another permanent you control), if it's the first time \+1\/\+1 counters have been put on that permanent this turn, /.exec(line) ?? /^(Whenever one or more counters are put on a creature you control), if it's the first time counters have been put on that creature this turn, /.exec(line)) : null;
   // Bioessence Hydra: "Whenever one or more loyalty counters are put on planeswalkers you control": once for each
   // planeswalker they're put on (an entering one's too, rulings), "that many" those put on it.
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 |loyalty )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control|an? [A-Z][a-z]+ you control|planeswalkers you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);
+  // Wickersmith's Tools: "Whenever one or more -1/-1 counters are put on a creature": any creature, once for each one.
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 |-1\/-1 |loyalty )?counters are put on (~|a creature|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control|an? [A-Z][a-z]+ you control|planeswalkers you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -4017,6 +4018,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (none) {
     const body = parseBody(none[2]!, { selfIt: true });
     return body ? { event: "state", state: { kind: "selfCounters", counter: none[1]!, min: 0, max: 0 }, body } : "fail";
+  }
+  // Bronze Bombshell: "When a player other than this creature's owner controls it, that player sacrifices it. If the player
+  // does, this creature deals 7 damage to the player." A state trigger (CR 603.8) controlled by that player; if it has
+  // changed controllers before it resolves, it can't be sacrificed and deals no damage (rulings, CR 701.21a).
+  const notOwner = /^When a player other than ~'s owner controls it, that player sacrifices it\. If the player does, ~ deals (\d+) damage to the player\.$/.exec(line);
+  if (notOwner) {
+    const body = parseBody(`Sacrifice ~. If you do, ~ deals ${notOwner[1]} damage to you.`, { selfIt: true });
+    return body ? { event: "state", state: { kind: "selfIs", filter: { kind: "object", types: [], owner: "opponent", text: "controlled by a player other than its owner" } }, body } : "fail";
   }
   // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
   // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4

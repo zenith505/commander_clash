@@ -58,6 +58,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   if (!m) return null;
   const costs = m[1]!.split(", ");
   let tap = false;
+  let untapSelf = false;
   let sacrificeSelf = false;
   let returnSelf = false;
   let manaCost = "";
@@ -84,6 +85,8 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       tapCost = { kind: "tap", filter: { ...filter, text: `untapped ${filter.text} you control` }, n: num(tc[1]!), ...(costs.includes("{T}") ? { other: true } : {}) };
     }
     else if (c === "{T}") tap = true;
+    // Pili-Pala: "{2}, {Q}: Add one mana of any color." (CR 107.6), not with {T} as well.
+    else if (c === "{Q}" && !untapSelf && !costs.includes("{T}")) untapSelf = true;
     else if (c === "Discard your hand" && !discardHand) discardHand = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
     // "Return ~ to its owner's hand" (Grinning Ignus): paid with the rest (CR 602.2b, 605.3a).
@@ -98,7 +101,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(returnSelf ? { returnSelf: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, ...(untapSelf ? { untapSelf: true as const } : {}), sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(returnSelf ? { returnSelf: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);

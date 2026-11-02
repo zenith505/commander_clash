@@ -798,6 +798,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (it?.ref !== "target" || it.index !== 0) return null;
     return [{ type: "delayed", when: "endOfCombat", of: it, withSource: true, effects: [{ type: "destroy", what: { ref: "subject" } }, { type: "destroy", what: { ref: "self" } }], text: "destroy it and ~" }];
   }
+  // Phytotitan: "When ~ dies, return it to the battlefield tapped under its owner's control at the beginning of their next
+  // upkeep": a delayed trigger (CR 603.7) about the card in the graveyard now, at its owner's next upkeep; it returns only
+  // if it's still there then (rulings, CR 400.7).
+  if (ctx.selfCard && !ctx.activated && !ctx.spell && (m = /^[Rr]eturn (?:it|~) to the battlefield( tapped)? under its owner's control at the beginning of their next upkeep$/.exec(s)))
+    return [{ type: "delayed", when: "ownersNextUpkeep", each: "selfCard", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, ...(m[1] ? { tapped: true as const } : {}), owner: true }], text: `return it to the battlefield${m[1] ?? ""} under its owner's control` }];
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);

@@ -8651,6 +8651,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
+  if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");

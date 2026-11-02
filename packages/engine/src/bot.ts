@@ -367,6 +367,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
+    // Wildfire Devils: the card exiled is copied for that player to cast: our best one for us, the least useful for an opponent.
+    if (pend.kind === "searchLibrary" && pend.copiedBy !== undefined) {
+      const ranked = chooseSearch(s, pend.copiedBy, pend.cards, pend.cards.length);
+      return [{ type: "searchLibrary", player: pid, found: pend.copiedBy === pid ? ranked.slice(0, pend.max) : ranked.slice(ranked.length - pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
       const ranked = chooseSearch(s, pend.forPlayer, pend.cards, pend.cards.length);
       return [{ type: "searchLibrary", player: pid, found: pend.helps ? ranked.slice(ranked.length - pend.max) : ranked.slice(0, pend.max) }];
@@ -443,6 +448,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.distinctManaValues) {
       const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
       return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => mv(s, x) === mv(s, id)) === i) }];
+    }
+    // "Cards with different powers" (Rip, Spawn Hunter): the best card of each power.
+    if (pend.kind === "searchLibrary" && pend.distinctPowers) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const pow = (id: string) => characteristics(s, s.objects[id]!).power;
+      return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => pow(x) === pow(id)) === i).slice(0, pend.max) }];
     }
     // "With total mana value 4 or less" (Lively Dirge): the best-ranked cards that still fit.
     if (pend.kind === "searchLibrary" && pend.totalMv !== undefined) {
@@ -1006,6 +1017,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         }
         return [{ type: "chooseOption", player: pid, choice: String(best) }];
       }
+      // Wheel of Potential: the {E} paid is how many each player who wheels draws; all we have, short of decking ourselves.
+      const wheelPaid = s.resolving?.body.effects.some((x) => x.type === "eachMay" && typeof x.wheel === "object" && "count" in x.wheel && x.wheel.count.kind === "notedAmount");
+      if (wheelPaid) return [{ type: "chooseOption", player: pid, choice: String(Math.max(0, Math.min(most, player(s, pid).library.length - 1))) }];
       const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
       const o = t?.kind === "object" ? s.objects[t.id] : undefined;
       const theirs = !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;

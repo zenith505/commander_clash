@@ -3965,10 +3965,12 @@ function LibrarySearch({
   const whose = zones ? s.players[pending.zonesOf!]!.name : "";
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
+  // "Cards with different powers" (Rip, Spawn Hunter): a card can't join one with the same power.
+  const powerOf = (id: string) => characteristics(s, s.objects[id]!).power;
   // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
   // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
   // "With total mana value 4 or less" (Lively Dirge): a card joins only if the total stays within it.
-  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
+  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -3997,6 +3999,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.cloak ? "cloak" : "manifest"} ${pending.what} from your hand (each a face-down 2/2 creature${pending.cloak ? " with ward {2}" : ""})`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
+                : pending.fromGraveyard === "exile" && pending.copiedBy !== undefined
+                  ? `${pending.source}: exile ${pending.what} from your graveyard. ${pending.copiedBy === pending.player ? "You copy it and may cast the copy" : `${s.players[pending.copiedBy]!.name} copies it and may cast the copy`} without paying its mana cost`
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
                   : pending.fromGraveyard === "battlefield" && pending.under !== undefined
@@ -4024,7 +4028,7 @@ function LibrarySearch({
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
-              ? `The rest go ${dig.rest}.${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}`
+              ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}`
               : pending.firstTo
                 ? pending.firstN ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal

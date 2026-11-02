@@ -6324,7 +6324,31 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
-    const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
+    // Scrambleverse: "For each nonland permanent, choose a player at random. Then each player gains control of each
+    // permanent for which they were chosen. Untap those permanents.": any player, its controller too, chosen at random
+    // for each one; all the control changes at once, indefinitely, and every one of them untaps (rulings).
+    if (/^For each nonland permanent, choose a player at random$/.test(s) && /^Then each player gains control of each permanent for which they were chosen\.?$/.test(sentences[si + 1] ?? "") && /^Untap those permanents\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "scrambleControl", filter: { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonland permanent" } });
+      si += 2;
+      continue;
+    }
+    // Talent of the Telepath: "Target opponent reveals the top seven cards of their library. You may cast an instant or
+    // sorcery spell from among them without paying its mana cost. Then that player puts the rest into their graveyard."
+    // and its spell mastery, "If there are two or more instant and/or sorcery cards in your graveyard, you may cast up to
+    // two instant and/or sorcery spells from among the revealed cards instead of one": cast from the library as it
+    // resolves, ignoring timing (CR 608.2g, rulings); the graveyard checked as it resolves, the spell itself still on the
+    // stack (rulings); the cards not cast go to their owner's graveyard (rulings).
+    const talent = new RegExp(`^(Target opponent|Target player) reveals the top ${NUM} cards of their library$`).exec(s);
+    if (talent && sentences[si + 1]?.replace(/\.$/, "") === "You may cast an instant or sorcery spell from among them without paying its mana cost" && /^Then that player puts the rest into their graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+      const who = parsePlayer(talent[1]!, ctx);
+      if (who?.ref !== "target") return null;
+      const mastery = new RegExp(`^If there are ${NUM} or more instant and/or sorcery cards in your graveyard, you may cast up to two instant and/or sorcery spells from among the revealed cards instead of one\\.?$`).exec(sentences[si + 3] ?? "");
+      const spells: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who, n: num(talent[2]!), reveal: true, filter: spells, max: 1, rest: { dest: "graveyard" }, ...(mastery ? { maxIfYard: { has: spells, min: num(mastery[1]!), max: 2 } } : {}) });
+      si += mastery ? 3 : 2;
+      continue;
+    }
+    const castAmongHead =new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
     // "You may cast an instant or sorcery spell with mana value X or less from among them ..." (Muse Vortex), "... up to
     // two sorcery spells ..." (Collected Conjuring): only so many, of those types.
     // "You may play lands and cast spells from among cards exiled this way without paying their mana costs" (Gix): lands
@@ -9893,6 +9917,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true }, text: `pay any amount of {E}. ${energyUse}` });
       si++;
+      continue;
+    }
+    // Wheel of Potential: "You get {E}{E}{E}, then you may pay any amount of {E}. Each player may exile their hand and draw
+    // a number of cards equal to the amount of {E} paid this way. If seven or more {E} was paid this way, you may play cards
+    // you own exiled this way until the end of your next turn.": X energy (0 is paying, rulings); then each player decides
+    // in turn order, those who chose exile their hands and draw X (rulings); the cards you exiled from your hand, yours
+    // (CR 400.3), may be played until the end of your next turn if X was seven or more.
+    if (anyEnergy && /^Each player may exile their hand and draw a number of cards equal to the amount of \{E\} paid this way\.?$/.test(sentences[si + 1] ?? "") && /^If seven or more \{E\} was paid this way, you may play cards you own exiled this way until the end of your next turn\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+      // The amount paid is noted for the instructions after the payment.
+      const paid: Amount = { count: { kind: "notedAmount" } };
+      effects.push(
+        { type: "may", effects: [{ type: "noteAmount", n: { count: { kind: "x" } } }], pay: {}, payX: { energy: true }, text: "pay any amount of {E}" },
+        { type: "eachMay", who: { ref: "eachPlayer" }, text: "exile your hand and draw a number of cards equal to the {E} paid", wheel: paid, effects: [{ type: "exileHand", who: { ref: "choseThisWay" }, mayPlayIfNoted: 7 }, { type: "draw", who: { ref: "choseThisWay" }, n: paid }] },
+      );
+      si += 2;
       continue;
     }
     // Localized Destruction: "You may pay one or more {E}. If you do, each creature you control with power equal to the
@@ -14023,6 +14062,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
     // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
+    // Wildfire Devils: "choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy
+    // that card. You may cast the copy without paying its mana cost.": any player, you too; the chosen player picks the
+    // card (rulings); the copy is made in exile and cast from there as this resolves, or it ceases to exist (CR 707.12,
+    // rulings). With no such card in that player's graveyard, nothing happens; no other player is chosen (rulings).
+    const devils = /^[Cc]hoose a player at random$/.test(s) ? /^That player exiles an? (.+? card) from their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (devils && /^Copy that card\.?$/.test(sentences[si + 2] ?? "") && /^You may cast the copy without paying its mana cost\.?$/.test(sentences[si + 3] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
+      const filter = parseSearchFilter(devils[1]!);
+      if (!filter || filter.kind !== "card" || !filter.types?.length || filter.types.some((t) => t !== "Instant" && t !== "Sorcery")) return null;
+      effects.push({ type: "choose", choice: "opponent", random: true, anyPlayer: true }, { type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, chooser: { ref: "chosenPlayer" } } });
+      si += 3;
+      continue;
+    }
     if (/^[Cc]hoose an opponent at random$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
       effects.push({ type: "choose", choice: "opponent", random: true });

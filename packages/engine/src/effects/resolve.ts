@@ -1232,6 +1232,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exchangePower":
     case "groupRules":
     case "ownersGainControl":
+    case "scrambleControl":
     case "swapCreatures":
     case "exchangeControl":
     case "playerGains":

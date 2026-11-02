@@ -1213,6 +1213,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
+      if (!sc.castAmong && e.fromYard?.chooser) {
+        // Wildfire Devils: the chosen player picks the card from their own graveyard (rulings) and exiles it; then a copy
+        // of only that card. None there: nothing happens.
+        const whose = players(s, e.fromYard.chooser, ctx)[0];
+        const pool = whose === undefined ? [] : player(s, whose).graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        const picked = sc.found?.filter((id) => pool.includes(id)) ?? (pool.length === 1 ? pool : undefined);
+        if (whose !== undefined && pool.length && !picked?.length) {
+          s.pending = { kind: "searchLibrary", player: whose, source: src, what: `${/^[aeiou]/i.test(e.fromYard.filter!.text) ? "an" : "a"} ${e.fromYard.filter!.text}`, cards: pool, min: 1, max: 1, fromGraveyard: "exile", copiedBy: you.id };
+          return "paused";
+        }
+        const gone: ObjectId[] = [];
+        if (whose !== undefined && picked?.length) {
+          moveObject(s, picked[0]!, "exile");
+          log(s, `${player(s, whose).name} exiles ${defOf(s, obj(s, picked[0]!)).name} from their graveyard.`);
+          if (obj(s, picked[0]!).zone === "exile") gone.push(picked[0]!);
+        } else if (whose !== undefined) log(s, `${player(s, whose).name} has no ${e.fromYard.filter!.text} in their graveyard.`);
+        sc.found = undefined;
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard?.random) {
         // Wondrous Crucible: one card at random; a copy of that card only.
         const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
@@ -1289,6 +1308,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const st = sc.castAmong;
       if (st.done) return;
+      // Spell mastery (Talent of the Telepath): checked once, as it starts resolving (rulings).
+      if (e.maxIfYard && st.max === undefined) st.max = you.graveyard.filter((id) => printedMatches(e.maxIfYard!.has, defOf(s, obj(s, id)))).length >= e.maxIfYard.min ? e.maxIfYard.max : (e.max ?? Number.MAX_SAFE_INTEGER);
+      const maxCast = st.max ?? e.max;
       const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
       // Still where they were put: in exile, or revealed in the library (`reveal`).
       const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && (e.handAndYard ? (e.andExile ? ["hand", "graveyard", "exile"] : ["hand", "graveyard"]).includes(s.objects[id]?.zone ?? "") : s.objects[id]?.zone === (e.yourYard ? "graveyard" : e.fromHand ? "hand" : e.reveal ? "library" : "exile")) && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
@@ -1332,8 +1354,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
         const others = left.filter((id) => !toHand.includes(id));
         if (e.rest.dest === "graveyard") {
+          // Each card to its owner's graveyard (CR 404.2): the target opponent's own, for Talent of the Telepath.
           for (const id of others) moveObject(s, id, "graveyard");
-          if (others.length) log(s, `${you.name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
+          if (others.length) log(s, `${player(s, obj(s, others[0]!).owner).name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
           return;
         }
         const byOwner = new Map<PlayerId, ObjectId[]>();
@@ -1449,7 +1472,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .map((x) => x.id)
         .filter((id) => !copiedOne.length || copiedOne.includes(id))
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
-      if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
+      if (!options.length || (maxCast !== undefined && (st.cast ?? 0) >= maxCast)) return finish();
       if (e.look && options.length === 1) {
         // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
         st.pick = options[0];
@@ -2137,6 +2160,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+          // Wheel of Potential: only the cards its controller owns, with seven or more energy paid.
+          else if (e.mayPlayIfNoted !== undefined && (s.resolving?.notedAmount ?? 0) >= e.mayPlayIfNoted && o.owner === ctx.controller && o.zone === "exile") o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "nextTurn", turn: s.turn };
           // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }

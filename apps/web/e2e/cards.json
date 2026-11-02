@@ -8251,6 +8251,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7c3171da-7a95-4f8e-ba30-c31af21c1828",
+  "name": "Goblin Flectomancer",
+  "manaCost": "{U}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Wizard"
+  ],
+  "oracleText": "Sacrifice this creature: You may change the targets of target instant or sorcery spell.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "51d9564b-44fc-4de1-9119-09d7b4089378",
   "name": "Goblin Guide",
   "manaCost": "{R}",

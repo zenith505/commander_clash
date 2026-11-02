@@ -2910,6 +2910,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
   // Whispering Specter: "that player discards a card for each poison counter they have": "they" is that player.
   if (opts.eventPlayer) text = text.replace(/\b([Tt]hat player discards a card for each poison counter) they have\./, "$1 that player has.");
+  // Hazezon Tamar: "create X 1/1 Sand Warrior creature tokens that are red, green, and white at the beginning of your next
+  // upkeep, where X is the number of lands you control at that time": a delayed trigger (rulings), X counted as it resolves.
+  text = text.replace(/^[Cc]reate X (\d+\/\d+) ([A-Z][a-z]+ [A-Z][a-z]+) creature tokens that are (red, green, and white) at the beginning of your next upkeep, where X is (the number of lands you control) at that time\.$/, "Create X $1 $3 $2 creature tokens at the beginning of your next upkeep, where X is $4.");
   // Besmirch: "Until end of turn, gain control of target creature and it gains haste": both until end of turn.
   text = text.replace(/(^|\. )Until end of turn, gain control of (target [^.,]+?) and it gains haste\./, "$1Gain control of $2 until end of turn. It gains haste until end of turn.");
   // Haldir, Lórien Lieutenant: "Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1
@@ -3480,6 +3483,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const made = parseOne(capital(sharedMv[1]!), ctx);
       if (made?.length !== 1 || made[0]!.type !== "createToken" || made[0]!.n !== 1) return null;
       effects.push({ ...made[0]!, n: { count: { kind: "revealedSharedMv" } } });
+      continue;
+    }
+    // Specter of Mortality: "you may exile one or more creature cards from your graveyard. When you do, each other creature
+    // gets -X/-X until end of turn, where X is the number of cards exiled this way.": any number, none being not doing it;
+    // the reflexive trigger (CR 603.12) only if one or more were exiled, X counted as it triggers.
+    const yardMany = /^[Yy]ou may exile one or more (creature) cards from your graveyard$/.exec(s);
+    const yardManyWhen = yardMany && /^When you do, (.+), where X is the number of cards exiled this way$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (yardMany && yardManyWhen) {
+      const filter = parseSearchFilter(`${yardMany[1]} card`);
+      const reflexive = filter ? reflexiveBody(yardManyWhen[1]!, ctx, false, false, true) : null;
+      if (!filter || !reflexive || !/\bX\b/.test(yardManyWhen[1]!)) return null;
+      const count: Amount = { count: { kind: "yardChosenThisWay" } };
+      effects.push({ type: "chooseFromGraveyard", n: 99, upTo: true, dest: "exile", filter });
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: count, min: 1 }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${yardManyWhen[1]}, where X is the number of cards exiled this way.` }, xAmount: count }] });
+      si++;
       continue;
     }
     // Augusta, Order Returned: "each player exiles a card from their graveyard. When one or more nonland cards are exiled
@@ -7835,6 +7853,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Eye of Doom: "each player chooses a nonland permanent and puts a doom counter on it": anyone's, not targeted, chosen in
+    // turn order starting with the active player, each seeing the earlier choices; then the counters go on all of them at
+    // once (rulings).
+    if (/^[Ee]ach player chooses a nonland permanent and puts a doom counter on it$/.test(s)) {
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonland permanent" };
+      effects.push(
+        { type: "pick", who: { ref: "eachPlayer" }, filter, n: 1, action: "choose", anyController: true, prompt: "click a nonland permanent (anyone's). A doom counter goes on each permanent chosen this way." },
+        { type: "counters", what: { ref: "created" }, counter: "doom", n: 1 },
+      );
+      continue;
+    }
     // Drop of Honey: "Destroy the creature with the least power. It can't be regenerated. If two or more creatures are tied
     // for least power, you choose one of them." Purging Scythe: "~ deals 2 damage to the creature with the least toughness.
     // If two or more ...": any player's, not targeted (rulings); you choose among those tied. A tied one with
@@ -10941,6 +10970,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Seasoned Cryomancer: "draw two cards, then discard two cards. When you discard one or more nonland cards this way,
+    // tap up to that many target creatures and put a stun counter on each of them.": a reflexive trigger (CR 603.12) only if
+    // one or more of the cards discarded are nonland cards, with up to that many targets, chosen then.
+    const whenSomeDiscarded = /^When you discard one or more nonland cards this way, (.+)$/.exec(s);
+    if (whenSomeDiscarded) {
+      const last = effects.at(-1);
+      const ok = last?.type === "discard" && last.who.ref === "you" && typeof last.n === "number" && last.n > 1 && !last.random && !last.upTo && !last.filter;
+      const reflexive = ok && /\bthat many\b/.test(whenSomeDiscarded[1]!) && !/\bX\b/.test(whenSomeDiscarded[1]!) ? reflexiveBody(whenSomeDiscarded[1]!.replace(/\bthat many\b/g, "X"), ctx, false, false, true) : null;
+      if (!reflexive) return null;
+      const nonland: Count = { kind: "discardedThisWay", filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: nonland }, min: 1 }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${whenSomeDiscarded[1]}.` }, xAmount: { count: nonland } }] });
+      continue;
+    }
     // Glacial Dragonhunt: "Draw a card, then you may discard a card. When you discard a nonland card this way, ~ deals 3
     // damage to target creature.": a reflexive trigger (CR 603.12), its target chosen then, if the card discarded is one.
     // Talion's Messenger: "draw a card, then discard a card. When you discard a card this way, ...": any card.
@@ -13065,7 +13107,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

@@ -788,6 +788,8 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Rocket Launcher (CR 302.6's test, for its controller's most recent turn).
+  if (/^you've controlled ~ continuously since the beginning of your most recent turn$/.test(text)) return { kind: "self", is: "controlledSinceYourTurnBegan" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // Lilypad Village: "Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn."
@@ -1279,7 +1281,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
   // Charging Cinderhorn, Keldon Twilight: "if no creatures attacked this turn": declared as attackers by anyone (CR 508.1).
   if (/^no creatures attacked this turn$/.test(text)) return { kind: "attackedThisTurn", not: true, anyone: true };
-  if ((m = /^you (didn't )?activate(?:d)? a loyalty ability of a planeswalker this turn$/.exec(text))) return { kind: "activatedLoyaltyThisTurn", ...(m[1] ? { not: true as const } : {}) };
+  // Kiora of Salt and Sand: "if you've activated a loyalty ability this turn": loyalty abilities are planeswalkers' (CR 606.3).
+  if ((m = /^you(?: (didn't )?activate(?:d)? a loyalty ability of a planeswalker|'ve activated a loyalty ability) this turn$/.exec(text))) return { kind: "activatedLoyaltyThisTurn", ...(m[1] ? { not: true as const } : {}) };
   if (/^you've committed a crime this turn$/.test(text)) return { kind: "committedCrime" }; // CR 700.13
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
   if ((m = /^you control the (creature|artifact) with the greatest (power|toughness|mana value) or tied for the greatest (power|toughness|mana value)$/.exec(text)) && m[2] === m[3])

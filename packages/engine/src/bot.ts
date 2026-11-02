@@ -1836,7 +1836,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       if (e.b.ref !== "target" || e.b.index !== i) continue;
       const chosen = e.a.ref === "target" ? out[e.a.index] : undefined;
       const a = e.a.ref === "self" ? (sourceId ? s.objects[sourceId] : undefined) : chosen?.kind === "object" ? obj(s, chosen.id) : undefined;
-      if (a) n += power(s, a);
+      if (a) n += e.type === "bite" && e.loyalty ? (a.counters.loyalty ?? 0) : power(s, a);
     }
     return n;
   };
@@ -2176,6 +2176,8 @@ function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecisio
     next[j] = best(s, pid, options, !!harm[j], damageTo(body, j, item.x ?? 0));
     changed = true;
   }
+  // "Change the targets" (CR 115.7a): every target or none, so a partial change is kept as it was.
+  if (changed && pend.allOrNone && next.some((t, j) => t.kind !== "none" && sameTarget(pend.current[j], t))) return undefined;
   return changed ? next : undefined;
 }
 
@@ -3243,7 +3245,8 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
   // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
   // else our least useful one.
-  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}')) {
+  // Eye of Doom: a doom counter (the Eye destroys them later) likewise.
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && after.counter === "doom")) {
     const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
     return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
   }

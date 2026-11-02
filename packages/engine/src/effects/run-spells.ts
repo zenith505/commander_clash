@@ -783,7 +783,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "newTargets": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return newTargets(s, ctx, t.id, src);
+      return newTargets(s, ctx, t.id, src, e.allOrNone);
     }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
@@ -1308,7 +1308,7 @@ function changeATargetToSelf(s: GameState, ctx: ResolveCtx, stackId: string, by:
  * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
  * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
  */
-function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string): "paused" | void {
+function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -1317,11 +1317,12 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string):
   if (!current.some((t) => t.kind !== "none") || specs.length !== current.length) return;
   const sc = (s.resolving!.scratch ??= {});
   if (!sc.retargets) {
-    if (!current.some((t, j) => t.kind !== "none" && changeTargetOptions(s, item, specs[j]!, t).length)) {
+    // "Change the targets" (CR 115.7a): if any one target can't change to another legal one, none of them change.
+    if (allOrNone ? current.some((t, j) => t.kind !== "none" && !changeTargetOptions(s, item, specs[j]!, t).length) : !current.some((t, j) => t.kind !== "none" && changeTargetOptions(s, item, specs[j]!, t).length)) {
       log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
       return;
     }
-    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current };
+    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}) };
     return "paused";
   }
   const next = sc.retargets;

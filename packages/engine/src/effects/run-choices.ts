@@ -542,7 +542,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         };
         if (r.chosen?.player !== undefined) return keep();
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
-        const most = Math.max(...living.map((x) => player(s, x).life));
+        const most = e.mostLife === "least" ? Math.min(...living.map((x) => player(s, x).life)) : Math.max(...living.map((x) => player(s, x).life));
         const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
         // "At random": no one chooses (CR 608.2d doesn't apply).
         if (e.random && opps.length > 1) {
@@ -556,7 +556,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return keep();
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.each) {
@@ -732,6 +732,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "targetSharesName"
             ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
               ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
+            : e.cond.kind === "targetSharesTypeWithCostExiled"
+            ? ((o) => !!o && ((types) => objects(s, { ref: "costExiled" }, ctx).some((x) => defOf(s, x).types.some((t) => types.includes(t))))(defOf(s, o).types))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "targetsSameColors"
             ? targetsSameColors(s, ctx, e.cond.index, e.cond.n)
             : e.cond.kind === "targetGreatestPower"

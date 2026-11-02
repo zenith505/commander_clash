@@ -1450,9 +1450,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
+  // Loxodon Peacekeeper: "the player with the lowest life total gains control of ~. If two or more players are tied for
+  // lowest life total, you choose one of them, and that player gains control of ~": any player, you too, chosen as it
+  // resolves (CR 608.2d).
+  text = text.replace(/^the player with the lowest life total gains control of ~\. If two or more players are tied for lowest life total, you choose one of them, and that player gains control of ~\.$/, "choose a player with the lowest life total or tied for lowest life total. That player gains control of ~.");
   // Kamahl's Will: "Choose target creature you don't control. Each creature you control deals damage equal to its power to
   // that creature": the same as "... to target creature you don't control" (the target chosen as it's cast, CR 601.2c).
-  text = text.replace(/(^|\. |• )Choose (target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control deals damage equal to its power) to that creature\./, "$1$3 to $2.");
+  // Nissa's Judgment: "Choose up to one target creature an opponent controls. Each creature you control with a +1/+1
+  // counter on it deals damage equal to its power to that creature": the same, after its support (rulings).
+  text = text.replace(/(^|\. |• )Choose ((?:up to one )?target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control(?: with a \+1\/\+1 counter on it)? deals damage equal to its power) to that creature\./, "$1$3 to $2.");
   // Motivated Pony: "attacking creatures get +1/+1 until end of turn. If a Food entered the battlefield under your control
   // this turn, untap those creatures and they get an additional +2/+2 until end of turn": both under the condition (it
   // can't change in between), about the creatures the first effect affected (CR 611.2c).
@@ -3074,6 +3080,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Broken Visage, Kalitas, Ritual of the Returned: "Create a black Spirit creature token. Its power is equal to that
   // creature's power and its toughness is equal to that creature's toughness": one instruction (tokens.ts).
   text = text.replace(/(^|\. |, )([Cc]reate) an? ([a-z]+ [A-Z][a-z]+ creature token)\. Its power is equal to (that creature|that card)'s power and its toughness is equal to \4's toughness\./, "$1$2 a 0/0 $3 with power and toughness equal to $4's.");
+  // Gemini Engine: "create a colorless Construct artifact creature token named Twin that's attacking. Its power is equal to
+  // ~'s power and its toughness is equal to ~'s toughness": the same, from ~ as the trigger resolves (rulings).
+  text = text.replace(/(^|\. |, )([Cc]reate) an? (colorless [A-Z][a-z]+ artifact creature token named [A-Z][a-z]+ that's attacking)\. Its power is equal to ~'s power and its toughness is equal to ~'s toughness\./, "$1$2 a 0/0 $3 with power and toughness equal to ~'s.");
   // Inspired Ultimatum: "Target player gains 5 life, ~ deals 5 damage to any target, then you draw five cards": three
   // instructions, each with its own subject, in order.
   text = text.replace(/^Target player gains (\w+) life, ~ deals (\w+) damage to any target, then you draw (\w+) cards\./, "Target player gains $1 life. ~ deals $2 damage to any target. You draw $3 cards.");
@@ -7838,6 +7847,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "destroy" || ctx.targets.length !== before + 2) return null;
       effects.push({ type: "if", cond: { kind: "targetsSameColors", index: before, n: 2 }, effects: [{ ...fx[0]!, ...(noRegen ? { noRegen: true } : {}) }] });
       if (noRegen) si++;
+      continue;
+    }
+    // Holistic Wisdom: "Return target card from your graveyard to your hand if it shares a card type with the card exiled this
+    // way": any card in your graveyard may be the target; the card types are compared as it resolves (CR 608.2b).
+    const holistic = ctx.activated && !ctx.spell ? /^(Return target card from your graveyard to your hand) if it shares a card type with the card exiled this way$/.exec(s) : null;
+    if (holistic) {
+      const before = ctx.targets.length;
+      const fx = parseOne(holistic[1]!, ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetSharesTypeWithCostExiled", index: before }, effects: fx });
       continue;
     }
     // Winnow: "Destroy target nonland permanent if another permanent with the same name is on the battlefield": any nonland
@@ -13645,7 +13664,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.chosenOpponent = true;
       continue;
     }
-    if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
+    // Loxodon Peacekeeper: "the player with the lowest life total ... If two or more players are tied for lowest life total,
+    // you choose one of them" (rewritten as "Choose a player with the lowest life total or tied for lowest life total").
+    if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the (?:most|lowest) life(?: total)? or tied for (?:most|lowest) life(?: total)?)$/.test(s)) {
       // The Offerings: a spell's second paragraph starting "Choose an opponent." again, its own choice (rulings on
       // Sylvan Offering: the same opponent or a different one, chosen as it resolves).
       if (ctx.chosenOpponent && ctx.spell && s === "Choose an opponent" && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined) {
@@ -13653,7 +13674,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
+      effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the lowest life/.test(s) ? { mostLife: "least" as const } : /^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }
@@ -14719,6 +14740,10 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   s = s.replace(/^(~ deals (?:\d+|X) damage to any target and (?:\d+|X) damage to) itself(?=$|, where X is )/, "$1 ~");
   // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
   s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
+  // The Fallen: "~ deals 1 damage to each opponent and planeswalker it has dealt damage to this game": as the object it is
+  // now, its controller's opponents only (rulings).
+  const fallen = /^~ deals (\d+) damage to each opponent and planeswalker it has dealt damage to this game$/.exec(s);
+  if (fallen && !ctx.spell) return [{ type: "damage", amount: num(fallen[1]!), to: { ref: "damagedBySelf" } }];
   // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.
   s = s.replace(/^((?:Untap|Tap) ~ and put .+ counters? on) it$/, "$1 ~");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.

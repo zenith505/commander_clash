@@ -896,6 +896,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   // "An ability ... from another legendary source" (The Peregrine Dynamo): not one of its own.
   if (spec.abilityFrom?.another && t.kind === "stack" && sourceId !== undefined && s.stack.find((x) => x.id === t.id)?.sourceId === sourceId) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
+  if (spec.damagedBySourceEver && (t.kind !== "player" || !sourceId || !s.objects[sourceId]?.damagedPlayers?.includes(t.id))) return false;
   if (spec.damagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.damagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;
   if (spec.lostLifeThisTurn && (t.kind !== "player" || !s.lostLifeThisTurn?.includes(t.id))) return false;

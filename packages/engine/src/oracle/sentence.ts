@@ -337,6 +337,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseWhileTapped(remains[1]!.replace(/^[Yy]ou g/, "G"), "controlled", ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" ? [{ ...fx[0]!, whileOnBattlefield: true }] : null;
   }
+  // Rootwater Matriarch: "gain control of target creature for as long as that creature is enchanted" (CR 611.2b): ending
+  // once no Aura is attached to it, even after ~ has left the battlefield (rulings).
+  const enchanted = !ctx.spell && /^((?:[Yy]ou )?[Gg]ain control of target creature) for as long as that creature is enchanted$/.exec(s);
+  if (enchanted) {
+    const fx = parseSentence(enchanted[1]!.replace(/^[Yy]ou g/, "G"), ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "game" ? [{ ...fx[0]!, whileEnchanted: true }] : null;
+  }
   // Kitesail Larcenist: "target ... becomes a Treasure artifact with "..." and loses all other card types and abilities for
   // as long as ~ remains on the battlefield": whoever controls ~, ending when it leaves (CR 611.2b).
   const remainsBecomes = !ctx.spell && /^(.+? becomes an? .+? and loses all other card types and abilities) for as long as ~ remains on the battlefield$/.exec(s);

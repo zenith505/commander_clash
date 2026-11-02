@@ -356,6 +356,10 @@ export interface GameObject {
   hasDealtDamage?: true;
   /** It has dealt combat damage since it became this object (Ruric Thar: "as long as they haven't dealt combat damage yet"). */
   hasDealtCombatDamage?: true;
+  /** The players it has dealt damage to since it became this object (Diseased Vermin: "target opponent previously dealt damage by it"). */
+  damagedPlayers?: PlayerId[];
+  /** The planeswalkers it has dealt damage to since it became this object, each while it's that object (The Fallen). */
+  damagedWalkers?: { id: ObjectId; zc: number }[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
@@ -1298,6 +1302,11 @@ export interface ContinuousEffect {
   whileControlled?: { id: ObjectId; zc: number; controller?: PlayerId };
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
+  /**
+   * "For as long as that creature is enchanted" (Rootwater Matriarch, CR 611.2b): over for a permanent once no Aura is
+   * attached to it (checked with the state-based actions), even if one is attached to it again later (rulings).
+   */
+  whileEnchanted?: true;
   /** "You may pay {W} to end this effect" (a Licid): `controller` may pay `cost` any time they have priority (CR 116.2c). */
   endable?: { cost: string };
   affected: ObjectId[];
@@ -1972,7 +1981,7 @@ export interface GameState {
   /** How much damage each damage rule with a tallied `countersOn` has prevented (Sacred Boon), by rule id. */
   preventedTally?: Record<string, number>;
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
-  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[]; /** The creatures that entered the battlefield during it, with their controllers then (Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn"). */ creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] };
+  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[]; /** The players dealt noncombat damage during it (Command the Stage). */ noncombatDamaged?: PlayerId[]; /** The creatures that entered the battlefield during it, with their controllers then (Ephara, God of the Polis: "if you had another creature enter the battlefield under your control last turn"). */ creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */

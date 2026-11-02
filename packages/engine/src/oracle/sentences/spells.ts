@@ -478,7 +478,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // control": each of them as this resolves, all at once, each the source of its own damage; none if the target is illegal.
   // Bartz and Boko: "each other Bird you control" the same way. Moonlight Hunt: "Choose target creature you don't control.
   // Each creature you control that's a Wolf or a Werewolf deals damage equal to its power to that creature" (body.ts).
-  if ((m = /^[Ee]ach ((?:modified )?creature you control|other [A-Z][a-z]+ you control|creature you control that's an? [A-Z][a-z]+ or an? [A-Z][a-z]+) deals damage equal to its power to (target creature (?:you don't control|an opponent controls))$/.exec(s))) {
+  // Nissa's Judgment: "each creature you control with a +1/+1 counter on it ... to up to one target creature an opponent
+  // controls": with no target chosen, nothing is dealt damage.
+  if ((m = /^[Ee]ach ((?:modified )?creature you control|creature you control with a \+1\/\+1 counter on it|other [A-Z][a-z]+ you control|creature you control that's an? [A-Z][a-z]+ or an? [A-Z][a-z]+) deals damage equal to its power to ((?:up to one )?target creature (?:you don't control|an opponent controls))$/.exec(s))) {
     const a = parseObject(`each ${m[1]}`, ctx);
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "each" && a.filter.controller === "you" && b?.ref === "target" && !isSeveral(b) ? [{ type: "bite", a, b }] : null;

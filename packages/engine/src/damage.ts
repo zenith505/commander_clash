@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { abilitiesOf, cardIdOf, defOf, lethalLeft, toughness, wasCastThisTurn } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, lethalLeft, objIsType, toughness, wasCastThisTurn } from "./cards";
 import { isRingBearer } from "./effects/run-ring";
 import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
@@ -113,9 +113,15 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  * dealDamageBatch; `shielded` says the caller already did that.
  */
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
-function noteDealt(s: GameState, src: DamageSource, combat?: boolean) {
+function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }) {
   const o = src.id ? s.objects[src.id] : undefined;
-  if (!o || o.zone !== "battlefield" || (o.hasDealtDamage && (!combat || o.hasDealtCombatDamage)) || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
+  if (!o || o.zone !== "battlefield" || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
+  // Diseased Vermin and The Fallen: the players and planeswalkers it has dealt damage to as this object (phasing keeps
+  // them, leaving the battlefield forgets them; The Fallen's rulings).
+  if ("player" in to) {
+    if (!o.damagedPlayers?.includes(to.player)) (o.damagedPlayers ??= []).push(to.player);
+  } else if (objIsType(s, to.object, "Planeswalker") && !o.damagedWalkers?.some((w) => w.id === to.object.id && w.zc === (to.object.zoneChanges ?? 0))) (o.damagedWalkers ??= []).push({ id: to.object.id, zc: to.object.zoneChanges ?? 0 });
+  if (o.hasDealtDamage && (!combat || o.hasDealtCombatDamage)) return;
   o.hasDealtDamage = true;
   // Ruric Thar, Magecrusher: "as long as they haven't dealt combat damage yet".
   if (combat) o.hasDealtCombatDamage = true;
@@ -258,7 +264,7 @@ export function dealDamage(
       else fireEvent(s, ev);
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src, opts.combat);
+    noteDealt(s, src, opts.combat, { object: o });
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
@@ -301,7 +307,7 @@ export function dealDamage(
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors] });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src, opts.combat);
+    noteDealt(s, src, opts.combat, { player: p.id });
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;

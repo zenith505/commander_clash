@@ -1155,6 +1155,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ ...e, n: { count: { kind: "x" }, times: 2 } }];
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
+    // Command the Stage: "Create a ... token named Cadet, then put a +1/+1 counter on each other Wizard token you control":
+    // other than the token just created, on a spell too.
+    const otherTokens = ctx.lastCreated ? /^each other ([A-Z][a-z]+ tokens? you control)$/.exec(m[3]!) : null;
+    if (otherTokens) {
+      const each = parseObject(`each ${otherTokens[1]}`, ctx);
+      return each?.ref === "each" && !each.other ? [{ type: "counters", what: { ...each, notCreated: true }, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
+    }
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
   }

@@ -4581,6 +4581,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield" (Metamorphose); protection from each color whose basic land type you control (Dominaria's Judgment);
   "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,263 of 31,936 with B83 and rounds 246
   and 247).
+- Round B85 (one-line templates from the bottom of the list): "that targets only ~" (Reflective Golem); "You may
+  change the targets of target instant or sorcery spell", all of them or none (CR 115.7a; Goblin Flectomancer, with
+  the retarget bar saying so); "Activate only if you've controlled ~ continuously since the beginning of your most
+  recent turn" (Rocket Launcher); "that spell or ability's controller gains control of that creature" (Fractured
+  Loyalty); Burden of Proof; "Whenever ~ deals combat damage to one or more blocking creatures" (Arashin War Beast);
+  "Whenever ~ and another creature attack different players" (Canal Courier); "When you discard one or more nonland
+  cards this way" (Seasoned Cryomancer); "if you attacked with exactly one other creature this combat" (Creepy
+  Puppeteer); "Permanents you control can't be the targets of blue or black spells your opponents control this turn"
+  (Display of Dominance); damage equal to a planeswalker's loyalty (Compel Brutality); each player chooses a
+  nonland permanent for a doom counter (Eye of Doom); Hazezon Tamar (X counted at the upkeep); Goblin Lyre (that
+  opponent or that planeswalker's controller); "if you've activated a loyalty ability this turn" (Kiora of Salt and
+  Sand); "When you do" after exiling one or more cards from your graveyard (Specter of Mortality). Two-word creature
+  types ("Eldrazi Scion", "Sand Warrior", "Spider Hero") now need both types instead of either (CR 205.3), which fixes
+  Kor Castigator, Deathless Behemoth, Hand of Emrakul, Drowner of Hope, Brood Birthing and Radioactive Spider. +16
+  (29,279 of 31,936 with B84).
+- Out after round B85 (looked at, not done): Grave Consequences (each player exiles any number from their own
+  graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
+  (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
+  an activated ability).
 - Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
   choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
   check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share

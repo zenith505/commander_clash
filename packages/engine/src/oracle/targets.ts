@@ -152,6 +152,14 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Gremlin Infestation: "enchanted artifact's controller", in a permanent's own ability.
   if (/^enchanted (?:artifact|creature|enchantment|land|permanent)'s controller$/.test(x) && !ctx.spell) return { ref: "hostController" };
   if (x === "each opponent") return { ref: "eachOpponent" };
+  // Friendly Fire: "Target creature's controller reveals ...": the creature is the target, and "that player" after it is
+  // its controller as it is as the spell resolves (or as it last existed, CR 608.2h).
+  if (x === "target creature's controller") {
+    const t = parseObjectNow("target creature", ctx);
+    if (t?.ref !== "target" || t.n) return null;
+    ctx.controllerNamed = t.index;
+    return { ref: "targetController", index: t.index };
+  }
   // Erestor of the Council: "each opponent who voted for a choice you voted for", in the vote that triggered it.
   if (x === "each opponent who voted for a choice you voted for" && ctx.votesEvent) return { ref: "votedWithYou" };
   if (x === "each player") return { ref: "eachPlayer" };

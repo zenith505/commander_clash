@@ -858,6 +858,8 @@ export interface TargetSpec {
    * `types` as the choice is made.
    */
   sharesTypeWithSacrificed?: true;
+  /** Mind Extraction: "all cards of each of the sacrificed creature's colors": a card sharing a color with what the spell's cost sacrificed, as it last existed (rulings: none if it was colorless); bound as it resolves. */
+  sharesColorWithSacrificed?: true;
   /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
   sharesTypeWithSubject?: true;
   /** "A creature of their choice that's blocking it" (Labyrinth Raptor): blocking the trigger's subject as the pick resolves (CR 509.1h); none once the subject has left combat or the battlefield (CR 506.4). Only a "pick" checks it. */
@@ -3379,6 +3381,8 @@ export type Effect =
       anyFromYard?: true;
       /** Covetous Urge: "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell": the ability's controller may (action "exile"). */
       youMay?: { anyType?: true };
+      /** Rakdos Augermage: "discard a card of target opponent's choice": who chooses the card, if not the controller (CR 701.9b). */
+      by?: PlayerRef;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
@@ -3426,7 +3430,7 @@ export type Effect =
   /** Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature token (you gain 5 life) instead." (Player.nextDrawInstead) */
   | { type: "nextDrawInstead"; gain?: number; token?: TokenSpec }
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
-  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "Then put the rest on top ... in any order" (Psychic Surgery): only the cards a dig before it left there, at most `n` (one left has no order to choose). */ digRest?: true; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true }
+  | { type: "orderTop"; who: PlayerRef; n: Amount; /** "Then put the rest on top ... in any order" (Psychic Surgery): only the cards a dig before it left there, at most `n` (one left has no order to choose). */ digRest?: true; /** Fateseal (CR 701.29a): with `who` the chosen player and `mayBottom`, the opponent is chosen first, as it resolves. */ fateseal?: true; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true; /** "Look at the top five cards of target player's library" (Visions): only looked at, never reordered. */ lookOnly?: true; /** "That player looks at the top three cards of your library, then puts them back in any order" (Tahngarth's Glare): who orders them, if not the controller. */ by?: PlayerRef }
   /**
    * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
    * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
@@ -3980,6 +3984,8 @@ export type Effect =
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
   /** `copyTimes` with `copies`: "Copy that card three times. You may cast the copies" (Mnemonic Deluge): that many copies of each. */
+  /** Thunderblade Charge: "you may cast it without paying its mana cost" in an ability of the card in your graveyard: that card, cast from there as this resolves (CR 608.2g), if it's still the same object (CR 400.7). */
+  | { type: "castSelfFree" }
   | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; copyTimes?: number; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true; /** Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard". */ randomEachOpponent?: true; /** Wondrous Crucible: one card matching `filter`, at random, exiled; then a copy of only that card. */ random?: true }; /** Kefka: "Then each player who owns a spell you cast this way loses life equal to its mana value." */ ownersLoseLife?: true; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true; /** Invoke Calamity: "from your graveyard and/or hand": the cards in your hand and graveyard, cast from where they are. */ handAndYard?: true; /** Galvanoth: "if it's an instant or sorcery spell": `filter`'s types are the spell's as it's cast (an Adventure too, CR 715.3), not the card's. */ asSpell?: true; /** Dance with Calamity: "As many times as you choose, you may exile the top card of your library. If the total mana value of the cards exiled this way is N or less, ...": asked card by card, then only if the total is at most this. */ pushLuck?: number; /** "If those spells would be put into your graveyard, exile them instead" (Invoke Calamity): the spells cast this way. */ exileCast?: true; /** Yennett, Cryptic Sovereign: "If you don't cast it, draw a card": with none cast, you draw this many (the revealed card stays on top). */ noneCastDraw?: number; /** "You may cast a spell from among cards exiled with ~ without paying its mana cost" (Kaho, Jeleva, Shell of the Last Kappa): the cards linked to the source (CR 607.2a), still exiled; those not cast stay there. */ fromLinked?: true; /** With `copies` and `copyTimes`: "Choose an instant or sorcery card exiled this way and copy it three times" (Chandra, Pyromaster): once one card has been copied, only its copies. */ oneCard?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
@@ -5018,7 +5024,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -5317,7 +5323,7 @@ export interface ActivatedAbility {
    * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
    * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
    */
-  xIs?: "linkedCardMv";
+  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind };
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -6243,6 +6249,8 @@ export interface CompiledCard {
   opponentsCantCastYourTurn?: true;
   /** "Your opponents can't cast spells during combat" (Marisi, Breaker of the Coil): during any combat phase, whoever's turn (CR 506.1), even a spell an effect lets or tells them cast (rulings). */
   opponentsCantCastDuringCombat?: true | /** "Players can't cast spells during combat" (Basandra, Battle Seraph): its controller too. */ "all";
+  /** Hand to Hand: "During combat, players can't cast instant spells or activate abilities that aren't mana abilities." */
+  combatNoInstantsOrAbilities?: true;
   /** "Each opponent who cast a spell this turn can't attack with creatures" (Angelic Arbiter): checked as attackers are declared, counting spells cast before it was there (rulings). */
   opponentsWhoCastCantAttack?: true;
   /** Wardscale Dragon: "As long as ~ is attacking, defending player can't cast spells": the player it's attacking (CR 506.2). */

@@ -1259,6 +1259,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
   if (didntDie) bodyText = bodyText.slice(didntDie[0].length);
   const notDies = !!didntDie || (!attached && m![3]! === "leaves the battlefield without dying");
+  // Urza's Miter: "Whenever an artifact you control is put into a graveyard from the battlefield, if it wasn't sacrificed":
+  // how it went there can't change, so it's part of the event (CR 603.4, 701.21a).
+  const notSacrificed = !attached && !leaves && /^if it wasn't sacrificed, /.exec(bodyText);
+  if (notSacrificed) bodyText = bodyText.slice(notSacrificed[0].length);
   // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
   // "If it had a -1/-1 counter on it" (Blowfly Infestation): of that kind.
   const hadCounter = !attached && new RegExp(`^if it had (?:a counter|one or more counters|counters|an? ${COUNTER} counter|one or more ${COUNTER} counters) on it, `).exec(bodyText);
@@ -1328,8 +1332,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   let phrase = m![2]!;
   // Unscythe: "a creature dealt damage by equipped creature this turn": the creature it's attached to as the other dies,
-  // whenever that damage was dealt (rulings).
-  const damaged = / dealt damage by (~|equipped creature) this turn$/.exec(phrase);
+  // whenever that damage was dealt (rulings). Vampiric Embrace: "by enchanted creature", the same for an Aura.
+  const damaged = / dealt damage by (~|equipped creature|enchanted creature) this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
   // Baneclaw Marauder: "Whenever a creature blocking ~ dies": one that was blocking it as it last existed (CR 603.10a,
   // 509.1g), ~ dying at the same time too.
@@ -1357,6 +1361,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
+      ...(notSacrificed ? { notSacrificed: true as const } : {}),
     },
     body,
   };
@@ -2055,7 +2060,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
+    // Measure of Wickedness: "Whenever another card is put into your graveyard from anywhere": not this permanent's own card.
+    const another = !!m[1];
+    m.splice(1, 1);
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c). Kishla Skimmer: "Whenever a card leaves your graveyard
     // during your turn".
@@ -2066,7 +2074,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
     // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
     // graveyard, CR 400.3).
-    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / (?:a|your) library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true };
+    if (another && (m[1] || !/^is put into your graveyard from anywhere$/.test(m[2]!))) return "fail";
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / (?:a|your) library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true, ...(another ? { other: true as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
     eachOwner = true;
@@ -3076,11 +3085,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Pyrewild Shaman: "Whenever one or more creatures you control deal combat damage to a player, if ~ is in your graveyard,
   // you may pay {3}. If you do, return ~ to your hand", Moss-Pit Skeleton: "..., you may put ~ on top of your library": an
   // ability that works only there (below), with an intervening if (CR 603.4), so nothing is paid once it has left.
-  const inYardWhen = /^((?:When|Whenever)\b[^,]+), if ~ is in your graveyard, ((?:you may )?(?:pay [^.]+\. If you do, )?)(return ~ to your hand|put ~ on top of your library)\.$/.exec(line);
+  // Thunderblade Charge: "..., you may pay {2}{R}{R}{R}. If you do, you may cast it without paying its mana cost": first the
+  // payment, then whether to cast it (rulings), from the graveyard as it resolves (CR 608.2g).
+  const inYardWhen = /^((?:When|Whenever)\b[^,]+), if ~ is in your graveyard, ((?:you may )?(?:pay [^.]+\. If you do, )?)(return ~ to your hand|put ~ on top of your library|you may cast (?:it|~) without paying its mana cost)\.$/.exec(line);
   if (inYardWhen && !/^(?:When|Whenever) ~ /.test(inYardWhen[1]!)) {
-    const what = inYardWhen[3] === "return ~ to your hand" ? "return ~ from your graveyard to your hand" : "put ~ from your graveyard on top of your library";
+    const cast = /^you may cast/.test(inYardWhen[3]!);
+    if (cast && !/^you may pay [^.]+\. If you do, $/.test(inYardWhen[2]!)) return "fail";
+    const what = inYardWhen[3] === "put ~ on top of your library" ? "put ~ from your graveyard on top of your library" : "return ~ from your graveyard to your hand";
     const t = parseTrigger(`${inYardWhen[1]}, ${inYardWhen[2]}${what}.`);
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
+    if (cast) {
+      const inner = t.body.effects.length === 1 && t.body.effects[0]!.type === "may" ? t.body.effects[0]! : undefined;
+      if (inner?.type !== "may" || inner.effects.length !== 1 || inner.effects[0]!.type !== "bounce") return "fail";
+      const text = `${inYardWhen[2]}${inYardWhen[3]}`;
+      return { ...t, body: { ...t.body, effects: [{ ...inner, effects: [{ type: "castSelfFree" }], text: text.replace(/^you may /, "") }], text: `${text.charAt(0).toUpperCase()}${text.slice(1)}.` }, ifCond: { kind: "selfInGraveyard" } };
+    }
     return { ...t, ifCond: { kind: "selfInGraveyard" } };
   }
   // Bridge from Below: "Whenever a nontoken creature is put into your graveyard from the battlefield, if ~ is in your

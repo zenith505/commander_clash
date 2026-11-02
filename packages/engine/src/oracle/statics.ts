@@ -1450,7 +1450,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
   if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
-  if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
+  // Even the Score: "if an opponent has drawn four or more cards this turn", the same as "drew".
+  if ((m = new RegExp(`^an opponent (?:drew|has drawn) ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
   if ((m = new RegExp(`^you cycled ${NUM} or more cards this turn$`).exec(text))) return { kind: "cycled", n: num(m[1]!) };
   // "If a permanent you controlled left the battlefield this turn" (Pegasus Guardian): the same (revolt).

@@ -2296,6 +2296,8 @@ export interface Resolving {
   poisonLost?: number;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
   endTurn?: true;
+  /** Its endCombatPhase instruction ran during a combat phase: that phase ends once it's done resolving (CR 724.2). */
+  endCombat?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
   tookFromHand?: number;
   /** The cards it exiled from your hand ("You may exile a creature card from your hand. If you do, create a token that's a copy of the exiled card"). */

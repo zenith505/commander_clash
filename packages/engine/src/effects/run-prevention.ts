@@ -120,6 +120,11 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   }
   if (spec.by?.filter) rule.by = { ...rule.by, filter: bindChosen(spec.by.filter, ctx.chosen) };
   if (spec.by?.notSelf && ctx.sourceId) rule.by = { ...rule.by, not: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } };
+  // Terrifying Presence: every creature's combat damage but that target's.
+  if (spec.by?.notTarget !== undefined) {
+    const so = objects(s, { ref: "target", index: spec.by.notTarget }, ctx)[0];
+    if (so) rule.by = { ...rule.by, not: { id: so.id, zc: so.zoneChanges ?? 0 } };
+  }
   if (spec.by?.target) {
     // "Prevent all damage target spell would deal this turn" (Hallow): that spell, and the permanent it becomes.
     const i = spec.by.target.ref === "target" ? spec.by.target.index : -1;

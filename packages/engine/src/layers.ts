@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, LINKED_TYPES_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -1552,8 +1552,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "removeKeywords":
       // Losing hexproof loses each "hexproof from [quality]" too (CR 702.11e).
-      // Losing protection or ward loses every one of them, whatever its quality or cost (Shay Cormac).
-      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x)) || (sameCI(k, "Protection") && /^protection from /i.test(x)) || (sameCI(k, "Ward") && /^ward\b/i.test(x))));
+      // Losing protection or ward loses every one of them, whatever its quality or cost (Shay Cormac). "Landwalk" is every
+      // landwalk ability (Hammerheim: "loses all landwalk abilities").
+      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x)) || (sameCI(k, "Protection") && /^protection from /i.test(x)) || (sameCI(k, "Ward") && /^ward\b/i.test(x)) || (sameCI(k, "Landwalk") && isLandwalk(x))));
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       if (c.sparedBy && m.keywords.some((k) => sameCI(k, "Protection"))) for (const k of Object.keys(c.sparedBy)) if (k.startsWith("protection from ")) delete c.sparedBy[k];
       if (m.keywords.some((k) => sameCI(k, "Ward"))) c.wardLost = true;

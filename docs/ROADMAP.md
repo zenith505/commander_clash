@@ -1,6 +1,6 @@
 # Roadmap
 
-29,268 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,303 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,952 of 4,988 (99%), top 10,000: 9,395 of
 9,979 (94%).
 
@@ -1668,7 +1668,7 @@ line blocks.
    be done fully) and "Whenever you forage" (Corpseberry Cultivator: event youForage, from forage costs too); "Whenever a
    creature you control deals combat damage to a player or planeswalker this turn" (Flitterwing Nuisance); "Then you may
    pay one or more {E}. If you do, put that many +1/+1 counters on ~" (Rampaging Aetherhood); "... and isn't a Human"
-   (Werewolf Pack Leader: loseTypes of a creature type). +14 (29,241 of 31,936).
+   (Werewolf Pack Leader: loseTypes of a creature type). +14 (29,241 of 31,936; 29,277 with B83 and B84).
    Round 249 (the top of the list and earlier skip lists): "a third of their life/cards/creatures/lands, rounded up"
    (Pox: loseLife, discard and sacrifice `third`); "that attacking player creates a tapped ... token named ... that's
    attacking that opponent" (Ellie, Brick Master); "for each player who discarded a card this turn" (Azula, Ruthless
@@ -1685,7 +1685,7 @@ line blocks.
    ~" and "Discard three cards with different names" as a cost (Ormos, Archive Keeper: CompiledCard.drawEmptyCounters,
    discard cost differentNames, checked in the UI's cost picker); "that player chooses a permanent card in your graveyard,
    then you put it onto the battlefield under your control" (Neyam Shai Murad: chooseFromGraveyard `chooser`). +10
-   (29,268 of 31,936 with B83).
+   (29,268 of 31,936 with B83; 29,303 with B84 and B85).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
    and the rulings' loss of non-Alien subtypes); Stitcher Geralf ("exile up to two creature cards put into graveyards
    this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
@@ -4600,6 +4600,46 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature of that color this turn, destroy that creature" (Zombie Boa); "Whenever one or more cards are put into
   exile during your turn" (Stonebinder's Familiar); "Each creature you control is no longer goaded" (Serene Sleuth);
   "X is the number of times this ability has resolved this turn" (Bronze Cudgels). +17 (29,208 of 31,936; 29,226 with round 246).
+- Round B84 (one-line templates from the bottom of the list): "as long as they haven't dealt combat damage yet"
+  (Ruric Thar, Magecrusher; reset when it changes zones); "Whenever a creature / spell deals damage to ~, ~ deals that
+  much damage to that creature / that spell's controller" (Tephraderm); Animate Artifact (enchanted noncreature
+  artifact becomes a creature with P/T equal to its mana value); "deals that much damage" from a spell's mana value
+  (Imminent Doom); Chaos Lord (an opponent gains control of it if the number of permanents is even; haste unless it
+  entered this turn); Mirror Golem (protection from each of the exiled card's card types, read from the linked exile);
+  "Each other player may put a creature card from their hand onto the battlefield" (Charmed Griffin); "the damage
+  dealt to you so far this turn by artifacts" (Reverse Polarity); "Whenever a source of the chosen color deals damage
+  to you" (Circle of Affliction); "Pay 3 life for each velocity counter on ~" as a cost (Tornado); damage equal to
+  the cards drawn this way (Malignant Growth); exile the top four and repeat while two share a name (Scalpelexis);
+  exile the top three and repeat until a land (Rally the Horde); "Any number of target players may each search"
+  (Turtle Tracks); look at the top eight, exile four at random (Orcish Librarian); "Whenever a creature card leaves an
+  opponent's graveyard" from the graveyard (Erebos's Titan); "That opponent may put ... from their hand onto the
+  battlefield" (Metamorphose); protection from each color whose basic land type you control (Dominaria's Judgment);
+  "if it shares a color with the most common color" (Tsabo's Assassin). +19 (29,263 of 31,936 with B83 and rounds 246
+  and 247).
+- Round B85 (one-line templates from the bottom of the list): "that targets only ~" (Reflective Golem); "You may
+  change the targets of target instant or sorcery spell", all of them or none (CR 115.7a; Goblin Flectomancer, with
+  the retarget bar saying so); "Activate only if you've controlled ~ continuously since the beginning of your most
+  recent turn" (Rocket Launcher); "that spell or ability's controller gains control of that creature" (Fractured
+  Loyalty); Burden of Proof; "Whenever ~ deals combat damage to one or more blocking creatures" (Arashin War Beast);
+  "Whenever ~ and another creature attack different players" (Canal Courier); "When you discard one or more nonland
+  cards this way" (Seasoned Cryomancer); "if you attacked with exactly one other creature this combat" (Creepy
+  Puppeteer); "Permanents you control can't be the targets of blue or black spells your opponents control this turn"
+  (Display of Dominance); damage equal to a planeswalker's loyalty (Compel Brutality); each player chooses a
+  nonland permanent for a doom counter (Eye of Doom); Hazezon Tamar (X counted at the upkeep); Goblin Lyre (that
+  opponent or that planeswalker's controller); "if you've activated a loyalty ability this turn" (Kiora of Salt and
+  Sand); "When you do" after exiling one or more cards from your graveyard (Specter of Mortality). Two-word creature
+  types ("Eldrazi Scion", "Sand Warrior", "Spider Hero") now need both types instead of either (CR 205.3), which fixes
+  Kor Castigator, Deathless Behemoth, Hand of Emrakul, Drowner of Hope, Brood Birthing and Radioactive Spider. +16
+  (29,279 of 31,936 with B84; 29,293 with round 248).
+- Out after round B85 (looked at, not done): Grave Consequences (each player exiles any number from their own
+  graveyard, then a count per player), Magus of the Arena (a target chosen by an opponent), Paragon of Modernity
+  (exactly three colors of mana spent on an activation), Scarwood Bandits (an "Unless an opponent pays" lead clause on
+  an activated ability).
+- Out after round B84 (looked at, not done): Traveling Plague (an Aura returned from the graveyard needs an attach
+  choice), Spellshift (another player's free cast from revealed cards), Obscura Ascendancy (an intervening "equals"
+  check), Eye of Singularity, Cornered Market and Bazaar of Wonders (name-based filters), Weight of Conscience ("share
+  a creature type" tap cost), Psychic Theft, Last Rites, Thought Dissector, Mimeofacture, Hakim,
+  Guard Dogs, Carry Away, Jandor's Ring.
 - Out after round B83 (looked at, not done): Fighting Chance (a coin flip for each blocking creature), Ersatz Gnomes
   (a spell becomes colorless: no rule for changing a spell's color yet), Clash of Elements (the owner's choice decides
   what happens to it and who is dealt damage), Write into Being (manifest one of the top two cards), Samite Elder

@@ -663,6 +663,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the (?:total )?(?:amount of )?damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsDamage" });
   // Discordant Spirit: "for each 1 damage dealt to you this turn": by any source, what was really dealt.
   if (each ? /^1 damage dealt to you this turn$/i.test(p) : /^the (?:total )?(?:amount of )?damage dealt to you this turn$/i.test(p)) return count({ kind: "playerDamageThisTurn", who: { ref: "you" } });
+  // Reverse Polarity: "the damage dealt to you so far this turn by artifacts": by sources that were artifacts as they dealt
+  // it (TurnLog.artifactDamage), what was really dealt.
+  if (!each && /^the damage dealt to you so far this turn by artifacts$/i.test(p)) return count({ kind: "playerDamageThisTurn", who: { ref: "you" }, byArtifacts: true });
   // Knollspine Dragon: "the damage dealt to target opponent this turn": by any source, what was really dealt (rulings).
   if (!each && ctx && /^the damage dealt to target opponent this turn$/i.test(p)) {
     const i = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
@@ -1003,7 +1006,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${singularWord(m[1]!)} an opponent controls`, { chosen: true });
     return spec?.kind === "object" && !spec.owner ? count({ kind: "permanents", filter: { ...spec, owner: "you", text: p } }) : null;
   }
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|the chosen player controls|those players control|those opponents control|enchanted creature's controller controls)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|that opponent or that planeswalker's controller controls|the chosen player controls|those players control|those opponents control|enchanted creature's controller controls)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those|the chosen|enchanted creature's) /.test(who);
@@ -1098,6 +1101,13 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   // Observed Stasis: "each tapped creature its controller controls", its being enchanted creature (CR 303.4).
   if (x === "enchanted creature's controller's" && !ctx.spell) return { ref: "hostController" };
   if (x === "defending player's" && ctx.defending) return { ref: "eventPlayer" };
+  // Goblin Lyre: "creatures that opponent or that planeswalker's controller controls": the opponent it targets, or the
+  // targeted planeswalker's controller (as it last existed, CR 608.2h).
+  if (x === "that opponent or that planeswalker's controller's") {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    return t?.kind === "any" && t.types?.includes("Planeswalker") && !t.types.includes("Creature") ? { ref: "targetOrController", index: i } : null;
+  }
   return null;
 }
 

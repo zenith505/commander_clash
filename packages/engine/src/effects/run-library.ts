@@ -168,7 +168,31 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "exileTop":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        // Scalpelexis: "If two or more of those cards have the same name, repeat this process": as often as it takes not
+        // to exile two with the same name (rulings); a library that runs out ends it, so no shortcut is needed (CR 732).
+        // Rally the Horde: "Exile the top card of your library" three times, "If the last card exiled isn't a land card, repeat
+        // this process": again while the last card of a batch isn't a land card, until the library runs out. "Exiled this
+        // way" is every card of every batch.
+        if (e.repeatSameName || e.repeatUnlessLastLand) {
+          const all: ObjectId[] = [];
+          for (let again = true; again; ) {
+            const batch = p.library.slice(0, Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid })));
+            for (const id of batch) moveObject(s, id, "exile");
+            all.push(...batch);
+            if (batch.length) log(s, `${p.name} exiles ${batch.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
+            const names = batch.map((id) => defOf(s, obj(s, id)).name);
+            again = e.repeatSameName ? names.some((a, i) => names.some((b, j) => j > i && sameName(a, b))) : batch.length > 0 && !defOf(s, obj(s, batch[batch.length - 1]!)).types.includes("Land");
+          }
+          if (s.resolving) s.resolving.exiledTopCards = all;
+          continue;
+        }
         const ids = p.library.slice(0, Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid })));
+        // Orcish Librarian: `n` of the top `randomOf` cards, picked at random.
+        if (e.randomOf !== undefined) {
+          const pool = p.library.slice(0, e.randomOf);
+          ids.length = 0;
+          for (let i = 0, k = Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid })); i < k && pool.length; i++) ids.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+        }
         for (const id of ids) {
           moveObject(s, id, "exile");
           const o = obj(s, id);

@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -750,6 +750,12 @@ export function compile(d: CardDef): CompiledCard {
     // Adaptive Training Post: "Whenever you cast ..., if ~ has fewer than three charge counters on it, put a charge counter
     // on it": "it" is ~ both times, not the spell.
     line = line.replace(/^(Whenever you cast [^,]+, if ~ has [^,]+ counters on it, put an? [^ ,]+ counter on) it\.$/, "$1 ~.");
+    // Imminent Doom: "Whenever you cast a spell with mana value equal to the number of doom counters on ~, ~ deals that much
+    // damage to any target": the number of counters as it triggered (rulings), which is that spell's mana value.
+    line = line.replace(/^(Whenever you cast a spell with mana value equal to the number of [a-z]+ counters on ~, ~ deals) that much damage (to any target\.)/, "$1 damage equal to that spell's mana value $2");
+    // Malignant Growth: "that player draws an additional card for each growth counter on ~, then ~ deals damage to the player
+    // equal to the number of cards they drew this way": the draw, then damage for the cards that draw really drew.
+    line = line.replace(/^(At the beginning of each opponent's draw step, that player draws an additional card for each [a-z]+ counter on ~), then ~ deals damage to the player equal to the number of cards they drew this way\.$/, "$1. ~ deals damage to that player equal to the number of cards drawn this way.");
     // Narcolepsy: "At the beginning of each upkeep, if enchanted creature is untapped, tap it": "it" is that creature.
     line = line.replace(/^(At the beginning of [^,]+, if enchanted creature is (?:un)?tapped, (?:un)?tap) it\.$/, "$1 enchanted creature.");
     // Stature, Size Shifter: "~ can't be blocked if ~'s power is 1 or less"; Illvoi Infiltrator: "... if you've cast two or
@@ -4900,6 +4906,20 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Burden of Proof: "Enchanted creature gets +2/+2 as long as it's a Detective you control. Otherwise, it has base power
+    // and toughness 1/1 and can't block Detectives.": one or the other by what the creature is and who controls it now,
+    // checked continuously (CR 611.3a); "you" is the Aura's controller.
+    const proof = /^Enchanted creature (gets [+-]\d+\/[+-]\d+) as long as it's an? ([A-Z][a-z]+) you control\. Otherwise, it (has base power and toughness \d+\/\d+ and can't block [A-Z][a-z]+s)\.$/.exec(line);
+    if (proof && CREATURE_TYPES.has(proof[2]!)) {
+      const [a, b] = [parseStatic(`Enchanted creature ${proof[1]}.`), parseStatic(`Enchanted creature ${proof[3]}.`)];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        const yes: TargetSpec = { kind: "object", types: ["Creature"], subtypes: [proof[2]!], controller: "you", text: `${proof[2]} you control` };
+        const notType: TargetSpec = { kind: "object", types: ["Creature"], notSubtypes: [proof[2]!], text: `non-${proof[2]} creature` };
+        const theirs: TargetSpec = { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "anyOf", conds: [{ kind: "attachedIs", filter: notType }, { kind: "attachedIs", filter: theirs }] }, text: line });
+        continue;
+      }
+    }
     // Mishra's Domination: "As long as you control enchanted creature, it gets +2/+2. Otherwise, it can't block.": who
     // controls it now, checked continuously (CR 611.3a); in a free-for-all game every other player is an opponent.
     const domination = /^As long as you control enchanted creature, it (gets [+-]\d+\/[+-]\d+)\. Otherwise, it (can't block|can't attack|can't attack or block)\.$/.exec(line);
@@ -5641,6 +5661,14 @@ function linkExile(out: CompiledCard) {
     const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
     if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
     else for (const e of yards) e.linked = true;
+  }
+  // Mirror Golem: "the exiled card" its protection reads is the one its imprint ability exiled as it entered, its only
+  // exile (CR 607.2a).
+  if (out.statics.some((st) => st.mods.some((m) => m.kind === "addKeywords" && m.keywords.includes(LINKED_TYPES_PROTECTION)))) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its protection can't be linked to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));

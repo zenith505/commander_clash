@@ -1247,6 +1247,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^(?:They gain|That player gains) control of ~$/.test(s) && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many && !ctx.targets[ctx.lastPlayerTarget]!.optional)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "target", index: ctx.lastPlayerTarget } }];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
+  // Fractured Loyalty: "that spell or ability's controller gains control of that creature": the trigger's creature (its
+  // subject) for the rest of the game (layer 2), given to the trigger's player.
+  if (/^[Tt]hat player gains control of that creature$/.test(s) && ctx.eventPlayer && ctx.subject && !ctx.spell && !ctx.targets.length)
+    return [{ type: "continuous", what: { ref: "subject" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
   // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
   // this resolves (CR 611.2c), until the cleanup step (514.2).
   if (/^[Tt]hat player gains control of equipped creature until end of turn$/.test(s) && ctx.eventPlayer && !ctx.spell)

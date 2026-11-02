@@ -583,7 +583,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
-    else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}` });
+    else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}${pending.allOrNone ? " (change all of them, or keep them)" : ""}` });
     else setTargeting((t) => (answering(t) ? null : t));
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : ""]);
 

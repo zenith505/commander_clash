@@ -1,6 +1,6 @@
 import type { Amount, AmountExpr, Affects, Modification, MostStat, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
-import { CHOSEN_KEYWORDS, CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
+import { CHOSEN_KEYWORDS, CREATURE_TYPES, LINKED_TYPES_PROTECTION, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular, singularWord } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
@@ -280,6 +280,21 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
   if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
     return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [m[1]!], text: m[1]! } } };
+  // Mirror Golem: "~ has protection from each of the exiled card's card types": the card its imprint ability exiled
+  // (CR 607.2a, linkExile), its types as a card in exile; none while there's none.
+  if (text === "~ has protection from each of the exiled card's card types") return { affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: [LINKED_TYPES_PROTECTION] }], text: line };
+  // Chaos Lord: "~ can attack as though it had haste unless it entered this turn": it may attack while summoning sick
+  // (CR 302.6) after it changes control, but not the turn it entered.
+  if (text === "~ can attack as though it had haste unless it entered this turn")
+    return { affects: { kind: "self" }, mods: [{ kind: "attackAsThoughHaste" }], text: line, condition: { kind: "self", is: "enteredThisTurn", not: true } };
+  // Animate Artifact: "As long as enchanted artifact isn't a creature, it's an artifact creature with power and toughness
+  // each equal to its mana value." Checked as the effect would start applying in layer 4 (CR 613.1d): an artifact that's
+  // already a creature keeps its power and toughness (rulings); once it applies, it keeps applying to it for layer 7b
+  // (CR 613.6), where it's a creature because of this effect.
+  if (text === "As long as enchanted artifact isn't a creature, it's an artifact creature with power and toughness each equal to its mana value") {
+    const mv = { count: { kind: "affectedManaValue" as const } };
+    return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: mv, toughness: mv }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature permanent" } } };
+  }
   // The Incarnations: "As long as ~ is in your graveyard and you control a Mountain, creatures you control have haste"
   // (Anger): it works only from its owner's graveyard (CR 113.6b).
   if ((m = /^As long as ~ is in your graveyard(?: and (.+?))?, ((?:creatures|lands) you control (?:have|get) .+)$/.exec(text))) {
@@ -773,6 +788,8 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Rocket Launcher (CR 302.6's test, for its controller's most recent turn).
+  if (/^you've controlled ~ continuously since the beginning of your most recent turn$/.test(text)) return { kind: "self", is: "controlledSinceYourTurnBegan" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // Lilypad Village: "Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn."
@@ -1264,7 +1281,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
   // Charging Cinderhorn, Keldon Twilight: "if no creatures attacked this turn": declared as attackers by anyone (CR 508.1).
   if (/^no creatures attacked this turn$/.test(text)) return { kind: "attackedThisTurn", not: true, anyone: true };
-  if ((m = /^you (didn't )?activate(?:d)? a loyalty ability of a planeswalker this turn$/.exec(text))) return { kind: "activatedLoyaltyThisTurn", ...(m[1] ? { not: true as const } : {}) };
+  // Kiora of Salt and Sand: "if you've activated a loyalty ability this turn": loyalty abilities are planeswalkers' (CR 606.3).
+  if ((m = /^you(?: (didn't )?activate(?:d)? a loyalty ability of a planeswalker|'ve activated a loyalty ability) this turn$/.exec(text))) return { kind: "activatedLoyaltyThisTurn", ...(m[1] ? { not: true as const } : {}) };
   if (/^you've committed a crime this turn$/.test(text)) return { kind: "committedCrime" }; // CR 700.13
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
   if ((m = /^you control the (creature|artifact) with the greatest (power|toughness|mana value) or tied for the greatest (power|toughness|mana value)$/.exec(text)) && m[2] === m[3])
@@ -1326,6 +1344,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
   // Karakyk Guardian: "~ has hexproof as long as it hasn't dealt damage yet": since it became this object (CR 400.7).
   if (/^(?:~|it) hasn't dealt damage yet$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "hasDealtDamage", not: true };
+  // Ruric Thar, Magecrusher: "~ has hexproof as long as they haven't dealt combat damage yet" ("they": the Ogre pair).
+  if (/^(?:~|it|they) (?:hasn't|haven't) dealt combat damage yet$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "hasDealtCombatDamage", not: true };
   // The Tarrasque: "~ has haste and ward {10} as long as it was cast": it entered as a spell, cast from any zone (rulings).
   // Only for a static ability's own effect: "When ~ enters, if it was cast" is the trigger's `ifCast`.
   if (/^(?:~|it) was cast$/.test(text) && st.mods.length && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "cast" };

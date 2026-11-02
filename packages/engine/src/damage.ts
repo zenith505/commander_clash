@@ -113,10 +113,12 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  * dealDamageBatch; `shielded` says the caller already did that.
  */
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
-function noteDealt(s: GameState, src: DamageSource) {
+function noteDealt(s: GameState, src: DamageSource, combat?: boolean) {
   const o = src.id ? s.objects[src.id] : undefined;
-  if (!o || o.zone !== "battlefield" || o.hasDealtDamage || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
+  if (!o || o.zone !== "battlefield" || (o.hasDealtDamage && (!combat || o.hasDealtCombatDamage)) || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
   o.hasDealtDamage = true;
+  // Ruric Thar, Magecrusher: "as long as they haven't dealt combat damage yet".
+  if (combat) o.hasDealtCombatDamage = true;
   invalidateCharacteristics(s);
 }
 
@@ -256,7 +258,7 @@ export function dealDamage(
       else fireEvent(s, ev);
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src);
+    noteDealt(s, src, opts.combat);
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
@@ -292,13 +294,14 @@ export function dealDamage(
     }
     (s.damageThisTurn ??= {})[p.id] = (s.damageThisTurn[p.id] ?? 0) + n;
     if (!opts.combat) ((s.turnLog ??= {}).noncombatDamage ??= {})[p.id] = (s.turnLog.noncombatDamage?.[p.id] ?? 0) + n;
+    if (src.types.includes("Artifact")) ((s.turnLog ??= {}).artifactDamage ??= {})[p.id] = (s.turnLog.artifactDamage?.[p.id] ?? 0) + n;
     // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n, combat: !!opts.combat });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
-    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
+    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors] });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
-    noteDealt(s, src);
+    noteDealt(s, src, opts.combat);
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;
@@ -500,7 +503,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   if (spec.notColors?.some((c) => src.colors.includes(c))) return false;
   const n = src.colors.length;
   if (spec.colorCount && (spec.colorCount === "colorless" ? n !== 0 : spec.colorCount === "monocolored" ? n !== 1 : spec.colorCount === "two" ? n !== 2 : spec.colorCount === "notTwo" ? n === 2 : spec.colorCount === "colored" ? n === 0 : spec.colorCount === "all" ? n < 5 : spec.colorCount === "notAll" ? n >= 5 : n < 2)) return false;
-  if (spec.subtypes?.length && !spec.subtypes.some((t) => src.subtypes.includes(t))) return false;
+  if (spec.subtypes?.length && !(spec.allSubtypes ? spec.subtypes.every((t) => src.subtypes.includes(t)) : spec.subtypes.some((t) => src.subtypes.includes(t)))) return false;
   if (spec.notSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.keywords?.some((k) => !kw(k)) || spec.notKeywords?.some(kw)) return false;
   if (spec.controller === "you" && src.controller !== controller) return false;
@@ -1405,7 +1408,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
     m.set(e.src, (m.get(e.src) ?? 0) + e.dealt);
     bySource.set(e.to.object, m);
   }
-  for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller, ...(src.id ? { srcId: src.id } : {}), ...(combat ? { combat: true as const } : {}), ...(src.id && src.types.includes("Creature") ? { creature: true as const } : {}) });
+  for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller, ...(src.id ? { srcId: src.id } : {}), ...(combat ? { combat: true as const } : {}), ...(src.id && src.types.includes("Creature") ? { creature: true as const } : {}), ...(src.spell ? { spell: true as const } : {}) });
   const toPlayers = playerBatch;
   playerBatch = outer;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });

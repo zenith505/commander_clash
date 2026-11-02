@@ -34,6 +34,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:the|each|each player's) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
+  // Arashin War Beast: once per combat damage step, however many blocking creatures it dealt combat damage to (rulings).
+  [/^Whenever ~ deals combat damage to one or more blocking creatures, (.+)$/, "selfDealsCombatDamageToBlockers"],
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   // "Whenever ~ attacks an opponent" (Kaalia of the Vast): every player it can attack is an opponent (CR 506.2, 102.3).
   [/^Whenever ~ attacks (?:a player|an opponent), (.+)$/, "selfAttacks"],
@@ -170,7 +172,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -287,6 +289,13 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!filter || filter.kind !== "object" || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
     const body = parseBody(byMany[2]!, { subjectIt: true, defending: true });
     return body ? { event: "selfBecomesBlocked", body, host: "attached", blockFilter: { ...filter, text: byMany[1]! } } : "fail";
+  }
+  // Fractured Loyalty: "Whenever enchanted creature becomes the target of a spell or ability, that spell or ability's
+  // controller gains control of that creature": the player who controls that spell or ability as it targets (CR 115.10),
+  // for good (a control effect with no duration, CR 611.2a).
+  if (m[2] === "creature" && !m[1] && !yours && /^becomes the target of a spell or ability, that spell or ability's controller gains control of that creature\.?$/.test(m[3]!)) {
+    const body = parseBody("that player gains control of that creature.", { subject: true, eventPlayer: true });
+    return body ? { event: "selfBecomesTarget", targeted: {}, body, host: "attached" } : "fail";
   }
   const byOne = m[2] === "creature" && !m[1] && !yours ? /^becomes blocked by a creature, (.+)$/.exec(m[3]!) : null;
   if (byOne) {
@@ -540,6 +549,13 @@ function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null 
   }
   const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
   if (!m) return null;
+  // Circle of Affliction: "Whenever a source of the chosen color deals damage to you, ...": once for each source of the
+  // color chosen as it entered, a spell too (rulings), its colors as it dealt the damage.
+  if (m[2] === "source of the chosen color") {
+    if (/\b(it|its|that source|that creature|that player|that much|that many)\b/.test(m[4]!)) return "fail";
+    const body = parseBody(m[4]!);
+    return body ? { event: "dealsDamageToYou", body, damagesYou: { chosenColor: true, ...(m[3] ? { combat: true as const } : {}) } } : "fail";
+  }
   const who = /^source(?: (an opponent|you) controls?)?$/.exec(m[2]!);
   let text = m[4]!;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
@@ -887,8 +903,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
   // "A spell that targets only a single artifact or creature you control" (Vesuvan Duplimancy): every target it has is
   // that one permanent (rulings), which "that artifact or creature" is.
+  // Reflective Golem: "an instant or sorcery spell that targets only ~": every target it has is this permanent (rulings
+  // on Zada: several targets all naming it count).
+  const onlySelf = / that targets only ~$/.exec(what);
+  if (onlySelf) what = what.slice(0, onlySelf.index);
   const onlyM = / that targets only a single (.+)$/.exec(what);
-  let targetsOnly: TargetSpec | undefined;
+  let targetsOnly: TargetSpec | "self" | undefined = onlySelf ? "self" : undefined;
   if (onlyM) {
     what = what.slice(0, onlyM.index);
     const spec = parseTargetPhrase(onlyM[1]!);
@@ -984,7 +1004,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const tgtsMany = !!tgtsM && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
   if (tgtsMany) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
-  const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
+  const subjectRef = targetsOnly && onlyM && text.includes(`that ${onlyM[1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
     // Read as the subject, whatever it is now (rulings: as it last existed, if it left).
     text = text.replaceAll(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`, "that creature");
@@ -2087,7 +2107,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:an?|(another)) (?:(.+?) )?card (leaves (?:your|an opponent's) graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library|your library))( during your turn)?, (.+)$/.exec(line))) {
     // Measure of Wickedness: "Whenever another card is put into your graveyard from anywhere": not this permanent's own card.
     const another = !!m[1];
     m.splice(1, 1);
@@ -2096,7 +2116,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // during your turn".
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
-    const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
+    // Erebos's Titan: "Whenever a creature card leaves an opponent's graveyard": a card an opponent owns (CR 404.1).
+    const whose = /an opponent's/.test(m[2]!) ? ("opponent" as const) : /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : undefined;
     // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
     // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
     // Pedantic Learning: "a land card is put into your graveyard from your library", the same (a card goes to its owner's
@@ -3013,6 +3034,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
     return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
   }
+  // Creepy Puppeteer (TriggeredAbility.oneOtherAttacker): "you may have that creature's base power and toughness become
+  // 4/3 until end of turn" is a may (CR 603.5), a P/T-setting effect in layer 7b until the cleanup step.
+  const puppet = /^Whenever ~ attacks, if you attacked with exactly one other creature this combat, you may have that creature's base power and toughness become (\d+)\/(\d+) until end of turn\.?$/.exec(line);
+  if (puppet) {
+    const inner = parseBody(`That creature has base power and toughness ${puppet[1]}/${puppet[2]} until end of turn.`, { subject: true });
+    if (!inner || inner.targets.length) return "fail";
+    const text = `you may have that creature's base power and toughness become ${puppet[1]}/${puppet[2]} until end of turn.`;
+    return { event: "selfAttacks", oneOtherAttacker: true, body: { targets: [], effects: [{ type: "may", effects: inner.effects, text }], text } };
+  }
+  // Canal Courier: "Whenever ~ and another creature attack different players" (TriggeredAbility.othersAtAnotherPlayer).
+  const apart = /^Whenever ~ and another creature attack different players, (.+)$/.exec(line);
+  if (apart) {
+    const t = parseTrigger(`Whenever ~ attacks, ${apart[1]}`);
+    return t && t !== "fail" && t.event === "selfAttacks" && !t.host ? { ...t, othersAtAnotherPlayer: true } : "fail";
+  }
   // Glimmer Lens: "Whenever equipped creature and at least one other creature attack, draw a card": the equipped
   // creature attacking with others, as attackers are declared (CR 508.1, 508.3a).
   const hostBattalion = /^Whenever equipped creature and at least (one|two) other creatures? attack, (.+)$/.exec(line);
@@ -3189,7 +3225,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Centaur Vinecrasher: "Whenever a land card is put into a graveyard from anywhere": also watched from graveyards, even
     // by a card put there in the same event (rulings).
     // Afterburner Expert: an exhaust ability activated is watched from graveyards too (see the activated event).
-    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "abilityActivated" && t.activates?.exhaust && t.activates.by === "you") && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose)) && t.batch.each)) || t.host) return "fail";
+    // Erebos's Titan: "Whenever a creature card leaves an opponent's graveyard" from its owner's graveyard (rulings: only
+    // there); not one that leaves with the player who leaves the game (their cards don't move, CR 800.4a).
+    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "abilityActivated" && t.activates?.exhaust && t.activates.by === "you") && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose) || (t.batch?.what === "leavesGraveyard" && t.batch.whose === "opponent")) && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
     // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
     const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);
@@ -3735,6 +3773,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damagesHost) {
     const body = parseBody(damagesHost[1]!, { subjectIt: true });
     return body ? { event: "creatureDealsDamageToAttached", host: "attached", body } : "fail";
+  }
+  // Tephraderm: "Whenever a creature deals damage to ~, ~ deals that much damage to that creature": once for each creature
+  // dealing it damage, combat damage or not, that creature the subject; "Whenever a spell deals damage to ~, ~ deals that
+  // much damage to that spell's controller": once for each spell, that player the spell's controller (CR 112.1). Both
+  // trigger even if the damage is lethal (rulings): it's still on the battlefield as the damage is dealt.
+  const damagedByAny = /^Whenever a (creature|spell) deals damage to ~, (.+)$/.exec(line);
+  if (damagedByAny) {
+    const spell = damagedByAny[1] === "spell";
+    const text = damagedByAny[2]!;
+    if (/\bX\b/.test(text)) return "fail";
+    const body = parseBody((spell ? text.replace(/\bthat spell's controller\b/g, "that player") : text).replace(/\bthat (?:much|many)\b/g, "X"), spell ? { eventPlayer: true } : { subjectIt: true });
+    return body ? { event: spell ? "spellDealsDamageToSelf" : "creatureDealsDamageToSelf", body: { ...replaceX(body, { count: { kind: "eventAmount" } }), text } } : "fail";
   }
   const damagedBy = /^Whenever a creature deals combat damage to ~, (.+)$/.exec(line);
   if (damagedBy) {

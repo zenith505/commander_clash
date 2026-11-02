@@ -1037,6 +1037,7 @@ export function moveObject(
   o.wasDealtDamage = undefined;
   o.wasDealtNoncombatDamage = undefined;
   o.hasDealtDamage = undefined;
+  o.hasDealtCombatDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -4751,7 +4752,7 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
 export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject, x?: number): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.lifeCostX ? (x ?? 0) : 0) + (ab.lifeCostPerCounter && o ? ab.lifeCostPerCounter.n * (o.counters[ab.lifeCostPerCounter.counter] ?? 0) : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {
@@ -8264,6 +8265,8 @@ function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     const changed = targets.map((t, i) => (t.kind === "none" ? (pend.current[i]?.kind ?? "none") !== "none" : !sameTarget(pend.current[i], t)));
     const part = (t: TargetChoice | undefined) => (t && (t.kind === "object" || t.kind === "player") ? t.amount : undefined);
     if (targets.some((t, i) => changed[i] && (pend.specs[i]?.divided || part(pend.current[i]) !== undefined) && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
+    // "Change the targets" (CR 115.7a): each target to another legal one, all of them or none; never to nothing.
+    if (pend.allOrNone && changed.some((c) => c) && targets.some((t, i) => (pend.current[i]?.kind ?? "none") !== "none" && (!changed[i] || t.kind === "none"))) throw new RulesError("change all of its targets, or none of them");
     const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     const q = stackItemQuality(s, item);
     for (let i = 0; i < targets.length; i++) {
@@ -10737,8 +10740,11 @@ function finishCombatDamage(s: GameState): boolean {
   const key = (e: DamageEvent) => e.src.id!;
   const done = dealPlanned(s, plan, { lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
   const dealt = new Map<ObjectId, number>();
+  // Arashin War Beast: the sources that dealt some of it to a creature that's blocking (CR 509.1g, 506.4).
+  const toBlocker = new Set<ObjectId>();
   for (const e of done) {
     dealt.set(key(e), (dealt.get(key(e)) ?? 0) + e.dealt);
+    if (e.dealt && "object" in e.to && s.objects[e.to.object]?.zone === "battlefield" && s.objects[e.to.object]!.blocking !== undefined) toBlocker.add(key(e));
     if ("player" in e.to && e.dealt) {
       const hitter = s.objects[key(e)];
       const first = hitter?.combatHitTurn !== s.turn;
@@ -10771,7 +10777,7 @@ function finishCombatDamage(s: GameState): boolean {
     lifelink.delete(key(e));
   }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
-  for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
+  for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true, ...(toBlocker.has(id) ? { toBlocker: true as const } : {}) });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
   // "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar): each player dealt it by creatures.
   // Who controlled each creature as it dealt it: "creatures an opponent controls" (Norn's Decree).

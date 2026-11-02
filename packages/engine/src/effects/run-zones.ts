@@ -2099,6 +2099,54 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
+    case "alternatePicks": {
+      // Memories Returning: revealed (CR 701.20a) and kept on top until picked; each step from those still there.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      if (!sc.alternate) {
+        const ids = you.library.slice(0, e.n);
+        log(s, `${you.name} reveals ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        sc.alternate = { ids, step: 0 };
+      }
+      const st = sc.alternate;
+      for (;;) {
+        const left = st.ids.filter((id) => you.library.includes(id));
+        if (!left.length || st.step >= e.steps.length) return;
+        const step = e.steps[st.step]!;
+        // "Then choose an opponent": before the first step that's theirs.
+        if (step === "bottom" && st.opp === undefined) {
+          const opps = opponents(s, you.id);
+          if (!opps.length) return;
+          if (opps.length === 1) {
+            st.opp = opps[0];
+            log(s, `${you.name} chooses ${player(s, st.opp!).name}.`);
+          } else if (s.resolving!.chosen?.player !== undefined && opps.includes(s.resolving!.chosen.player)) st.opp = s.resolving!.chosen.player;
+          else {
+            s.pending = { kind: "chooseOption", player: you.id, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: `choose an opponent to put cards on the bottom of your library` };
+            return "paused";
+          }
+        }
+        const last = st.step === e.steps.length - 1 && step === "hand" && left.length === 1;
+        const picker = step === "hand" ? you.id : st.opp!;
+        const pick = left.length === 1 ? left[0]! : st.pick !== undefined && left.includes(st.pick) ? st.pick : undefined;
+        st.pick = undefined;
+        if (pick === undefined) {
+          s.pending = { kind: "chooseOption", player: picker, source: src, what: "alternatePick", options: left, labels: left.map((id) => defOf(s, obj(s, id)).name), prompt: step === "hand" ? `put one of the revealed cards into your hand` : `put one of the cards ${you.name} revealed on the bottom of their library` };
+          return "paused";
+        }
+        if (step === "hand") {
+          moveObject(s, pick, "hand");
+          log(s, `${you.name} puts ${defOf(s, obj(s, pick)).name} into their hand${last ? " (the last one)" : ""}.`);
+        } else {
+          you.library.splice(you.library.indexOf(pick), 1);
+          you.library.push(pick);
+          log(s, `${player(s, picker).name} puts ${defOf(s, obj(s, pick)).name} on the bottom of ${you.name}'s library.`);
+        }
+        // No longer among those revealed and still to be picked.
+        st.ids = st.ids.filter((id) => id !== pick);
+        st.step++;
+      }
+    }
     case "predicament": {
       // Master of Predicaments (rulings): the card chosen without revealing it; the guess made blind; nothing revealed
       // unless it's cast.

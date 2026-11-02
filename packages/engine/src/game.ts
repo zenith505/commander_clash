@@ -8947,6 +8947,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "alternatePick") {
+    const st = r.scratch?.alternate;
+    if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "predicamentCard" || pend.what === "predicamentGuess") {
     // Master of Predicaments: the card stays secret (rulings); the guess is announced.
     const st = r.scratch?.predicament;

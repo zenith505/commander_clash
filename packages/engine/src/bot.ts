@@ -984,6 +984,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "You may pay any amount of {E}" (Galvanic Discharge, Die Young): enough to kill the target if it's another
     // player's creature or planeswalker (all of it if that's not enough), nothing for one of ours.
+    // Memories Returning: our best card into our hand; as the opponent, their best card to the bottom.
+    if (pend.kind === "chooseOption" && pend.what === "alternatePick") {
+      const owner = obj(s, pend.options[0]!).owner;
+      return [{ type: "chooseOption", player: pid, choice: chooseSearch(s, owner, pend.options, 1)[0] ?? pend.options[0]! }];
+    }
     // Master of Predicaments: most cards in a hand have mana value 4 or less, so we guess that; as the chooser, our
     // costliest nonland card, the one a wrong guess pays off most for.
     if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];

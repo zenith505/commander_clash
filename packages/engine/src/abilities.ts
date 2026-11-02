@@ -3104,6 +3104,13 @@ export type Effect =
    * 107.3b); a land can't be cast (rulings).
    */
   | { type: "predicament"; who: PlayerRef; over: number }
+  /**
+   * Memories Returning: "Reveal the top five cards of your library. Put one of them into your hand. Then choose an
+   * opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the
+   * bottom of your library. Put the other into your hand.": the picks in that order, you to your hand and the opponent you
+   * chose to the bottom of your library, each from those still revealed; with fewer cards, as far as they go.
+   */
+  | { type: "alternatePicks"; n: number; steps: ("hand" | "bottom")[] }
   | {
       type: "revealUntil";
       filter: TargetSpec;

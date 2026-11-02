@@ -6324,6 +6324,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
+    // Memories Returning: "Reveal the top five cards of your library. Put one of them into your hand. Then choose an
+    // opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the bottom
+    // of your library. Put the other into your hand."
+    const memories = new RegExp(`^Reveal the top ${NUM} cards of your library$`).exec(s);
+    const memoriesRest = ["Put one of them into your hand", "Then choose an opponent", "They put one on the bottom of your library", "Then you put one into your hand", "Then they put one on the bottom of your library", "Put the other into your hand"];
+    if (memories && num(memories[1]!) === 5 && !ctx.chosenOpponent && memoriesRest.every((x, i) => sentences[si + 1 + i]?.replace(/\.$/, "") === x)) {
+      effects.push({ type: "alternatePicks", n: 5, steps: ["hand", "bottom", "hand", "bottom", "hand"] });
+      si += memoriesRest.length;
+      continue;
+    }
     // Master of Predicaments, after "Whenever ~ deals combat damage to a player": "choose a card in your hand. That player
     // guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without
     // paying its mana cost." (rulings: a land can't be cast; a split card's mana value is both halves').

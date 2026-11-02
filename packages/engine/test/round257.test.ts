@@ -47,6 +47,7 @@ const devils = (): CardDef => ({"oracleId":"b446b485-c10b-4175-bb49-16ac2f9e7718
 const creativity = (): CardDef => ({"oracleId":"e2161ae2-e5d2-4a56-85d4-d2214c5b3e2e","name":"Indomitable Creativity","manaCost":"{X}{R}{R}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy X target artifacts and/or creatures. For each permanent destroyed this way, its controller reveals cards from the top of their library until an artifact or creature card is revealed and exiles that card. Those players put the exiled cards onto the battlefield, then shuffle.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","artUrl":"https://cards.scryfall.io/art_crop/front/e/d/edd00e45-2ae1-4cd0-92a1-155c95f8dc72.jpg?1783936753","commanderLegal":"legal","set":"aer","releasedAt":"2017-01-20","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 const passage = (): CardDef => ({"oracleId":"f4b30f6c-09ac-407e-9c72-da64d212ce93","name":"Guided Passage","manaCost":"{G}{U}{R}","cmc":3,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Reveal the cards in your library. An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.","colors":["G","R","U"],"colorIdentity":["G","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","artUrl":"https://cards.scryfall.io/art_crop/front/0/b/0b2e8e58-aee1-4882-943a-17a6af2f8410.jpg?1783945335","commanderLegal":"legal","set":"apc","releasedAt":"2001-06-04","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 const predicaments = (): CardDef => ({"oracleId":"503447d9-2489-46d7-b5aa-a14bbb22dcc8","name":"Master of Predicaments","manaCost":"{3}{U}{U}","cmc":5,"typeLine":"Creature — Sphinx","supertypes":[],"types":["Creature"],"subtypes":["Sphinx"],"oracleText":"Flying\nWhenever this creature deals combat damage to a player, choose a card in your hand. That player guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without paying its mana cost.","power":"4","toughness":"4","colors":["U"],"colorIdentity":["U"],"keywords":["Flying"],"imageUrl":"https://cards.scryfall.io/normal/front/f/0/f0b1720b-ab7a-4b52-a6d0-11c4fc573d17.jpg?1783939190","artUrl":"https://cards.scryfall.io/art_crop/front/f/0/f0b1720b-ab7a-4b52-a6d0-11c4fc573d17.jpg?1783939190","commanderLegal":"legal","set":"m15","releasedAt":"2014-07-18","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const memories = (): CardDef => ({"oracleId":"6cdc6548-cb32-437f-850a-9002542ad3d5","name":"Memories Returning","manaCost":"{2}{U}{U}","cmc":4,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Reveal the top five cards of your library. Put one of them into your hand. Then choose an opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the bottom of your library. Put the other into your hand.\nFlashback {7}{U}{U}","colors":["U"],"colorIdentity":["U"],"keywords":["Flashback"],"imageUrl":"https://cards.scryfall.io/normal/front/a/7/a753abfc-35d3-4faf-ab35-3b51aa778174.jpg?1783906633","artUrl":"https://cards.scryfall.io/art_crop/front/a/7/a753abfc-35d3-4faf-ab35-3b51aa778174.jpg?1783906633","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const redBolt = card("Test Bolt", "Instant", "{R}", { cmc: 1, colors: ["R"], oracleText: "Test Bolt deals 3 damage to any target." });
 const blueStudy = card("Test Study", "Sorcery", "{1}{U}", { cmc: 2, colors: ["U"], oracleText: "Draw two cards." });
@@ -72,7 +73,7 @@ const fight = (s: GameState, ap: PlayerId, attackers: ObjectId[], defender: Play
 
 describe("round 257", () => {
   it("every card of the round compiles fully", () => {
-    supported(talent(), scramble(), rip(), wheel(), devils(), creativity(), passage(), predicaments());
+    supported(talent(), scramble(), rip(), wheel(), devils(), creativity(), passage(), predicaments(), memories());
   });
 });
 
@@ -405,5 +406,41 @@ describe("Master of Predicaments", () => {
     expect(botActions(t, ap1)).toEqual([{ type: "chooseOption", player: ap1, choice: big }]);
     t = act(t, { type: "chooseOption", player: ap1, choice: big });
     expect(botActions(t, opp)).toEqual([{ type: "chooseOption", player: opp, choice: "notOver" }]);
+  });
+});
+
+describe("Memories Returning", () => {
+  it("you take one, the opponent you choose bottoms one, you take one, they bottom one, the last is yours", () => {
+    const { s: s0, ap, opp, ids } = setup([memories()]);
+    const lib = [redBolt, blueStudy, ogre, cart, cycle].reverse().map((d) => into(s0, ap, d, "library")).reverse();
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "alternatePick", player: ap, options: lib });
+    s = act(s, { type: "chooseOption", player: ap, choice: lib[2]! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "opponent", player: ap });
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "alternatePick", player: opp, options: [lib[0], lib[1], lib[3], lib[4]] });
+    s = act(s, { type: "chooseOption", player: opp, choice: lib[0]! });
+    expect(s.pending).toMatchObject({ player: ap, options: [lib[1], lib[3], lib[4]] });
+    s = act(s, { type: "chooseOption", player: ap, choice: lib[3]! });
+    expect(s.pending).toMatchObject({ player: opp, options: [lib[1], lib[4]] });
+    s = settle(act(s, { type: "chooseOption", player: opp, choice: lib[4]! }));
+    expect(s.pending).toBeNull();
+    expect([lib[2], lib[3], lib[1]].map((id) => zone(s, id!))).toEqual(["hand", "hand", "hand"]);
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+    expect(s.players[ap]!.library.slice(-2)).toEqual([lib[0], lib[4]]);
+  });
+  it("bots: the caster takes its best card, the opponent bottoms the caster's best", () => {
+    const { s: s0, ap, opp, ids } = setup([memories()]);
+    [redBolt, blueStudy, ogre, cart, cycle].reverse().forEach((d) => into(s0, ap, d, "library"));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 10 && s.pending; i++) {
+      const p = s.pending;
+      s = botActions(s, p.player).reduce((x, a) => act(x, a), s);
+    }
+    s = settle(s);
+    expect(s.pending).toBeNull();
+    expect(s.players[ap]!.library.length).toBeGreaterThan(0);
+    void opp;
   });
 });

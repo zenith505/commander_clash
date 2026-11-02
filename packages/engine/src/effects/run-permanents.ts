@@ -244,14 +244,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const wasTapped = all.filter((o) => o.tapped);
         const wasUntapped = all.filter((o) => !o.tapped);
         for (const o of wasTapped) untapPermanent(s, o);
-        for (const o of wasUntapped) tapPermanent(s, o);
+        for (const o of wasUntapped) tapPermanent(s, o, undefined, ctx.controller);
         log(s, `${wasTapped.length} tapped creature${wasTapped.length === 1 ? "" : "s"} untap and ${wasUntapped.length} untapped creature${wasUntapped.length === 1 ? "" : "s"} tap.`);
         return;
       }
       for (const o of objects(s, e.what, ctx)) {
         if (e.type === "untap") untapPermanent(s, o);
         else if (!o.tapped) {
-          tapPermanent(s, o);
+          tapPermanent(s, o, undefined, ctx.controller);
           if (o.tapped) tapped++;
         }
       }
@@ -307,7 +307,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const ids = sc.chosen[ctx.controller]!.filter((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
       sc.chosen = undefined;
       sc.queue = undefined;
-      for (const id of ids) tapPermanent(s, obj(s, id));
+      for (const id of ids) tapPermanent(s, obj(s, id), undefined, ctx.controller);
       r.tappedThisWay = ids.length;
       r.tappedIds = ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
       log(s, ids.length ? `${player(s, ctx.controller).name} taps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.` : `${player(s, ctx.controller).name} taps nothing.`);
@@ -334,7 +334,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const choice = sc.tapOrUntap;
       sc.tapOrUntap = undefined;
-      if (choice === "tap") tapPermanent(s, o);
+      if (choice === "tap") tapPermanent(s, o, undefined, ctx.controller);
       else if (choice === "untap") untapPermanent(s, o);
       log(s, choice === "neither" ? `${src}: ${defOf(s, o).name} is neither tapped nor untapped.` : `${src} ${choice}s ${defOf(s, o).name}.`);
       return;

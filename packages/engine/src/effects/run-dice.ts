@@ -105,7 +105,9 @@ export function noteFlipped(s: GameState, pid: PlayerId) {
  * or lost is an event of its own ("whenever you win a coin flip").
  */
 export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin" }>, ctx: ResolveCtx, src: string): "paused" | void {
-  const who = ctx.controller;
+  // "That player flips a coin" (Planar Chaos): they flip it, win or lose it (CR 705.2), and their Krark's Thumb applies.
+  const who = e.who ? players(s, e.who, ctx).find((p) => !player(s, p).lost) : ctx.controller;
+  if (who === undefined) return;
   const sc = (s.resolving!.scratch ??= {});
   // Krark's Thumb (a replacement, CR 614.1a): each flip is two coins, one of them ignored, so only the kept one counts
   // as won or lost. A second Thumb is treated as one (not modeled: ROADMAP).

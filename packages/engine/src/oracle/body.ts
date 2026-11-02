@@ -341,7 +341,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   // The Girl in the Fireplace: "Whenever a creature you control deals combat damage to a player this turn, time travel":
   // once for each creature (CR 603.7b).
-  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players|a creature you control deals combat damage to a player) this turn, (.+)$/.exec(s);
+  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players|a creature you control deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn, that player loses 1
   // life": once for each card (CR 603.7b), not a token (rulings), each opponent's.
@@ -9532,6 +9532,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Rampaging Aetherhood: "Then you may pay one or more {E}. If you do, put that many +1/+1 counters on ~": X energy, at
+    // least one to have paid (CR 107.14), "that many" that X.
+    const oneOrMoreCounters = /^(?:Then )?[Yy]ou may pay one or more \{E\}$/.test(s) ? /^If you do, put that many \+1\/\+1 counters on (~|this creature)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (oneOrMoreCounters && !ctx.selfCard) {
+      const inner = parseOne("Put X +1/+1 counters on ~", ctx);
+      if (inner?.length !== 1 || inner[0]!.type !== "counters") return null;
+      effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true, atLeastOne: true }, text: "pay one or more {E}. If you do, put that many +1/+1 counters on ~" });
+      si++;
+      continue;
+    }
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
     // Madame Null, Power Broker: "you may pay life equal to its power. If you do, put that many +1/+1 counters on it": the
     // same, "that many" being the life paid (its power as it resolves, or as it last existed, rulings).
@@ -10970,7 +10980,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "wonFlip", ...(whenFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
-    const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
+    // "If they lose the flip" after "that player flips a coin" (Planar Chaos): that player's flip; "you" after your own.
+    const theirFlip = /^If they (win|lose) the flip, (.+)$/.exec(s);
+    const lastFlip = [...effects].reverse().find((e) => e.type === "flipCoin");
+    if (theirFlip && !(lastFlip?.type === "flipCoin" && lastFlip.who)) return null;
+    if (!theirFlip && lastFlip?.type === "flipCoin" && lastFlip.who && /^If you (win|lose) the flip, /.test(s)) return null;
+    const ifFlip = /^If (?:you|they) (win|lose) the flip, (.+)$/.exec(s);
     if (ifFlip) {
       // "If you win the flip, you may exile ~, then return it to the battlefield transformed ..." (Ral, Monsoon Mage):
       // decided as it resolves, after the flip (CR 608.2d).

@@ -1067,6 +1067,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
       if (endsTurnOnly(body)) return theirs;
+      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell.
+      if (countersTheirStack(body)) return true;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
       if (c?.type === "counterSpell" && c.ifKicked && !top.kicked?.length) return false;
@@ -1088,7 +1090,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (free && free[free.length - 1]!.type === "castSpell") return free;
       }
       const plan = planCast(s, pid, id, targets, undefined, "auto", x);
-      if (plan && plan[plan.length - 1]!.type === "castSpell" && ((plan[plan.length - 1] as { targets?: unknown }).targets || endsTurnOnly(body))) return plan;
+      if (plan && plan[plan.length - 1]!.type === "castSpell" && ((plan[plan.length - 1] as { targets?: unknown }).targets || endsTurnOnly(body) || countersTheirStack(body))) return plan;
       // Its alternative cost when the mana isn't there: Force of Will's blue card, Daze's Island (CR 118.9).
       if (targets && altCost(d, "alternative") && !cost.hasX) {
         const extra = chooseExtraCosts(s, pid, id, targets, undefined, "alternative");
@@ -1237,6 +1239,11 @@ function endCombatWorth(s: GameState, pid: PlayerId): boolean {
  */
 function endsTurnOnly(body: AbilityBody): boolean {
   return !body.targets.length && !body.modal && body.effects.length > 0 && (body.effects.every((e) => e.type === "endTurn") || body.effects.every((e) => e.type === "dismissStack"));
+}
+
+/** "Counter all spells your opponents control and all abilities your opponents control" (Glen Elendra's Answer). */
+function countersTheirStack(body: AbilityBody): boolean {
+  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack");
 }
 
 /**
@@ -2216,7 +2223,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack")) return null;
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack")) return null;
   // Aggressive Mining: "You can't play lands" only once we have enough of them.
   if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.

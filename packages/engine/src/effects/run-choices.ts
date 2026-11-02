@@ -21,6 +21,7 @@ import { defMv, sameName } from "../faces";
 import { putCounters } from "../counters";
 import { CREATURE_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
+import { fireEvent } from "./triggers";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -290,6 +291,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       }
       for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      if (e.forage) fireEvent(s, { type: "foraged", player: ctx.controller });
       return;
     }
     case "villainous": {

@@ -236,7 +236,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       if (e.action === "flicker") continue; // the flicker after it says what it exiles
       if (e.action === "tap") {
         if (o.tapped) continue;
-        tapPermanent(s, o);
+        tapPermanent(s, o, undefined, pid);
         log(s, `${player(s, pid).name} taps ${defOf(s, o).name}.`);
         continue;
       }
@@ -2973,7 +2973,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             putCounters(s, c, e.yoursCounterElseTap, 1);
             log(s, `${src} puts a ${e.yoursCounterElseTap} counter on ${defOf(s, c).name}.`);
           } else if (!c.tapped) {
-            tapPermanent(s, c);
+            tapPermanent(s, c, undefined, ctx.controller);
             log(s, `${src} taps ${defOf(s, c).name}.`);
           }
         }

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,583 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
+29,599 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,506 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -81,7 +81,7 @@ line blocks.
    land's mana replaced by {C} when it makes two or more, which has to come after other mana replacements like Mana
    Reflection, CR 616.1), Captain Howler, Sea Scourge (+2/+0 for each card discarded in one batch, then a trigger
    for "that creature" this turn), Angel of Jubilation (no paying life or sacrificing creatures for any cost),
-   Olivia, Crimson Bride (the returned creature gains a leaves condition on legendary Vampires), Relentless Dead
+   Olivia, Crimson Bride (done in round 267), Relentless Dead
    ("you may pay {X}" on a dies trigger, then a target with mana value X), Cache Grab ("if you control a Squirrel or
    returned a Squirrel card this way"), Rot Hulk (up to X targets, X the number of opponents), Calix, Destiny's Hand ("until target enchantment you control
    leaves the battlefield"), Xenagos, the Reveler (any number of creature and land cards from among seven onto the
@@ -107,7 +107,7 @@ line blocks.
    with mana of any type), Zurzoth, Chaos Rider (done in round 266), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
    anywhere other than your hand"), Everlasting Torment (all damage as
-   though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
+   though it had wither), Kotis, the Fangkeeper (done in round 267), Vial Smasher the Fierce (an
    opponent at random, then that player or their planeswalker), Ragost, Deft Gastronaut (artifacts become Foods with a
    granted ability), Observed Stasis ("remove enchanted creature from combat"), Eshki, Temur's Roar ("that spell's
    power"), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
@@ -591,7 +591,7 @@ line blocks.
    Out after round 196 (looked at, not done): Proteus Staff ("the rest on the bottom in any order"),
    Sidisi, Regent of the Mire (done in round 266), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
-   Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
+   Eruth, Tranquil Frillback (done in round 267), Yusri, Blitzball Stadium, Underdark Rift,
    Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
    tails for the others without asking.
@@ -1277,7 +1277,7 @@ line blocks.
    Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (every draw
    replaced, alongside dredge and the other draw replacements, CR 616.1); Hofri Ghostforge and Timothar, Baron of Bats
    (a token's granted ability linked to the card the trigger exiled, rulings); Anrakyr the Traveller (cast an artifact
-   spell from hand or graveyard for life during a trigger's resolution); Crabomination (a card at random from the
+   spell from hand or graveyard for life during a trigger's resolution); Crabomination (done in round 267; a card at random from the
    graveyard and from the hand, then cast one of the three); Winnowing (each player's sacrifice by the creature types of
    a creature you chose for them); Grolnok, the Omnivore (a card trigger for each permanent card milled, croak counters,
    playing them from exile); Coram, the Undertaker (lands and spells from every graveyard, cards you don't own);
@@ -1931,6 +1931,31 @@ line blocks.
    creature you control with mana value X other than ~: Return target creature card with mana value X plus 1" (Sidisi,
    Regent of the Mire: X announced and bound by the sacrifice, CR 107.3a, 602.2b; bots trade their least useful creature
    for a bigger card; with a browser test). +7 (29,560 of 31,936; 29,570 with B95; 29,590 with B96 and B97).
+   Round 267 took the next cards from the top. "exile the top X cards of their library, where X is the amount of damage
+   dealt. You may cast any number of spells with mana value X or less from among them" (Kotis, the Fangkeeper: both X's
+   the combat damage, cast as it resolves, the rest stay exiled, rulings); 'It gains "When you don't control a legendary
+   Vampire, exile this creature."' on a creature returned tapped and attacking (Olivia, Crimson Bride: a state trigger,
+   CR 603.8, an effect gave the permanent; such granted state triggers now carry their body and stack index, they
+   crashed the trigger queue before); "Exile all creatures. For each card exiled this way, you may play that card for as
+   long as it remains exiled, and mana of any type can be spent to cast that spell" (Heartless Conscription: lands with
+   a land play, tokens gone, rulings); "target opponent exiles the top card of their library, a card at random from
+   their graveyard, and a card at random from their hand. You may cast a spell from among cards exiled this way" free
+   (Crabomination: castFromAmong topYardHand; lands stay exiled, rulings); "Each opponent exiles cards ... until they
+   have exiled cards with total mana value 5 or greater this way. Until end of turn, you may cast cards exiled this way
+   without paying their mana costs" (Dream Harvest: impulse untilTotalMv, X as 0); "exile up to one target black card
+   from your graveyard and copy it. You may cast the copy. If you do, you lose 2 life" (Kaervek, the Punisher: the copy
+   paid for, the life lost only once it's cast); "Remove a loyalty counter from each of any number of permanents you
+   control. Exile that many cards ... You may play them this turn" (Chandra, Legacy of Fire, with a browser test; bots
+   pick only planeswalkers that keep a loyalty counter); "you may pay {G} up to three times. When you pay this cost one or
+   more times, choose up to that many —" (Tranquil Frillback, and Hawkeye, Master Marksman's "When you do": payX
+   times with a max, the modal reflexive trigger's modes capped by its X as it's put on the stack, CR 603.12, rulings;
+   with a browser test). +9 (29,579 of 31,936; 29,599 with B96 and B97).
+   Out after round 267 (looked at, not done): The Infamous Cruelclaw ("You may cast that card by discarding a card
+   rather than paying its mana cost": an alternative cost of discarding for a card cast as a trigger resolves, a new
+   cast-time cost for the UI and bots); Espers to Magicite (a reflexive target among the cards exiled this way, and a
+   token copy "except it's an artifact and it loses all other card types"); Green Sun's Twilight (with X 5 or more, both
+   chosen cards onto the battlefield or both into your hand, rulings: a new choice); Yusri, Fortune's Flame (choose a
+   number from 1 to 5, flip that many coins, and "if you won five flips this way" free casting from hand this turn).
    Out after round 266 (looked at, not done): Moxite Refinery ("Remove X counters from an artifact or creature you
    control": X counters of any kinds from one permanent, a cost the counter picker can't limit to one permanent yet).
    Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
@@ -1995,7 +2020,7 @@ line blocks.
    (a token copy of the discarded card "except it's a 0/2 Thopter artifact creature with flying"); Optimus Prime, Hero //
    Autobot Leader ("The chosen creature" after bolster, and a delayed convert when it deals combat damage).
    Out after round 252 (looked at, not done): Cybership (the top two cards of a library, lands included, put onto the
-   battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher ("You may cast the copy.
+   battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher (done in round 267; "You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
    Legacy would follow); Ob Nixilis, the Adversary (casualty X: the copy's starting loyalty from the chosen X);
    Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
@@ -2004,7 +2029,7 @@ line blocks.
    Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a
    look-at put "tapped and attacking that player"); Pact Weapon ("draw a card and reveal it", the X lost if the draw is
    replaced, rulings); Long River Lurker (a floating "whenever that creature deals combat damage this turn" on the
-   target); Olivia, Crimson Bride (the returned creature gains a leaves condition on legendary Vampires, as before);
+   target); Olivia, Crimson Bride (done in round 267);
    Horrid Shadowspinner (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (the X
    from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (a
    prevention that puts a counter for each creature's damage prevented); Professor Hojo (the first activated ability that
@@ -2132,13 +2157,13 @@ line blocks.
    Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
-   Dream-Thief's Bandana, Chandra, Legacy of Fire, Theoretical Duplication,
+   Dream-Thief's Bandana, Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
    Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,
-   Kaervek, the Punisher, Obsessive Pursuit,
+   Kaervek, the Punisher (done in round 267), Obsessive Pursuit,
    Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
    Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Erdwal Illuminator, Sigarda, Host of
-   Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
+   Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription (done in round 267), Bloatfly Swarm, War's
    Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond (done in round 265), Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
    Smaller gaps from round 174: Howlpack Piper's and Tlincalli Hunter's tests use their front face alone (and Retrieve
@@ -2319,7 +2344,7 @@ line blocks.
    never forages for mana (on purpose: what to forage is the player's choice; bots do); forage as an instruction and
    "whenever you forage" came in round 248;
    Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea and
-   Lantern Flare (cleave with other lines) are out; Dream Harvest (exile until mana value 5, then cast them free) and
+   Lantern Flare (cleave with other lines) are out; Dream Harvest (done in round 267) and
    Rumbling Ruin are out; bots separate Liliana of the Veil's piles by a rough worth of each permanent; bots never cast
    Glorious End and end the turn only with nothing of their own on the stack; Arachne's card types leave out Kindred.
    Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence but other lines keep them out. Smaller gaps from round 120: bots don't plan around The Chain
@@ -2361,7 +2386,7 @@ line blocks.
    still in your pool is spent before other mana of its color, so a permanent spell paid from the pool discovers whether
    or not you meant it to; a granted quoted ability
    names the Class in its description (Druid Class); Return to Dust asks "may" after its second target was chosen.
-   Smaller gaps from round 105: Kotis, the Fangkeeper (cast spells with total mana value X from among the exiled cards); bots
+   Smaller gaps from round 105: Kotis, the Fangkeeper (done in round 267); bots
    activate Chainer only in their own main phase with an empty stack, five or more cards in hand and a creature card of
    mana value 2 or more they can afford in the graveyard; Valakut Exploration and other "for as long as it remains
    exiled" impulse draws link only when the card has one such exile. Smaller gaps from round 104: bots activate Kozilek, the Great
@@ -2710,7 +2735,7 @@ line blocks.
      (Caparocti Sunborn), "the mana value of the exiled card" (Ellie and Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
    - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
      battlefield, that creature is also goaded" (Hot Pursuit).
-   - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).
+   - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek, done in round 267).
    - Conditional flash still out: "five or more mana values among cards in your graveyard" (Graveyard Shift), "two or more
      instant and/or sorcery cards in your graveyard" (spell mastery: Swift Reckoning). "~ has flash as long as" on a
      permanent stays out on purpose (it doesn't work in your hand, CR 113.6e); "This spell has flash" does.

@@ -2578,7 +2578,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     let printed = triggerBody(s, t);
     // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
     if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
-      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId })));
+      // Tranquil Frillback: "choose up to that many" in a reflexive trigger: its X, the times paid.
+      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId, ...(t.x !== undefined ? { x: t.x } : {}) })));
       printed = triggerBody(s, t);
     }
     if (printed.modal && !t.modes) {
@@ -2723,6 +2724,7 @@ export function checkStateConditions(s: GameState) {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;
+    let printed: TriggeredAbility[] | undefined;
     triggers.forEach((t, index) => {
       if (t.event !== "state" || !t.state || (t.activeIf && !staticConditionNow(s, t.activeIf, id, controllerOf(s, o)))) return;
       // Not again until it has resolved (CR 603.8): one waiting, on the stack, or resolving now.
@@ -2732,7 +2734,10 @@ export function checkStateConditions(s: GameState) {
       // "When an opponent has 10 or less life, if ~ is an enchantment" (Lurking Jackals): an intervening if, checked as it
       // triggers and again as it resolves (CR 603.4); once it's false, the state doesn't trigger it again.
       if (t.ifCond && !staticConditionNow(s, t.ifCond, id, controllerOf(s, o))) return;
-      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0, ...(t.ifCond ? { ifCond: t.ifCond } : {}) });
+      // An ability an effect gave it (Olivia, Crimson Bride's 'It gains "When you don't control a legendary Vampire, exile
+      // this creature."'): not on its card, so the trigger carries what it does.
+      printed ??= compileCard(defOf(s, o)).triggers;
+      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0, ...(t.ifCond ? { ifCond: t.ifCond } : {}), ...(printed[index] !== t ? { body: t.body, stateTrigger: true as const } : {}) });
     });
   }
 }
@@ -2817,7 +2822,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
-    ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
+    ...(t.index >= 0 && (t.stateTrigger || triggerOf(s, t)?.event === "state") ? { stateIndex: t.index } : {}),
     ...(t.chapter ? { chapter: true as const } : {}),
     ...(t.finalChapter !== undefined ? { finalChapter: t.finalChapter } : {}),
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).

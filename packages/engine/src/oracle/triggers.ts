@@ -4363,7 +4363,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // one is back by the time it resolves (rulings).
   // Last Laugh: "When no creatures are on the battlefield" is the same.
   // Garruk Relentless: "When ~ has two or fewer loyalty counters on him, transform him": "him" is ~ (CR 603.8).
-  const stLine = line.replace(/^(When ~ has [a-z ]+ counters) on ~, (transform ~\.)$/, "$1 on it, $2");
+  // Olivia, Crimson Bride's grant: "When you don't control a legendary Vampire, exile this creature": the same as "When you
+  // control no legendary Vampires" (CR 603.8), the creature itself counting if it's one.
+  const stLine = line.replace(/^(When ~ has [a-z ]+ counters) on ~, (transform ~\.)$/, "$1 on it, $2").replace(/^When you don't control an? ((?:legendary )?[A-Z][a-z]+), /, "When you control no $1s, ");
   const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|no creatures are on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(stLine);
   if (st) {
     const state = parseStaticCondition(st[1]!.replace(/^no creatures are on the battlefield$/, "there are no creatures on the battlefield"), { affects: { kind: "self" }, mods: [], text: "" });
@@ -4742,6 +4744,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
       // Jagged Poppet: "that player discards cards equal to the damage": that many, the combat damage dealt to them.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^that player discards cards equal to the damage\.$/, "that player discards that many cards.");
+      // Kotis, the Fangkeeper: "exile the top X cards of their library, where X is the amount of damage dealt. You may cast
+      // any number of spells with mana value X or less from among them ...": the same X, that damage, in both sentences.
+      if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X.]*)\bX\b([^X.]*), where X is the amount of damage dealt\. ([^X.]*)\bX\b([^X.]*\.)$/, "$1that many$2. $3that many$4");
       // Storm the Citadel's grant: "Whenever this creature deals combat damage to a player or planeswalker, destroy target
       // artifact or enchantment defending player controls": the player dealt the damage, or the planeswalker's controller
       // (rulings), which is the trigger's player (see the planeswalker's combatDamageToPlayer event).

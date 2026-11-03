@@ -29,7 +29,7 @@ test("ward—blight 2: Pay, then click a creature of yours for the -1/-1 counter
 // plus 1 in your graveyard, then click the creature to sacrifice.
 test("Sidisi: X = 2, target the 3-mana creature card in your graveyard, sacrifice the 2-mana creature", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Sidisi, Regent of the Mire", "Grizzly Bears", "Llanowar Elves"], yard: ["Centaur Courser", "Hill Giant"] });
-  const [sidisi, bears, elves, courser, giant] = ["Sidisi, Regent of the Mire", "Grizzly Bears", "Llanowar Elves", "Centaur Courser", "Hill Giant"].map((n) => one(s, n));
+  const [sidisi, bears, elves, courser, giant] = ["Sidisi, Regent of the Mire", "Grizzly Bears", "Llanowar Elves", "Centaur Courser", "Hill Giant"].map((n) => one(s, n)) as [string, string, string, string, string];
   await open(page, s);
   await page.locator(`[data-obj="${sidisi}"]`).first().click();
   await menu(page).locator("button", { hasText: "Return target creature card" }).click();

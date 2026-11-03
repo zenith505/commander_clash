@@ -749,7 +749,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
         const top = s.stack[s.stack.length - 1];
         const mv = mvX.kind === "discard" && top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
-        const extra = mvX.kind === "discard" ? "discard a card with mana value X" : `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}`;
+        const extra = mvX.kind === "sacrifice" ? `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}` : "discard a card with mana value X";
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));

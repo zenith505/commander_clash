@@ -1562,12 +1562,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.selfAnd && !(ev.ids.includes(o.id) && ev.ids.some((x) => x !== o.id && s.objects[x] && objectMatches(s, t.selfAnd!, obj(s, x), ev.controller, false)))) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
-        const hit = fits(t);
+        // Zurzoth, Chaos Rider: only those attacking a player count, and "those players" are the ones they attack (CR 508.3e).
+        const hit = fits(t).filter(([x]) => !t.attacksPlayers || (obj(s, x).attacking !== undefined && !obj(s, x).attackingPermanent));
         if (hit.length < (t.minAttackers ?? 1) || (t.exactAttackers && hit.length !== t.minAttackers)) continue;
         if (t.minTotalPower && hit.reduce((n, [x]) => n + power(s, obj(s, x)), 0) < t.minTotalPower) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.exactAttackers === !!t.exactAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander && !!tt.attacksPlayers === !!t.attacksPlayers;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
+        if (t.attacksPlayers) {
+          const attackedPlayers = s.turnOrder.filter((p) => hit.some(([x]) => obj(s, x).attacking === p));
+          add(o, ev.controller, (_, tt) => same(tt) && !!tt.attacksPlayers, list, undefined, undefined, undefined, undefined, undefined, { players: attackedPlayers, group });
+          continue;
+        }
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
@@ -2574,7 +2580,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     let printed = triggerBody(s, t);
     // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
     if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
-      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId })));
+      // Tranquil Frillback: "choose up to that many" in a reflexive trigger: its X, the times paid.
+      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId, ...(t.x !== undefined ? { x: t.x } : {}) })));
       printed = triggerBody(s, t);
     }
     if (printed.modal && !t.modes) {
@@ -2719,6 +2726,7 @@ export function checkStateConditions(s: GameState) {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;
+    let printed: TriggeredAbility[] | undefined;
     triggers.forEach((t, index) => {
       if (t.event !== "state" || !t.state || (t.activeIf && !staticConditionNow(s, t.activeIf, id, controllerOf(s, o)))) return;
       // Not again until it has resolved (CR 603.8): one waiting, on the stack, or resolving now.
@@ -2728,7 +2736,10 @@ export function checkStateConditions(s: GameState) {
       // "When an opponent has 10 or less life, if ~ is an enchantment" (Lurking Jackals): an intervening if, checked as it
       // triggers and again as it resolves (CR 603.4); once it's false, the state doesn't trigger it again.
       if (t.ifCond && !staticConditionNow(s, t.ifCond, id, controllerOf(s, o))) return;
-      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0, ...(t.ifCond ? { ifCond: t.ifCond } : {}) });
+      // An ability an effect gave it (Olivia, Crimson Bride's 'It gains "When you don't control a legendary Vampire, exile
+      // this creature."'): not on its card, so the trigger carries what it does.
+      printed ??= compileCard(defOf(s, o)).triggers;
+      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0, ...(t.ifCond ? { ifCond: t.ifCond } : {}), ...(printed[index] !== t ? { body: t.body, stateTrigger: true as const } : {}) });
     });
   }
 }
@@ -2813,7 +2824,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
-    ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
+    ...(t.index >= 0 && (t.stateTrigger || triggerOf(s, t)?.event === "state") ? { stateIndex: t.index } : {}),
     ...(t.chapter ? { chapter: true as const } : {}),
     ...(t.finalChapter !== undefined ? { finalChapter: t.finalChapter } : {}),
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).

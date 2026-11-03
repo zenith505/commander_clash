@@ -1570,6 +1570,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e3cd53c1-86bd-4177-adb0-a1fa693b44c6",
+  "name": "Auntie Ool, Cursewretch",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Goblin Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warlock"
+  ],
+  "oracleText": "Ward—Blight 2. (To blight 2, a player puts two -1/-1 counters on a creature they control.)\nWhenever one or more -1/-1 counters are put on a creature, draw a card if you control that creature. If you don't control it, its controller loses 1 life.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Blight",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecc",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4f452ce7-1166-4810-afed-ea5e156a6f52",
   "name": "Aurelia's Vindicator",
   "manaCost": "{2}{W}{W}",
@@ -3830,6 +3870,40 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8dfa789d-ae1c-4f18-a55c-f49a363a5e33",
+  "name": "Chandra, Legacy of Fire",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "At the beginning of your end step, Chandra deals X damage to each opponent, where X is the number of planeswalkers you control.\n+1: Add {R} for each planeswalker you control.\n0: Remove a loyalty counter from each of any number of permanents you control. Exile that many cards from the top of your library. You may play them this turn.",
+  "loyalty": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14997,6 +15071,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12bd2051-297b-4bab-ac64-6eb26a42e3e2",
+  "name": "Nahiri's Resolve",
+  "manaCost": "{3}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Creatures you control get +1/+0 and have haste.\nAt the beginning of your end step, exile any number of nontoken artifacts and/or creatures you control. Return those cards to the battlefield under their owner's control at the beginning of your next upkeep.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
   "name": "Nautiloid Ship",
   "manaCost": "{4}",
@@ -19675,6 +19777,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "72074972-418d-4dce-83cf-ce8cf310fc42",
+  "name": "Sidisi, Regent of the Mire",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Zombie Snake Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Snake",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Sacrifice a creature you control with mana value X other than Sidisi: Return target creature card with mana value X plus 1 from your graveyard to the battlefield. Activate only as a sorcery.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8aed54cb-d1bb-45ad-adbe-38e55d84ff31",
   "name": "Silence",
   "manaCost": "{W}",
@@ -23170,6 +23306,36 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e87a4461-f3d1-443f-ad4c-dba91a993809",
+  "name": "Tranquil Frillback",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "When this creature enters, you may pay {G} up to three times. When you pay this cost one or more times, choose up to that many —\n• Destroy target artifact or enchantment.\n• Exile target player's graveyard.\n• You gain 4 life.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

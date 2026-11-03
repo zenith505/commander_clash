@@ -177,6 +177,7 @@ import {
   FACE_DOWN_WARD,
   faceDef,
   pickOptions,
+  blightOptions,
   shareLandType,
   oneOfEachFits,
   activatedCosts,
@@ -742,12 +743,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (x === undefined && abilityCostsHaveX(ab)) {
       // "Discard a card with mana value X" (Kozilek): only some X work, so the greatest that does, starting at the mana value
       // of the spell on top of the stack when that one does.
-      if (ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+      // "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): likewise.
+      const mvX = ab.costs?.find((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX);
+      if (mvX) {
         const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
         const top = s.stack[s.stack.length - 1];
-        const mv = top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
-        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
+        const mv = mvX.kind === "discard" && top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
+        const extra = mvX.kind === "sacrifice" ? `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}` : "discard a card with mana value X";
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
@@ -855,8 +859,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         c.kind === "sacrifice"
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId && !(c.selfIf && objectMatches(s, c.selfIf, s.objects[id]!, HUMAN, false))) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
-      const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
-      const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
+      const what = c.kind === "sacrifice" ? c.filter.text.replace(/~/g, cardOf(s, d.objectId).name) : (c.filter?.text ?? "card");
+      // "Sacrifice a creature with mana value 2 other than Sidisi": its text already says which.
+      const article = c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
       // Ormos, Archive Keeper: "Discard three cards with different names".
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;
@@ -5460,7 +5465,9 @@ function Controls({
     // "Ward—Sacrifice a creature": you pick which after choosing to pay.
     const sac = pending.sacrifice;
     const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
-    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // "Ward—Blight 2": only with a creature to put the counters on (CR 701.68b); you pick it after choosing to pay.
+    const canBlight = !pending.blight || blightOptions(s, HUMAN, pending.blight).length > 0;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice && canBlight ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     // Ward—Waterbend: mana first, then your artifacts and creatures pay {1} each of the rest (CR 701.67a).
     const water = !taps && pending.waterbend ? autoWaterbend(s, HUMAN, parseManaCost(pending.cost), 0, pending.waterbend, []) : null;
     return (
@@ -5475,6 +5482,8 @@ function Controls({
             "exile all cards from your graveyard"
           ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
+          ) : pending.blight ? (
+            `blight ${pending.blight} (put ${pending.blight === 1 ? "a -1/-1 counter" : `${pending.blight} -1/-1 counters`} on a creature you control)`
           ) : pending.poison ? (
             `get ${pending.poison} poison counter${pending.poison === 1 ? "" : "s"}`
           ) : pending.cost === "{0}" && life ? (
@@ -5484,7 +5493,7 @@ function Controls({
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life && !(pending.cost === "{0}" && !discard && !sac) ? ` and ${life} life` : ""}
+          {life && !(pending.cost === "{0}" && !discard && !sac && !pending.blight) ? ` and ${life} life` : ""}
           {pending.waterbend ? ` (waterbend: your artifacts and creatures can each pay {1} of up to ${pending.waterbend})` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
         <button disabled={!taps && !water} onClick={() => dispatch(water ? [...water.taps, { type: "payUnless", player: HUMAN, pay: true, tap: water.tapped }] : [...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>

@@ -164,6 +164,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
+  if (spec.controllerCombatDamagedBy && (s.turnLog?.combatDamagedByTypes?.[c.controller] ?? []).filter((e) => e.types.includes("*") || e.types.includes(spec.controllerCombatDamagedBy!.subtype)).length < spec.controllerCombatDamagedBy.min) return false;
   if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
   if (spec.turnedFaceUpThisTurn && (o.zone !== "battlefield" || o.turnedFaceUpTurn !== s.turn)) return false;
@@ -858,8 +859,8 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     } else if (t.xRange) {
       // "With mana value X" (Spell Blast): the X announced (CR 107.3a).
       const { xRange, ...rest } = t;
-      const x = ctx.x ?? 0;
-      t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
+      const x = (ctx.x ?? 0) + (xRange.plus ?? 0);
+      t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: xRange.plus ? rest.text.replace(/ x plus \d+\b/, ` ${x}`) : rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
     }
     // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
     // it was cast (rulings), which can't change.

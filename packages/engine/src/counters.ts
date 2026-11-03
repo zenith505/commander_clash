@@ -332,6 +332,17 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
 /** Suncleanser's bans whose source is still on the battlefield as the object that made them (CR 611.2b). */
 const counterBans = (s: GameState) => s.battlefield.flatMap((id) => (s.objects[id]!.bansCounters ?? []).filter((b) => b.zc === (s.objects[id]!.zoneChanges ?? 0)));
 
+/**
+ * Blight N (CR 701.68a): the creatures `pid` controls that can have the -1/-1 counters put on them; none means they
+ * can't choose to blight (701.68b). The counters all go on one of them (rulings).
+ */
+export function blightOptions(s: GameState, pid: PlayerId, _n: number): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const o = s.objects[id]!;
+    return controllerOf(s, o) === pid && characteristics(s, o).types.includes("Creature") && !countersBanned(s, o, "-1/-1");
+  });
+}
+
 /** Solemnity: "Players can't get counters." No poison (infect damage then does nothing to a player), energy, experience or rad counters (rulings). */
 export const playerCountersBanned = (s: GameState): boolean => s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPlayerCounters);
 

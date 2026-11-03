@@ -1260,6 +1260,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", poison: n }, ward: true }], text: `Ward—Get ${m[1]} poison counter${n === 1 ? "" : "s"}: counter that spell or ability unless its controller gets ${m[1]} poison counter${n === 1 ? "" : "s"}.` },
       });
+    } else if ((m = /^ward—blight (\d+)\.?$/i.exec(p))) {
+      // "Ward—Blight 2" (Auntie Ool, Cursewretch): counter it unless that player puts two -1/-1 counters on one creature
+      // they control (CR 702.21a, 701.68a), which they can't choose to do with no creature (701.68b).
+      const n = Number(m[1]);
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", blight: n }, ward: true }], text: `Ward—Blight ${n}: counter that spell or ability unless its controller blights ${n}.` },
+      });
     } else if ((m = /^ward—waterbend \{(\d+)\}\.?$/i.exec(p))) {
       // "Ward—Waterbend {4}" (The Unagi of Kyoshi Island): counter it unless that player pays {4}, tapping their
       // artifacts and creatures for {1} each of it if they like (CR 702.21a, 701.67a).

@@ -134,7 +134,7 @@ import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
-import { removableCounters } from "./counters";
+import { blightOptions, removableCounters } from "./counters";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -310,6 +310,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "payUnless" && pend.discardRandom) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discardRandom }];
     // Poison counters as a payment: only while we'd stay well short of ten (CR 704.5c).
     if (pend.kind === "payUnless" && pend.poison) return [{ type: "payUnless", player: pid, pay: (player(s, pid).poison ?? 0) + pend.poison < 8 }];
+    // "Ward—Blight 2": pay with a creature of ours that survives the -1/-1 counters, never our commander.
+    if (pend.kind === "payUnless" && pend.blight) return [{ type: "payUnless", player: pid, pay: blightHost(s, pid, blightOptions(s, pid, pend.blight), pend.blight) !== null }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),
       // and a sacrifice only with enough permanents that aren't our commander.
@@ -574,7 +576,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const others = opponents(s, pid).filter((p) => p !== giver);
       return [{ type: "pickPermanents", player: pid, ids: giver === pid || others.length ? choosePicks(s, pid, pend.options, 1, "counters", pend.counter) : [] }];
     }
-    if (pend.kind === "pickPermanents" && pend.action === "flicker") return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options) }];
+    // Blighting for ward (see payUnless): the least useful creature that survives the counters, else the least useful.
+    if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.counter === "-1/-1" && /^blight \d+:/.test(pend.prompt ?? "")) {
+      const n = Number(/^blight (\d+)/.exec(pend.prompt!)![1]);
+      return [{ type: "pickPermanents", player: pid, ids: [blightHost(s, pid, pend.options, n) ?? [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
+    }
+    // Nahiri's Resolve: gone until our next upkeep, a creature can't block meanwhile: only noncreature ones then.
+    if (pend.kind === "pickPermanents" && pend.action === "flicker") {
+      const next = s.resolving?.body.effects[s.resolving.next + 1];
+      const untilUpkeep = next?.type === "flicker" && next.at === "yourNextUpkeep";
+      return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options).filter((id) => !untilUpkeep || !objIsType(s, obj(s, id), "Creature")) }];
+    }
     // Birthing Ritual: sacrifice a creature (never a commander) for a better one among the cards looked at, one with
     // mana value 1 more (or a token for one with mana value 1 or less), the cheapest such creature first.
     if (pend.kind === "pickPermanents" && pend.looked && pend.action === "sacrifice") {
@@ -595,7 +607,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > 0) }];
+      // Chandra, Legacy of Fire (loyalty counters, a card each): only planeswalkers that keep one, so none of ours dies.
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > (removing.counter === "loyalty" ? 1 : 0)) }];
     // Krenko's Buzzcrusher: for each player, up to one of their permanents to destroy: an opponent's best one, none of ours.
     const destroying = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && destroying?.type === "destroy" && destroying.what.ref === "created") {
@@ -4490,6 +4503,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       // "Remove X ki counters from ~" (the Bakus): as many as it has, or as the mana for an {X} allows (Talon of Pain).
       const counterX = ab.removeCounters?.x ? Math.min(removableCounters(s, o, ab.removeCounters.counter), parseManaCost(ab.manaCost).hasX ? Math.max(0, availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(parseManaCost(ab.manaCost))) : Infinity) : 0;
+      // Sidisi, Regent of the Mire: our least useful creature (never our commander) for the biggest creature card in our
+      // graveyard with one more mana value.
+      if (ab.costs?.some((c) => c.kind === "sacrifice" && c.mvX)) {
+        const plan = sacrificeMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
@@ -5270,6 +5290,36 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else return null;
   }
   return out;
+}
+
+/**
+ * "{T}, Sacrifice a creature you control with mana value X other than ~: Return target creature card with mana value X plus 1
+ * from your graveyard to the battlefield" (Sidisi, Regent of the Mire): each X a creature of ours has, its least useful one
+ * (never our commander), for the creature card with the most power and toughness among the legal targets; the biggest
+ * card first.
+ */
+function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
+  if (ab.body.modal || ab.body.targets.length !== 1 || parseManaCost(ab.manaCost).hasX) return null;
+  const size = (id: ObjectId) => { const d = defOf(s, obj(s, id)); return Number(d.power ?? 0) + Number(d.toughness ?? 0); };
+  const cards = [...player(s, pid).graveyard].filter((c) => isType(defOf(s, obj(s, c)), "Creature")).sort((a, b) => size(b) - size(a));
+  const mine = s.battlefield.map((x) => obj(s, x)).filter((c) => c.id !== o.id && controllerOf(s, c) === pid && !c.isCommander && objIsType(s, c, "Creature")).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  for (const card of cards) {
+    for (const c of mine) {
+      const x = characteristics(s, c).manaValue;
+      const t: TargetChoice[] = [{ kind: "object", id: card }];
+      if (size(card) <= power(s, c) + toughness(s, c)) continue;
+      if (abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] })) continue;
+      const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] });
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/** Blight N for a payment: our least useful creature among `options` that survives N -1/-1 counters, never our commander; null if none. */
+function blightHost(s: GameState, pid: PlayerId, options: ObjectId[], n: number): ObjectId | null {
+  const pool = options.map((x) => obj(s, x)).filter((o) => !o.isCommander && toughness(s, o) > n).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  return pool[0]?.id ?? null;
 }
 
 /**

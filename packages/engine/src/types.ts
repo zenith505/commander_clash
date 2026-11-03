@@ -1112,6 +1112,8 @@ export interface PendingTrigger {
   sourceCardId: string;
   controller: PlayerId;
   index: number; // which of the card's triggered abilities
+  /** A state trigger (CR 603.8) an effect gave the object (with `body`): `index` is its place among abilitiesOf's triggers, kept as StackItem.stateIndex so it doesn't trigger again until it has resolved. */
+  stateTrigger?: true;
   sourceZc?: number; // the source's zoneChanges when it triggered
   modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
   /** "If you control a commander, you may choose both instead" was true as it was put on the stack (AbilityBody.modal.bothIf). */

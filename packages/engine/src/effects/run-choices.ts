@@ -74,7 +74,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.payX?.times && e.pay?.mana && sc.may === undefined) {
         if (sc.payX === undefined) {
           let cap = 0;
-          while (cap < 40 && planMana(s, ctx.controller, parseManaCost(timesMana(e.pay.mana, cap + 1)))) cap++;
+          // "Up to three times" (Tranquil Frillback): no more than that.
+          const most = e.payX.max !== undefined ? Math.min(40, amountNow(s, e.payX.max, ctx)) : 40;
+          while (cap < most && planMana(s, ctx.controller, parseManaCost(timesMana(e.pay.mana, cap + 1)))) cap++;
           if (!cap) sc.may = false;
           else {
             const options = ["none", ...Array.from({ length: cap }, (_, i) => String(i + 1))];

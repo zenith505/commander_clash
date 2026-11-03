@@ -1338,7 +1338,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   }
   // Modes with text before them, or a kind of choice we don't support; but "You may pay {1}. When you do, choose one —
   // • ..." (Hylda of the Icy Crown) is a modal reflexive trigger, its modes chosen as it's put on the stack (CR 603.12).
-  const reflexiveModes = /\bWhen you do, choose [^•.]*—\s*•/.exec(text);
+  // Tranquil Frillback: "When you pay this cost one or more times, choose up to that many — • ...", the same.
+  const reflexiveModes = /\bWhen you (?:do|pay this cost one or more times), choose [^•.]*—\s*•/.exec(text);
   if (text.includes("•") && (!reflexiveModes || text.indexOf("•") < reflexiveModes.index)) return null;
   const ctx: Ctx = {
     targets: [],
@@ -4264,6 +4265,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Chandra, Legacy of Fire: "Remove a loyalty counter from each of any number of permanents you control. Exile that many
+    // cards from the top of your library. You may play them this turn.": the permanents chosen as it resolves, none too,
+    // one loyalty counter off each (one with none loses none and counts none, CR 122.8); the cards played with their usual
+    // timing and costs (rulings).
+    if (!ctx.spell && /^Remove a loyalty counter from each of any number of permanents you control$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Exile that many cards from the top of your library" && sentences[si + 2]?.replace(/\.$/, "") === "You may play them this turn") {
+      const filter = pickFilter("permanents you control");
+      if (filter?.kind !== "object") return null;
+      effects.push(
+        { type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", anyNumber: true, prompt: "click any number of your permanents to remove a loyalty counter from each, then choose them (that many cards exiled from the top of your library, playable this turn)." },
+        { type: "removeCounters", what: { ref: "created" }, counter: "loyalty", n: 1 },
+        { type: "impulse", n: { count: { kind: "countersRemovedThisWay" } }, until: "thisTurn" },
+      );
+      si += 2;
+      continue;
+    }
     // Yorion, Sky Nomad: "exile any number of other nonland permanents you own and control. Return those cards to the
     // battlefield at the beginning of the next end step": chosen as it resolves (rulings), exiled together, and returned
     // together by one delayed trigger (CR 603.7) under your control (CR 110.2a); a token doesn't come back (rulings).
@@ -5247,6 +5263,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const ex = prev?.type === "may" && !prev.pay && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (ex?.type !== "exile" || ex.what.ref !== "subject" || ex.until || ex.linked || ex.ownerMay || ex.youMay) return null;
       ex.youMay = { thisTurn: true, play: true };
+      continue;
+    }
+    // Heartless Conscription: "Exile all creatures. For each card exiled this way, you may play that card for as long as it
+    // remains exiled, and mana of any type can be spent to cast that spell": a permission for each card the permanents
+    // became in exile (CR 400.7, 609.4b; a token ceases to exist, CR 704.5d), played with its usual timing and costs, a
+    // land with a land play (rulings).
+    if (/^For each card exiled this way, you may play that card for as long as it remains exiled, and mana of any type can be spent to cast that spell$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.what.ref !== "each" || prev.until || prev.linked || prev.ownerMay || prev.youMay || prev.counters || prev.suspend) return null;
+      prev.youMay = { play: true, anyType: true };
       continue;
     }
     // Scholar of Combustion: "You may cast that card until the end of your next turn": the same.
@@ -6716,6 +6742,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Kaervek, the Punisher: "exile up to one target black card from your graveyard and copy it. You may cast the copy. If
+    // you do, you lose 2 life.": cast as this resolves or never, paying its costs (X chosen as usual), one not cast ceasing
+    // to exist (rulings, CR 608.2g, 707.12); the life lost only for a copy cast.
+    const castLose = exileCopy && sentences[si + 1]?.replace(/\.$/, "") === "You may cast the copy" ? /^If you do, you lose (\d+) life\.?$/.exec(sentences[si + 2] ?? "") : null;
+    if (exileCopy && castLose) {
+      const what = parseObject(exileCopy[1]!, ctx, true);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index }, paid: true, castLoseLife: Number(castLose[1]) });
+      si += 2;
+      continue;
+    }
     // Jacob Frye: "exile up to one target Assassin card or card with freerunning from your graveyard. If you do, copy it.
     // You may cast the copy." A card that's either (CR 702.181 freerunning is a keyword on the card); the copy is made in
     // exile and cast as this resolves or never, paying its costs (X chosen as usual), and one not cast ceases to exist
@@ -6899,6 +6936,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (wandCast) {
       const spells: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, opponents: true, untilHit: spells, filter: spells, max: num(wandCast[1]!) });
+      si++;
+      continue;
+    }
+    // Crabomination: "target opponent exiles the top card of their library, a card at random from their graveyard, and a
+    // card at random from their hand. You may cast a spell from among cards exiled this way without paying its mana cost."
+    // Cast as it resolves or not at all, ignoring timing; a land, or a card not cast, stays exiled (rulings).
+    if (/^[Tt]arget opponent exiles the top card of their library, a card at random from their graveyard, and a card at random from their hand$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell from among cards exiled this way without paying its mana cost") {
+      const who = parsePlayer("target opponent", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who, n: 0, topYardHand: true, max: 1 });
+      si++;
+      continue;
+    }
+    // Dream Harvest: "Each opponent exiles cards from the top of their library until they have exiled cards with total mana
+    // value 5 or greater this way. Until end of turn, you may cast cards exiled this way without paying their mana costs.":
+    // each opponent's own total (X as 0, rulings), the permission yours, lands not castable.
+    const harvest = /^[Ee]ach opponent exiles cards from the top of their library until they have exiled cards with total mana value (\d+) or greater this way$/.exec(s);
+    if (harvest && sentences[si + 1]?.replace(/\.$/, "") === "Until end of turn, you may cast cards exiled this way without paying their mana costs") {
+      effects.push({ type: "impulse", n: 0, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, free: true, untilTotalMv: Number(harvest[1]) });
       si++;
       continue;
     }
@@ -10314,15 +10370,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // The Adversaries: "you may pay {1}{W} any number of times. When you pay this cost one or more times, put that many valor
     // counters on ~": how many times is chosen and paid as it resolves, then a reflexive trigger (CR 603.12; rulings) with
     // its X that number, and none if it wasn't paid.
-    const payTimesAny = !payFirst ? /^[Yy]ou may pay ((?:\{(?:\d+|[WUBRGC])\})+) any number of times$/.exec(s) : null;
-    const whenPaidTimes = payTimesAny ? /^When you pay this cost one or more times, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Tranquil Frillback: "you may pay {G} up to three times. When you pay this cost one or more times, choose up to that
+    // many —": the same, at most that many times (rulings: none, once, twice or three times), the modes and targets chosen
+    // as the reflexive trigger is put on the stack.
+    const payTimesAny = !payFirst ? /^[Yy]ou may pay ((?:\{(?:\d+|[WUBRGC])\})+) (any number of|up to (?:two|three|four|five)) times$/.exec(s) : null;
+    // Hawkeye, Master Marksman: "you may pay {1} up to three times. When you do, choose up to that many —": the same.
+    const whenPaidTimes = payTimesAny ? (payTimesAny[2] === "any number of" ? /^When you pay this cost one or more times, (.+)$/ : /^When you (?:do|pay this cost one or more times), (.+)$/).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // "Choose up to that many — • ...": a modal reflexive trigger whose modes are chosen as it's put on the stack, as many
+    // as the times paid at most, each mode once (CR 603.12, 700.2).
+    const upToMany = whenPaidTimes ? /^choose up to that many —\s*((?:•[^•]+)+)$/.exec([whenPaidTimes[1]!, ...sentences.slice(si + 2).map((x) => x.replace(/\.$/, ""))].join(". ")) : null;
+    if (payTimesAny && upToMany) {
+      const reflexive = reflexiveBody(`choose any number — ${upToMany[1]!}`.replace(/\.$/, ""), ctx);
+      if (!reflexive?.modal || usesX(reflexive.modal.modes)) return null;
+      reflexive.modal = { ...reflexive.modal, maxCount: { count: { kind: "x" } } };
+      const most = /^up to (\w+)$/.exec(payTimesAny[2]!);
+      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: { mana: payTimesAny[1]! }, payX: { times: true, ...(most ? { max: num(most[1]!) } : {}) }, text: `pay ${payTimesAny[1]} ${payTimesAny[2]} times. ${sentences[si + 1]!.replace(/ —[\s\S]*$/, "")}` });
+      si = sentences.length;
+      continue;
+    }
     if (payTimesAny && whenPaidTimes) {
       const rest = [whenPaidTimes[1]!, ...sentences.slice(si + 2).map((x) => x.replace(/\.$/, ""))].join(". ");
       const text = rest.replace(/\btwice that many\b/g, "twice X").replace(/\bthat many\b/g, "X");
       if (text === rest || /\bX\b/.test(rest)) return null;
       const reflexive = reflexiveBody(text, ctx, false, false, true);
       if (!reflexive) return null;
-      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: { mana: payTimesAny[1]! }, payX: { times: true }, text: `pay ${payTimesAny[1]} any number of times. When you pay this cost one or more times, ${rest}` });
+      const upTo = /^up to (\w+)$/.exec(payTimesAny[2]!);
+      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: { mana: payTimesAny[1]! }, payX: { times: true, ...(upTo ? { max: num(upTo[1]!) } : {}) }, text: `pay ${payTimesAny[1]} ${payTimesAny[2]} times. When you pay this cost one or more times, ${rest}` });
       si = sentences.length;
       continue;
     }

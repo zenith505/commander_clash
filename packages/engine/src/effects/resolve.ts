@@ -1008,6 +1008,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noLifeGain":
     case "noLifeGainForGame":
     case "turnRules":
+    case "landManaUntilEndOfTurn":
     case "blockTaxThisTurn":
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
@@ -1179,6 +1180,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tapAnyNumber":
     case "tapOrUntap":
     case "becomeSaddled":
+    case "replaceLandMana":
     case "becameCrewed":
     case "gaveGift":
     case "cumulativeUpkeepPaid":

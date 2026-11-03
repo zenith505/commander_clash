@@ -1148,6 +1148,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Rumbling Ruin: "count the number of +1/+1 counters on creatures you control. Creatures your opponents control with power
   // less than or equal to that number can't block this turn": that number in place.
   text = text.replace(/\bcount the number of (\+1\/\+1 counters on creatures you control)\. Creatures your opponents control with power less than or equal to that number can't block this turn\./, "creatures your opponents control with power less than or equal to the number of $1 can't block this turn.");
+  // Temporal Firestorm: "Choose up to X creatures and/or planeswalkers you control, where X is the number of times ~ was
+  // kicked. Those permanents phase out.": one instruction (sentences/permanents.ts), the ones chosen phasing out.
+  text = text.replace(/^Choose up to X creatures and\/or planeswalkers you control, where X is the number of times ~ was kicked\. Those permanents phase out\./, "Up to X creatures and/or planeswalkers you control of your choice phase out, where X is the number of times ~ was kicked.");
+  // Mist of Stagnation: "that player chooses a permanent for each card in their graveyard, then untaps those permanents": one
+  // instruction (sentences/basics.ts), the permanents untapped being the ones chosen.
+  text = text.replace(/^that player chooses a permanent for each card in their graveyard, then untaps those permanents\.$/, "that player chooses a permanent for each card in their graveyard and untaps those permanents.");
   // Scrounge: "Target opponent chooses an artifact card in their graveyard. Put that card onto the battlefield under your
   // control.": that player chooses as it resolves (not targeted), the card entering under your control.
   text = text.replace(/^Target opponent chooses an artifact card in their graveyard\. Put that card onto the battlefield under your control\.$/, "Target opponent puts an artifact card of their choice from their graveyard onto the battlefield under your control.");
@@ -15539,10 +15545,13 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
     // Waiting in the Weeds: "Each player creates a 1/1 green Cat creature token for each untapped Forest they control": each
     // their own number.
     const eachCreates = e.type === "createToken" && e.who?.ref === "eachPlayer" ? e.who : null;
-    const who = e.type === "loseLife" || e.type === "gainLife" || e.type === "draw" ? e.who : eachCreates;
+    // Omen of Fire: "Each player sacrifices a Plains or a white permanent of their choice for each white permanent they
+    // control": each their own number, counted before anyone sacrifices (CR 608.2h, resolve.ts amountFor).
+    const eachSacs = e.type === "pick" && e.action === "sacrifice" && e.n === 1 && e.who.ref === "eachPlayer" && !e.unless ? e.who : null;
+    const who = e.type === "loseLife" || e.type === "gainLife" || e.type === "draw" ? e.who : (eachCreates ?? eachSacs);
     if (!who) return null;
     // "That player gains 2 life for each creature they control" (Benevolent Offering): the chosen opponent.
-    const whose: PlayerRef | null = eachCreates ? { ref: "eachOne" } : who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { ref: "eachOne" } : who.ref === "target" && !who.n ? who : who.ref === "eventPlayer" || (who.ref === "chosenPlayer" && who.nth === undefined) ? who : null;
+    const whose: PlayerRef | null = eachCreates || eachSacs ? { ref: "eachOne" } : who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { ref: "eachOne" } : who.ref === "target" && !who.n ? who : who.ref === "eventPlayer" || (who.ref === "chosenPlayer" && who.nth === undefined) ? who : null;
     // Allied Strategies: "draws a card for each basic land type among lands they control": that player's domain.
     if (whose && /^basic land type among lands$/.test(theirs[1]!)) {
       const scaled = scaleEffect(e, { count: { kind: "basicLandTypes", whose } });

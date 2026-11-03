@@ -279,6 +279,8 @@ export interface GameObject {
   copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
+  /** Quarum Trench Gnomes: "If target Plains is tapped for mana, it produces colorless mana instead of white mana" (indefinitely, CR 614.1a): each such effect on this permanent. */
+  manaReplaced?: { from: ManaType; to: ManaType }[];
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
   preventNext?: number;
   /** "The next N damage that would be dealt to it this turn is dealt to [X] instead" (CR 614.9, 615.7). */
@@ -1883,6 +1885,11 @@ export interface GameState {
   turnCountMods?: { turn: number; controller: PlayerId; mod: CountMod; source: ObjectId }[];
   /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
   turnRules?: TurnRule[];
+  /**
+   * Pale Moon, Deep Water: "Until end of turn, if a player taps a nonbasic land for mana, it produces colorless mana instead
+   * of any other type" (CR 614.1a): `player` made it; `yours`, only lands that player controls. In timestamp order.
+   */
+  landManaRules?: { turn: number; player: PlayerId; mana: ManaType; nonbasic?: true; yours?: true }[];
   /**
    * "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect from a
    * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins

@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -1106,7 +1106,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "removeCounters" && typeof e.n !== "string" && ((n) => !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= n))(amountNow(s, e.n, ctx))) return false;
     if (e.type === "removeAnyCounters" && typeof e.n === "number" && !e.upTo && !objects(s, e.what, ctx).some((o) => Object.values(o.counters).reduce((a, b) => a + Math.max(0, b ?? 0), 0) >= (e.n as number))) return false;
     // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
-    if (e.type === "processExile" && processCandidates(s, ctx.controller).length < e.n) return false;
+    if (e.type === "processExile" && !e.adventureOf && processCandidates(s, ctx.controller).length < e.n) return false;
+    if (e.type === "processExile" && e.adventureOf && !adventureExileCards(s, players(s, e.adventureOf, ctx)[0]).length) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;

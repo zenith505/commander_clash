@@ -579,6 +579,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = pend.options.filter((id) => controllerOf(s, obj(s, id)) !== pid).map((id) => ({ id, w: permanentWorth(s, pid, id) })).sort((a, b) => b.w - a.w);
       return [{ type: "pickPermanents", player: pid, ids: theirs[0] && theirs[0].w > 0 ? [theirs[0].id] : [] }];
     }
+    // Temporal Firestorm: "up to X creatures and/or planeswalkers you control" phase out before the damage: our best ones.
+    const phasing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && phasing?.type === "phaseOut" && phasing.what.ref === "created")
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, pend.count) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
@@ -1606,10 +1610,13 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
   // last: its other face is a spell we may want.
   const spellFace = (id: ObjectId) => !!s.cards[obj(s, id).cardId]?.faces?.some((f) => !f.types.includes("Land"));
   // Lake of the Dead costs a Swamp: last, and never with no Swamp to sacrifice (it would only go to the graveyard).
-  const sacInstead = (id: ObjectId) => compileCard(defOf(s, obj(s, id))).entersSacrificeInstead;
+  // Sheltered Valley sacrifices the others with its name: a normal land with none of them, never played with one.
+  const sacAll = (id: ObjectId) => !!compileCard(defOf(s, obj(s, id))).entersSacrificeInsteadAll;
+  const sacInstead = (id: ObjectId) => (sacAll(id) ? undefined : compileCard(defOf(s, obj(s, id))).entersSacrificeInstead);
   const rank = (a: Extract<Action, { type: "playLand" }>) => (obj(s, a.objectId).zone === "graveyard" ? 0 : sacInstead(a.objectId) ? 3 : spellFace(a.objectId) ? 2 : 1);
   // Lotus Vale costs two untapped lands: only with five or more lands, so it still adds mana.
   options.splice(0, options.length, ...options.filter((x) => {
+    if (sacAll(x.action.objectId)) return !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, x.action.objectId)).name));
     const f = sacInstead(x.action.objectId);
     const n = compileCard(defOf(s, obj(s, x.action.objectId))).entersSacrificeInsteadN ?? 1;
     const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
@@ -3279,6 +3286,16 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && after.counter === "doom")) {
     const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
     return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
+  }
+  // Mist of Stagnation: permanents to untap, anyone's: our tapped ones, the best first; then ones already untapped (no
+  // change); an opponent's tapped one last.
+  if (after?.type === "untap" && after.what.ref === "created") {
+    const rank = (id: ObjectId) => {
+      const o = obj(s, id);
+      const mine = controllerOf(s, o) === pid;
+      return mine && o.tapped ? 2000 + worth(s, pid, o) : !o.tapped ? 1000 : -worth(s, pid, o);
+    };
+    return [...options].sort((a, b) => rank(b) - rank(a)).slice(0, count);
   }
   // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   // Riches: "Each opponent chooses a creature they control. You gain control of those creatures.": the same.

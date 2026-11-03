@@ -408,6 +408,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // A gift was given (CR 702.174c), whatever it gave.
       fireEvent(s, { type: "gaveGift", player: ctx.controller });
       return;
+    case "replaceLandMana":
+      // Quarum Trench Gnomes: on that permanent from now on (CR 614.1a); a new object if it changes zones (CR 400.7).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield") continue;
+        (o.manaReplaced ??= []).push({ from: e.from, to: e.into });
+        log(s, `${defOf(s, o).name} produces colorless mana instead of {${e.from}} from now on.`);
+      }
+      return;
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

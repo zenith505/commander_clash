@@ -44,6 +44,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // opponents own from exile into their owners' graveyards" (Effect processExile).
   if (/^[Pp]ut a card an opponent owns from exile into that player's graveyard$/.test(s0)) return [{ type: "processExile", n: 1 }];
   if (/^[Pp]ut two cards your opponents own from exile into their owners' graveyards$/.test(s0)) return [{ type: "processExile", n: 2 }];
+  // Memory Theft: "You may put a card that has an Adventure that player owns from exile into that player's graveyard":
+  // any face-up one (rulings), not only one cast as an Adventure; chosen after seeing their hand, none too.
+  if (/^[Pp]ut a card that has an Adventure that player owns from exile into that player's graveyard$/.test(s0) && ctx.lastPlayerTarget !== undefined) return [{ type: "processExile", n: 1, adventureOf: { ref: "target", index: ctx.lastPlayerTarget } }];
   let m: RegExpExecArray | null;
   // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
   // same as "Return any number of target creature cards ... from your graveyard to the battlefield".

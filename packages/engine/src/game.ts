@@ -3528,6 +3528,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.turnRules = undefined;
+  s.landManaRules = undefined;
   // "Until the end of your next turn" (Single Combat): kept until that player's next turn has ended, or they've left the
   // game (as other such effects, below).
   // "Until your next turn" (Hope of Ghirapur): until that player's next turn begins, this one (CR 611.2b), or they've left.
@@ -7349,6 +7350,11 @@ export function hiddenInExile(o: GameObject, viewer: PlayerId): boolean {
  * The Eldrazi processors (BFZ): the cards `pid`'s opponents own in exile, any of which may be put into its owner's
  * graveyard ("put a card an opponent owns from exile into that player's graveyard").
  */
+/** Memory Theft: the face-up cards with an Adventure `owner` owns in exile (CR 715.2; rulings). */
+export function adventureExileCards(s: GameState, owner: PlayerId | undefined): ObjectId[] {
+  return owner === undefined ? [] : player(s, owner).exile.filter((id) => !obj(s, id).isToken && faceDownExileGroup(obj(s, id)) === undefined && s.cards[obj(s, id).cardId]?.layout === "adventure");
+}
+
 export function processCandidates(s: GameState, pid: PlayerId): ObjectId[] {
   return opponents(s, pid).flatMap((x) => player(s, x).exile.filter((id) => !obj(s, id).isToken));
 }
@@ -9461,9 +9467,19 @@ function askEntersChoice(s: GameState): boolean {
       // Lake of the Dead (CR 614.1a): a Swamp its controller controls, if they have one to sacrifice; otherwise it goes
       // to the graveyard instead. It isn't on the battlefield yet, so it can't be the one.
       const you = controllerOf(s, o);
-      const filter = compileCard(defOf(s, o)).entersSacrificeInstead!;
-      const n = compileCard(defOf(s, o)).entersSacrificeInsteadN ?? 1;
+      const compiledO = compileCard(defOf(s, o));
+      const filter0 = compiledO.entersSacrificeInstead!;
+      // Sheltered Valley: "each other permanent named ~": by its name (CR 201.5).
+      const filter = filter0.named === "~" ? { ...filter0, named: defOf(s, o).name } : filter0;
+      const n = compiledO.entersSacrificeInsteadN ?? 1;
       const options = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, filter, obj(s, id), you, false) && canBeSacrificed(s, obj(s, id)));
+      if (compiledO.entersSacrificeInsteadAll) {
+        // Sheltered Valley: all of them at once (none is fine), then it enters (CR 614.1a).
+        q.shift();
+        if (options.length) sacrificedInstead(s, o, options, c.enters);
+        else fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
       if (n > 1) {
         // Lotus Vale: "two untapped lands", sacrificed together; with fewer, none is sacrificed and it never enters
         // (rulings).

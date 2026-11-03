@@ -132,6 +132,12 @@ export function pickFilter(phrase: string): TargetSpec | null {
     const anyOf = [...orList[1]!.split(", ").filter(Boolean), orList[2]!].map((w) => pickFilter(w));
     return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
   }
+  // Omen of Fire: "a Plains or a white permanent": one permanent that's either.
+  const either = /^((?:Plains|Island|Swamp|Mountain|Forest)) or an? ((?:white|blue|black|red|green) permanent)$/.exec(phrase.trim());
+  if (either) {
+    const anyOf = [pickFilter(either[1]!), pickFilter(either[2]!)];
+    return anyOf.every((a): a is TargetSpec => a?.kind === "object") ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // Jungle Patrol: "Sacrifice a token named Wood": a permanent with that name (CR 201.2), here the token it makes.
   const named = /^(token|creature|artifact|permanent) named ([A-Z][A-Za-z' -]*)$/.exec(phrase.trim());
   if (named) {

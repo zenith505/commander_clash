@@ -639,6 +639,15 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(blocksMany[2]!, { selfIt: true });
     return body ? { event: "selfBlocks", body, blocksAtLeast: num(blocksMany[1]!) } : "fail";
   }
+  // No Quarter: "Whenever a creature becomes blocked by a creature with lesser power, destroy the blocking creature";
+  // "Whenever a creature blocks a creature with lesser power, destroy the attacking creature": once for each such pair as
+  // blockers are declared (CR 509.3c-d), anyone's creatures, the one destroyed the trigger's subject.
+  const lesser = /^Whenever a creature (becomes blocked by|blocks) a creature with lesser power, destroy the (blocking|attacking) creature\.$/.exec(line);
+  if (lesser) {
+    if ((lesser[1] === "blocks") !== (lesser[2] === "attacking")) return "fail";
+    const body = parseBody("Destroy it.", { subjectIt: true });
+    return body ? { event: "creatureBlocksCreature", body: { ...body, text: `destroy the ${lesser[2]} creature.` }, blockPower: lesser[2] === "blocking" ? "blockerLess" : "attackerLess" } : "fail";
+  }
   // Righteous Indignation: "Whenever a creature blocks a black or red creature, the blocking creature gets +1/+1 until end
   // of turn": once for each such creature it blocks (CR 509.3c), "the blocking creature" the blocker.
   const blocksA = /^Whenever (an?) (creature(?: you control)?) blocks (an? [^,]+? creature), (.+)$/.exec(line);
@@ -976,6 +985,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // Lullmage's Familiar: "Whenever you cast a kicked spell": its kicker cost was paid as it was cast (CR 702.33d).
   const kickedM = /^kicked(?: spell)?$/.exec(what);
   if (kickedM) what = "spell";
+  // Virtual Assistant: "Whenever you cast a spell using teamwork": its teamwork cost was paid as it was cast (CR 702.194b).
+  const teamworkM = !kickedM ? / using teamwork$/.exec(what) : null;
+  if (teamworkM) what = what.slice(0, teamworkM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
   // Chalice of the Void: "a spell with mana value equal to the number of charge counters on ~", as it's cast (rulings).
@@ -1038,7 +1050,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -1437,7 +1449,8 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   line = line.replace(/^Whenever (an?|another) (\w+) you control (with an? [^ ]+ counter on it) deals combat damage /, "Whenever $1 $2 $3 you control deals combat damage ");
   // Subira, Tulzidi Caravanner: "whenever a creature you control with power 2 or less deals combat damage to a player":
   // its power right after the damage is dealt (rulings), as the trigger event happens.
-  line = line.replace(/^Whenever (an?|another) creature you control (with (?:power|toughness) \d+ or (?:less|greater)) deals combat damage /, "Whenever $1 creature $2 you control deals combat damage ");
+  // Ms. Marvel, Elastic Ally: "with power greater than its base power" (CR 208.4b), the same way.
+  line = line.replace(/^Whenever (an?|another) creature you control (with (?:power|toughness) \d+ or (?:less|greater)|with power greater than its base power) deals combat damage /, "Whenever $1 creature $2 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   // The Master, Mesmerist: "Whenever a creature with skulk deals combat damage to one of your opponents, put a +1/+1

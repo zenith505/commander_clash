@@ -684,6 +684,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "continuous", what, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "self" } } }, toughness: { count: { kind: "toughness", of: { ref: "self" } } } }], duration: "endOfTurn" }];
   }
   // Dream Fighter: "Whenever ~ blocks or becomes blocked by a creature, ~ and that creature phase out": both, as it resolves.
+  // Temporal Firestorm (as parseBody joins it): "up to X creatures and/or planeswalkers you control" chosen as it resolves,
+  // not targeted, then they phase out (CR 702.26).
+  if (/^Up to X creatures and\/or planeswalkers you control of your choice phase out$/.test(s))
+    return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], text: "planeswalker" }], text: "creature or planeswalker" }, n: X, action: "choose", upTo: true, prompt: "choose creatures and/or planeswalkers you control to phase out, up to one for each time ~ was kicked" }, { type: "phaseOut", what: { ref: "created" } }];
   if (/^~ and that creature phase out$/.test(s) && ctx.subject && !ctx.subjectIt) return [{ type: "phaseOut", what: { ref: "self" } }, { type: "phaseOut", what: { ref: "subject" } }];
   if ((m = /^(.+?) phases? out$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);

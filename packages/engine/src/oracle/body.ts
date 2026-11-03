@@ -1949,6 +1949,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Teyo, Lightshield Expert: "Put a +1/+1 counter on it if it's a creature. Put a loyalty counter on it if it's a
   // planeswalker.": each checked as it resolves (CR 608.2c); both if it's both (rulings).
   text = text.replace(/(^|\. )Put (an? [+\-/0-9a-z]+ counter) on it if it's an? (creature|planeswalker)(?=\.)/g, "$1If it's a $3, put $2 on it");
+  // Summoner's Sending: "Put a +1/+1 counter on it if the exiled card's mana value is 4 or greater" reads as the leading
+  // "If the exiled card's mana value is 4 or greater, put ..." (parseHowCast).
+  text = text.replace(/(^|\. )Put (an? [+\-/0-9a-z]+ counter on it) if (the exiled card's (?:power|toughness|mana value) is \d+ or greater)(?=\.)/g, "$1If $3, put $2");
   // HYDRA Troopers: "create a tapped 2/1 ... token with menace if there are two or more creature cards in your graveyard.
   // Otherwise, mill two cards.": checked as it resolves (CR 608.2c), not an intervening "if".
   text = text.replace(/^create ([^.]+?) if (there are [a-z]+ or more [a-z]+ cards in your graveyard)\. Otherwise,/, "If $2, create $1. Otherwise,");
@@ -3700,6 +3703,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Ravenous Rotbelly: "you may sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each
+    // opponent sacrifices that many creatures of their choice.": none to three of yours, chosen as it resolves; then, if
+    // any, a reflexive ability (CR 603.12) that players may respond to, its number the Zombies sacrificed (rulings).
+    const sacUpTo = /^[Yy]ou may sacrifice up to (two|three|four|five) ([A-Z][a-z]+s)$/.exec(s);
+    const sacUpToWhen = sacUpTo && new RegExp(`^When you sacrifice one or more ${sacUpTo[2]} this way, (each opponent sacrifices) that many (creatures|permanents|nonland permanents) of their choice$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (sacUpTo && sacUpToWhen) {
+      const filter = parseTargetPhrase(`${sacUpTo[2]!.replace(/s$/, "")} you control`);
+      const reflexive = filter?.kind === "object" ? reflexiveBody(`${sacUpToWhen[1]} X ${sacUpToWhen[2]} of their choice`, ctx, false, false, true) : null;
+      if (!reflexive || filter?.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacUpTo[2]!.replace(/s$/, "") }, n: num(sacUpTo[1]!), upTo: true, action: "sacrifice" });
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${capital(sacUpToWhen[1]!)} that many ${sacUpToWhen[2]} of their choice.` }, xSacrificed: true }] });
+      si++;
+      continue;
+    }
     // Swashbuckler Extraordinaire: "you may sacrifice one or more Treasures. When you do, up to that many target creatures
     // gain double strike until end of turn." Any number, none too; the reflexive trigger (CR 603.12) has up to as many
     // targets as were sacrificed, chosen as it's put on the stack.
@@ -3949,7 +3966,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Reign of Terror: "Destroy all green creatures or all white creatures"; Lava Storm: "~ deals 2 damage to each attacking
     // creature or ~ deals 2 damage to each blocking creature": one or the other, chosen as it resolves (CR 608.2d).
     // Essence Filter: "Destroy all enchantments or all nonwhite enchantments".
-    const orAll = /^(Destroy all (?:[a-z]+ )?(?:creatures|enchantments)) or all ((?:[a-z]+ )?(?:creatures|enchantments))$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
+    // Catastrophe: "Destroy all lands or all creatures" (rulings: chosen as it resolves).
+    const orAll = /^(Destroy all (?:[a-z]+ )?(?:creatures|enchantments)|Destroy all lands) or all ((?:[a-z]+ )?(?:creatures|enchantments))$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
     if (orAll) {
       const halves = [orAll[1]!, /^Destroy/.test(orAll[1]!) ? `Destroy all ${orAll[2]}` : orAll[2]!];
       const options = halves.map((h) => parseOne(h, ctx));
@@ -5594,6 +5612,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Zoyowa Lava-Tongue: "each opponent may discard a card or sacrifice a permanent of their choice. ~ deals 3 damage to
+    // each opponent who didn't." Osseous Sticktwister: "each opponent may sacrifice a nonland permanent of their choice or
+    // discard a card. Then ~ deals damage equal to its power to each opponent who didn't sacrifice a permanent or discard a
+    // card this way.": a punisher. Each in turn order chooses (an empty hand can't discard, no permanent can't sacrifice),
+    // then the discards and sacrifices happen at once, then the damage to those who did neither (rulings, CR 101.4); its
+    // power as this resolves, or as it last existed (rulings).
+    const mayEither = /^([Ee]ach opponent) may (discard a card or sacrifice an? [a-z ]+? of their choice|sacrifice an? [a-z ]+? of their choice or discard a card)$/.exec(s);
+    const didnt = mayEither && /^(?:Then )?(~ deals (?:\d+ damage|damage equal to its power)) to each opponent who didn't(?: (sacrifice a permanent or discard a card|discard a card or sacrifice a permanent) this way)?\.?$/.exec(sentences[si + 1] ?? "");
+    if (mayEither && didnt) {
+      const options = parsePunisherOptions(mayEither[2]!, ctx);
+      const dmg = parseOne(`${didnt[1]!.replace(/\bits power\b/, "~'s power")} to each opponent`, ctx);
+      if (!options || options.length !== 2 || dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+      const n = dmg[0]!.amount;
+      effects.push({ type: "punisher", who: { ref: "eachOpponent" }, options, effects: [{ ...dmg[0]!, to: { ref: "punished" } }], penalty: typeof n === "number" ? `Take ${n} damage` : "Take damage equal to ~'s power" });
+      si++;
+      continue;
+    }
     // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
     // unless they discard a card".
     const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
@@ -6894,6 +6929,37 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then || (oth && !otherwise) || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, max: 0 }, effects: then, ...(otherwise ? { otherwise } : {}) });
       if (oth) si++;
+      continue;
+    }
+    // Sanctuary Warden: "you may remove a counter from a creature or planeswalker you control. If you do, draw a card and
+    // create ...": any kind of counter (rulings), from one of yours with a counter on it, chosen as it resolves; with none
+    // there's nothing to choose, and the rest happens only once a counter is removed.
+    const mayRemoveOne = /^[Yy]ou may remove a counter from a creature or planeswalker you control$/.test(s) ? /^If you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (mayRemoveOne) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(mayRemoveOne[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature", "Planeswalker"], controller: "you", counter: ANY_COUNTER, text: "creature or planeswalker you control with a counter on it" };
+      effects.push(
+        { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", prompt: "click a creature or planeswalker you control to remove a counter from it, then choose it." }, { type: "removeAnyCounters", what: { ref: "created" }, n: 1 }], text: "remove a counter from a creature or planeswalker you control" },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: then },
+      );
+      si++;
+      continue;
+    }
+    // Dyadrine, Synthesis Amalgam: "you may remove a +1/+1 counter from each of two creatures you control. If you do, ...":
+    // two different creatures of yours with one on each, chosen as it resolves; it can't be done with fewer than two.
+    const mayRemoveTwo = /^[Yy]ou may remove a \+1\/\+1 counter from each of two creatures you control$/.test(s) ? /^If you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (mayRemoveTwo) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(mayRemoveTwo[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", counter: "+1/+1", text: "creature you control with a +1/+1 counter on it" };
+      effects.push(
+        { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 2, action: "choose", prompt: "click two creatures you control to remove a +1/+1 counter from each, then choose them." }, { type: "removeCounters", what: { ref: "created" }, counter: "+1/+1", n: 1 }], text: "remove a +1/+1 counter from each of two creatures you control" },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 2 }, effects: then },
+      );
+      si++;
       continue;
     }
     // Mister Hyde, Monster Within: "Remove a counter from a creature you control. If you do, draw a card.": a creature of
@@ -8687,6 +8753,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], notSubtypes: ["Vehicle"], text: "not a Vehicle" };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [{ type: "continuous", what, mods: [{ kind: "setPT", power: Number(notVehicle[1]), toughness: Number(notVehicle[2]) }], duration: "game" }] });
       si++;
+      continue;
+    }
+    // Katsumasa, the Animator: "Until end of turn, target noncreature artifact you control becomes an artifact creature and
+    // gains flying. If it's not a Vehicle, it has base power and toughness 1/1 until end of turn": the same, until end of
+    // turn, the Vehicle checked as this resolves (CR 608.2c).
+    const notVehicleEot = /^If it's not a Vehicle, (it has base power and toughness \d+\/\d+ until end of turn)$/.exec(s);
+    const animatedEot = effects[effects.length - 1];
+    if (notVehicleEot && animatedEot?.type === "continuous" && animatedEot.what.ref === "target" && !animatedEot.what.n && animatedEot.duration === "endOfTurn" && animatedEot.mods.some((m) => m.kind === "addTypes" && m.types.includes("Creature"))) {
+      const fx = parseOne(capital(notVehicleEot[1]!), ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "continuous" || fx[0]!.what.ref !== "target" || fx[0]!.what.index !== animatedEot.what.index || fx[0]!.mods.length !== 1 || fx[0]!.mods[0]!.kind !== "setPT") return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], notSubtypes: ["Vehicle"], text: "not a Vehicle" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: animatedEot.what.index, filter }, effects: fx });
       continue;
     }
     // Too Greedily, Too Deep: "Put target creature card from a graveyard onto the battlefield under your control. That
@@ -11320,6 +11398,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter: filter! }, effects: fx });
       continue;
     }
+    // Anchor to Reality: "Search your library for an Equipment or Vehicle card, put that card onto the battlefield, then
+    // shuffle. If it has mana value less than the sacrificed permanent's mana value, scry 2": the card put onto the
+    // battlefield this way (X as 0, rulings), against the permanent sacrificed to cast it as it last existed (CR 608.2h);
+    // nothing if no card was put onto the battlefield.
+    const searchedLess = /^If it has mana value less than the sacrificed (creature|artifact|enchantment|permanent)'s mana value, (.+)$/.exec(s);
+    const searchedPrev = effects[effects.length - 1];
+    if (searchedLess && searchedPrev?.type === "search" && searchedPrev.dest.zone === "battlefield" && searchedPrev.n === 1 && !searchedPrev.others && !searchedPrev.who && !searchedPrev.library) {
+      const sac = parseCount(`the sacrificed ${searchedLess[1]}'s mana value`, ctx);
+      const inner = parseOne(capital(searchedLess[2]!), ctx);
+      if (!sac || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "createdNone" }, effects: [], otherwise: [{ type: "if", cond: { kind: "amountsCompare", a: sac, atLeast: { count: { kind: "manaValue", of: { ref: "created" } }, plus: 1 } }, effects: inner }] });
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
     // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
     // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).
@@ -13043,6 +13134,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "reflexive", body: reflexive, ...perToken });
         continue;
       }
+      // Craig Boone, Novac Guard: "Put two quest counters on ~. When you do, ...": once for every two put this way (rulings).
+      if (counted && prev.type === "counters" && typeof prev.n === "number" && prev.n >= 2 && !prev.orCounter && !prev.eventCounter) {
+        effects.push({ type: "reflexive", body: reflexive, perCounters: { counter: prev.counter, n: prev.n } });
+        continue;
+      }
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
@@ -13381,6 +13477,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = filter && parseOne(capital(foundIs[2]!), ctx);
       if (!filter || !then || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "searchFound", filter }, effects: then });
+      continue;
+    }
+    // Shilgengar, Sire of Famine: "Return each creature card from your graveyard to the battlefield with a finality counter
+    // on it. Those creatures are Vampires in addition to their other types": each as it enters (CR 614.12), from then on.
+    const thoseAreType = /^Those creatures are ([A-Z][a-z]+)s in addition to their other types$/.exec(s);
+    const thosePrev = effects[effects.length - 1];
+    if (thoseAreType && CREATURE_TYPES.has(thoseAreType[1]!) && thosePrev?.type === "returnAllFromGraveyard" && !thosePrev.toHand && !thosePrev.alsoMods && thosePrev.filter.types?.length === 1 && thosePrev.filter.types[0] === "Creature") {
+      thosePrev.alsoMods = [{ kind: "addTypes", types: [], subtypes: [thoseAreType[1]!] }];
       continue;
     }
     // Grimoire of the Dead: "Put all creature cards from all graveyards onto the battlefield under your control. They're
@@ -15289,8 +15393,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       // Reign of Terror: "Destroy all green creatures or all white creatures. They can't be regenerated.": either one.
-      if (prev?.type === "either" && /^They\b/.test(s) && prev.options.every((o) => o.length === 1 && o[0]!.type === "destroy")) {
-        for (const o of prev.options) if (o[0]!.type === "destroy") o[0]!.noRegen = true;
+      // Catastrophe: "Destroy all lands or all creatures. Creatures destroyed this way can't be regenerated.": either one,
+      // but only what's a creature as it's destroyed (a land creature too).
+      if (prev?.type === "either" && /^(?:They|Creatures destroyed this way)\b/.test(s) && prev.options.every((o) => o.length === 1 && o[0]!.type === "destroy")) {
+        for (const o of prev.options) if (o[0]!.type === "destroy") o[0]!.noRegen = /^They\b/.test(s) ? true : "creatures";
         continue;
       }
       // Essence Vortex: "Destroy target creature unless its controller pays life equal to its toughness. A creature destroyed
@@ -15620,6 +15726,14 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
     const kind = sacPT[1] === "mana value" ? "manaValue" : (sacPT[1] as "power" | "toughness");
     return { cond: { kind: "amountNow", amount: { count: { kind, of: { ref: "sacrificed" } } }, min: Number(sacPT[2]) }, not: false, text: sacPT[3]!, noTargets: true };
   }
+  // Summoner's Sending: "... you may exile target creature card from a graveyard. If you do, create a 1/1 ... token. Put a
+  // +1/+1 counter on it if the exiled card's mana value is 4 or greater": the one card targeted, as it is in exile (X is
+  // 0, CR 202.3e, rulings).
+  const exiledPT = /^If the exiled card's (power|toughness|mana value) is (\d+) or greater, (.+)$/.exec(s);
+  if (exiledPT) {
+    const amount = parseCount(`the exiled card's ${exiledPT[1]}`, ctx);
+    return amount ? { cond: { kind: "amountNow", amount, min: Number(exiledPT[2]) }, not: false, text: exiledPT[3]!, noTargets: true } : null;
+  }
   // "If the sacrificed creature was a Hamster, draw X cards" (Minsc & Boo): its creature types as it last existed (CR
   // 608.2h), a changeling's all of them.
   // "If that spell's mana value is 5 or greater, create three of those tokens instead" (Prismari Pianist), in a cast
@@ -15635,8 +15749,12 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   const sacColor = /^If the sacrificed creature was (white|blue|black|red|green), (.+)$/.exec(s);
   if (sacColor) return { cond: { kind: "sacrificedColor", color: COLOR_WORDS[sacColor[1]!]! }, not: false, text: sacColor[2]!, noTargets: true };
   // Thallid Omnivore: "If a Saproling was sacrificed this way, ..." after a "Sacrifice another creature" cost: the same.
-  const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s) ?? (ctx.activated && !ctx.spell ? /^If an? ([A-Z][a-z]+) was sacrificed this way, (.+)$/.exec(s) : null);
-  if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
+  // Shilgengar, Sire of Famine: "If you sacrificed an Angel this way, ..." the same.
+  const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s) ?? (ctx.activated && !ctx.spell ? /^If an? ([A-Z][a-z]+) was sacrificed this way, (.+)$/.exec(s) ?? /^If you sacrificed an? ([A-Z][a-z]+) this way, (.+)$/.exec(s) : null);
+  // Shilgengar: "..., create a number of Blood tokens equal to its toughness instead": "its" is the creature sacrificed, as
+  // it last existed (rulings).
+  const sacIts = sacType && /^If you sacrificed /.test(s) ? sacType[2]!.replace(/\bequal to its (power|toughness)\b/, "equal to the sacrificed creature's $1") : sacType?.[2];
+  if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacIts!, noTargets: true };
   // Boneyard Desecrator: "If an outlaw was sacrificed this way": an Assassin, Mercenary, Pirate, Rogue or Warlock as it
   // last existed (CR 700.12).
   const sacOutlaw = ctx.activated && !ctx.spell ? /^If an outlaw was sacrificed this way, (.+)$/.exec(s) : null;

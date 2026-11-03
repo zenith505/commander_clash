@@ -858,6 +858,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "returnAllFromGraveyard") return null;
     return [{ ...fx[0]!, counters: { [withCounter[2]!]: 1 } }];
   }
+  // Shilgengar, Sire of Famine: "Return each creature card from your graveyard to the battlefield with a finality counter
+  // on it": each enters with one (CR 614.1c, 122.1h).
+  const yardWithCounter = /^Return each (creature|artifact|enchantment|permanent) card from your graveyard to the battlefield with a (finality|\+1\/\+1) counter on it$/.exec(s);
+  if (yardWithCounter) {
+    const fx = parseZonesSentence(`Return all ${yardWithCounter[1]} cards from your graveyard to the battlefield`, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "returnAllFromGraveyard" || fx[0]!.toHand || fx[0]!.who.ref !== "you") return null;
+    return [{ ...fx[0]!, counters: { [yardWithCounter[2]!]: 1 } }];
+  }
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
   // Balthor the Defiled: "all black and all red creature cards": each card that is either.
   if (eachReturns) s = `Return all ${eachReturns[1]!.replace(/^(white|blue|black|red|green) and all (white|blue|black|red|green) creature$/, "$1 or $2 creature")} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;

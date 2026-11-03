@@ -2553,6 +2553,8 @@ export interface Resolving {
       destroys?: ObjectId;
       /** Or that its controller sacrifices the source (Icy Prison's "sacrifice ~ unless any player pays {3}"). */
       losesSource?: true;
+      /** Or that this permanent is dealt this much damage (Craig Boone's "deals damage ... to up to one target creature unless ..."). */
+      hurts?: { id: ObjectId; n: number };
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };

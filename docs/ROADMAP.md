@@ -1,7 +1,7 @@
 # Roadmap
 
-29,646 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,514 of
+29,663 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,529 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -203,11 +203,11 @@ line blocks.
    ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
    Unstable Glyphbridge (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
    replacement together), Loki, God of Mischief ("becomes the target of an ability you control"), Katsumasa, the
-   Animator ("if it's not a Vehicle"), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
+   Animator (done in round 270), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
    trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
    creature cards with different powers, an opponent chooses two), Leader, Super-Genius (a connive replacement), This
    Is How It Ends (villainous choice after a shuffle), Azor's Gateway (counting mana values among cards exiled with
-   it), Tamiyo, Collector of Tales, Anchor to Reality (the sacrificed permanent's mana value after a search), Detective's
+   it), Tamiyo, Collector of Tales, Anchor to Reality (done in round 270), Detective's
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
    commander's mana value), Strata Scythe (imprint a land from the library), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
@@ -531,7 +531,7 @@ line blocks.
    Phoenix, Celestus Sanctifier), and "look at the top two cards of your library. Put one of them into your graveyard"
    (Jace, the Living Guildpact). Rules fix: "half X, rounded down" where X is defined elsewhere (a spell's X) kept the
    whole X.
-   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine, Armed and Armored ("choose a Dwarf you
+   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine (done in round 270), Armed and Armored ("choose a Dwarf you
    control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
    Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board ("remove an omen counter ... then if it has no omen
    counters on it, transform it").
@@ -1967,6 +1967,42 @@ line blocks.
    discard a card. Each player who discarded a card this way draws a card. If a creature card was discarded this way, ...
    Then if a noncreature card was discarded this way, ..." (Mog, Moogle Warrior: each in turn order, CR 101.4; one with an
    empty hand isn't asked, 101.3). +8 (29,587 of 31,936; 29,607 with B96 and B97; 29,617 with B98).
+   Round 269 went back over earlier skips from the top. "Each opponent may discard a card or sacrifice a permanent of
+   their choice. ~ deals 3 damage to each opponent who didn't" (Zoyowa Lava-Tongue) and "each opponent may sacrifice a
+   nonland permanent of their choice or discard a card. Then ~ deals damage equal to its power to each opponent who
+   didn't" (Osseous Sticktwister: a punisher, choices in turn order, CR 101.4, its power as the ability resolves or as it
+   last existed; with a browser test); "Whenever a creature you control attacks a player, if no other creatures are
+   attacking that player" (Jin Sakai, Ghost of Tsushima: an intervening if, CR 603.4, checked again as it resolves); "you
+   may remove a counter from a creature or planeswalker you control. If you do" (Sanctuary Warden: any kind of counter;
+   with a browser test) and "remove a +1/+1 counter from each of two creatures you control" (Dyadrine, Synthesis
+   Amalgam); "When you put one or more quest counters on ~ this way ... deals damage equal to the number of quest counters
+   on it to up to one target creature unless that creature's controller has ~ deal that much damage to them" (Craig
+   Boone, Novac Guard: a reflexive trigger for each two counters put, rulings, with Doubling Season twice); "you may
+   sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each opponent sacrifices that many
+   creatures of their choice" (Ravenous Rotbelly: with a browser test); "Remove a counter from an artifact, creature,
+   land, or planeswalker you control" as a cost, any kind (Soul Diviner). Bots take a harmful counter off first and never
+   a planeswalker's last loyalty counter. +8 (29,595 of 31,936; 29,644 with B96 to B100).
+   Round 270 went back over earlier skips from the top. "Put a +1/+1 counter on it if the exiled card's mana value is 4
+   or greater" (Summoner's Sending: the one card targeted, X as 0, rulings); "Sacrifice an artifact with mana value X:
+   Return target artifact card with mana value less than X" (Scrap Welder: X announced, an equal mana value not legal,
+   rulings; with a browser test; bots don't use it yet), and with that target March of Burgeoning Life (the spell's X);
+   "Destroy all lands or all creatures. Creatures destroyed this way can't be regenerated" (Catastrophe: chosen as it
+   resolves, rulings; a land that's a creature can't be regenerated either; with a browser test); "Target creature loses
+   first strike or swampwalk until end of turn" (Urborg: chosen as it resolves, only the one with both, double strike
+   untouched, rulings; with a browser test); "If it has mana value less than the sacrificed permanent's mana value, scry 2"
+   after a search put it onto the battlefield (Anchor to Reality); "enters with two +1/+1 counters on it for each creature
+   that convoked it" (Ancient Imperiosaur, CR 702.51a); "If it's not a Vehicle, it has base power and toughness 1/1 until
+   end of turn" (Katsumasa, the Animator); "If you sacrificed an Angel this way, create a number of Blood tokens equal to
+   its toughness instead" (its toughness as it last existed, rulings) and "Return each creature card from your graveyard
+   to the battlefield with a finality counter on it. Those creatures are Vampires in addition to their other types"
+   (Shilgengar, Sire of Famine). +9 (29,653 of 31,936 with B96 to B100).
+   Out after round 270 (looked at, not done): Dauntless Bodyguard (still no choice of a permanent as something enters);
+   Tegwyll's Scouring ("cast as though it had flash by tapping three untapped creatures you control with flying": an
+   extra cost only when cast at instant speed); Osgir, the Reconstructor ("Exile an artifact card with mana value X from
+   your graveyard" as a cost, then token copies of that card); Agent's Toolkit (enters with four kinds of counters, then
+   "move a counter" of a kind chosen).
+   Out after round 269 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
+   spell": how the words group isn't settled enough to compile honestly); Summoner's Sending (done in round 270).
    Out after round 268 (looked at, not done): Eruth, Tormented Prophet ("If you would draw a card, exile the top two cards
    of your library instead": a draw replacement that has to join the choice among the other draw replacements, CR 616.1,
    and the draws a resolution counts); Quintorius Kand's −6 ("You may play those cards this turn" about the cards its own
@@ -2022,9 +2058,7 @@ line blocks.
    sacrificed, then an extra combat); Gollum, Scheming Guide (an opponent guesses land or nonland about your top card, then
    Gollum is removed from combat); Elrond of the White Council (secret council votes, then you gain control of the creatures
    chosen); Reverse the Sands (redistribute life totals).
-   Out after round 256 (looked at, not done): Scrap Welder ("Sacrifice an artifact with mana value X" as a cost, X set by
-   the artifact sacrificed and the target's mana value less than it: no sacrifice cost with a mana value X yet, in the
-   engine, the bot or the app); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
+   Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
    abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
    (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic and Crashing Wave (tap creatures, or
@@ -2076,10 +2110,9 @@ line blocks.
    from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity ("target face-up card in
    exile": no exile-card targets yet).
    Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
-   "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg ("loses first
-   strike or swampwalk", one of the two chosen as it resolves, rulings); Consume Spirit ("Spend only black mana on X":
-   autopay has no restriction on the mana for X); Catastrophe ("Destroy all lands or all creatures", chosen as it
-   resolves); Muraganda Petroglyphs ("creatures with no abilities", a layer dependency on ability-adding effects).
+   "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg (done in round
+   270); Consume Spirit ("Spend only black mana on X":
+   autopay has no restriction on the mana for X); Catastrophe (done in round 270); Muraganda Petroglyphs ("creatures with no abilities", a layer dependency on ability-adding effects).
    Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
@@ -2425,8 +2458,8 @@ line blocks.
    granted to another permanent (Garland, Assault Suit, Jon Irenicus, Stilt-Man, Zurgo); Kindle the Carnage, Forbidden
    Ritual; Agatha's Soul Cauldron lends abilities after every ability-removing effect (no timestamp order against
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
-   that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
-   to Dust and Knight-Errant of Eos (what convoked them); Nissa's two-sentence "Nth time" branches; Rose Room
+   that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Everything Comes
+   to Dust and Knight-Errant of Eos (what convoked them; Ancient Imperiosaur done in round 270); Nissa's two-sentence "Nth time" branches; Rose Room
    Treasurer; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
@@ -5235,7 +5268,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   artifact you control": one permanent can't be both, so the Human picked must leave an artifact, CR 609.3; with a browser
   test), Weight of Spires (nonbasic lands that creature's controller controls), Devour Flesh ("That player gains life equal
   to that creature's toughness"), Sudden Insight (different mana values among nonland cards in your graveyard), Gladewalker
-  Ritualist ("Whenever another creature named ~ enters"). +10 (29,646 of 31,936 with B99, B100 and round 268).
+  Ritualist ("Whenever another creature named ~ enters"). +10 (29,663 of 31,936 with B99, B100 and rounds 268 to 270).
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
   of Littjara (damage from each creature with power 4 or greater), Founding the Third Path and Helmut Zemo (casting with mana
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,

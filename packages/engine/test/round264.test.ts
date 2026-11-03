@@ -4,8 +4,8 @@
 // more loyalty counters are removed from Chandra", once for each event, combat damage dealt at the same time being one).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { invalidateCharacteristics } from "../src";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { destroyPermanent, invalidateCharacteristics } from "../src";
 import { putCounters } from "../src/counters";
 import { abilitiesOf, applyAction, characteristics, dealDamageBatch, isFullySupported, objectSource, planActivate, moveObject, planCast, planSuspend, runStateBasedActions, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
@@ -50,6 +50,8 @@ const into = (s: GameState, pid: PlayerId, def: CardDef, z: "graveyard" | "hand"
   invalidateCharacteristics(s);
   return id;
 };
+
+const reyhan = (): CardDef => ({"oracleId":"3e7df01c-75af-440d-97fd-1b1b794281b9","name":"Reyhan, Last of the Abzan","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Human Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warrior"],"oracleText":"Reyhan enters with three +1/+1 counters on it.\nWhenever a creature you control dies or is put into the command zone, if it had one or more +1/+1 counters on it, you may put that many +1/+1 counters on target creature.\nPartner (You can have two commanders if both have partner.)","power":"0","toughness":"0","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Partner"],"commanderLegal":"legal","set":"c16","releasedAt":"2016-11-11","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 /** A Protean Hydra with `n` +1/+1 counters, and an opponent's creature to deal damage with. */
 const withHydra = (n: number) => {
@@ -317,5 +319,77 @@ describe("Bloatfly Swarm", () => {
     // With no counters left the damage isn't prevented.
     runStateBasedActions(s);
     expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Reyhan, Last of the Abzan", () => {
+  /** Reyhan with three counters, another creature of yours, and a creature to get the counters. */
+  const withReyhan = () => {
+    const { s, ap } = setup([]);
+    const r = putOnBattlefield(s, ap, reyhan());
+    s.objects[r]!.counters["+1/+1"] = 3;
+    const b = putOnBattlefield(s, ap, bear());
+    const to = putOnBattlefield(s, ap, card("Test Squire", "Creature — Human", "{1}", { power: "1", toughness: "1" }));
+    return { s, ap, r, b, to };
+  };
+  /** Answers its target and its "you may". */
+  const answer = (s: GameState, ap: PlayerId, to: ObjectId) => {
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: to }] }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    return settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+  };
+
+  it("a creature of yours with +1/+1 counters dying: that many on target creature, as it last existed", () => {
+    expect(isFullySupported(reyhan())).toBe(true);
+    const { s: s0, ap, b, to } = withReyhan();
+    s0.objects[b]!.counters["+1/+1"] = 2;
+    destroyPermanent(s0, s0.objects[b]!, "test");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(2);
+  });
+
+  it("Reyhan itself dying counts; -1/-1 counters that killed it don't lower the number (rulings)", () => {
+    const { s: s0, ap, r, to } = withReyhan();
+    putCounters(s0, s0.objects[r]!, "-1/-1", 6);
+    runStateBasedActions(s0);
+    expect(s0.objects[r]!.zone).toBe("graveyard");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(3);
+  });
+
+  it("a creature without +1/+1 counters dying doesn't trigger it", () => {
+    const { s: s0, b } = withReyhan();
+    destroyPermanent(s0, s0.objects[b]!, "test");
+    const s = settle(s0);
+    expect(s.pending).toBeFalsy();
+    expect(s.stack.length).toBe(0);
+  });
+
+  it("a commander with counters put into the command zone instead of its library triggers it (CR 903.9b)", () => {
+    const { s: s0, ap, to } = withReyhan();
+    const c = putOnBattlefield(s0, ap, card("Test Captain", "Legendary Creature — Human", "{2}", { power: "2", toughness: "2" }), { commander: true });
+    s0.objects[c]!.counters["+1/+1"] = 4;
+    moveObject(s0, c, "library");
+    expect(s0.objects[c]!.zone).toBe("command");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(4);
+  });
+
+  it("a commander that dies and then goes to the command zone triggers it only once (CR 903.9a)", () => {
+    const { s: s0, ap, to } = withReyhan();
+    const c = putOnBattlefield(s0, ap, card("Test Captain", "Legendary Creature — Human", "{2}", { power: "2", toughness: "2" }), { commander: true });
+    s0.objects[c]!.counters["+1/+1"] = 1;
+    destroyPermanent(s0, s0.objects[c]!, "test");
+    let s = settle(s0);
+    // Its owner may move it to the command zone as a state-based action.
+    if (s.pending?.kind === "chooseMay" && s.pending.player === ap && s.objects[c]!.zone === "graveyard") s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: to }] }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(plus(s, to)).toBe(1);
+    expect(s.pending).toBeFalsy();
+    expect(s.stack.length).toBe(0);
   });
 });

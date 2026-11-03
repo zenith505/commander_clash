@@ -543,7 +543,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "creaturesLeftThisTurn":
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
     case "typeToYourGraveyardThisTurn":
-      return s.turnLog?.permanentTypesToYard?.[ctx.controller]?.includes(c.type) ? 1 : 0;
+      return (c.controlled ? s.turnLog?.controlledTypesToYard : s.turnLog?.permanentTypesToYard)?.[ctx.controller]?.includes(c.type) ? 1 : 0;
     case "artifactsToGraveyardThisTurn":
       return s.turnLog?.artifactsToYard ?? 0;
     case "creaturesToYourGraveyard":
@@ -1358,7 +1358,7 @@ function describeCount(c: Count): string {
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":
-      return `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
+      return c.controlled ? `a ${c.type.toLowerCase()} you controlled put into a graveyard from the battlefield this turn` : `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
     case "artifactsToGraveyardThisTurn":
       return "#artifacts put into graveyards from the battlefield this turn";
     case "creaturesToYourGraveyard":

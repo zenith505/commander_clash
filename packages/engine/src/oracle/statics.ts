@@ -1414,6 +1414,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   // Kami of Transience: "if an enchantment was put into your graveyard from the battlefield this turn".
   if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
+  if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) you controlled was put into a graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!), controlled: true } }, min: 1 };
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Wolverine, Best There Is: "if ~ dealt damage to another creature this turn".

@@ -1164,6 +1164,11 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined, selfCardExiled(s, effects, ctx))) return false;
     // "Unless you return a non-Lair land you control": you can't if you have none.
     if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller, ctx.sourceId).length < amountNow(s, e.n, ctx)) return false;
+    // Fugitive of the Judoon: "exile a Human you control and an artifact you control": two different permanents.
+    if (e.type === "pick" && e.who.ref === "you" && e.leaving) {
+      const next = pickOptions(s, { filter: e.leaving }, ctx.controller, ctx.sourceId);
+      if (!pickOptions(s, e, ctx.controller, ctx.sourceId).some((id) => next.some((x) => x !== id))) return false;
+    }
   }
   return true;
 }

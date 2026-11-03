@@ -2134,9 +2134,11 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Kumano, Master Yamabushi; Kumano's Blessing: a replacement effect (CR 614.1a) on creatures it dealt damage this turn.
-    const kumano = /^If a creature dealt damage by (~|enchanted creature) this turn would die, exile it instead\.$/.exec(line);
+    // Etching of Kumano: "If a creature dealt damage this turn by a source you controlled would die, exile it instead":
+    // any source, controlled by ~'s controller as it dealt the damage.
+    const kumano = /^If a creature dealt damage by (~|enchanted creature) this turn would die, exile it instead\.$/.exec(line) ?? /^If a creature dealt damage this turn by (a source you controlled) would die, exile it instead\.$/.exec(line);
     if (kumano) {
-      out.exileWhatItDamaged = kumano[1] === "~" ? "self" : "attached";
+      out.exileWhatItDamaged = kumano[1] === "~" ? "self" : kumano[1] === "a source you controlled" ? "yours" : "attached";
       continue;
     }
     // The Darkness Crystal: "If a nontoken creature an opponent controls would die, instead exile it and you gain 2 life."

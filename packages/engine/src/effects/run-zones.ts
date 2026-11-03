@@ -109,6 +109,14 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
  * Each player picks their own permanents, in APNAP order, then they're all sacrificed or returned to
  * their owners' hands at once (CR 101.4, 701.21a). With no more than they have to pick, there's no choice.
  */
+/** A pick's options that leave another permanent for the pick after it (`leaving`), or all of them if none does. */
+export function pickLeaving(s: GameState, e: Extract<Effect, { type: "pick" }>, options: ObjectId[], pid: PlayerId, ctx: ResolveCtx): ObjectId[] {
+  if (!e.leaving) return options;
+  const next = pickOptions(s, { filter: e.leaving }, pid, ctx.sourceId, ctx.sourceZc);
+  const ok = options.filter((id) => next.some((x) => x !== id));
+  return ok.length ? ok : options;
+}
+
 function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const r = s.resolving!;
   // Martyr's Bond: the card types of the trigger's subject, on the battlefield or as it last existed (CR 608.2h).
@@ -161,7 +169,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options0 = ofTargets ?? group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId, ctx.sourceZc)) : pickOptions(s, e, pid, ctx.sourceId, ctx.sourceZc));
     // Labyrinth Raptor: only creatures blocking the trigger's subject now, the same attacking object (CR 400.7, 509.1h).
     const attacker = e.filter.blockingSubject && ctx.subject ? s.objects[ctx.subject.id] : undefined;
-    const options = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
+    const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
+    // Fugitive of the Judoon: "exile a Human you control and an artifact you control": the Human picked first leaves an
+    // artifact to pick next, when one can (an artifact Human can't be both).
+    const options = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

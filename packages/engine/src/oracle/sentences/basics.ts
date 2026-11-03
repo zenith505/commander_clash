@@ -545,6 +545,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || (fx[0]!.type !== "destroy" && fx[0]!.type !== "damage") || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: fx[0]!.type === "destroy" ? "Let ~ destroy it" : `Let ~ ${m[1]!.replace(/^~ deals (\d+) damage to target creature$/, "deal $1 damage to it")}` }];
   }
+  // Craig Boone, Novac Guard (its reflexive ability): "~ deals damage equal to the number of quest counters on it to up to
+  // one target creature unless that creature's controller has ~ deal that much damage to them": that permanent's
+  // controller decides as it resolves (CR 608.2d); the amount counted as it resolves, the counters as ~ last existed if
+  // it's gone (rulings). With no target chosen, nobody decides and nothing happens.
+  if ((m = /^~ deals damage equal to (the number of [a-z]+ counters on (?:it|~)) to up to one target creature unless that creature's controller has ~ deal that much damage to them$/.exec(s))) {
+    const amount = parseCount(m[1]!.replace(/ on it$/, " on ~"), ctx);
+    const before = ctx.targets.length;
+    const fx = amount && parseSentence("~ deals 1 damage to up to one target creature", ctx);
+    if (!amount || fx?.length !== 1 || fx[0]!.type !== "damage" || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options: [{ damage: amount }], effects: [{ ...fx[0]!, amount }], penalty: "Let ~ deal that damage to it" }];
+  }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
   if ((m = /^(.+?) unless any player (pays (?:\{[^}]+\})+)$/.exec(s)) && /\bgets? an additional [+-]\d+\/[+-]\d+ until end of turn$/.test(m[1]!)) {

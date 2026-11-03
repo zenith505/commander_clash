@@ -474,7 +474,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (put && !put.length) return;
       // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
       const kind = e.perToken && tokenDef(e.perToken).oracleId;
-      const times = kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
+      // Craig Boone, Novac Guard: once for every two quest counters put on it this way, so twice with Doubling Season's
+      // four and not at all if none could be put (rulings).
+      const perCounters = e.perCounters;
+      const times = perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
       for (let i = 0; i < times; i++) s.triggerQueue.push({
         sourceId,
         sourceCardId: cardId,
@@ -1211,7 +1214,11 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     // "Equal to ~'s power" (Combustion Man): the amount as the choices start, the same for everyone.
     const options = e.options.map((o) => ("damage" in o && typeof o.damage !== "number" ? { damage: amountNow(s, o.damage, ctx) } : o));
     const doomed = e.effects.length === 1 && e.effects[0]!.type === "destroy" ? objects(s, e.effects[0]!.what, ctx)[0]?.id : undefined;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
+    // For the bots: damage counted as the choices start (Osseous Sticktwister's "equal to its power", Craig Boone's counters).
+    const dmg = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
+    const dmgN = dmg?.type === "damage" && typeof dmg.amount !== "number" ? Math.max(0, amountNow(s, dmg.amount, ctx)) : undefined;
+    const hurt = dmg?.type === "damage" && "index" in dmg.to && dmg.to.ref === "target" ? objects(s, { ref: "target", index: dmg.to.index }, ctx)[0] : undefined;
+    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options, ...punisherHarm(e), ...(dmgN !== undefined && !hurt ? { lose: dmgN } : {}), ...(hurt && dmg?.type === "damage" ? { hurts: { id: hurt.id, n: dmgN ?? (typeof dmg.amount === "number" ? dmg.amount : 0) }, lose: undefined } : {}), ...(doomed ? { destroys: doomed } : {}), ...(e.mode ? { mode: e.mode } : {}) };
   }
   if (e.options.some((o) => "damage" in o && typeof o.damage !== "number")) e = { ...e, options: e.options.map((o, i) => ("damage" in o ? sc.punish!.options[i]! : o)) };
   // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.

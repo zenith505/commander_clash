@@ -15785,6 +15785,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "33c3a81a-6cea-48c9-b966-67084d96e74f",
+  "name": "Osseous Sticktwister",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Scarecrow",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Scarecrow"
+  ],
+  "oracleText": "Lifelink\nDelirium — At the beginning of your end step, if there are four or more card types among cards in your graveyard, each opponent may sacrifice a nonland permanent of their choice or discard a card. Then this creature deals damage equal to its power to each opponent who didn't sacrifice a permanent or discard a card this way.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Delirium",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "473a7998-669d-4181-83fe-f178a2e781f0",
   "name": "Out of the Tombs",
   "manaCost": "{2}{B}",
@@ -17544,6 +17578,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8f0738ce-1f07-422c-9895-8ac3c65f9054",
+  "name": "Ravenous Rotbelly",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Horror"
+  ],
+  "oracleText": "When this creature enters, you may sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each opponent sacrifices that many creatures of their choice.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
   "name": "Razorgrass Screen",
   "manaCost": "{1}",
@@ -18644,6 +18709,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "713bcfb6-e5ea-411e-b4b3-52e5eed5cdf1",
+  "name": "Sanctuary Warden",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel",
+   "Soldier"
+  ],
+  "oracleText": "Flying\nThis creature enters with two shield counters on it.\nWhenever this creature enters or attacks, you may remove a counter from a creature or planeswalker you control. If you do, draw a card and create a 1/1 green and white Citizen creature token.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "71cb48e2-2328-471c-a04a-7b6461f378f4",
   "name": "Sarkhan, Dragon Ascendant",
   "manaCost": "{1}{R}",
@@ -18791,6 +18889,36 @@
   "set": "spg",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e0fefaf0-da20-4d58-8db7-019dba16c780",
+  "name": "Scathe Zombies",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

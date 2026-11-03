@@ -3667,6 +3667,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Ravenous Rotbelly: "you may sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each
+    // opponent sacrifices that many creatures of their choice.": none to three of yours, chosen as it resolves; then, if
+    // any, a reflexive ability (CR 603.12) that players may respond to, its number the Zombies sacrificed (rulings).
+    const sacUpTo = /^[Yy]ou may sacrifice up to (two|three|four|five) ([A-Z][a-z]+s)$/.exec(s);
+    const sacUpToWhen = sacUpTo && new RegExp(`^When you sacrifice one or more ${sacUpTo[2]} this way, (each opponent sacrifices) that many (creatures|permanents|nonland permanents) of their choice$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (sacUpTo && sacUpToWhen) {
+      const filter = parseTargetPhrase(`${sacUpTo[2]!.replace(/s$/, "")} you control`);
+      const reflexive = filter?.kind === "object" ? reflexiveBody(`${sacUpToWhen[1]} X ${sacUpToWhen[2]} of their choice`, ctx, false, false, true) : null;
+      if (!reflexive || filter?.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacUpTo[2]!.replace(/s$/, "") }, n: num(sacUpTo[1]!), upTo: true, action: "sacrifice" });
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: { ...reflexive, text: `${capital(sacUpToWhen[1]!)} that many ${sacUpToWhen[2]} of their choice.` }, xSacrificed: true }] });
+      si++;
+      continue;
+    }
     // Swashbuckler Extraordinaire: "you may sacrifice one or more Treasures. When you do, up to that many target creatures
     // gain double strike until end of turn." Any number, none too; the reflexive trigger (CR 603.12) has up to as many
     // targets as were sacrificed, chosen as it's put on the stack.
@@ -5561,6 +5575,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Zoyowa Lava-Tongue: "each opponent may discard a card or sacrifice a permanent of their choice. ~ deals 3 damage to
+    // each opponent who didn't." Osseous Sticktwister: "each opponent may sacrifice a nonland permanent of their choice or
+    // discard a card. Then ~ deals damage equal to its power to each opponent who didn't sacrifice a permanent or discard a
+    // card this way.": a punisher. Each in turn order chooses (an empty hand can't discard, no permanent can't sacrifice),
+    // then the discards and sacrifices happen at once, then the damage to those who did neither (rulings, CR 101.4); its
+    // power as this resolves, or as it last existed (rulings).
+    const mayEither = /^([Ee]ach opponent) may (discard a card or sacrifice an? [a-z ]+? of their choice|sacrifice an? [a-z ]+? of their choice or discard a card)$/.exec(s);
+    const didnt = mayEither && /^(?:Then )?(~ deals (?:\d+ damage|damage equal to its power)) to each opponent who didn't(?: (sacrifice a permanent or discard a card|discard a card or sacrifice a permanent) this way)?\.?$/.exec(sentences[si + 1] ?? "");
+    if (mayEither && didnt) {
+      const options = parsePunisherOptions(mayEither[2]!, ctx);
+      const dmg = parseOne(`${didnt[1]!.replace(/\bits power\b/, "~'s power")} to each opponent`, ctx);
+      if (!options || options.length !== 2 || dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+      const n = dmg[0]!.amount;
+      effects.push({ type: "punisher", who: { ref: "eachOpponent" }, options, effects: [{ ...dmg[0]!, to: { ref: "punished" } }], penalty: typeof n === "number" ? `Take ${n} damage` : "Take damage equal to ~'s power" });
+      si++;
+      continue;
+    }
     // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
     // unless they discard a card".
     const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
@@ -6861,6 +6892,37 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then || (oth && !otherwise) || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, max: 0 }, effects: then, ...(otherwise ? { otherwise } : {}) });
       if (oth) si++;
+      continue;
+    }
+    // Sanctuary Warden: "you may remove a counter from a creature or planeswalker you control. If you do, draw a card and
+    // create ...": any kind of counter (rulings), from one of yours with a counter on it, chosen as it resolves; with none
+    // there's nothing to choose, and the rest happens only once a counter is removed.
+    const mayRemoveOne = /^[Yy]ou may remove a counter from a creature or planeswalker you control$/.test(s) ? /^If you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (mayRemoveOne) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(mayRemoveOne[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature", "Planeswalker"], controller: "you", counter: ANY_COUNTER, text: "creature or planeswalker you control with a counter on it" };
+      effects.push(
+        { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", prompt: "click a creature or planeswalker you control to remove a counter from it, then choose it." }, { type: "removeAnyCounters", what: { ref: "created" }, n: 1 }], text: "remove a counter from a creature or planeswalker you control" },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 1 }, effects: then },
+      );
+      si++;
+      continue;
+    }
+    // Dyadrine, Synthesis Amalgam: "you may remove a +1/+1 counter from each of two creatures you control. If you do, ...":
+    // two different creatures of yours with one on each, chosen as it resolves; it can't be done with fewer than two.
+    const mayRemoveTwo = /^[Yy]ou may remove a \+1\/\+1 counter from each of two creatures you control$/.test(s) ? /^If you do, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (mayRemoveTwo) {
+      const before = ctx.targets.length;
+      const then = parseOne(capital(mayRemoveTwo[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", counter: "+1/+1", text: "creature you control with a +1/+1 counter on it" };
+      effects.push(
+        { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 2, action: "choose", prompt: "click two creatures you control to remove a +1/+1 counter from each, then choose them." }, { type: "removeCounters", what: { ref: "created" }, counter: "+1/+1", n: 1 }], text: "remove a +1/+1 counter from each of two creatures you control" },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersRemovedThisWay" } }, min: 2 }, effects: then },
+      );
+      si++;
       continue;
     }
     // Mister Hyde, Monster Within: "Remove a counter from a creature you control. If you do, draw a card.": a creature of
@@ -12971,6 +13033,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       if (created || always) {
         effects.push({ type: "reflexive", body: reflexive, ...perToken });
+        continue;
+      }
+      // Craig Boone, Novac Guard: "Put two quest counters on ~. When you do, ...": once for every two put this way (rulings).
+      if (counted && prev.type === "counters" && typeof prev.n === "number" && prev.n >= 2 && !prev.orCounter && !prev.eventCounter) {
+        effects.push({ type: "reflexive", body: reflexive, perCounters: { counter: prev.counter, n: prev.n } });
         continue;
       }
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });

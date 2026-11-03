@@ -608,6 +608,23 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
       // Chandra, Legacy of Fire (loyalty counters, a card each): only planeswalkers that keep one, so none of ours dies.
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > (removing.counter === "loyalty" ? 1 : 0)) }];
+    // "Remove a counter from a creature or planeswalker you control" (Sanctuary Warden, Mister Hyde, Chisei), "a +1/+1
+    // counter from each of two creatures you control" (Dyadrine): ours with a harmful counter first (-1/-1, stun), then
+    // those with the most counters to spare; never a planeswalker's last loyalty counter while another will do.
+    // The pick may sit inside a "may" (Sanctuary Warden): the effect after it, in the body's preorder, comes next.
+    const flat = pend.kind === "pickPermanents" && pend.action === "choose" && !pend.anyNumber && pend.min === undefined && s.resolving ? allEffects(s.resolving.body.effects) : [];
+    const at = flat.findIndex((x) => x.type === "pick" && pend.kind === "pickPermanents" && x.prompt === pend.prompt);
+    const unloading = at >= 0 ? flat[at + 1] : undefined;
+    if (pend.kind === "pickPermanents" && (unloading?.type === "removeAnyCounters" || unloading?.type === "removeCounters") && unloading.what.ref === "created" && pend.options.every((id) => controllerOf(s, obj(s, id)) === pid)) {
+      const score = (id: ObjectId) => {
+        const c = obj(s, id).counters;
+        const harmful = Object.entries(c).some(([k, n]) => n > 0 && harmfulCounter(k));
+        const total = Object.values(c).reduce((a, b) => a + Math.max(0, b), 0);
+        const lastLoyalty = objIsType(s, obj(s, id), "Planeswalker") && (c.loyalty ?? 0) <= 1 && total <= 1;
+        return (harmful ? 100 : 0) + total - (lastLoyalty ? 1000 : 0);
+      };
+      return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((a, b) => score(b) - score(a)).slice(0, pend.count) }];
+    }
     // Krenko's Buzzcrusher: for each player, up to one of their permanents to destroy: an opponent's best one, none of ours.
     const destroying = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && destroying?.type === "destroy" && destroying.what.ref === "created") {
@@ -2752,7 +2769,10 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   const doomed = pu.destroys ? s.objects[pu.destroys] : undefined;
   // Icy Prison: its controller keeps it if no one else does; the others let it go.
   const sourceWorth = pu.losesSource && controller === pid && !settled && s.resolving?.item.sourceId && s.objects[s.resolving.item.sourceId]?.zone === "battlefield" ? Math.max(3, worth(s, pid, obj(s, s.resolving.item.sourceId))) : 0;
-  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Craig Boone: the damage to that creature, worth the creature if it would die of it, little otherwise.
+  const hurt = pu.hurts ? s.objects[pu.hurts.id] : undefined;
+  const hurtCost = hurt && hurt.zone === "battlefield" ? (toughness(s, hurt) - (hurt.damage ?? 0) <= pu.hurts!.n && !objHasKeyword(s, hurt, "Indestructible") ? worth(s, pid, hurt) : 0.5) : 0;
+  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.hurts ? hurtCost : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];

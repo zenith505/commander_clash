@@ -747,7 +747,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
  */
 const TIBALT = "Its controller mills one to three cards chosen at random and exiles cards from the top of their library until they exile a nonland card with a different name than that spell; they may cast that card without paying its mana cost and put the exiled cards on the bottom of their library in a random order";
 
-function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; more?: Effect[]; next: number } | null | "fail" {
   // Tibalt's Trickery, after "Counter target spell": "Choose 1, 2, or 3 at random. Its controller mills that many cards,
   // then exiles ... until they exile a nonland card with a different name than that spell. They may cast that card
   // without paying its mana cost. Then they put the exiled cards on the bottom of their library in a random order."
@@ -811,6 +811,18 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   // "Shuffle your library, then reveal ...", "..., then put all cards revealed this way ...": split at ", then" by now.
   const shuffleFirst = /^[Ss]huffle your library$/.test(sentences[at]!);
   const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
+  // Amplifire: "Reveal cards from the top of your library until you reveal a creature card. Until your next turn, ~'s base
+  // power becomes twice that card's power and its base toughness becomes twice that card's toughness. Put the revealed
+  // cards on the bottom of your library in a random order.": the values set in layer 7b (CR 613.4b), locked in as it
+  // resolves (CR 608.2h); with no creature card, 0/0 and the whole library put back in a random order (rulings).
+  if (!shuffleFirst && /^[Rr]eveal cards from the top of your library until you reveal a creature card$/.test(s) && sentences[at + 1] === "Until your next turn, ~'s base power becomes twice that card's power and its base toughness becomes twice that card's toughness" && /^Put the revealed cards on the bottom of your library in a random order\.?$/.test(sentences[at + 2] ?? "")) {
+    const twice = (kind: "power" | "toughness"): Amount => ({ count: { kind, of: { ref: "revealed" } }, times: 2 });
+    return {
+      effect: { type: "exileUntilNonland", reveal: true, then: "keep", untilTypes: ["Creature"] },
+      more: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: twice("power"), toughness: twice("toughness") }], duration: "yourNextTurn" }, { type: "revealedUntilToBottom", random: true }],
+      next: at + 3,
+    };
+  }
   const reveal = (shuffleFirst ? /^Reveal cards from the top of it until you reveal a nonland card$/ : /^[Rr]eveal cards from the top of your library until you reveal a nonland card$/).test(s);
   const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
   // "They exile cards ... until they exile a nonland card" in a villainous choice's option (Ensnared by the Mara): the
@@ -2072,6 +2084,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Mica, Reader of Ruins: "you may sacrifice an artifact. If you do, copy that spell and you may choose new targets for
   // the copy": the copy, then its new targets.
   text = text.replace(/(\. If you do, copy that spell) and you may choose new targets for the copy\./, "$1. You may choose new targets for the copy.");
+  // Meletis Charlatan: "The controller of target instant or sorcery spell copies it. That player may choose new targets for
+  // the copy.": one instruction (sentences/spells.ts).
+  text = text.replace(/(^|\. )(The controller of target [a-z ]*spell copies it)\. That player may choose new targets for the copy\./, "$1$2 and may choose new targets for the copy.");
   // Revenge of the Hunted: "Until end of turn, target creature gets +6/+6 and gains trample, and all creatures able to
   // block it this turn do so": the pump, then the lure on the same target.
   text = text.replace(/^Until end of turn, (target creature) (gets [+-]\d+\/[+-]\d+ and gains [a-z]+), and all creatures able to block it this turn do so\./, (_, w: string, g: string) => `${capital(w)} ${g} until end of turn. All creatures able to block it this turn do so.`);
@@ -4357,6 +4372,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Rites of Initiation: "Discard any number of cards at random. Creatures you control get +1/+0 until end of turn for each
+    // card discarded this way.": its controller chooses how many as it resolves (none to all, CR 107.1c), then that many
+    // are discarded at random (CR 701.9a); the pump counts the cards discarded.
+    if (/^[Dd]iscard any number of cards at random$/.test(s) && /\bfor each card discarded this way\b/i.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "choose", choice: "number", upToHand: true }, { type: "discard", who: { ref: "you" }, n: { count: { kind: "chosenNumber" } }, random: true });
+      continue;
+    }
     // Sacred Rites: "Discard any number of cards. Creatures you control get +0/+1 until end of turn for each card
     // discarded this way.": none or more, chosen as it resolves (CR 107.1c).
     // Mind Maggots: "discard any number of creature cards. For each card discarded this way, put two +1/+1 counters on ~":
@@ -5125,7 +5147,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const untilNonland = parseUntilNonland(sentences, si, ctx);
     if (untilNonland === "fail") return null;
     if (untilNonland) {
-      effects.push(untilNonland.effect);
+      effects.push(untilNonland.effect, ...(untilNonland.more ?? []));
       si = untilNonland.next - 1;
       continue;
     }
@@ -5256,6 +5278,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Wurm), "any opponent may have it deal 4 damage to them. If a player does, sacrifice ~" (Vexing Devil), "Any player
     // may have ~ deal 5 damage to them. If no one does, target player draws three cards" (Browbeat): a punisher whose
     // instructions happen once, if anyone did or if no one did (see its `mode`).
+    // Distant Memories: "Search your library for a card, exile it, then shuffle. Any opponent may have you put that card into
+    // your hand. If no player does, you draw three cards.": each opponent in turn order chooses (rulings), seeing the card
+    // (exiled face up); if one does, it goes to your hand; if none does, it stays exiled and you draw three.
+    const memSearch = effects.at(-1);
+    if (s === "Any opponent may have you put that card into your hand" && memSearch?.type === "search" && memSearch.n === 1 && memSearch.dest.zone === "exile" && !memSearch.dest.faceDown && !memSearch.who && !memSearch.library && /^If no player does, (you draw (?:a card|two cards|three cards))\.?$/.test(sentences[si + 1] ?? "")) {
+      const draw = attempt(ctx, () => parseOne(capital(/^If no player does, (.+?)\.?$/.exec(sentences[si + 1]!)![1]!), ctx));
+      if (!draw) return null;
+      memSearch.rememberExiled = true;
+      delete memSearch.away;
+      effects.push({ type: "punisher", who: { ref: "eachOpponent" }, options: [{ allow: "Have them put it into their hand" }], effects: [{ type: "bounce", what: { ref: "exiledTop" } }], mode: "ifAny", otherwise: draw, thenText: "the exiled card goes to their hand (if no one does, they draw instead)" });
+      si++;
+      continue;
+    }
     const anyMay = /^[Aa]ny (player|opponent) may (.+)$/.exec(s);
     const anyThen = anyMay && /^If (a player does|no one does), (.+)$/.exec(sentences[si + 1] ?? "");
     if (anyMay && anyThen) {
@@ -7661,6 +7696,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       continue;
     }
+    // Shattered Seraph and its cycle, Emrakul, the Exigent Doom: "{2}, Exile this card from your hand: Target land gains "{T}:
+    // Add {W}, {U}, or {B}" until this card is cast from exile. You may cast this card for as long as it remains exiled.":
+    // the grant lasts until that card becomes cast from exile (its mana can pay for it, rulings), or forever if it leaves
+    // exile another way (rulings).
+    const untilCast = ctx.activated ? /^(Target land gains "[^"]+") until ~ is cast from exile$/.exec(s) : null;
+    if (untilCast && /^You may cast ~ for as long as it remains exiled\.?$/.test(sentences[si + 1] ?? "")) {
+      const grant = attempt(ctx, () => parseOne(`${untilCast[1]!} until end of turn`, ctx));
+      const g = grant?.length === 1 ? grant[0]! : undefined;
+      if (g?.type !== "continuous" || g.duration !== "endOfTurn" || !g.mods.every((m) => m.kind === "addAbility")) return null;
+      effects.push({ ...g, duration: "game", untilCastFromExile: true }, { type: "mayCastExiledSelf" });
+      si++;
+      continue;
+    }
+    // Sword-Point Diplomacy: "Reveal the top three cards of your library. For each of those cards, put that card into your
+    // hand unless any opponent pays 3 life. Then exile the rest.": all revealed first, then one card at a time in an order
+    // you choose, each opponent in turn order choosing whether to pay for it (rulings); the cards not put into your hand
+    // are exiled.
+    const swordPoint = /^[Rr]eveal the top (two|three|four|five) cards of your library$/.exec(s);
+    const perCard = swordPoint ? /^For each of those cards, put that card into your hand unless any opponent (pays \d+ life)$/.exec(sentences[si + 1] ?? "") : null;
+    if (swordPoint && perCard && /^Then exile the rest\.?$/.test(sentences[si + 2] ?? "")) {
+      const options = parsePunisherOptions(perCard[1]!, ctx);
+      if (!options) return null;
+      effects.push({ type: "revealTop", n: num(swordPoint[1]!) }, { type: "forEachRevealed", effects: [{ type: "punisher", who: { ref: "eachOpponent" }, options, effects: [{ type: "bounce", what: { ref: "revealed" } }], mode: "ifNone", thenText: "the card goes to their hand" }], rest: "exile" });
+      si += 2;
+      continue;
+    }
     // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
     // refers to the card.
     const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's|defending player's) library$/.exec(s);
@@ -7671,6 +7732,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!r) return null;
       effects.push({ type: "revealTop", look: true }, r.effect);
       si = r.next - 1;
+      // Bison Whistle: "If it's a Bison card, you may put it onto the battlefield. If it's a creature card, you may reveal
+      // it and put it into your hand. Otherwise, you may put it into your graveyard.": the second check only while the card
+      // is still on top (not put onto the battlefield), so a Bison left there may still go to your hand.
+      const mayPut = r.effect.type === "if" && r.effect.cond.kind === "revealedIs" && !r.effect.cond.not && !r.effect.otherwise && r.effect.effects.length === 1 && r.effect.effects[0]!.type === "may" && r.effect.effects[0]!.effects.length === 1 && r.effect.effects[0]!.effects[0]!.type === "putOntoBattlefield";
+      if (mayPut && /^If it's an? [a-z]+ card, /.test(sentences[si + 1] ?? "")) {
+        const r2 = parseRevealedIf(sentences, si + 1, ctx);
+        if (!r2) return null;
+        effects.push({ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } }, effects: [r2.effect] });
+        si = r2.next - 1;
+        continue;
+      }
       // Sidequest: Catch a Fish: "If you put a card into your hand this way, create a Food token and transform ~": only
       // after the card went to your hand.
       const putThen = /^If you put a card into your hand this way, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -10016,6 +10088,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "may", effects: [paidPutAll], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}. ${sentences[si + 1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
         payFirst = null;
         si++;
+        continue;
+      }
+      // Darigaaz, the Igniter (as triggers.ts words it): "you may pay {2}{R}. If you do, choose a color. That player reveals
+      // their hand. ~ deals damage to that player equal to the number of cards of the chosen color in their hand.": the
+      // color chosen as it resolves (rulings), and the reveal and the damage too only if paid.
+      if (!payFirst.payX && then[1] === "choose a color" && sentences[si + 1] === "That player reveals their hand" && /^~ deals damage to that player equal to the number of cards of the chosen color in their hand\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+        const rest = [sentences[si + 1]!, sentences[si + 2]!.replace(/\.$/, "")].map((x) => attempt(ctx, () => parseOne(x, ctx)));
+        if (rest.some((x) => !x)) return null;
+        effects.push({ type: "may", effects: [{ type: "choose", choice: "color" }], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` }, { type: "if", cond: { kind: "youDid" }, effects: rest.flat() as Effect[] });
+        payFirst = null;
+        si = sentences.length;
         continue;
       }
       // Skirk Drill Sergeant: "you may pay {2}{R}. If you do, reveal the top card of your library. If it's a Goblin

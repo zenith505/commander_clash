@@ -1517,6 +1517,14 @@ export function compile(d: CardDef): CompiledCard {
       else (out.entersChoose ??= []).push({ what: "colorAndType", options: pairs });
       continue;
     }
+    // Roots of Life: "As ~ enters, choose Island or Swamp." (CR 614.12): one of these basic land types, kept as
+    // Chosen.landType.
+    const asLandTypeList = /^As ~ enters, choose (Plains|Island|Swamp|Mountain|Forest) or (Plains|Island|Swamp|Mountain|Forest)\.$/.exec(line);
+    if (asLandTypeList) {
+      if (out.entersChoose?.length) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "basicLandType", options: [asLandTypeList[1]!, asLandTypeList[2]!] });
+      continue;
+    }
     // "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk." (Eclipsed Realms,
     // CR 614.12): one of these creature types.
     const asTypeList = /^As (?:~|it) enters, choose ((?:[A-Z][a-z]+, )+or [A-Z][a-z]+)\.$/.exec(line);
@@ -6196,7 +6204,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" ? needs.add("landType") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

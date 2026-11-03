@@ -703,6 +703,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const except = m[3] ? { colors: [COLOR_WORDS[m[3].toLowerCase()]!] } : m[2] ? { notLegendary: true } : undefined;
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(except ? { except } : {}) }] : null;
   }
+  // Meletis Charlatan: "The controller of target instant or sorcery spell copies it and may choose new targets for the
+  // copy" (body.ts joins the two sentences): any such spell, anyone's; its controller controls the copy and chooses the new
+  // targets (rulings, CR 707.10).
+  if ((m = /^The controller of target ((?:instant or sorcery |instant |sorcery )?spell) copies it and may choose new targets for the copy$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: true, byController: true }] : null;
+  }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).
   // Gogo, Master of Mimicry: "... you control X times", the X paid for the ability (CR 107.3a).

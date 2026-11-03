@@ -7,7 +7,7 @@ import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw,
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
-import { ResolveCtx, apnap, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
+import { ResolveCtx, apnap, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
@@ -317,7 +317,40 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         moveObject(s, hit, "hand");
         log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, hit)).name} into their hand.`);
       }
-      return toBottom(s, ctx.controller, seen.filter((id) => s.objects[id]?.zone === "library"), src, false);
+      return toBottom(s, ctx.controller, seen.filter((id) => s.objects[id]?.zone === "library"), src, !!e.random);
+    }
+    case "forEachRevealed": {
+      // Each revealed card in turn, in an order its controller chooses (rulings on Sword-Point Diplomacy: the opponents
+      // decide about one card before the next, knowing the earlier choices).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const here = (id: ObjectId) => s.objects[id]?.zone === "library";
+      const st = (sc.eachRevealed ??= { left: (r.revealedUntil ?? []).filter(here), step: 0 });
+      for (;;) {
+        if (st.current === undefined) {
+          const left = st.left.filter(here);
+          if (!left.length) break;
+          if (left.length > 1 && (st.next === undefined || !left.includes(st.next))) {
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "nextRevealed", options: left, labels: left.map((id) => defOf(s, obj(s, id)).name), prompt: "choose the revealed card to do next" };
+            return "paused";
+          }
+          st.current = st.next ?? left[0]!;
+          st.next = undefined;
+          st.left = left.filter((id) => id !== st.current);
+          st.step = 0;
+          r.revealed = { id: st.current, zc: obj(s, st.current).zoneChanges ?? 0 };
+        }
+        for (; st.step < e.effects.length; st.step++) if (runEffect(s, e.effects[st.step]!, ctx) === "paused") return "paused";
+        st.current = undefined;
+      }
+      sc.eachRevealed = undefined;
+      r.revealed = undefined;
+      if (e.rest === "exile") {
+        const rest = (r.revealedUntil ?? []).filter(here);
+        for (const id of rest) moveObject(s, id, "exile");
+        if (rest.length) log(s, `${player(s, ctx.controller).name} exiles ${rest.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      }
+      return;
     }
     case "parleyReveal": {
       // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
@@ -1364,6 +1397,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // Myr Incubator: "Search your library for any number of artifact cards, exile them, then create that many ...":
           // the cards this exiled (Count "cardsExiledThisWay").
           if (to.zone === "exile" && obj(s, id).zone === "exile" && e.dest.zone === "exile" && exiledFor(pid) === undefined) (r.exiledCards ??= []).push(id);
+          // Distant Memories: "that card" is the one exiled (CR 400.7), as it is in exile.
+          if (e.rememberExiled && to.zone === "exile" && obj(s, id).zone === "exile") r.exiledTop = { id, zc: obj(s, id).zoneChanges ?? 0 };
           // Bring to Light: the card exiled is the one to cast (castSearched).
           if (to.castFree && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) r.searchCast = id;
           // Endless Horizons: linked to the source as it is (CR 607.2a).

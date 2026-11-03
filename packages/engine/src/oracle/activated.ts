@@ -588,7 +588,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const exileOwn = costs.split(", ").includes("Exile ~");
   // "Exile ~ from your hand: Add {R}" (Simian Spirit Guide): it works only while the card is in your hand (CR 113.6k),
   // and exiling it is the whole cost. A mana ability all the same (CR 605.1a).
-  const exileFromHand = costs === "Exile ~ from your hand";
+  // Shattered Seraph: "{2}, Exile this card from your hand: Target land gains ..." (not a mana ability): mana and the exile.
+  const exileFromHand = costs === "Exile ~ from your hand" || (costs.split(", ").includes("Exile ~ from your hand") && costs.split(", ").every((c) => c === "Exile ~ from your hand" || /^(?:\{(?:\d+|[WUBRGC])\})+$/.test(c)));
   if (exileOwn && (fromYard || fromHand || /Sacrifice ~/.test(costs))) return "fail";
   // "{1}{G}, {T}, Return ~ to its owner's hand: ..." (Shigeki): returning the permanent itself is part of the cost (CR
   // 602.2b, 601.2h).
@@ -628,7 +629,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "Remove X storage counters from ~: Add X mana ..." (Crucible of the Spirit Dragon, Petalmane Baku): an X for a mana
   // ability isn't announced anywhere yet.
   if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf || removeCounters?.x))) return "fail";
-  if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
+  if (exileFromHand && (anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length || (mana === "mana" ? costs !== "Exile ~ from your hand" : !JSON.stringify(body.effects).includes('"type":"mayCastExiledSelf"')))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X") && !energyX && !removeCounters?.x && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,

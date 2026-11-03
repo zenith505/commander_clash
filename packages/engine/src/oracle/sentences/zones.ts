@@ -692,6 +692,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
   // chosen as it resolves (not targeted).
   if (/^[Pp]ut a card from your graveyard on the bottom of your library$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryBottom" }];
+  // Stream of Thought: "You shuffle up to four cards from your graveyard into your library": not targeted, chosen as it
+  // resolves (rulings), put into the library, which is then shuffled (CR 701.24a), even with none chosen.
+  if ((m = /^You shuffle up to (one|two|three|four|five) cards from your graveyard into your library$/.exec(s))) return [{ type: "chooseFromGraveyard", n: num(m[1]!), upTo: true, dest: "libraryBottom" }, { type: "shuffle", who: { ref: "you" } }];
   // Stillness in Motion: "put five cards from your graveyard on top of your library in any order": chosen as it resolves
   // (all of them with fewer), then put in the order you choose (CR 401.4).
   if ((m = /^(?:[Tt]hen )?[Pp]ut (two|three|four|five|six|seven) cards from your graveyard on top of your library in any order$/.exec(s))) {

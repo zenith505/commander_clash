@@ -2499,6 +2499,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(loyalEnchanted[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "you", loyalty: true, equipped: true }, body } : "fail";
   }
+  // Gideon the Oathless: "Whenever an opponent activates a loyalty ability, ~ deals 1 damage to that player": "that
+  // player" is the opponent who activated it (CR 606.3).
+  const oppLoyal = /^Whenever an opponent activates a loyalty ability, (.+)$/.exec(line);
+  if (oppLoyal) {
+    const body = parseBody(oppLoyal[1]!, { activatedAbility: true, eventPlayer: true });
+    return body ? { event: "abilityActivated", activates: { by: "opponent", loyalty: true }, body } : "fail";
+  }
   const loyal = /^Whenever you activate a loyalty ability(?: of an? ([A-Z][a-z]+) planeswalker)?, (?:if you removed (two|three|four|five) or more loyalty counters to activate it, )?(.+)$/.exec(line);
   if (loyal) {
     const of = loyal[1] ? parseTargetPhrase(`${loyal[1]} planeswalker`) : undefined;

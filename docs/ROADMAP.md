@@ -1,6 +1,6 @@
 # Roadmap
 
-29,693 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,711 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,535 of
 9,979 (95%).
 
@@ -1187,7 +1187,7 @@ line blocks.
    the return fail.
    Out after round 222 (looked at, not done): Deconstruction Hammer and its kind (a granted ability that sacrifices
    the Equipment granting it); Subterranean Schooner (explore by the creature that crewed it); Turtle Van; Trove of
-   Temptation (an attack requirement on opponents); Hedron Matrix (a per-object amount in a static); Voracious Dragon
+   Temptation (an attack requirement on opponents); Hedron Matrix (done in round B104) (a per-object amount in a static); Voracious Dragon
    (types of the devoured creatures); Jurin, Leading the Charge; Incite Rebellion; Ajani Unrelenting. Sosuke, Dragon's
    Prey, Dire Downdraft and Nullmage Advocate were left to Lane B, whose templates cover them.
    Round 223 (fresh cards from rank 15,000 on): "You may reveal this card from your opening hand. If you do, at the
@@ -2801,7 +2801,7 @@ line blocks.
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel).
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
      (Echoing Return, Rat King), "not named ~" (Detention Sphere), Legion's End's "exiles all cards with that name from
-     their hand". (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End
+     their hand". (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End (done in round B104)
      is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
@@ -3153,7 +3153,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Bone Shaman (which creatures a source damaged this turn); Sea Troll and Lurker (whether
   it blocked or was blocked by something this turn); Lifelace and Purelace (a color change on a spell); Ronom Hulk
   (protection from snow); Wandering Mage, Samite Censer-Bearer, Pearl Shard, Elvish Healer, Orim's Touch (prevention
-  forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (prevent damage
+  forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (done in round B104) (prevent damage
   from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
   single source); Groffskithur ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
@@ -3278,9 +3278,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit, Expel the
   Unworthy and Agonizing Demise (kicked riders not parsed yet); Morgue Burst ("the power of the card returned this
   way"); Sudden Insight ("each different mana value among nonland cards in your graveyard"); Doomsday Specter ("The
-  player discards that card"); Alaborn Zealot ("destroy both creatures"); Crown-Hunter Hireling ("unless defending
+  player discards that card"); Alaborn Zealot ("destroy both creatures"); Crown-Hunter Hireling (done in round B104) ("unless defending
   player is the monarch"); Landscaper Colos, Draugr Thought-Thief, Reveka, Hellhole Rats, Unyaro Griffin, Liability,
-  Sunken Hope, Mage Hunters' Onslaught, Lure of Prey, Light of Sanction, Enshrouding Mist, Arcades Sabboth, High Seas
+  Sunken Hope, Mage Hunters' Onslaught, Lure of Prey (done in round B104), Light of Sanction (done in round B104), Enshrouding Mist, Arcades Sabboth (done in round B104), High Seas
   and Aether Storm (each a template not parsed yet).
 - Round B7 (ranks about 23,800 up to about 21,900, template clusters, plus more played cards the same templates cover:
   Foresight, Relic Crush, Hellion Eruption, Ensoul Artifact, the Zendikons, the Genjus and others): "skips all
@@ -3303,13 +3303,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   as there are no cards in your graveyard"; "as long as an opponent is poisoned"; "Sacrifice all creatures you
   control, then create that many ..."; "Your life total becomes equal to your starting life total"; targets "cards
   with cycling (mutate) from your graveyard". +73, four of them also done by round 177: +69 (25,641 with round 177).
-- Skipped there, with reasons: Sadistic Sacrament (a kicked search "instead"); Dark Matter Manipulator and Master's
+- Skipped there, with reasons: Sadistic Sacrament (a kicked search "instead"); Dark Matter Manipulator (done in round B104) and Master's
   Councillors ("for every seven": a divided amount); Ichor Shade (a typed "put into a graveyard this turn" count);
   Crackling Emergence and Harmonious Emergence (a destroy replacement on the enchanted land); Genju of the Fields (a
   damage trigger granted until end of turn); Oppressive Rays, Qal Sisma Behemoth, Myr Prototype and Cowed by Wisdom
   (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid, Gremlin Infestation
   (each a template not parsed yet); Wall of Shadows ("can't be the target of spells that can target only Walls");
-  Chained Throatseeker ("can't attack unless defending player is poisoned").
+  Chained Throatseeker (done in round B104) ("can't attack unless defending player is poisoned").
 - Round B8 (ranks about 21,900 up to about 19,500, template clusters, plus more played cards the same templates cover:
   Cruel Reality, Wasitora, Vicious Battlerager, Nessian Boar, Glorious Enforcer and others): mass pumps split by
   controller ("creatures you control get +1/+1 and creatures your opponents control get -1/-1", Skulduggery's two
@@ -3331,12 +3331,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player's hand and choose a card from it. That player discards that card"; "Destroy all creatures except for ~".
   +86, three of them also done by round 179: +83 (25,870 with round 179).
 - Skipped there, with reasons: Devour Flesh and Doomgape (the sacrificed creature's toughness, as an effect's
-  sacrifice); Laquatus's Creativity ("that many" counted after the draw); Voidpouncer (two kinds of counters);
-  Ravaging Riftwurm (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
-  block); Orcish Spy (looking at the top cards without reordering); Gandalf, Wandering Wizard ("~'s owner ... and
-  draws"); Jaded Response ("shares a color with a
+  sacrifice); Laquatus's Creativity ("that many" counted after the draw); Voidpouncer (done in round B104) (two kinds of counters);
+  Ravaging Riftwurm (done in round B104) (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
+  block); Orcish Spy (done in round B104) (looking at the top cards without reordering); Gandalf, Wandering Wizard (done in round B104) ("~'s owner ... and
+  draws"); Jaded Response (done in round B104) ("shares a color with a
   creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
-  Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (moving every +1/+1 counter); Driftgloom Coyote
+  Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (done in round B104) (moving every +1/+1 counter); Driftgloom Coyote
   ("if that creature had power 2 or less" after an exile until).
 - Round B9 (ranks about 19,600 up to about 17,100, the easier templates, plus more played cards the same templates
   cover: Goblin Shrine, Kjeldoran Pride, Ancient Runes, Pippin's Bravery, Giant Opportunity, Regenerate and others):
@@ -3396,7 +3396,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spells and lifelink), Dennick (graveyard cards that can't be targeted), Captain Mar-Vell ("an opponent cast a
   spell" condition), Centaur Omenreader (a conditional cost reduction), Hercules (the first damage each turn), Ginger,
   Queen of Sweets (a token copy of the card Gingerbrute), Light of Judgment ("up to one Equipment attached to it"),
-  Scrib Nibblers (a condition on the exiled top card), Stream of Thought (shuffle up to four cards from graveyards),
+  Scrib Nibblers (a condition on the exiled top card), Stream of Thought (done in round B104) (shuffle up to four cards from graveyards),
   Mindshrieker (the milled card's mana value), Take Out the Trash ("if you do" after a conditional may), Zenith Flare
   (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short, Spreading Plague, Nullmage and
   Spurnmage Advocate (not parsed yet).
@@ -4350,11 +4350,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   tapped, untap it" (Volition Reins), "If you do, each opponent loses 2 life" after returning itself (Bob, Reluctant
   HYDRA Agent), "if it was kicked twice" (Archangel of Wrath), X counters "as this creature enters or is turned face up"
   (Crowd-Control Warden). +27 (28,323 of 31,936 with rounds 217 to 221).
-- Out after round B52 (looked at, not done): Gideon the Oathless and Way of the Paradox (Lane A's round 222 adds
+- Out after round B52 (looked at, not done): Gideon the Oathless (done in round B104) and Way of the Paradox (Lane A's round 222 adds
   "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
   template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
   Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning, Victor
-  Mancha, Encumbered Reejerey ("while" trigger conditions), Entrails Feaster, Ichorid, Nether Shadow, Cursed Rack,
+  Mancha, Encumbered Reejerey ("while" trigger conditions), Entrails Feaster, Ichorid, Nether Shadow, Cursed Rack (done in round B104),
   Celestial Kirin, Skyfire Kirin, Lumaret's Favor, Definitely Not a Turtle, Advice from the Fae, Petals of Insight,
   Rowdy Crew, Thijarian Witness, Riptide Replicator, Teferi's Response, Dawn Evangel, Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
@@ -4412,7 +4412,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Veiled Butcher ("If you sacrificed a creature this way", "who didn't discard two nonland cards"), Blackmail (the
   player reveals three of their choice), Cannibalize (two targets controlled by the same player), Moonlace ("target
   spell or permanent"), Living Conundrum (skip a draw from an empty library), Vhati il-Dal (base power 1 or base
-  toughness 1: a new choice), Hedron Matrix ("+X/+X, where X is its mana value" for the equipped creature). Possible
+  toughness 1: a new choice), Hedron Matrix (done in round B104) ("+X/+X, where X is its mana value" for the equipped creature). Possible
   bug to check: the target phrase "attacking creature or tapped creature" parses to `combat: attacking` plus an anyOf.
 - Round B55 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000): "Then discard
   two cards unless you discard an instant or sorcery card or a creature card with flying" (Steamcore Scholar), "Look at
@@ -5307,6 +5307,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards; "that's an artifact or that has mana value 3 or less"), Genestealer Patriarch (infection counters), Leonardo, Sewer
   Samurai (creature spells with power or toughness 1 or less from your graveyard during your turn, entering with a finality
   counter). +9 (29,693 of 31,936 with rounds 269 to 271).
+- Round B104 (single-line blockers from the skip lists, least played first): Gideon the Oathless ("Whenever an opponent
+  activates a loyalty ability": 1 damage to that player), Crown-Hunter Hireling and Chained Throatseeker ("can't attack
+  unless defending player is the monarch / is poisoned", one or more poison counters, CR 122.1f, checked as attackers are
+  declared), The End ("if your life total is 5 or less"), Dark Matter Manipulator ("for every seven cards in your
+  graveyard": whole groups), Cursed Rack ("The chosen player's maximum hand size is four", in timestamp order with other
+  hand size effects, rulings), Jaded Response (a spell sharing a color with a creature you control as it resolves,
+  rulings; bots only aim it at such a spell), Orcish Spy ("Look at the top three cards of target player's library": in the
+  same order), Gandalf, Wandering Wizard ("~'s owner shuffles ~ into their library and draws three cards": the owner, also
+  when another player controls it), Ravaging Riftwurm ("three additional time counters" on top of vanishing's two when
+  kicked), Voidpouncer (kicked: two +1/+1 counters, a trample counter and haste), Spike Cannibal ("move all +1/+1 counters
+  from all creatures onto it", no other kind), Hedron Matrix ("+X/+X, where X is its mana value": the equipped
+  creature's), Arcades Sabboth ("Each untapped creature you control gets +0/+2 as long as it's not attacking", itself
+  too, rulings), Light of Sanction (your sources' damage to your creatures prevented), Desert Nomads (damage from Deserts
+  prevented), Stream of Thought ("You shuffle up to four cards from your graveyard into your library": chosen as it
+  resolves, not targeted, rulings; with a browser test), Lure of Prey ("Cast ~ only if an opponent cast a creature spell
+  this turn"). +18 (29,711 of 31,936 with rounds 269 to 271).
+- Out after round B104 (looked at, not done): Memory Crystal ("Buyback costs cost {2} less": a reduction of only the
+  buyback part of the total cost, rulings), Elderwood Scion (spells that target it cost {2} less or more: a cost that
+  depends on the targets chosen, and on who casts the spell).
 - Out after round B103 (looked at, not done): The Three Seasons ("Choose three cards in each graveyard": a pick in every
   graveyard, not targeted), Pursuit of Knowledge (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
   Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its

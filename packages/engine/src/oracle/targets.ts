@@ -1242,6 +1242,28 @@ export function parseTargetPhrase(
   // Telim'Tor's Edict: "target permanent you own or control": yours by either (CR 108.3, 110.2).
   if (phrase.trim() === "permanent you own or control")
     return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: [], notTypes: [], notColors: [], owner: "you", text: "permanent you own" }, { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }], text: "target permanent you own or control" };
+  // A card in exile, whoever exiled it (CR 406): "target exiled card with flashback you own" (Runic Repetition), "target
+  // card with flashback you own from exile" (Rootcoil Creeper), "target face-up exiled card" (Pull from Eternity). Only a
+  // face-up one: a face-down card has no characteristics or abilities (CR 406.3, rulings on Runic Repetition). Read as the
+  // same card in a graveyard would be, matched by its printed characteristics (TargetSpec.inExile).
+  const exiled = /^(target )?(?:(?:face-up )?exiled ((?:[a-z]+ )*)card((?: with [a-z]+)?)( you own)?|((?:[a-z]+ )*)card((?: with [a-z]+)?) you own from exile)$/.exec(phrase.trim());
+  if (exiled) {
+    const types = exiled[2] ?? exiled[5] ?? "";
+    const quality = exiled[3] ?? exiled[6] ?? "";
+    const owned = !!exiled[4] || exiled[5] !== undefined;
+    const head = parseTargetPhrase(`${exiled[1] ?? ""}${types}card${quality} from ${owned ? "your" : "a"} graveyard`, opts);
+    if (head?.kind !== "card" || head.linkedExile || head.anyOf) return null;
+    return { ...head, inExile: true, text: phrase.trim().startsWith("target ") ? phrase.trim() : `target ${phrase.trim()}` };
+  }
+  // Sorceress's Schemes: "target instant or sorcery card from your graveyard or exiled card with flashback you own": one
+  // card, in either zone (TargetSpec.orExile).
+  const yardOrExile = /^(target )?(.+ card from your graveyard) or (exiled card .+)$/.exec(phrase.trim());
+  if (yardOrExile) {
+    const head = parseTargetPhrase(`${yardOrExile[1] ?? ""}${yardOrExile[2]}`, opts);
+    const alt = parseTargetPhrase(yardOrExile[3]!, opts);
+    if (head?.kind !== "card" || head.linkedExile || head.inExile || alt?.kind !== "card" || !alt.inExile || alt.owner !== head.owner) return null;
+    return { ...head, orExile: alt, text: phrase.trim().startsWith("target ") ? phrase.trim() : `target ${phrase.trim()}` };
+  }
   // Ice Cream Kitty: "Sacrifice another creature or token": a permanent that's either (a token of any type too).
   const orToken = /^(artifact|creature|enchantment|land) or token$/.exec(phrase.trim());
   if (orToken) {
@@ -1894,7 +1916,7 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if (inGraveyard && (m = /(?:^| )with (cycling(?: abilities)?|awaken|foretell|mutate|flashback|madness|disturb|a cycling ability)$/.exec(p))) {
+  } else if (inGraveyard && (m = /(?:^| )with (cycling(?: abilities)?|awaken|foretell|mutate|flashback|madness|disturb|warp|a cycling ability)$/.exec(p))) {
     // Sacred Excavation: "cards with cycling from your graveyard": a card's printed keyword abilities, typecycling being
     // cycling too (CR 702.29e; the card data lists "Cycling" with it). Spellpyre Phoenix: "with a cycling ability", Herald
     // of the Forgotten: "with cycling abilities", the same.

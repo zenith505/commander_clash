@@ -667,7 +667,11 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (spec.kind === "card") {
     // A card in a graveyard (CR 109.2a). Nothing in the engine changes characteristics in a
     // graveyard, so the printed card is what's checked; hexproof only works on the battlefield.
-    if (o.zone !== (spec.linkedExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
+    // Sorceress's Schemes: a card in exile fits the exile half (TargetSpec.orExile).
+    if (spec.orExile && o.zone === "exile") return isLegalTarget(s, spec.orExile, t, controller, src);
+    if (o.zone !== (spec.linkedExile || spec.inExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
+    // "Target exiled card": a face-up one; a face-down card has no characteristics (CR 406.3, 702.143a, 702.75a).
+    if (spec.inExile && (o.foretold || o.hiddenExile || o.faceDown)) return false;
     // Ground Seal: "Cards in graveyards can't be the targets of spells or abilities."
     if (o.zone === "graveyard" && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).graveyardUntargetable)) return false;
     if (spec.owner === "you" && o.owner !== controller) return false;
@@ -791,7 +795,8 @@ export function legalTargets(s: GameState, spec0: TargetSpec, controller: Player
   if (spec.kind === "object" || spec.kind === "any" || spec.orPermanent) for (const id of s.battlefield) out.push({ kind: "object", id });
   if (spec.kind === "spell") for (const item of s.stack) if (item.id !== excludeStackId) out.push({ kind: "stack", id: item.id });
   if (spec.kind === "card" && spec.linkedExile) for (const l of linkedCards(s, sourceId)) out.push({ kind: "object", id: l.id, zc: l.zc });
-  else if (spec.kind === "card" || spec.orCard) for (const pid of livingPlayers(s)) for (const id of player(s, pid).graveyard) out.push({ kind: "object", id });
+  else if (spec.kind === "card" && spec.inExile) for (const pid of livingPlayers(s)) for (const id of player(s, pid).exile) out.push({ kind: "object", id });
+  else if (spec.kind === "card" || spec.orCard) for (const pid of livingPlayers(s)) for (const id of [...player(s, pid).graveyard, ...(spec.orExile ? player(s, pid).exile : [])]) out.push({ kind: "object", id });
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));
 }
 

@@ -597,6 +597,13 @@ export interface TargetSpec {
   owner?: "you" | "opponent";
   /** For "card": a card in exile linked to the source instead ("target creature card exiled with ~", CR 607.2a). */
   linkedExile?: true;
+  /**
+   * For "card": a face-up card in exile instead, whoever exiled it ("target exiled card with flashback you own", Runic
+   * Repetition; "target face-up exiled card", Pull from Eternity; CR 406.3). `owner` as for a graveyard.
+   */
+  inExile?: true;
+  /** For "card": or a card in exile matching this ("target instant or sorcery card from your graveyard or exiled card with flashback you own", Sorceress's Schemes). */
+  orExile?: TargetSpec;
   /** For objects: owned by this player, a mutating creature spell's owner (CR 702.140a). */
   ownerIs?: PlayerId;
   /** For objects/spells: at least one of these card types (empty = any permanent). */
@@ -3309,7 +3316,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
+  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** With `giveTo`: "If they do, ..." after it (Stiltzkin, Moogle Merchant): whether that player gained control of it is what "if you do" asks. */ setsDid?: true; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).

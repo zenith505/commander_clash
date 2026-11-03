@@ -1,6 +1,6 @@
 # Roadmap
 
-29,684 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,693 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,535 of
 9,979 (95%).
 
@@ -5297,6 +5297,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature, destroy both creatures"), Hellhole Rats ("that card's mana value": the discarded card's), Liability ("a player's
   graveyard ... that player": the card's owner, CR 400.3), Landscaper Colos ("the bottom of their library": its owner's),
   Kazandu Stomper ("return up to two lands you control", none too). +13 (29,684 of 31,936 with rounds 269 to 271).
+- Round B103 (fresh cards from the bottom of the list, and templates near them): Karona, False God ("that player untaps ~
+  and gains control of it" at each player's upkeep, the newest control effect winning, CR 613.7), Illicit Masquerade
+  (impostor counters; "up to one other target creature card": other than the card that died), Vadrok, Apex of Thunder
+  ("target noncreature card with mana value 3 or less" cast free from your graveyard as the mutate trigger resolves; a land
+  card can be the target but not cast, CR 305.9), Rose Tyler (time counters for each suspended card you own and each other
+  permanent you control with one), Chaos Shrine's Black Crystal (a linked card back "with a finality counter on it"),
+  Confession Dial and Desdemona, Freedom's Edge (escape until end of turn with the card's own mana cost plus exiling other
+  cards; "that's an artifact or that has mana value 3 or less"), Genestealer Patriarch (infection counters), Leonardo, Sewer
+  Samurai (creature spells with power or toughness 1 or less from your graveyard during your turn, entering with a finality
+  counter). +9 (29,693 of 31,936 with rounds 269 to 271).
+- Out after round B103 (looked at, not done): The Three Seasons ("Choose three cards in each graveyard": a pick in every
+  graveyard, not targeted), Pursuit of Knowledge (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
+  Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its
+  exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite ("defending player" in an
+  activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (a random creature it
+  could enchant), Ms. Marvel, Kamala Khan (a gained "base power is equal to" ability that keeps counting, not locked in),
+  Araumi of the Dead Tide (encore granted until end of turn).
 - Out after round B102 (looked at, not done): Lichenthrope and Phytohydra (damage replaced by counters: its controller
   orders it with prevention shields and with damage-increasing replacements, CR 616.1, and the best order differs between
   the two, so it needs that choice), Mausoleum Turnkey, Erithizon and Ley Line (a target chosen by another player),

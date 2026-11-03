@@ -24731,6 +24731,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "78eb5399-8c8b-4310-b585-e4ccd9d7c9cc",
+  "name": "Wake to Slaughter",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose up to two target creature cards in your graveyard. An opponent chooses one of them. Return that card to your hand. Return the other to the battlefield under your control. It gains haste. Exile it at the beginning of the next end step.\nFlashback {4}{B}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fea95888-e16a-4209-9cd4-623f7f4d2f67",
   "name": "Walking Corpse",
   "manaCost": "{1}{B}",

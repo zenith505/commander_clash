@@ -511,6 +511,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (what?.ref !== "target" || what.n !== 3) return null;
     return [{ type: "destroyRandomTarget", what }];
   }
+  // Reins of the Vinesteed: "When enchanted creature dies, you may return this card from your graveyard to the battlefield
+  // attached to a creature that shares a creature type with that creature": any such creature (not targeted, CR 303.4f) the
+  // Aura could enchant, sharing a type with the dead creature as it last existed (rulings); none, and it stays.
+  if (ctx.auraCard && /^[Rr]eturn ~ from your graveyard to the battlefield attached to a creature that shares a creature type with that creature$/.test(s))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard", moved: true, yours: true }, attachSharesTypeWithSubject: true }];
   if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on (?:it|~))?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
@@ -1397,6 +1402,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Prowling Geistcatcher: "return each card exiled with it to the battlefield under your control": the same, under the
   // ability's controller's control (rulings: cards it doesn't own too).
   if (/^[Rr]eturn each card exiled with (?:it|~) to the battlefield under your control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield", yours: true }];
+  // Dual Nature: "Whenever a nontoken creature leaves the battlefield, exile all tokens with the same name as that creature":
+  // every token (anyone's) with that creature's name as it last existed (CR 201.2, 603.10a).
+  if (/^[Ee]xile all tokens with the same name as that creature$/.test(s) && ctx.subject && !ctx.spell) return [{ type: "exile", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], token: true, text: "tokens" }, sameNameAsSubject: true } }];
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
   if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
@@ -1705,6 +1713,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const whom = parsePlayer("target opponent", ctx);
     if (what && !isGroup(what) && whom?.ref === "target") return [{ type: "continuous", what, mods: [{ kind: "mustAttackPlayer", player: { target: whom.index } }], duration: "endOfTurn" }];
     return null;
+  }
+  // Hustle: "Target creature attacks or blocks this turn if able": both requirements for the turn (CR 508.1d, 509.1c), as
+  // with "attacks or blocks each combat if able"; a tapped one, or one that can't, does neither (rulings).
+  if ((m = /^(target creature) attacks or blocks this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }, { kind: "mustBlock" }], duration: "endOfTurn" }] : null;
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

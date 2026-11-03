@@ -2700,6 +2700,8 @@ export interface Resolving {
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
     castingTarget?: ObjectId;
+    /** Wake to Slaughter: the opponent's pick is done (opponentSplitsTargets). */
+    splitDone?: true;
     /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
     exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */

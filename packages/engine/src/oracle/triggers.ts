@@ -585,7 +585,10 @@ function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null 
   const damagesYou = { by: who ? (who[1] === "an opponent" ? ("opponent" as const) : who[1] === "you" ? ("you" as const) : ("any" as const)) : undefined, ...(m[3] ? { combat: true as const } : {}) };
   if (who) {
     // "That player" is the source's controller only when it's an opponent's.
-    if (/\b(it|its|that source|that creature)\b/.test(text) || (damagesYou.by !== "opponent" && /\bthat player\b/.test(text))) return "fail";
+    // Stick, Fearless Mentor: "exile the top card of your library. You may play it until the end of your next turn": "it"
+    // is the exiled card there, not the source.
+    const guard = text.replace(/^exile the top card of your library\. You may play it (?=until the end of your next turn\.?$)/, "");
+    if (/\b(it|its|that source|that creature)\b/.test(guard) || (damagesYou.by !== "opponent" && /\bthat player\b/.test(text))) return "fail";
     let body = parseBody(text, { eventPlayer: true });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
@@ -1811,7 +1814,10 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
   if (self) {
     // "When you sacrifice ~, it deals 3 damage to any target" (Ordeal of Purphoros): ~ as it last existed (CR 608.2h).
-    const body = parseBody(self[1]!.replace(/^it deals /, "~ deals "));
+    // Biolume Egg: "return it to the battlefield transformed under its owner's control at the beginning of the next end
+    // step": the card where it went, as with "When ~ dies" (CR 400.7, 603.7).
+    const returnIt = /^return it to the battlefield transformed under its owner's control at the beginning of the next end step\.?$/.test(self[1]!);
+    const body = parseBody(self[1]!.replace(/^it deals /, "~ deals "), returnIt ? { selfCard: true } : {});
     return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
   }
   // "Whenever you sacrifice one or more Foods" (Camellia, the Seedmiser): once for each event that sacrificed any (CR

@@ -1515,6 +1515,34 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "opponentSplitsTargets": {
+      // Wake to Slaughter: the target cards still legal and in your graveyard; an opponent you choose picks the one that goes
+      // to your hand (CR 608.2c), the other returns to the battlefield under your control with haste, exiled at the next end
+      // step (CR 603.7). With one left, it goes to your hand (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.splitDone) return;
+      if (e.what.ref !== "target") return;
+      const at = new Map<ObjectId, number>();
+      for (let i = e.what.index; i < e.what.index + (e.what.n ?? 1); i++) {
+        const t = ctx.targets[i];
+        if (ctx.legal[i] && t?.kind === "object" && s.objects[t.id]?.zone === "graveyard" && s.objects[t.id]!.owner === ctx.controller) at.set(t.id, i);
+      }
+      const cards = [...at.keys()];
+      if (!cards.length) return;
+      const got = opponentPicks(s, ctx, src, undefined, ctx.controller, cards, cards, 1, { zone: "hand" }, { zone: "battlefield" });
+      if (got === "paused") return "paused";
+      sc.splitDone = true;
+      const p = player(s, ctx.controller);
+      for (const id of got) {
+        log(s, `${p.name} returns ${defOf(s, obj(s, id)).name} to their hand (${src}).`);
+        moveObject(s, id, "hand");
+      }
+      for (const id of cards.filter((x) => !got.includes(x))) {
+        const r = runEffect(s, { type: "putOntoBattlefield", what: { ref: "target", index: at.get(id)! }, haste: "game", atEndStep: "exile" }, ctx);
+        if (r === "paused") return r;
+      }
+      return;
+    }
     case "vault": {
       // Lim-Dûl's Vault (rulings): look at the top five. Each time the player pays 1 life, those go to the bottom in the
       // order they choose and they look at the top five again (the same ones with five or fewer cards). When they stop,

@@ -2322,6 +2322,19 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Leonardo, Sewer Samurai: "During your turn, you may cast creature spells with power or toughness 1 or less from your
+    // graveyard. If you cast a spell this way, that creature enters with a finality counter on it." Any number, paying all
+    // costs and following the timing rules (rulings), during its controller's turn only; the creature enters with the
+    // counter (CR 614.1c), as with Noctis, Prince of Lucis.
+    if (line === "During your turn, you may cast creature spells with power or toughness 1 or less from your graveyard. If you cast a spell this way, that creature enters with a finality counter on it.") {
+      const f = parseTargetPhrase("creature card with power or toughness 1 or less from a graveyard");
+      if (f?.kind !== "card" || f.anyOf?.length !== 2) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...rest } = f;
+        (out.graveyardGrants ??= []).push({ filter: { ...rest, text: "creature cards with power or toughness 1 or less" }, way: { kind: "permission", costs: [], exile: false, entersWith: { counter: "finality", n: 1 } }, yourTurn: true });
+      }
+      continue;
+    }
     // Jaya Ballard's emblem: "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be
     // put into your graveyard, exile it instead." Any number, paying their costs and following the usual timing rules; a
     // spell cast this way that's countered goes to exile too (CR 614.1a), one that leaves the stack another way doesn't.

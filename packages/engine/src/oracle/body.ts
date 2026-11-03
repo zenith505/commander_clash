@@ -1886,7 +1886,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Disciple of Phenax: "target player reveals a number of cards from their hand equal to ... You choose one of them.
   // That player discards that card." Cabal Interrogator: "... reveals X cards from their hand and you choose one of them.
   // That player discards that card.": one instruction (spells.ts).
-  text = text.replace(/\b(reveals (?:X cards|a number of cards) from their hand(?: equal to [^.]+?)?)(?:\. You choose one of (?:them|those cards)| and you choose one of them)\. That player discards that card\./, "$1 and discards the one of them you choose.");
+  // Landscaper Colos: "put target card from an opponent's graveyard on the bottom of their library": its owner's.
+  text = text.replace(/^(put target card from an opponent's graveyard on the bottom of) their library\.$/, "$1 its owner's library.");
+  // Hellhole Rats: "target player discards a card. ~ deals damage to that player equal to that card's mana value.": the
+  // card discarded, its mana value in the graveyard (none discarded: 0).
+  text = text.replace(/\b(target player discards a card\. ~ deals damage to that player equal to) that card's mana value\./, "$1 the discarded card's mana value.");
+  // Noggin Whack: "reveals three cards from their hand. You choose two of them. That player discards those cards.",
+  // Blackmail: "reveals three cards ... and you choose one of them": the same, that many. Thieving Sprite: "reveals X
+  // cards from their hand, where X is ...": X counted as it resolves.
+  text = text.replace(/\b(reveals (?:X cards|a number of cards|three cards) from their hand(?: equal to [^.]+?)?)(, where X is [^.]+?)?(?:\. You choose (one|two) of (?:them|those cards)| and you choose (one|two) of them)\. That player discards (that card|those cards)\./, (all, head: string, where: string | undefined, a: string | undefined, b: string | undefined, which: string) =>
+    ((a ?? b) === "one") === (which === "that card") ? `${head} and discards the ${a ?? b} of them you choose${where ?? ""}.` : all);
   // Ral's Staticaster: "~ gets +1/+0 for each card in your hand until end of turn": the usual order, counted as it
   // resolves (rulings).
   text = text.replace(/(^|\. )(~ gets [+-]\d+\/[+-]\d+) for each ([^.]+?) until end of turn\./, "$1$2 until end of turn for each $3.");
@@ -2250,6 +2259,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Discard all the cards in your hand\. Add (\{[WUBRGC]\}) for each card discarded this way, then draw that many cards plus one\./, "$1Discard your hand. Add $2 for each card discarded this way. Draw cards equal to the number of cards discarded this way plus one.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
+  // Confession Dial, Desdemona: "... gains escape until end of turn. The escape cost is equal to its mana cost plus exile
+  // three other cards from your graveyard." is one instruction.
+  text = text.replace(/ gains escape until end of turn\. The escape cost is equal to its mana cost plus exile (two|three|four|five) other cards from your graveyard\./g, " gains escape with its mana cost and exile $1 other cards until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   // Flubs, the Fool: "draw a card if you have no cards in hand. Otherwise, discard a card." is "If you have no cards in
@@ -4553,6 +4565,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const dmg = parseOne("~ deals 1 damage to that player", ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "tap" || dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
       effects.push({ ...fx[0]!, noteTapped: true }, { ...dmg[0]!, amount: { count: { kind: "tappedThisWay" } } });
+      continue;
+    }
+    // Pulse of the Dross: "Then if that player has more cards in hand than you, return ~ to its owner's hand.": the target
+    // player's hand and yours as it resolves, after the discard; the spell goes to its owner's hand instead of the graveyard
+    // (CR 608.2n).
+    if (/^(?:Then )?[Ii]f that player has more cards in hand than you, return ~ to its owner's hand$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "takeFromHand" || prev.who.ref !== "target" || !opts.spell) return null;
+      const theirs = { kind: "cardsInHand" as const, who: prev.who };
+      const mine = { kind: "cardsInHand" as const, who: { ref: "you" as const } };
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a: { count: theirs }, atLeast: { count: mine, plus: 1 } }, effects: [{ type: "bounce", what: { ref: "self" } }] });
+      continue;
+    }
+    // Angel's Trumpet: "tap all untapped creatures that player controls that didn't attack this turn. ~ deals damage to the
+    // player equal to the number of creatures tapped this way.": those that became tapped, as with Monsoon (rulings: ones
+    // already tapped aren't counted).
+    if (/^[Tt]ap all untapped creatures that player controls that didn't attack this turn$/.test(s) && /^~ deals damage to the player equal to the number of creatures tapped this way\.?$/.test(sentences[si + 1] ?? "")) {
+      const fx = parseOne(s, ctx);
+      const dmg = parseOne("~ deals 1 damage to that player", ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "tap" || dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+      effects.push({ ...fx[0]!, noteTapped: true }, { ...dmg[0]!, amount: { count: { kind: "tappedThisWay" } } });
+      si++;
       continue;
     }
     // Rhystic Lightning: "~ deals 4 damage to any target unless that permanent's controller or that player pays {2}. If they
@@ -7491,7 +7525,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const what = parseCardTarget(castTarget[1]!, ctx, theirs || anyYard ? undefined : "you");
       const t = ctx.targets[before];
       // A land card can't be cast (CR 305.9).
-      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : anyYard ? t.owner || t.controller : t.owner !== (theirs ? "opponent" : "you")) || !t.types?.length || t.types.includes("Land")) return null;
+      // Vadrok, Apex of Thunder: "you may cast target noncreature card with mana value 3 or less from your graveyard without
+      // paying its mana cost", no rider: the spell goes where it would after (rulings). A land card can be the target (mana
+      // value 0) but can't be cast (CR 305.9), so nothing happens then.
+      const noncreature = castTarget[2] === "your" && !exileAfter && !rider?.startsWith("If ") && t?.kind === "card" && !t.types?.length && t.notTypes?.length === 1 && t.notTypes[0] === "Creature" && !!t.manaValue;
+      if (!what || (!exileAfter && !theirs && !noncreature) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : anyYard ? t.owner || t.controller : t.owner !== (theirs ? "opponent" : "you")) || (!noncreature && !t.types?.length) || t.types?.includes("Land")) return null;
       effects.push({ type: "castTargetFree", what, ...(exileAfter ? { exileAfter } : {}) });
       if (exileAfter) si++;
       continue;
@@ -9004,7 +9042,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // permanent was a Liliana planeswalker, her controller loses 3 life.": the same, as it last existed.
     const destroyWas = /^[Dd]estroy target (?:creature|creature with [a-z]+|artifact or enchantment|black creature or black planeswalker|Forest, green enchantment, or green planeswalker)$/.test(s)
       ? /^If (?:that creature|that permanent|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+)(?: planeswalker)?)|was a legendary enchantment|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
-      : /^[Dd]estroy target (?:land|non-Swamp land)$/.test(s) ? /^If that land (was a snow land|was nonbasic)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+      : /^[Dd]estroy target (?:land|non-Swamp land)$/.test(s) ? /^If that land (was a snow land|was nonbasic|was legendary)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
     const planeswalkerWas = destroyWas && / planeswalker,/.test(sentences[si + 1] ?? "");
     if (destroyWas && (!destroyWas[4] || planeswalkerWas || CREATURE_TYPES.has(destroyWas[4]))) {
       const before = ctx.targets.length;
@@ -9017,6 +9055,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         ? { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Snow"], text: "snow" }
         : destroyWas[1] === "was nonbasic"
         ? { kind: "object", types: [], notTypes: [], notColors: [], notSupertypes: ["Basic"], text: "nonbasic" }
+        : destroyWas[1] === "was legendary"
+        ? { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" }
         : planeswalkerWas
         ? { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], subtypes: [destroyWas[4]!], text: `a ${destroyWas[4]} planeswalker` }
         : destroyWas[2]
@@ -9026,7 +9066,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
           : destroyWas[5]
             ? { kind: "object", types: [], notTypes: [], notColors: [], counter: "+1/+1", text: "with a +1/+1 counter on it" }
             : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
-      const then = parseOne(capital(destroyWas[6]!.replace(/\b(?:the land's|her) controller\b/, "that permanent's controller")), ctx);
+      // Feast of Worms: "If that land was legendary, its controller sacrifices another land of their choice": the land's
+      // controller as it last existed (CR 608.2h), another land than that one if it's still there (indestructible).
+      const another = destroyWas[1] === "was legendary" && /^its controller sacrifices another land of their choice$/.test(destroyWas[6]!);
+      const then: Effect[] | null = another
+        ? [{ type: "pick", who: { ref: "targetController", index: before }, filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" }, n: 1, action: "sacrifice", otherThanTarget: before }]
+        : parseOne(capital(destroyWas[6]!.replace(/\b(?:the land's|her) controller\b/, "that permanent's controller")), ctx);
       if (!then || !then.length || ctx.targets.length !== before + 1) return null;
       const yes = [...fx, ...then];
       effects.push(destroyWas[1] === "wasn't attacking"

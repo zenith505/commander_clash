@@ -727,6 +727,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^(?:[Tt]hen )?[Ii]f it's the first end step of the turn, there is an additional end step after this step$/.test(s)) return [{ type: "addEndStep" }];
   // Sphinx of the Second Sun: "there is an additional beginning phase after this phase" (CR 500.8).
   if (/^[Tt]here is an additional beginning phase after this phase$/.test(s)) return [{ type: "addPhases", phases: ["beginning"] }];
+  // The Ninth Doctor: "you get an additional upkeep step after this step" (CR 500.8): during your own upkeep, where the
+  // trigger from your untap step resolves (rulings).
+  if (/^[Yy]ou get an additional upkeep step after this step$/.test(s)) return [{ type: "addUpkeepStep", you: true }];
+  // Obeka, Splitter of Seconds: "you get that many additional upkeep steps after this phase": an upkeep step happens only in
+  // a beginning phase, so each is an additional beginning phase after this one with its untap and draw steps skipped
+  // (rulings, CR 500.8).
+  // In a trigger, "that many" is the event's amount, read as X (parseTrigger).
+  if (/^[Yy]ou get X additional upkeep steps after this phase$/.test(s)) return [{ type: "addUpkeepPhases", n: X }];
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
   // "Target player shuffles their graveyard into their library."
   // Endurance: "up to one target player puts all the cards from their graveyard on the bottom of their library in a random

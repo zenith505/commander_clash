@@ -12,6 +12,9 @@ import { parseDamageMod } from "./damage-mods";
 import { QUOTED_SOURCE_NAME } from "./compile";
 import { parseBecomes } from "./sentence";
 
+/** Every land type (CR 205.3i): the basic ones (Forest, Island, Mountain, Plains, Swamp) and the others. */
+const ALL_LAND_TYPES = ["Cave", "Desert", "Forest", "Gate", "Island", "Lair", "Locus", "Mine", "Mountain", "Plains", "Planet", "Power-Plant", "Sphere", "Swamp", "Tower", "Town", "Urza's"];
+
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
   let m: RegExpExecArray | null;
@@ -2699,6 +2702,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   const chosenColor = /^(~|Enchanted land) is the chosen color$/.exec(text);
   if (chosenColor) return { affects: chosenColor[1] === "~" ? { kind: "self" } : { kind: "attached" }, mods: [{ kind: "setColors", colors: [], chosen: true }], text: line };
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
+  // Omo, Queen of Vesuva: "Each land with an everything counter on it is every land type in addition to its other types":
+  // all of them (CR 205.3i, rulings), its basic ones giving it their mana abilities (CR 305.6); "Each nonland creature with
+  // an everything counter on it is every creature type." Both in the type-changing layer (CR 613.1d).
+  if (text === "Each land with an everything counter on it is every land type in addition to its other types")
+    return { affects: { kind: "filter", types: ["Land"], spec: { kind: "object", types: ["Land"], notTypes: [], notColors: [], counter: "everything", text: "each land with an everything counter on it" } }, mods: [{ kind: "addTypes", types: [], subtypes: [...ALL_LAND_TYPES] }], text: line };
+  if (text === "Each nonland creature with an everything counter on it is every creature type")
+    return { affects: { kind: "filter", types: ["Creature"], spec: { kind: "object", types: ["Creature"], notTypes: ["Land"], notColors: [], counter: "everything", text: "each nonland creature with an everything counter on it" } }, mods: [{ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true }], text: line };
   // Opalescence: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and base
   // toughness each equal to its mana value" (Starfield of Nyx: "... you control"); March of the Machines: "Each
   // noncreature artifact is an artifact creature with power and toughness each equal to its mana value". The set is

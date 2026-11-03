@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
@@ -192,7 +192,8 @@ export function continueResolution(s: GameState): Resolution {
     }
     if (r.next >= r.body.effects.length) break;
     if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
-    if (runAsking(s, r.body.effects[r.next]!, ctx) === "paused") return "paused";
+    // An instruction's taps happen at the same time (CR 608.2c): "one or more ... become tapped" triggers once.
+    if (batchTaps(s, () => runAsking(s, r.body.effects[r.next]!, ctx)) === "paused") return "paused";
     r.next++;
     r.scratch = undefined;
   }
@@ -1069,6 +1070,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "skip":
     case "addPhases":
     case "addUpkeepStep":
+    case "addUpkeepPhases":
     case "addEndStep":
     case "loseGame":
     case "winGame":

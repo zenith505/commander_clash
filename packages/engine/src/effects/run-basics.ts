@@ -1,5 +1,6 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
+import { defMv } from "../faces";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { addPhases, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
@@ -87,6 +88,31 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} will take ${n === 1 ? "an extra turn" : `${n} extra turns`} after this one.`);
       }
       return;
+    case "timesifter": {
+      // Each round: everyone still in it exiles their top card at once (APNAP order makes no difference); a land is 0 (CR
+      // 202.3). One greatest takes the turn; a tie goes again among the tied ones only (rulings); no card, out of it.
+      let left = apnap(s, livingPlayers(s));
+      while (left.length) {
+        const mv = new Map<PlayerId, number>();
+        for (const pid of left) {
+          const top = player(s, pid).library[0];
+          if (top === undefined) continue;
+          moveObject(s, top, "exile");
+          mv.set(pid, defMv(defOf(s, obj(s, top))));
+          log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, top)).name} (mana value ${mv.get(pid)}) from the top of their library.`);
+        }
+        if (!mv.size) break;
+        const most = Math.max(...mv.values());
+        left = [...mv.keys()].filter((pid) => mv.get(pid) === most);
+        if (left.length === 1) {
+          (s.extraTurns ??= []).push({ player: left[0]! });
+          log(s, `${player(s, left[0]!).name} exiled the greatest mana value and will take an extra turn after this one (${src}).`);
+          break;
+        }
+        log(s, `${left.map((pid) => player(s, pid).name).join(" and ")} are tied; they exile again.`);
+      }
+      return;
+    }
     case "controlPlayer": {
       // CR 723.1: it applies to the next turn that player actually takes, waiting through skipped turns (723.1b).
       const controller = players(s, e.controller, ctx)[0];

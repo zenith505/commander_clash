@@ -3143,11 +3143,14 @@ export function compile(d: CardDef): CompiledCard {
     // Omnipresence: "You may cast spells with mana value less than or equal to the number of creatures you control from your
     // hand without paying their mana costs": an alternative cost of nothing (CR 118.9), X at 0 (107.3b, rulings), the count
     // taken as each spell is cast; normal timing (rulings).
-    const omni = /^You may cast spells with mana value less than or equal to (the number of creatures you control) from your hand without paying their mana costs\.$/.exec(line);
+    // Fires of Invention: "You may cast spells with mana value less than or equal to the number of lands you control without
+    // paying their mana costs": the same from wherever they may be cast, not with another alternative cost a permission
+    // requires (flashback), X at 0 (rulings).
+    const omni = /^You may cast spells with mana value less than or equal to (the number of creatures you control|the number of lands you control)( from your hand)? without paying their mana costs\.$/.exec(line);
     if (omni) {
       const n = parseCount(omni[1]!, null);
       if (!n || out.payZero) out.unsupported.push(raw);
-      else out.payZero = { fromHand: true, maxMvCount: n };
+      else out.payZero = { ...(omni[2] ? { fromHand: true as const } : {}), maxMvCount: n };
       continue;
     }
     // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
@@ -4004,6 +4007,11 @@ export function compile(d: CardDef): CompiledCard {
       out.skipUpkeepIfHellbent = true;
       continue;
     }
+    // Storage Matrix (game.ts untapChoices): checked as the untap step's untapping comes, after phasing (CR 502.1-3).
+    if (line === "As long as ~ is untapped, each player chooses artifact, creature, or land during their untap step. That player can untap only permanents of the chosen type this step.") {
+      out.untapTypeChoice = true;
+      continue;
+    }
     if (line === "Players skip their untap steps." || line === "Each player skips their untap step.") {
       out.skipUntapSteps = true;
       continue;
@@ -4435,6 +4443,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
       out.opponentsSorceryTiming = true;
+      continue;
+    }
+    // Fires of Invention: both for its controller only; the two spells are every spell they've cast this turn, before Fires
+    // was there too, and one cast during another turn or as a third is barred even when an effect says to cast it
+    // (rulings).
+    if (line === "You can cast spells only during your turn and you can cast no more than two spells each turn.") {
+      out.castOnlyYourTurn = true;
+      (out.castLimits ??= []).push({ who: "you", n: 2, text: "You can cast no more than two spells each turn." });
       continue;
     }
     // Dosan the Falling Leaf: no player can cast a spell during another player's turn, even while something resolves.

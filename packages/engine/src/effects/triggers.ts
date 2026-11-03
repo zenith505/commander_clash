@@ -298,7 +298,7 @@ export type TriggerSourceEvent =
   /** A player searched their own library (CR 701.23). */
   | { type: "searchedLibrary"; player: PlayerId }
   /** A player's library was shuffled (CR 701.24), by its owner. */
-  | { type: "shuffledLibrary"; player: PlayerId }
+  | { type: "shuffledLibrary"; player: PlayerId; /** The controller of the spell or ability that caused it (rng.ts shuffleLibrary). */ by?: PlayerId }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number; /** The controller of the spell or ability whose effect made them discard, if one did (not a cost). */ cause?: PlayerId }
   /** A card (or token) was put into a graveyard, from any zone. */
@@ -1296,8 +1296,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "countersPut") {
     // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.
     const o = obj(s, ev.id);
-    const kindOk = (t: TriggeredAbility, you: PlayerId) => (t.countersKind === undefined || t.countersKind === ev.counter) && (!t.countersByYou || ev.by === you);
-    const info = { amount: ev.amount };
+    // Bold Plagiarist: an opponent of the ability's controller putting them on a creature that opponent controls.
+    const theirsOk = (t: TriggeredAbility, you: PlayerId) => !t.countersByOpponentOnTheirs || (ev.by !== undefined && ev.by !== you && controllerOf(s, o) === ev.by && opponents(s, you).includes(ev.by));
+    const kindOk = (t: TriggeredAbility, you: PlayerId) => (t.countersKind === undefined || t.countersKind === ev.counter) && (!t.countersByYou || ev.by === you) && theirsOk(t, you);
+    const info = { amount: ev.amount, counter: ev.counter, ...(ev.by !== undefined ? { player: ev.by } : {}) };
     const after = o.counters[ev.counter] ?? 0;
     const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
     // "For the first time each turn": counters put on this object earlier this turn count, whatever had the ability then.
@@ -2329,6 +2331,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentShufflesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // Psychogenic Probe: "Whenever a spell or ability causes a player to shuffle their library"; Widespread Panic: "...
+      // causes its controller to shuffle their library", that player's own spell or ability.
+      if (ev.by !== undefined) add(o, you, (e) => e === "effectShufflesLibrary" || (e === "effectShufflesOwnLibrary" && ev.by === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "draw") {
     const draws = (o: GameObject, you: PlayerId) =>

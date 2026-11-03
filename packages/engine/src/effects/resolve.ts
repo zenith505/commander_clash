@@ -1064,6 +1064,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "createdFightEach":
     case "bite":
     case "extraTurn":
+    case "timesifter":
     case "endTurn":
     case "endCombatPhase":
     case "controlPlayer":

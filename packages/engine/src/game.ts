@@ -1284,7 +1284,9 @@ export function moveObject(
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
-  if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
+  // Darksteel Colossus: its own replacement ability shuffled it in, controlled by whoever controlled it (by its owner
+  // from another zone, CR 113.8).
+  if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner), fromZone === "battlefield" ? lastController : o.owner);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
   // Cosmic Intervention: each card exiled this way gets its own delayed trigger (rulings); a token ceases to exist and
@@ -3620,6 +3622,43 @@ export function untapChoiceProblem(s: GameState, ap: PlayerId, options: ObjectId
   return more ? `${nameOf(s, more)} can untap too: untap as many as the limits allow` : undefined;
 }
 
+/**
+ * Storage Matrix: a permanent of the active player's that can't untap this step for lacking one of the types they chose
+ * (an artifact creature untaps with "artifact" or "creature" chosen, rulings; two Matrices, two choices, both kept to).
+ */
+function untapTypeBlocked(s: GameState, o: GameObject, ap: PlayerId): boolean {
+  const c = player(s, ap).untapTypes;
+  if (c?.turn !== s.turn || controllerOf(s, o) !== ap) return false;
+  const types = characteristics(s, o).types;
+  return !c.types.every((t) => types.includes(t));
+}
+
+/**
+ * The untap step's choices before its permanents untap (CR 502.3): Storage Matrix's type, for each untapped one (each its
+ * own choice), then "you may choose not to untap ~".
+ */
+function untapChoices(s: GameState): void {
+  const ap = s.activePlayer;
+  const p = player(s, ap);
+  const matrices = s.battlefield.filter((id) => !obj(s, id).tapped && abilitiesOf(s, obj(s, id)).untapTypeChoice);
+  const chosen = p.untapTypes?.turn === s.turn ? p.untapTypes.types : [];
+  if (chosen.length < matrices.length) {
+    const options = ["Artifact", "Creature", "Land"];
+    s.pending = { kind: "chooseOption", player: ap, source: nameOf(s, matrices[chosen.length]!), what: "untapType", options, labels: options, prompt: "choose artifact, creature, or land: only your permanents of that type untap this step" };
+    return;
+  }
+  // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
+  const may = s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !characteristics(s, o).doesntUntap && !untapTypeBlocked(s, o, ap) && abilitiesOf(s, o).mayNotUntap;
+  });
+  if (may.length) {
+    s.pending = { kind: "pickPermanents", player: ap, source: "Untap step", action: "keepTapped", what: "permanents to keep tapped", options: may, count: may.length, min: 0 };
+    return;
+  }
+  return untapStep(s, []);
+}
+
 /** The untap step untaps the active player's permanents, except `keep` (CR 502.3), then ends (no priority, CR 502.4). */
 function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
   const ap = s.activePlayer;
@@ -3628,7 +3667,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
     const limits = untapLimitsNow(s, ap);
     const would = s.battlefield.filter((id) => {
       const o = obj(s, id);
-      return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !keep.includes(id) && !characteristics(s, o).doesntUntap;
+      return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !keep.includes(id) && !characteristics(s, o).doesntUntap && !untapTypeBlocked(s, o, ap);
     });
     const options = would.filter((id) => limits.some((l) => objectMatches(s, l.filter, obj(s, id), ap, false)));
     if (limits.some((l) => options.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length > l.n)) {
@@ -3649,7 +3688,7 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
     if (o.skipNextUntap) {
       o.skipNextUntap = o.skipMoreUntaps ? true : undefined;
       o.skipMoreUntaps = o.skipMoreUntaps && o.skipMoreUntaps > 1 ? o.skipMoreUntaps - 1 : undefined;
-    } else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) {
+    } else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !untapTypeBlocked(s, o, ap) && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) {
       // Freyalise's Winds: a tapped permanent that would untap with such counters on it loses them all instead (CR 614.1a;
       // rulings: only one that would untap, not one kept tapped).
       const winds = o.tapped ? s.battlefield.map((b) => abilitiesOf(s, obj(s, b)).untapRemovesCounters).find((k) => k && (o.counters[k] ?? 0) > 0) : undefined;
@@ -3727,16 +3766,7 @@ function beginStep(s: GameState, step: Step): void {
           if (controllerOf(s, o) === ap && characteristics(s, o).types.some((t) => noUntap.includes(t))) o.skipNextUntap = true;
         }
       }
-      // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
-      const may = s.battlefield.filter((id) => {
-        const o = obj(s, id);
-        return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !characteristics(s, o).doesntUntap && abilitiesOf(s, o).mayNotUntap;
-      });
-      if (may.length) {
-        s.pending = { kind: "pickPermanents", player: ap, source: "Untap step", action: "keepTapped", what: "permanents to keep tapped", options: may, count: may.length, min: 0 };
-        return;
-      }
-      return untapStep(s, []);
+      return untapChoices(s);
     }
     case "upkeep": {
       // Eon Hub: "Players skip their upkeep steps" replaces the whole step (CR 614.10): nothing triggers "at the beginning
@@ -6490,6 +6520,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
     if (abilitiesOf(s, o).opponentsSorceryTiming && controllerOf(s, o) !== pid && (s.resolving || !canActAtSorcerySpeed(s, pid)))
       return `${characteristics(s, o).name}: opponents can cast spells only any time they could cast a sorcery`;
+    if (abilitiesOf(s, o).castOnlyYourTurn && controllerOf(s, o) === pid && pid !== s.activePlayer) return `${characteristics(s, o).name}: you can cast spells only during your turn`;
     if (abilitiesOf(s, o).castOnlyOwnTurn && pid !== s.activePlayer) return `${characteristics(s, o).name}: players can cast spells only during their own turns`;
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
@@ -6536,7 +6567,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
       if (l.filter && !printedMatches(l.filter, d)) continue;
-      if ((s.castThisTurn ?? []).some((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))))
+      if ((s.castThisTurn ?? []).filter((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))).length >= (l.n ?? 1))
         return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
     }
   }
@@ -8791,6 +8822,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (!st) throw new RulesError("nothing to choose a number for");
     st.pick = Number(choice);
     continueResolution(s);
+    return;
+  }
+  // Storage Matrix: one more type chosen for this untap step, then its other choices and the untapping.
+  if (pend.what === "untapType") {
+    const had = p.untapTypes?.turn === s.turn ? p.untapTypes.types : [];
+    p.untapTypes = { turn: s.turn, types: [...had, choice] };
+    log(s, `${p.name} chooses ${choice.toLowerCase()}: only their ${choice.toLowerCase()}s untap this step (${pend.source}).`);
+    untapChoices(s);
     return;
   }
   if (pend.what === "damageShield") {

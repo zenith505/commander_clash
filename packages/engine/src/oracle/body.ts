@@ -2308,6 +2308,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ],
       text,
     };
+  // Thunderous Debut: "Look at the top twenty cards of your library. You may reveal up to two creature cards from among
+  // them. If ~ was bargained, put the revealed cards onto the battlefield. Otherwise, put the revealed cards into your
+  // hand. Then shuffle.": one look, its destination set by whether it was bargained as it was cast (a copy of a bargained
+  // spell is bargained too, rulings).
+  const debut = opts.spell ? /^Look at the top (\w+) cards of your library\. You may reveal up to (\w+) (creature|artifact|land) cards from among them\. If ~ was bargained, put the revealed cards onto the battlefield\. Otherwise, put the revealed cards into your hand\. Then shuffle\.$/.exec(text.trim()) : null;
+  if (debut) {
+    const look = `Look at the top ${debut[1]} cards of your library.`;
+    const onto = parseBody(`${look} You may put up to ${debut[2]} ${debut[3]} cards from among them onto the battlefield. Then shuffle.`, opts);
+    const hand = parseBody(`${look} You may reveal up to ${debut[2]} ${debut[3]} cards from among them and put them into your hand. Then shuffle.`, opts);
+    if (!onto || !hand || onto.targets.length || hand.targets.length) return null;
+    return { targets: [], effects: [{ type: "if", cond: { kind: "bargained" }, effects: onto.effects, otherwise: hand.effects }], text };
+  }
   // Praetor's Grasp: "Search target opponent's library for a card and exile it face down. Then that player shuffles. You
   // may play that card for as long as it remains exiled." Hoarding Broodlord, The Creation of Avacyn: "search your
   // library for a card, exile it face down, then shuffle(. For as long as that card remains exiled, you may play it)."
@@ -3951,6 +3963,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // spell it's cast as; a face-down card in exile only if you may look at it (rulings); X is 0 (rulings).
     if (/^[Yy]ou may cast a legendary spell from your hand, from your graveyard, or from among cards you own in exile without paying its mana cost$/.test(s)) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, handAndYard: true, andExile: true, max: 1, filter: { kind: "card", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary card" } });
+      continue;
+    }
+    // Spectral Arcanist: "you may cast an instant or sorcery spell with mana value less than or equal to the number of
+    // Spirits you control from a graveyard without paying its mana cost. If that spell would be put into a graveyard, exile
+    // it instead.": one card from any graveyard, cast as this resolves or never (rulings, CR 608.2g); the count as it
+    // resolves, the spell's mana value with X as 0 (rulings, CR 107.3b).
+    const arcanist = /^[Yy]ou may cast (an instant or sorcery|an? [a-z]+) spell with mana value less than or equal to (.+) from a graveyard without paying its mana cost$/.exec(s);
+    if (arcanist && /^If that spell would be put into a graveyard, exile it instead\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter = parseSearchFilter(`${arcanist[1]!.replace(/^an? /, "")} card`);
+      const maxMv = parseCount(arcanist[2]!, ctx);
+      if (filter?.kind !== "card" || filter.anyOf || !filter.types?.length || !maxMv || typeof maxMv !== "object") return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, anyYard: true, filter, maxMv, max: 1, exileCast: true });
+      si++;
       continue;
     }
     // Chandra Ablaze: "Cast any number of red instant and/or sorcery cards from your graveyard without paying their mana
@@ -5623,6 +5648,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // End-Blaze Epiphany: "When that creature dies this turn, exile a number of cards from the top of your library equal to
+    // its power, then choose a card exiled this way. Until the end of your next turn, you may play that card.": a delayed
+    // trigger about the target (CR 603.7), its power as it last existed on the battlefield (CR 608.2h), then Tectonic
+    // Giant's choice (costs paid and timing followed as usual, rulings).
+    if (/^When that creature dies this turn, exile a number of cards from the top of your library equal to its power$/.test(s) && /^(?:[Tt]hen c|C)hoose a card exiled this way\.?$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play that card\.?$/.test(sentences[si + 2] ?? "") && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many) {
+      effects.push({ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "impulse", n: { count: { kind: "power", of: { ref: "subject" } } }, until: "nextTurn", choose: true }], text: "exile a number of cards from the top of your library equal to its power, then choose a card exiled this way. Until the end of your next turn, you may play that card", thisTurn: true });
+      si += 2;
+      continue;
+    }
     // Tectonic Giant: "Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may
     // play that card." The same, the card chosen as it resolves (rulings).
     // You Find Some Prisoners: "Exile the top three cards of target opponent's library. Choose one of them. Until the end
@@ -6684,6 +6718,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (crucible && /^Copy it$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^You may cast the copy without paying its mana cost$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
       const filter: TargetSpec = crucible[1] === "nonland" ? { kind: "card", types: [], notTypes: ["Land"], notColors: [], owner: "you", text: "nonland card" } : { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, random: true } });
+      si += 2;
+      continue;
+    }
+    // Storm of Memories: "Exile an instant or sorcery card with mana value 3 or less from your graveyard at random. You may
+    // cast it without paying its mana cost. If that spell would be put into a graveyard, exile it instead.": one card
+    // matching, at random, cast as this resolves or never (CR 608.2g); X is 0 (CR 107.3b).
+    const stormMem = /^[Ee]xile (an? [^.]+? card(?: with mana value \d+ or less)?) from your graveyard at random$/.exec(s);
+    if (stormMem && /^You may cast it without paying its mana cost$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^If that spell would be put into a graveyard, exile it instead$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(stormMem[1]!.replace(/^an? /, ""));
+      if (filter?.kind !== "card" || filter.anyOf || !filter.types?.length || filter.types.some((x) => x !== "Instant" && x !== "Sorcery")) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, fromYard: { filter: { ...filter, owner: "you" }, random: true }, max: 1, exileCast: true });
+      si += 2;
+      continue;
+    }
+    // Capricious Hellraiser: "exile three cards at random from your graveyard. Choose a noncreature, nonland card from among
+    // them and copy it. You may cast the copy without paying its mana cost.": any three cards (all of them with fewer), then
+    // one copy of one of those, cast as this resolves or never; the cards stay exiled (rulings, CR 608.2g, 707.12).
+    const hellraiser = new RegExp(`^[Ee]xile ${NUM} cards at random from your graveyard$`).exec(s);
+    const hellChoose = hellraiser ? /^Choose (an? [^.]+? card) from among them and copy it$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (hellChoose && /^You may cast the copy without paying its mana cost$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(hellChoose[1]!.replace(/^an? /, ""));
+      if (filter?.kind !== "card" || filter.anyOf) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, oneCard: true, max: 1, filter, fromYard: { filter: { kind: "card", types: [], notTypes: [], notColors: [], owner: "you", text: "card" }, random: true, n: num(hellraiser![1]!) } });
       si += 2;
       continue;
     }
@@ -13227,9 +13284,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "You may exile target creature. If you do, create a Gold token." (King Macar): only if it was exiled (not if a
       // commander went to the command zone instead, CR 903.9b).
       if (ifDid[1] === "do" && exiled?.type === "exile" && !exiled.until && !exiled.linked && !exiled.ownerMay && !exiled.youMay && exiled.what.ref === "target" && !exiled.what.n && ctx.targets[exiled.what.index]?.kind === "object") {
-        const inner = parseOne(capital(ifDid[2]!), ctx);
+        // Fireflux Squad: "If you do, reveal cards from the top of your library until you reveal a creature card. Put that
+        // card onto the battlefield tapped and attacking and the rest ...": all the rest of the ability, with no targets.
+        const revealRest = /^reveal cards from the top of your library until /.test(ifDid[2]!) ? parseBody(`${[capital(ifDid[2]!), ...sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`) : undefined;
+        if (revealRest === null || (revealRest && (revealRest.targets.length || !revealRest.effects.length || revealRest.effects[0]!.type !== "revealUntil"))) return null;
+        const inner = revealRest ? revealRest.effects : parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledThisWay", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }, min: 1 }, effects: inner });
+        if (revealRest) si = sentences.length;
         continue;
       }
       // "You may exile an artifact or creature card from your hand. If you do, create a token that's a copy of the exiled
@@ -14147,6 +14209,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || filter.kind !== "card" || filter.anyOf || (!aura && (!filter.types?.length || !filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Enchantment") || filter.subtypes?.length))) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", mayElseHand: true, rest: "bottom" });
       si += 3;
+      continue;
+    }
+    // Part in Friendship: "... until you reveal a creature card. If its mana value is less than or equal to the number of
+    // lands you control, put it onto the battlefield. Otherwise, put it into your hand. Put the rest on the bottom of your
+    // library in a random order.": the card's mana value with X as 0 (rulings, CR 202.3e) and the count, as it resolves.
+    const mvOnto = until && !mayUntil && !sharesM ? /^If its mana value is less than or equal to (.+), put it onto the battlefield$/.exec(sentences[si + 1] ?? "") : null;
+    if (mvOnto && sentences[si + 2] === "Otherwise, put it into your hand" && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "")) {
+      const filter = parseSearchFilter(until![1]!);
+      const n = parseCount(mvOnto[1]!, ctx);
+      if (!filter || filter.kind !== "card" || filter.anyOf || filter.types?.length !== 1 || filter.types[0] !== "Creature" || filter.subtypes?.length || !n || typeof n !== "object") return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", ontoIfMvAtMost: n, rest: "bottom" });
+      si += 3;
+      continue;
+    }
+    // Genesis Storm: "... until you reveal a nonland permanent card. You may put that card onto the battlefield. Then put
+    // all cards revealed this way that weren't put onto the battlefield on the bottom of your library in a random order.":
+    // if you don't (or it can't, an Aura with nothing to enchant, CR 303.4g), it goes to the bottom with the rest (rulings).
+    // Any permanent card: an Aura's host and a battle's protector are chosen as it enters (CR 303.4f, 310.9a).
+    if (until && !mayUntil && !sharesM && sentences[si + 1] === "You may put that card onto the battlefield" && /^Then put all cards revealed this way that weren't put onto the battlefield on the bottom of your library in a random order\.?$/.test(sentences[si + 2] ?? "") && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+      const filter = parseSearchFilter(until[1]!);
+      const permanentTypes = ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"];
+      if (!filter || filter.kind !== "card" || filter.anyOf || !filter.types?.length || !filter.types.every((x) => permanentTypes.includes(x)) || filter.subtypes?.length) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", mayElseBottom: true, rest: "bottom" });
+      si += 2;
       continue;
     }
     // Hei Bai, Forest Guardian: "... until you reveal a Shrine card. You may put that card onto the battlefield. Then

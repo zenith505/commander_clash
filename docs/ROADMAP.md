@@ -1,6 +1,6 @@
 # Roadmap
 
-29,503 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,512 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,468 of
 9,979 (94%).
 
@@ -1829,6 +1829,32 @@ line blocks.
    with a browser test); "Return target creature card and all other cards with the same name as that card from your
    graveyard to the battlefield tapped" (Rat King, Verminister); "When ~ dies this turn, return it to the battlefield
    transformed under your control" (Golden Guardian; bots don't use it yet). +9 (29,477 of 31,936; 29,491 with B92).
+   Round 260 (cards from the top of the list not looked at before): "Reveal cards ... until you reveal a nonland permanent
+   card. You may put that card onto the battlefield. Then put all cards revealed this way that weren't put onto the
+   battlefield on the bottom of your library in a random order" (Genesis Storm: declined, or an Aura with nothing to
+   enchant, it goes to the bottom too, with a browser test); "If its mana value is less than or equal to the number of
+   lands you control, put it onto the battlefield. Otherwise, put it into your hand" after revealing until a creature card
+   (Part in Friendship, X as 0); "you may exile another target attacking creature you control. If you do, reveal cards
+   ... Put that card onto the battlefield tapped and attacking ..." (Fireflux Squad); "If ~ was bargained, put the
+   revealed cards onto the battlefield. Otherwise, put the revealed cards into your hand" (Thunderous Debut); "Exile an
+   instant or sorcery card with mana value 3 or less from your graveyard at random. You may cast it without paying its
+   mana cost. If that spell would be put into a graveyard, exile it instead" (Storm of Memories); "exile three cards at
+   random from your graveyard. Choose a noncreature, nonland card from among them and copy it. You may cast the copy"
+   (Capricious Hellraiser); "you may cast an instant or sorcery spell with mana value less than or equal to the number of
+   Spirits you control from a graveyard without paying its mana cost" (Spectral Arcanist: any graveyard, with a browser
+   test); "When that creature dies this turn, exile a number of cards from the top of your library equal to its power,
+   then choose a card exiled this way. Until the end of your next turn, you may play that card" (End-Blaze Epiphany: its
+   power as it last existed); "Put up to two noncreature artifact cards with total mana value less than or equal to the
+   sacrificed artifact's mana value from among them onto the battlefield" (Smelting Vat, with a browser test). +9 (29,486
+   of 31,936; 29,500 with B92). Rules gap seen: a dies trigger's "its power" reads the card's printed power if the card has left the
+   graveyard again before the trigger resolves (effects/resolve.ts subjectEvenIfGone), not its last known power (CR 608.2h).
+   Out after round 260 (looked at, not done): Mirror-Mad Phantasm (owner shuffles it in, then reveals until a card named
+   it, the rest milled: compilable, but bots would activate it and mill themselves, so it needs a bot rule first); Over
+   the Top (each player reveals cards equal to their nonland permanents and all permanent cards revealed enter at once);
+   Terminal Velocity (a permanent put from your hand gains a leaves-the-battlefield trigger and an end-step sacrifice);
+   Hurkyl, Master Wizard (one revealed card for each card type among noncreature spells you cast this turn); Hew the
+   Entwood (sacrifice any number of lands as it resolves, then reveal that many and pick artifact and land cards, nonland
+   ones entering first); Coin of Fate (an opponent chooses which of the two cards exiled as a cost goes to the bottom).
    Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
    and "that creature's controller may have ~ deal 1 damage to it"); Sorceress's Schemes (a target that is either a card
    in your graveyard or an exiled card with flashback: exile targets aren't supported); Reyhan, Last of the Abzan ("or is
@@ -4948,7 +4974,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   pays 5 life" (Aether Rift); "that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken
   permanents of that type phase out" (Teferi's Realm, with a browser test); Juxtapose (the greatest mana value creatures,
   then artifacts, exchanged; a tie chosen by its controller, with a browser test). +12 (29,494 of 31,936 with B92 and
-  rounds 257 and 258; 29,503 with round 259).
+  rounds 257 and 258; 29,512 with rounds 259 and 260).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
   Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card

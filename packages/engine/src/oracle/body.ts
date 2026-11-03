@@ -4033,6 +4033,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Sorcerous Squall: "Target opponent mills nine cards, then you may cast an instant or sorcery spell from that player's
+    // graveyard without paying its mana cost. If that spell would be put into a graveyard, exile it instead.": one card from
+    // that graveyard, cast as this resolves or never, its type's timing ignored (rulings, CR 608.2g); X is 0 (CR 107.3b).
+    const squall = ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many ? /^(?:then )?you may cast (an instant or sorcery|an? [a-z]+) spell from that player's graveyard without paying its mana cost$/i.exec(s) : null;
+    if (squall && /^If that spell would be put into a graveyard, exile it instead\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter = parseSearchFilter(`${squall[1]!.replace(/^an? /i, "")} card`);
+      if (filter?.kind !== "card" || filter.anyOf || !filter.types?.length) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, anyYard: true, yardOf: { ref: "target", index: ctx.lastPlayerTarget! }, filter, max: 1, exileCast: true });
+      si++;
+      continue;
+    }
     // Chandra Ablaze: "Cast any number of red instant and/or sorcery cards from your graveyard without paying their mana
     // costs.": chosen and cast one after another as it resolves, in any order, ignoring the sorceries' timing but not other
     // restrictions (rulings, CR 608.2g); X is 0 (CR 107.3b). "Any number" may be none.
@@ -5663,6 +5674,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // order, then the chosen ones discard; one with no cards in hand can't, so doesn't (CR 101.3).
     const discardAlone = offer && !does && offer[2] === "discard a card" && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) loses \d+ life\.?$/.test(sentences[si + 1] ?? "");
     const alone = offer && !does && (sacAlone || discardAlone || /^(?:scry \d+|surveil \d+|draw a card|investigate)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
+    // Mog, Moogle Warrior: "Each player may discard a card. Each player who discarded a card this way draws a card. If a
+    // creature card was discarded this way, you create .... Then if a noncreature card was discarded this way, ...": each
+    // chooses in turn order, then the chosen ones discard (CR 101.4; one with no cards in hand can't, CR 101.3) and draw;
+    // then the two checks look at every card discarded this way, whoever discarded it.
+    if (offer && !does && offer[1] === "player" && offer[2] === "discard a card" && /^Each player who discarded a card this way draws a card\.?$/.test(sentences[si + 1] ?? "")) {
+      const tail: Effect[] = [];
+      let k = si + 2;
+      for (; k < sentences.length; k++) {
+        const ifKind = /^(?:Then )?[Ii]f an? ((?:non)?creature card) was discarded this way, (.+?)\.?$/.exec(sentences[k]!);
+        if (!ifKind) break;
+        const filter = parseSearchFilter(ifKind[1]!);
+        const before = ctx.targets.length;
+        const inner = parseOne(capital(ifKind[2]!), ctx);
+        if (!filter || !inner || ctx.targets.length !== before) return null;
+        tail.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
+      }
+      effects.push({ type: "eachMay", who: { ref: "eachPlayer" }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: false }], text: "discard a card", each: true, need: { zone: "hand", filter: { kind: "card", text: "card" } } }, { type: "draw", who: { ref: "choseThisWay" }, n: 1 }, ...tail);
+      si = k - 1;
+      continue;
+    }
     // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
     // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
     const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -6300,6 +6331,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (castAmongKind) {
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, castFilter });
+      si++;
+      continue;
+    }
+    // Narset, Enlightened Master: "Exile the top four cards of your library. Until end of turn, you may cast noncreature
+    // spells from among those cards without paying their mana costs." Spells that are noncreature as they're cast, with
+    // their normal timing; no lands; X is 0; the rest stay exiled (rulings).
+    const castFreeKind = exTop && exTop[1] && !exEqual && !impulseIf ? /^Until end of turn, you may cast (noncreature) spells from among (?:those cards|them) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (castFreeKind) {
+      const spellFilter = parseSearchFilter(`${castFreeKind[1]} card`);
+      if (!spellFilter) return null;
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, spellFilter });
       si++;
       continue;
     }

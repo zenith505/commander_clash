@@ -1947,6 +1947,11 @@ export type StaticCondition =
   | { kind: "selfInGraveyard"; creatureAbove?: true; /** Nether Spirit: "if ~ is the only creature card in your graveyard". */ onlyCreature?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
   | { kind: "selfInExile" }
+  /**
+   * "If this card is suspended" (Deep-Sea Kraken, Pardic Dragon): the same card, face up in its owner's exile, with suspend
+   * and a time counter on it (CR 702.62b, rulings), an intervening if (CR 603.4).
+   */
+  | { kind: "selfSuspended" }
   /** Firemane Angel's "if ~ is in your graveyard or on the battlefield", one ability for each zone: still there, the same object (CR 400.7, 603.4). */
   | { kind: "selfStill"; zone: "graveyard" | "battlefield" }
   /** Codespell Cleric: "if it was the second spell you cast this turn": ~ entered this turn as that spell, cast (not a copy), the `n`th of its controller's this turn. */
@@ -6479,6 +6484,8 @@ export interface CompiledCard {
    * damage prevented even with none on it, rulings).
    */
   counterShield?: true | "always";
+  /** Bloatfly Swarm's counterShield: then each player gets a rad counter for each +1/+1 counter removed this way. */
+  counterShieldRad?: true;
   /**
    * Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).

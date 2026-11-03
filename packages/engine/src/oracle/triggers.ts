@@ -3251,6 +3251,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
     return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
   }
+  // Deep-Sea Kraken: "Whenever an opponent casts a spell, if ~ is suspended, remove a time counter from it"; Pardic Dragon:
+  // "..., that player may put a time counter on ~". An ability that works while the card is suspended in exile (CR 113.6,
+  // 702.62b), its owner controlling it (CR 113.8), with an intervening if (CR 603.4). "It" is the card: a spell can't have
+  // a time counter put on it or removed.
+  const suspendedIf = /^(Whenever (?:a player|an opponent|you) casts? a spell), if ~ is suspended, (.+)$/.exec(line);
+  if (suspendedIf) {
+    const t = parseTrigger(`${suspendedIf[1]}, ${suspendedIf[2]!.replace(/ time counter from it\.$/, " time counter from ~.")}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.zone || t.ifCond || t.cast.orCopy) return "fail";
+    // The card in exile ("selfCard"), not a permanent: only removing a time counter from it is modeled.
+    const fx = t.body.effects;
+    if (fx.length !== 1 || fx[0]!.type !== "removeCounters" || fx[0]!.what.ref !== "self" || fx[0]!.counter !== "time") return "fail";
+    return { ...t, zone: "exile", ifCond: { kind: "selfSuspended" }, body: { ...t.body, effects: [{ ...fx[0]!, what: { ref: "selfCard" } }] } };
+  }
   // Oloro, Ageless Ascetic: "At the beginning of your upkeep, if ~ is in the command zone, you gain 2 life." An ability
   // that works only in the command zone (CR 113.6), with an intervening if (CR 603.4).
   const inCommand = /^((?:When|Whenever|At)\b[^,]+), if ~ is in the command zone, (.+)$/.exec(line);

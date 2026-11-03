@@ -1093,6 +1093,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
         countersRemoved(s, o, e.counter, n);
+        // Deep-Sea Kraken removing a time counter from itself in exile: "whenever a time counter is removed from ~ while
+        // it's exiled" sees it too (CR 113.6).
+        if (e.counter === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;

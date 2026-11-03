@@ -191,6 +191,13 @@ export function dealDamage(
         invalidateCharacteristics(s);
         log(s, `${off} +1/+1 counter${off === 1 ? " is" : "s are"} removed from ${targetName}.`);
         countersRemoved(s, o, "+1/+1", off);
+        // Bloatfly Swarm: "then give each player a rad counter for each +1/+1 counter removed this way".
+        if (abilitiesOf(s, o).counterShieldRad)
+          for (const pid of s.turnOrder) {
+            if (s.players[pid]!.lost) continue;
+            const got = putPlayerCounters(s, pid, "rad", off);
+            if (got) log(s, `${s.players[pid]!.name} gets ${got} rad counter${got === 1 ? "" : "s"}.`);
+          }
       }
       o.phantomEvent = event;
       if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {

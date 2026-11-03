@@ -2113,6 +2113,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
+    // Deep-Sea Kraken, Pardic Dragon: abilities of suspended cards that work in exile (CR 113.6).
+    fromExiled(castWatch);
     fromFloating(castWatch);
     fromEmblems(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.

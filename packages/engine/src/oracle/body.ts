@@ -10923,20 +10923,52 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of
     // experience counters you have, return it to the battlefield. Otherwise, put it into your hand." (Meren of Clan Nel
     // Toth): compared as it resolves; with it lower, it can't go to the hand instead (rulings).
-    const ifMv = /^If that card's mana value is less than or equal to (.+?), (.+)$/.exec(s);
+    // Spikeshell Harrier: "return target creature or Vehicle an opponent controls to its owner's hand. If that opponent's
+    // speed is greater than each other player's speed, reduce that opponent's speed by 1. This effect can't reduce their speed
+    // below 1." That opponent is the target's controller (as it last existed, once it's been returned).
+    if (s === "If that opponent's speed is greater than each other player's speed, reduce that opponent's speed by 1" && sentences[si + 1] === "This effect can't reduce their speed below 1") {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (i !== prevTargets || i + 1 !== curTargets || t?.kind !== "object" || t.controller !== "opponent" || t.optional || t.many) return null;
+      effects.push({ type: "reduceSpeedIfFastest", who: { ref: "targetController", index: i } });
+      si++;
+      continue;
+    }
+    // Brilliance Unleashed: "Choose target artifact card in your graveyard. Return it to the battlefield if it's an artifact
+    // creature card. Otherwise, return it to the battlefield and it's a 3/3 Robot artifact creature with flying.": the card
+    // checked as it resolves; otherwise the permanent it becomes is that, from then on (CR 611.2c), keeping its other card
+    // types and its abilities (CR 205.1b: a "[creature type] artifact creature" replaces only its creature types; rulings).
+    const ifCreatureCard = /^Return it to the battlefield if it's an? ([a-z]+ creature card)$/.exec(s);
+    const elseBecomes = ifCreatureCard && /^Otherwise, return it to the battlefield and it's (an? \d+\/\d+ .+)$/.exec(sentences[si + 1] ?? "");
+    if (ifCreatureCard && elseBecomes) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const filter = parseSearchFilter(ifCreatureCard[1]!);
+      const mods = parseBecomes(elseBecomes[1]!);
+      if (i !== prevTargets || i + 1 !== curTargets || t?.kind !== "card" || t.optional || t.many || !filter || !mods) return null;
+      const put: Effect = { type: "putOntoBattlefield", what: { ref: "target", index: i } };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [put], otherwise: [{ ...put, alsoMods: mods }] });
+      si++;
+      continue;
+    }
+    // Bortuk Bonerattle: "Return that card to the battlefield if its mana value is less than or equal to the number of basic
+    // land types among lands you control. Otherwise, put it into your hand.": the same, worded the other way round.
+    const mvFirst = /^If that card's mana value is less than or equal to (.+?), (.+)$/.exec(s);
+    const mvLast = mvFirst ? null : /^(Return (?:that card|it) to the battlefield) if its mana value is less than or equal to (.+)$/.exec(s);
+    const ifMv = mvFirst ? { than: mvFirst[1]!, then: mvFirst[2]! } : mvLast ? { than: mvLast[2]!, then: mvLast[1]! } : null;
     const elseMv = ifMv && /^Otherwise, (.+)$/.exec(sentences[si + 1] ?? "");
     if (ifMv && elseMv) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       if (i !== prevTargets || i + 1 !== curTargets || !t || t.kind !== "card" || t.optional || t.many) return null;
-      const amount = parseCount(ifMv[1]!, ctx);
+      const amount = parseCount(ifMv.than, ctx);
       // The card targeted: "return it to the battlefield", "put it into your hand".
       const move = (x: string): Effect[] | null =>
-        /^return it to the battlefield$/i.test(x) ? [{ type: "putOntoBattlefield", what: { ref: "target", index: i } }] : /^(?:put it into|return it to) your hand$/i.test(x) ? [{ type: "bounce", what: { ref: "target", index: i } }] : null;
-      const yes = amount && ctx.targets.length === i + 1 ? move(ifMv[2]!) : null;
+        /^return (?:it|that card) to the battlefield$/i.test(x) ? [{ type: "putOntoBattlefield", what: { ref: "target", index: i } }] : /^(?:put it into|return it to) your hand$/i.test(x) ? [{ type: "bounce", what: { ref: "target", index: i } }] : null;
+      const yes = amount && ctx.targets.length === i + 1 ? move(ifMv.then) : null;
       const no = yes ? move(elseMv[1]!) : null;
       if (!amount || !yes || !no || ctx.targets.length !== i + 1 || ![...yes, ...no].every((e) => mentionsTarget(e, i))) return null;
-      const filter: TargetSpec = { kind: "card", bound: { key: "manaValue", at: "most", amount }, text: `mana value less than or equal to ${ifMv[1]}` };
+      const filter: TargetSpec = { kind: "card", bound: { key: "manaValue", at: "most", amount }, text: `mana value less than or equal to ${ifMv.than}` };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: yes, otherwise: no });
       si++;
       continue;

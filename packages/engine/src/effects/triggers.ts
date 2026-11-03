@@ -1,3 +1,4 @@
+import { exiledWithNamed } from "../names";
 import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
@@ -2082,6 +2083,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
           if (!name || !player(s, ev.controller).graveyard.some((g) => sameName(defOf(s, obj(s, g)).name, name))) return false;
         }
+        if (t.cast.nameExiledWithSelf) {
+          const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
+          if (!name || !exiledWithNamed(s, o, name)) return false;
+        }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         if (t.cast.sharesNoTypeWithYours) {
@@ -2160,6 +2165,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (w.spell && item!.kind !== "spell") return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
+        // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.
+        if (w.abilityOf && !(item!.kind === "ability" && item!.sourceId && s.objects[item!.sourceId] && objectMatches(s, w.abilityOf, s.objects[item!.sourceId]!, watcher, false))) return false;
         const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
         if (!mine(by)) return false;
         return !w.first || !before.some(mine);

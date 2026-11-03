@@ -185,6 +185,7 @@ import {
   blockWithoutCompany,
   showGrantSource,
   sameName,
+  mayPayUse,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -5410,7 +5411,7 @@ function Controls({
     // "You may pay {1}. If you do, ...": Pay taps what's needed, like ward's prompt.
     const { mana, life = 0, energy = 0 } = pending.pay;
     const me = s.players[HUMAN]!;
-    const taps = me.life >= life && (me.energy ?? 0) >= energy ? (mana ? planMana(s, HUMAN, parseManaCost(mana)) : []) : null;
+    const taps = me.life >= life && (me.energy ?? 0) >= energy ? (mana ? planMana(s, HUMAN, parseManaCost(mana), 0, undefined, [], mayPayUse(s, pending)) : []) : null;
     return (
       <div className="controls">
         <span>

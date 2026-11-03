@@ -24,7 +24,7 @@ import { characteristics, controllerOf, everyCreatureType, invalidateCharacteris
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
-import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
@@ -1738,7 +1738,10 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
         // Kalain, Coin of Mastery: the mana from Treasures or artifact sources spent to cast it, kept as the spell became
         // this permanent (none for one not cast, or a token copy of a spell, CR 707.10).
         const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : r.perSpentFrom ? (o.spent?.from?.[r.perSpentFrom] ?? 0) : r.per !== undefined ? evalAmount(s, r.per, { controller: you, sourceId: src.id }) : 1;
-        if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
+        // Blue, Loyal Raptor: one of each kind of counter on it as the permanent would enter (CR 614.1c, 122.1).
+        if (r.eachKindOnSource) {
+          for (const [kind, n] of Object.entries(src.counters)) if ((n ?? 0) > 0) out[kind] = (out[kind] ?? 0) + r.n;
+        } else if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
         if (r.asSubtype && !subtypes.includes(r.asSubtype)) subtypes.push(r.asSubtype);
       }
     }
@@ -4849,7 +4852,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; flashbackFromGraveyard?: true; owner?: PlayerId } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -9739,7 +9742,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     const { mana, life = 0, energy = 0 } = pend.pay;
     if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.4, 119.8
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
-    const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, payableLife(s, p.id) - life) : null;
+    const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), mayPayUse(s, pend), 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
     payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     loseEnergy(s, p.id, energy);
@@ -12017,7 +12020,7 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up", "special") : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
   if (cp) return cp;
   const cost = faceUpManaCost(fd.cost, x);
-  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to turn it face up (${cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(cost), { ability: o, faceUp: fd.kind })) return `not enough mana to turn it face up (${cost})`;
   return null;
 }
 
@@ -12044,7 +12047,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   const name = defOf(s, { ...o, faceDown: undefined }).name;
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
-  if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
+  if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), { ability: o, faceUp: fd.kind });
   turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id);
   s.passedInSuccession = [];
 }

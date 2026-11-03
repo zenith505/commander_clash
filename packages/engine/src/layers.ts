@@ -2321,6 +2321,36 @@ export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDe
   return out;
 }
 
+/** Re-entry guard for offFieldDefinedPT: a count that reads the card itself (Tarmogoyf in a graveyard) sees its own values. */
+const definingPT = new Set<ObjectId>();
+
+/**
+ * `d`, the definition of `o` outside the battlefield, with the power and toughness its characteristic-defining ability
+ * gives it: a "*" works in every zone (CR 604.3, 208.2a), so a Lhurgoyf in a graveyard or a hand has the power its ability
+ * counts, with its owner as "you" (CR 109.5; a spell's controller on the stack). Anything else is `d` itself. While the
+ * layer system is being worked out (`building`) this is `d` too: counting there would start the layers again.
+ */
+export function offFieldDefinedPT(s: GameState, o: GameObject, d: CardDef): CardDef {
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || o.faceDown) return d;
+  if (!d.types.includes("Creature") || (/^-?\d+$/.test(d.power ?? "0") && /^-?\d+$/.test(d.toughness ?? "0"))) return d;
+  if (building || definingPT.has(o.id)) return d;
+  const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((x) => x.kind === "definePT"));
+  const def = cda?.mods.find((x) => x.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+  if (!def) return d;
+  definingPT.add(o.id);
+  try {
+    const ctx = { controller: o.zone === "stack" ? o.controller : o.owner, sourceId: o.id };
+    const pt = (key: "power" | "toughness") => {
+      const a = def[key];
+      return /^-?\d+$/.test(d[key] ?? "0") || a === undefined ? d[key] : String(evalAmount(s, a, ctx));
+    };
+    const [p, t] = [pt("power"), pt("toughness")];
+    return p === d.power && t === d.toughness ? d : { ...d, power: p, toughness: t };
+  } finally {
+    definingPT.delete(o.id);
+  }
+}
+
 /** Who controls this object right now (after control-changing effects). */
 export const controllerOf = (s: GameState, o: GameObject): PlayerId => (o.zone === "battlefield" ? characteristics(s, o).controller : o.controller);
 

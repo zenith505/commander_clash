@@ -769,6 +769,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   // Silverfur Partisan: "becomes the target of an instant or sorcery spell": a spell of either type.
   // Fugitive Druid: "becomes the target of an Aura spell": a spell with that subtype.
   const typed = /^(When(?:ever)? (?:~|an?(?:other)? .+?) becomes the target of )an (instant or sorcery|Aura) spell(?! or ability)/.exec(line);
+  // Skophos Maze-Warden: "Whenever another creature becomes the target of an ability of a land you control named Labyrinth of
+  // Skophos, you may have ~ fight that creature." Once for each such ability, however many of its targets it is; it
+  // resolves first, even if that ability is countered (rulings).
+  const maze = /^Whenever another creature becomes the target of an ability of a land you control named ([^,]+), (you may have ~ fight that creature\.)$/.exec(line);
+  if (maze) {
+    const body = parseBody(maze[2]!, { subjectIt: true });
+    if (!body) return "fail";
+    return { event: "permanentBecomesTarget", targeted: { other: true, abilityOf: { kind: "object", types: ["Land"], controller: "you", named: maze[1]!, text: `land you control named ${maze[1]}` } }, subjectFilter: { kind: "object", types: ["Creature"], text: "creature" }, body };
+  }
   const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(typed ? line.replace(typed[0], `${typed[1]}a spell`) : line);
   if (!m) return null;
   const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(typed ? (typed[2] === "Aura" ? { spellSubtypes: ["Aura"] } : { spellTypes: ["Instant", "Sorcery"] }) : {}), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
@@ -914,6 +923,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // graveyard as the spell becomes cast (rulings); a face-down spell has no name (CR 708.2).
   const nameInYard = m[1] === "an opponent" ? / with the same name as a card in their graveyard$/.exec(what) : null;
   if (nameInYard) what = what.slice(0, nameInYard.index);
+  // Circle of Confinement: "a Vampire spell with the same name as a card exiled with ~": the cards its exile ability exiled
+  // that are still exiled (CR 607.2a), as the spell becomes cast; a face-down spell has no name (CR 708.2).
+  const nameExiled = / with the same name as a card exiled with ~$/.exec(what);
+  if (nameExiled) what = what.slice(0, nameExiled.index);
   // Folk Hero's "Whenever you cast a spell that shares a creature type with this creature": one creature type in common,
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
@@ -1050,7 +1063,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, controllerOf, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
+import { characteristics, controllerOf, offFieldColored, offFieldDefinedPT, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
@@ -103,8 +103,9 @@ const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone ==
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return o.textFrom && !o.faceDown ? withTextOf(s, out, o.textFrom, textKey(o)!) : out;
-  // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
-  return offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
+  // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types; a "*" power
+  // or toughness is what its characteristic-defining ability says (CR 604.3), last: the caches above key on the card.
+  return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out))));
 };
 
 /**

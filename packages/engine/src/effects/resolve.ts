@@ -1046,6 +1046,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "extraLandThisTurn":
     case "ringTempts":
     case "increaseSpeed":
+    case "reduceSpeedIfFastest":
     case "ascend":
     case "gainLife":
     case "noteLife":

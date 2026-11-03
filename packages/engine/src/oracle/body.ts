@@ -7429,6 +7429,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Ultimate Magic: Meteor: "If ~ was cast from exile, for each opponent, choose an artifact or land that player controls.
+    // Destroy the chosen permanents." You choose for each opponent as it resolves, none targeted (as Chaos Defiler), then
+    // those still there are destroyed at once (CR 608.2c, 101.4).
+    const meteor = /^If ~ was cast from exile, for each opponent, choose an? ([a-z ]+?) that player controls$/.exec(s);
+    if (meteor && ctx.spell && /^Destroy the chosen permanents\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter = pickFilter(meteor[1]!);
+      if (!filter || filter.kind !== "object") return null;
+      const pick: Effect = { type: "pick", who: { ref: "eachOpponent" }, filter, n: 1, action: "choose", youChoose: true, prompt: `click ${/^[aeiou]/.test(filter.text) ? "an" : "a"} ${filter.text} of {player}. ~ destroys the chosen permanents.` };
+      effects.push({ type: "if", cond: { kind: "castFromGraveyard", exile: true }, effects: [pick, { type: "destroy", what: { ref: "created" } }] });
+      si++;
+      continue;
+    }
     // Winnowing: "For each player, you choose a creature that player controls. Then each player sacrifices all other
     // creatures they control that don't share a creature type with the chosen creature they control." Not targeted;
     // then all at once (CR 101.4). A changeling shares every creature type (CR 702.73a); a creature with none shares none.

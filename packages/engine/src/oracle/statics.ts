@@ -2882,6 +2882,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control), "... enchanted artifact creature." (Domineer)
   if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless their controller pays {1} for each creature
+  // they control that's attacking a planeswalker you control": only on the attacks on those planeswalkers (CR 508.1g-h).
+  const pwTax = /^Creatures can't attack planeswalkers you control unless their controller pays \{(\d+)\} for each creature they control that's attacking a planeswalker you control$/.exec(text);
+  if (pwTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: Number(pwTax[1]), onlyPlaneswalkers: true }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
   // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
   const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);

@@ -2698,6 +2698,7 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
     if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
+    if ("halfLife" in w) return lifeCost(w.halfLife === "up" ? Math.ceil(Math.max(0, p.life) / 2) : Math.floor(Math.max(0, p.life) / 2));
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };

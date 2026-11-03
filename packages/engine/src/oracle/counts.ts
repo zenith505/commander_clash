@@ -911,7 +911,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return of && count({ kind: "toxicValue", of });
   }
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|equipped creature's|enchanted creature's|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|equipped creature's|enchanted creature's|that creature's|that land's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
@@ -1173,6 +1173,12 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // "Whenever you cast a spell, you lose life equal to its mana value" (Teval, Arbiter of Virtue): in a cast trigger's
   // first sentence with no target, "it" is the spell cast.
   if (x === "its" && ctx.castSpell && ctx.spellIt && !ctx.targets.length && !ctx.selfIt) return { ref: "castSpell" };
+  // Earthshape: "Earthbend 3. Then each creature you control with power less than or equal to that land's power ...": the
+  // one land targeted, as it is when that's checked (after earthbending made it a creature).
+  if (x === "that land's") {
+    const lands = ctx.targets.flatMap((t, i) => (t.kind === "object" ? [i] : []));
+    return lands.length === 1 && ctx.targets[lands[0]!]!.kind === "object" && ctx.targets[lands[0]!]!.types?.length === 1 && ctx.targets[lands[0]!]!.types![0] === "Land" ? { ref: "target", index: lands[0]! } : null;
+  }
   // "The creature's power" after "that creature's controller" (Boros Fury-Shield): the creature targeted.
   if (x === "the creature's") return ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // "Destroy target artifact. ... where X is that artifact's mana value" (Artifact Mutation): the target, as it last existed.

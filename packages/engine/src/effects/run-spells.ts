@@ -3,6 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
+import { blightOptions, putCounters } from "../counters";
 import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
@@ -1290,6 +1291,16 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     for (const id of ids) moveObject(s, id, "exile");
     sc.paid = true;
   }
+  // "Ward—Blight 2": the creature they chose (see payUnless), the -1/-1 counters put on it as the payment (CR 701.68a).
+  if (sc.paid === undefined && unless.blight && sc.chosen?.[payer]) {
+    for (const id of sc.chosen[payer]!) {
+      const o = s.objects[id];
+      if (o?.zone !== "battlefield") continue;
+      const put = putCounters(s, o, "-1/-1", unless.blight);
+      log(s, `${player(s, payer).name} blights ${unless.blight}, putting ${put === 1 ? "a" : put} -1/-1 counter${put === 1 ? "" : "s"} on ${defOf(s, o).name}.`);
+    }
+    sc.paid = true;
+  }
   // "Ward—Sacrifice a creature": the permanents they chose (see payUnless), sacrificed as the payment (CR 701.21a).
   if (sc.paid === undefined && unless.sacrifice && sc.chosen?.[payer]) {
     for (const id of sc.chosen[payer]!) {
@@ -1309,13 +1320,13 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
     // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
     // (CR 118.3), so they can't pay that.
-    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n)) sc.paid = false;
-    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.exileGraveyard && !unless.discardRandom && !unless.poison) {
+    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) || (unless.blight && !blightOptions(s, payer, unless.blight).length)) sc.paid = false;
+    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.exileGraveyard && !unless.discardRandom && !unless.poison && !unless.blight) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.exileGraveyard ? { exileGraveyard: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.exileGraveyard ? { exileGraveyard: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}), ...(unless.blight ? { blight: unless.blight } : {}) };
       return "paused";
     }
   }

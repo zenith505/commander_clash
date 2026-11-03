@@ -460,6 +460,8 @@ export interface GameObject {
   /** The last combat it was declared as an attacker or blocker in (GameState.combatsThisTurn), as this object (CR 400.7):
    *  "if ~ attacked or blocked this combat" (Kjeldoran Home Guard). */
   declaredInCombat?: { turn: number; combat: number };
+  /** The last combat it was declared as an attacker in, as this object (CR 400.7), and the player it attacked then, if a player (not a planeswalker or battle): Territorial Hellkite's "an opponent ... that ~ didn't attack during your last combat". */
+  attackedInCombat?: { turn: number; combat: number; player?: PlayerId };
   /** The turn it last became blocked (CR 509.1h), as this object (CR 400.7): "if it was blocked this turn" (Fyndhorn Druid). */
   becameBlockedTurn?: number;
   /** The turn it last dealt combat damage to a player, as this object (CR 400.7): "for the first time each turn" (Raphael, Tag Team Tough). */
@@ -887,6 +889,8 @@ export interface Player {
   attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The players this player attacked with creatures in any combat of its latest turn that had one (Weathered Sentinels). */
   attackedInTurn?: { turn: number; players: PlayerId[] };
+  /** The latest two combat phases of this player's turns (GameState.combatsThisTurn), the latest last: Territorial Hellkite's "your last combat". */
+  combatsBegun?: { turn: number; combat: number }[];
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
   /** An enduring story (CR 702.195b): from storied, kept for the rest of the game. */
@@ -1362,7 +1366,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** "Ward—Blight 2": this many -1/-1 counters on one creature they control as the payment, the creature chosen after saying yes (CR 701.68a). */ blight?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -1594,6 +1598,11 @@ export interface TurnLog {
   combatDamageSubtypes?: string[];
   /** Prowl (CR 702.76a): for each player, the creature types of the sources they controlled that dealt a player combat damage, as they dealt it ("*": every creature type). */
   combatDamageTypesBy?: Record<number, string[]>;
+  /**
+   * For each player, the creatures (`id@zoneChanges`) that dealt them combat damage and their creature types as they dealt
+   * it ("*": every creature type), each creature once (Admiral Beckett Brass: "dealt combat damage by three or more Pirates").
+   */
+  combatDamagedByTypes?: Record<number, { key: string; types: string[] }[]>;
   /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
   legendaryCombatDamaged?: PlayerId[];
   /**

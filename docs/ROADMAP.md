@@ -1,6 +1,6 @@
 # Roadmap
 
-29,593 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,600 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
@@ -64,9 +64,7 @@ line blocks.
    Saint of Dusk ("hexproof from instants": hexproof from a card type isn't modeled, only from colors); Xu-Ifit,
    Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
    it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Out after round 161:
-   Toralf, God of Fury // Toralf's Hammer (the front face's "any target other than that permanent" is easy, but the
-   Hammer grants the equipped creature an ability whose cost unattaches the Hammer and whose damage the Hammer deals,
-   rulings: an ability granted by an Equipment that names the Equipment isn't modeled). Out after round 162, each with a
+   Toralf, God of Fury // Toralf's Hammer (done in round 266). Out after round 162, each with a
    piece of its own: Possibility Storm (the spell cast from a hand is exiled by its trigger, then cards until one that
    shares a card type with it), Izzet Generatorium (an energy replacement and "if you've paid or lost four or more {E}
    this turn"), Triple Triad (every player's exiled top card, playable for free by mana value), Mm'menon, the Right Hand
@@ -89,7 +87,7 @@ line blocks.
    leaves the battlefield"), Xenagos, the Reveler (any number of creature and land cards from among seven onto the
    battlefield), Great Unclean One (a token for each opponent with less life than you). Out after round 164: Agility
    Bobblehead (up to X targets, X counted as it's activated; "can't be blocked except by creatures with haste"),
-   Nahiri's Resolve (exile any number of your artifacts and creatures, then return those cards at your next upkeep),
+   Nahiri's Resolve (done in round 266),
    Omo, Queen of Vesuva (done in round 265), Shelob, Child of Ungoliant
    (creatures dealt damage this turn by a Spider you controlled; a copy that's a Food artifact and loses its other
    card types), Professor Hojo (a cost reduction for the first activated ability that targets a creature you control;
@@ -106,8 +104,7 @@ line blocks.
    (an exile trigger counting cards and permanents), Kid Loki (a static for each creature), Abby, Merciless Soldier
    (named tokens plus entering under an opponent's control), Wurmquake (corrupted, then "another one of those tokens"). Out after round 166:
    The Everflowing Well (a permanent becomes a copy of a spell), Summon: Esper Valigarmanda (cast a card exiled with ~
-   with mana of any type), Zurzoth, Chaos Rider ("one or more Devils attack one or more players", "those
-   players"), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
+   with mana of any type), Zurzoth, Chaos Rider (done in round 266), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
    anywhere other than your hand"), Everlasting Torment (all damage as
    though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
@@ -514,7 +511,7 @@ line blocks.
    miracle), Coram, Brimaz, Mindleech Mass, Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
-   graveyard"), Undead Alchemist, Auntie Ool (ward—blight),
+   graveyard"), Undead Alchemist, Auntie Ool (done in round 266),
    Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
    Round 193 went on from the top: "whenever you cast a spell this turn" as a Saga chapter (Showdown of the Skalds,
    Origin of Thor: "deals damage equal to its power to each opponent" too), "if you do, it becomes plotted" (Kellan
@@ -592,7 +589,7 @@ line blocks.
    Gideon, Martial Paragon) and Equipment tokens named Stoneforged Blade / "Return it to your hand at the beginning of the
    next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
    Out after round 196 (looked at, not done): Proteus Staff ("the rest on the bottom in any order"),
-   Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Unidentified
+   Sidisi, Regent of the Mire (done in round 266), Unidentified
    Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
    Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
    Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
@@ -606,7 +603,7 @@ line blocks.
    tests click through each prompt. An optional additional cost isn't kicker (CR 601.2b): "kicked spell" triggers and
    Ertai's Trickery ignore it.
    Out after round 197 (looked at, not done): Dawnhand Dissident (casting from exile by removing counters), Auntie Ool
-   (ward—blight and a "one or more -1/-1 counters are put on" trigger). Smaller gaps: bots blight only a creature that
+   (done in round 266). Smaller gaps: bots blight only a creature that
    survives the counters, and never their commander.
    Round 198 went on from the top: targets "of the chosen type" on a permanent's abilities, bound to the creature type
    chosen as it entered (Dawn-Blessed Pennant, Kindred Boon, From the Rubble; never on a spell or with nothing chosen),
@@ -733,8 +730,8 @@ line blocks.
    ask for it). New prompt: time travel.
    Out after round 203 (looked at, not done): Coward // Killer (the face named Coward, and "each other creature that
    shares a creature type with it"), The Wedding of River Song, The Aesir Escape Valhalla ("the exiled card" across
-   chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Admiral Beckett Brass (combat damage by three or
-   more Pirates to one player), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
+   chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Admiral Beckett Brass (done in round
+   266), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
    nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
    Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
    Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
@@ -1254,7 +1251,7 @@ line blocks.
    Wombat). UI fix: clicking an opponent's planeswalker to attack it attacked the player instead. +14 (28,615 of 31,936 with Lane B B63).
    Tadeas, Juniper Ascendant was left to Lane B's B63.
    Out after round 225 (looked at, not done): Wayta, Trainer Prodigy (damage triggers doubled across many events);
-   Auntie Ool (ward with blight); Fell Beast's Shriek (splice onto instant or sorcery); Jasmine Boreal of the Seven
+   Auntie Ool (done in round 266); Fell Beast's Shriek (splice onto instant or sorcery); Jasmine Boreal of the Seven
    (mana for creature spells with no abilities); Kethis, the Hidden Hand (graveyard cards gain "you may play"); Cult of
    the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
    Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
@@ -1284,7 +1281,7 @@ line blocks.
    graveyard and from the hand, then cast one of the three); Winnowing (each player's sacrifice by the creature types of
    a creature you chose for them); Grolnok, the Omnivore (a card trigger for each permanent card milled, croak counters,
    playing them from exile); Coram, the Undertaker (lands and spells from every graveyard, cards you don't own);
-   Territorial Hellkite (an opponent at random it didn't attack last combat); Boreas Charger (an opponent who controls
+   Territorial Hellkite (done in round 266); Boreas Charger (an opponent who controls
    more lands, a search for the difference); Eivor, Wolf-Kissed ("a Saga card and/or a land card" from among the milled
    ones).
    Round 227 (fresh cards from the top): "Other creatures you control are Assassins ... The same is true for creature
@@ -1327,7 +1324,7 @@ line blocks.
    Out after round 228 (looked at, not done): Bilbo, Thief in the Night (a paid cast from a graveyard during
    resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade ("until
-   end of combat on your next turn"); Auntie Ool, Cursewretch (Ward—Blight); Arlinn's back face (a temporary "enters with
+   end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
    an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief, Ninja Teen (granted sneak from
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
@@ -1520,8 +1517,8 @@ line blocks.
    Out after round 239 (looked at, not done): Omnath, Locus of All ("If you would lose unspent mana, that mana becomes
    black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (protection that doesn't
    remove your own Auras and Equipment already attached, an exception to CR 702.16); Scion of the Ur-Dragon (becomes a copy of a card in
-   your graveyard until end of turn); Sidisi, Regent of the Mire (X set by a sacrifice cost's mana value, a target with
-   mana value X plus 1); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
+   your graveyard until end of turn); Sidisi, Regent of the Mire (done in round
+   266); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
    Round 240 (top of the list, now done): "Until end of turn, you may look at the top card of your library any time,
    and you may play lands and cast spells from the top of your library" (The Belligerent); "All Forests and all
    Saprolings are 1/1 green Saproling creatures and Forest lands in addition to their other types" (Life and Limb,
@@ -1919,6 +1916,23 @@ line blocks.
    basic types' mana abilities, CR 205.3i, 305.6; nonland creatures every creature type); "Whenever a player loses the
    game, if they were attacked this turn by an Assassin you controlled, you win the game" (Ramses, Assassin Lord:
    Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7 (29,553 of 31,936; 29,563 with B95).
+   Round 266 went back over earlier skips from the top. "~ deals damage equal to the excess to any target other than that
+   permanent" (Toralf, God of Fury: excess noncombat damage, CR 120.4a, 120.10, rulings) and "Equipped creature ... it's
+   legendary" (Toralf's Hammer; its granted ability was already modeled); "Whenever one or more Devils you control attack
+   one or more players, you and those players each draw a card, then discard a card at random" (Zurzoth, Chaos Rider:
+   attacks on planeswalkers and battles don't count, CR 508.3e, players in APNAP order); Ward—Blight 2 (Auntie Ool,
+   Cursewretch: pay by putting two -1/-1 counters on a creature you control, CR 701.68a-b, unpayable with no creature,
+   with a browser test) and "put a -1/-1 counter on it if you control it. If you don't control it, ..."; "target nonland
+   permanent controlled by a player who was dealt combat damage by three or more Pirates this turn" (Admiral Beckett
+   Brass: TurnLog.combatDamagedByTypes, the source's types as it dealt the damage); "attacks a player chosen at random
+   it didn't attack during your last combat" (Territorial Hellkite: Player.combatsBegun, GameObject.attackedInCombat,
+   tapped when no player can be chosen, rulings); "exile any number of nontoken artifacts and/or creatures you control.
+   Return those cards ... at the beginning of your next upkeep" (Nahiri's Resolve, with a browser test); "Sacrifice a
+   creature you control with mana value X other than ~: Return target creature card with mana value X plus 1" (Sidisi,
+   Regent of the Mire: X announced and bound by the sacrifice, CR 107.3a, 602.2b; bots trade their least useful creature
+   for a bigger card; with a browser test). +7 (29,560 of 31,936; 29,570 with B95; 29,590 with B96 and B97).
+   Out after round 266 (looked at, not done): Moxite Refinery ("Remove X counters from an artifact or creature you
+   control": X counters of any kinds from one permanent, a cost the counter picker can't limit to one permanent yet).
    Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
    would deal combat damage to a player, instead that player mills that many cards": a replacement, not a prevention,
    so it applies to damage that can't be prevented and the player orders it with the damage shields, CR 616.1; the
@@ -2076,8 +2090,8 @@ line blocks.
    Foremost, Goliath Hatchery (other lines, not started).
    Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
    the dead creature's +1/+1 counters).
-   Out after round 235 (looked at, not done): Deeproot Pilgrimage (done in round 265); Zurzoth, Chaos Rider ("you and those
-   players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
+   Out after round 235 (looked at, not done): Deeproot Pilgrimage (done in round 265); Zurzoth, Chaos Rider (done in
+   round 266); Clockspinning (choose a counter kind on a permanent or suspended card);
    Radiant Lotus (sacrifice one or more artifacts, another player adds the
    mana).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (its +2's
@@ -2419,7 +2433,7 @@ line blocks.
    data calls them all Kindred now). Bots never cast Donate, Harmless Offering or Bazaar Trader's ability (they would
    only give away their own permanents), never use Lion's Eye Diamond (automatic payment doesn't either), and cast from
    Bolas's Citadel only while their life stays 15 or more. Round 88 leftovers still out: Ob Nixilis of the Black Oath
-   and Karn, Living Legacy emblems, Karn, Scion of Urza, Toralf, Death Kiss, Burning-Rune Demon, Emergent Ultimatum,
+   and Karn, Living Legacy emblems, Karn, Scion of Urza, Toralf (done in round 266), Death Kiss, Burning-Rune Demon, Emergent Ultimatum,
    Ecological Appreciation. Bots never exile a Spirit Guide from their hand for mana (the player can, from the
    hand-card menu; autopay doesn't use it either). Bots don't hold Teferi's Protection for anything but lethal combat
    damage or a board wipe of their own permanents worth 12+ mana value; bots only animate the biggest creature card
@@ -2458,7 +2472,7 @@ line blocks.
    - Emblems still out: emblems with activated abilities (Ob Nixilis of the Black Oath, Karn, Living Legacy: they need
      activating from the command zone and a button for it), Ral's storm on spells. Karn, Scion of Urza (an opponent
      chooses, then silver counters in exile) and Karn, Living Legacy's "pay any amount of mana".
-   - Excess damage still out: Toralf ("any target other than that permanent"), Vikya ({Q} costs).
+   - Excess damage still out: Vikya ({Q} costs); Toralf done in round 266.
    - "It" in a cast trigger is the spell only as the first instruction ("Whenever you cast an Elf spell, it gains
      haste"); "untap ~. It gains ..." (Pristine Skywise, Bloodsky Berserker) is about the permanent and isn't parsed.
    - Tap any number still out: as an additional cost (Burn at the Stake, Explosive Singularity), "each player may tap"

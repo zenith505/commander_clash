@@ -1600,6 +1600,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^it isn't attacking or blocking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackingOrBlocking", not: true };
   if (/^it isn't attacking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attacking", not: true };
   if ((m = /^it's (white|blue|black|red|green)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: m[1]! } };
+  // Toralf's Hammer: "Equipped creature gets +3/+0 as long as it's legendary": the equipped creature's supertypes as the
+  // layers leave them (CR 205.4, 613.1d).
+  if (/^it's legendary$/.test(text) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" } };
   // Spectral Cloak: "Enchanted creature has shroud as long as it's untapped": the enchanted creature.
   if ((m = /^it's (tapped|untapped)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", tapped: m[1] === "tapped", text: `${m[1]} permanent` } };
   // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).

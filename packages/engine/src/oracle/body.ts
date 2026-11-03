@@ -4275,6 +4275,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, owner: "you", ...(anyUntilEnd[1] ? { notSource: true } : {}), text: `${anyUntilEnd[1] ?? ""}${anyUntilEnd[2]!} you own and control` }, n: 1, action: "flicker", anyNumber: true }, { type: "flicker", what: { ref: "created" }, under: "you", at: "nextEndStep" });
       continue;
     }
+    // Nahiri's Resolve: "exile any number of nontoken artifacts and/or creatures you control. Return those cards to the
+    // battlefield under their owner's control at the beginning of your next upkeep": chosen as it resolves, exiled
+    // together, returned together by one delayed trigger (CR 603.7) under their owners' control.
+    const anyUntilUpkeep = !ctx.spell ? /^[Ee]xile any number of (.+?) you control$/.exec(s) : null;
+    if (anyUntilUpkeep && /^Return those cards to the battlefield under their owner's control at the beginning of your next upkeep$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      // "Artifacts and/or creatures": an artifact or creature, each one chosen.
+      const filter = pickFilter(`${anyUntilUpkeep[1]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (/^(artifacts|creatures|enchantments|planeswalkers|permanents)$/.test(w) ? w.slice(0, -1) : w)).join(" ")} you control`);
+      if (filter?.kind !== "object") return null;
+      si++;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${anyUntilUpkeep[1]!} you control` }, n: 1, action: "flicker", anyNumber: true, prompt: `click any number of your ${anyUntilUpkeep[1]!} to exile. They return to the battlefield at the beginning of your next upkeep.` }, { type: "flicker", what: { ref: "created" }, under: "owner", at: "yourNextUpkeep" });
+      continue;
+    }
     // Another Round: "Exile any number of creatures you control, then return them to the battlefield under their owner's
     // control. Then repeat this process X more times." Chosen as it resolves, each time anew (rulings), exiled and
     // returned together; a token doesn't come back (CR 111.7).
@@ -14633,6 +14645,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || filter.kind !== "card" || !filter.types?.length || filter.types.some((t) => t !== "Instant" && t !== "Sorcery")) return null;
       effects.push({ type: "choose", choice: "opponent", random: true, anyPlayer: true }, { type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, chooser: { ref: "chosenPlayer" } } });
       si += 3;
+      continue;
+    }
+    // Territorial Hellkite: "choose an opponent at random that ~ didn't attack during your last combat. ~ attacks that
+    // player this combat if able. If you can't choose an opponent this way, tap ~.": the requirement to attack that player
+    // (CR 508.1d), or tapped when every opponent was attacked then (rulings: any of them if it didn't attack then).
+    if (/^[Cc]hoose an opponent at random that ~ didn't attack during your last combat$/.test(s) && /^~ attacks that player this combat if able\.?$/.test(sentences[si + 1] ?? "") && /^If you can't choose an opponent this way, tap ~\.?$/.test(sentences[si + 2] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined || ctx.spell) return null;
+      effects.push(
+        { type: "choose", choice: "opponent", random: true, notAttackedLastCombat: true },
+        { type: "continuous", what: { ref: "self" }, mods: [{ kind: "mustAttackPlayer", player: "chosen", combat: "this" }], duration: "endOfTurn" },
+        { type: "if", cond: { kind: "noPlayerChosen" }, effects: [{ type: "tap", what: { ref: "self" } }] },
+      );
+      ctx.chosenOpponent = true;
+      si += 2;
       continue;
     }
     if (/^[Cc]hoose an opponent at random$/.test(s)) {

@@ -706,7 +706,7 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 // whose ability this is, so "another" changes nothing.
 // "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
 // "A Pegasus, Unicorn, or Horse creature spell" (Thurid, Mare of Destiny) too.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+(?: creature)? spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+(?: creature)? spell(?: from (?:your|their) hand)?|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
 // "The chosen player" (Sewer Nemesis): the player chosen as the permanent entered.
 const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted", "the chosen player": "chosen" } as const;
@@ -4033,6 +4033,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const [e, ...more] = t.body.effects;
     if (more.length || e?.type !== "continuous" || e.what.ref !== "each" || e.what.filter.combat !== "attacking") return "fail";
     return { ...t, attacksMoreLife: true, body: { ...t.body, effects: [{ ...e, what: { ...e.what, filter: { ...e.what.filter, attackingWhom: "eventPlayer", text: "other creatures you control attacking that player" } } }], text: moreLife[1]! } };
+  }
+  // Owlbear Cub: "Whenever ~ attacks a player who controls eight or more lands, look at the top eight cards of your
+  // library. You may put a creature card from among them onto the battlefield tapped and attacking that player. ...": a
+  // player (not a planeswalker) controlling that many lands as it attacks (part of the event, not an intervening "if",
+  // CR 603.4); "that player" is that player (CR 508.4).
+  const landsAttack = new RegExp(`^Whenever ~ attacks a player who controls ${NUM} or more lands, (.+)$`).exec(line);
+  if (landsAttack) {
+    const rest = landsAttack[2]!.replace(/ onto the battlefield tapped and attacking that player\. /, " onto the battlefield tapped and attacking. ");
+    if (rest === landsAttack[2] || /\bthat player\b/.test(rest)) return "fail";
+    const t = parseTrigger(`Whenever ~ attacks a player, ${rest}`);
+    if (!t || t === "fail" || t.event !== "selfAttacks" || !t.attacksPlayer || t.activeIf || t.ifCond || t.attacksMostLife || t.attacksMoreLife) return "fail";
+    const digs = allEffects(t.body.effects).filter((e) => e.type === "dig");
+    if (digs.length !== 1 || digs[0]!.type !== "dig" || !digs[0]!.attacking || digs[0]!.into !== "battlefield") return "fail";
+    digs[0]!.attackingEvent = true;
+    return { ...t, attacksPlayerLands: num(landsAttack[1]!), body: { ...t.body, text: landsAttack[2]! } };
   }
   const mostLife = /^Whenever (~|equipped creature) attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
   if (mostLife && (mostLife[1] === "~" || mostLife[2]!.startsWith("the player"))) {

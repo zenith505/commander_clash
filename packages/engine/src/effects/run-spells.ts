@@ -272,17 +272,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      // A token that died has ceased to exist (CR 704.5d, 111.7), but its dies trigger still makes the delayed trigger,
+      // which works on its own once made (CR 603.7): "When this creature dies, create a 4/4 red Bird ... at the
+      // beginning of the next end step" (a token Rukh Egg). It's about the object that was, its source the ability's
+      // card definition (CR 113.7a); Ochre Jelly's copy is already known (createTokenCopy.copyKey).
+      const key = effects.find((x) => x.type === "createTokenCopy" && x.copyKey) as { copyKey: string } | undefined;
+      const goneCardId = !o && id ? (key?.copyKey ?? (item?.kind !== "spell" ? item?.sourceCardId : undefined)) : undefined;
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
-      // Ochre Jelly's token: it ceased to exist in the graveyard (CR 704.5d, 111.7), but what the delayed trigger copies
-      // is already known (createTokenCopy.copyKey), so it's made about the object that was.
-      else if (id && effects.some((x) => x.type === "createTokenCopy" && x.copyKey)) {
-        const key = effects.find((x) => x.type === "createTokenCopy" && x.copyKey)!;
-        (s.delayed ??= []).push({ when: e.when as DelayedTrigger["when"], controller: ctx.controller, sourceCardId: (key as { copyKey: string }).copyKey, subject: { id, zc: ctx.sourceZc ?? 0 }, body, turn: s.turn, step: s.step });
-      }
+      else if (id && goneCardId) (s.delayed ??= []).push({ when: e.when as DelayedTrigger["when"], controller: ctx.controller, sourceCardId: goneCardId, subject: { id, zc: ctx.sourceZc ?? 0 }, body, turn: s.turn, step: s.step });
+      const made = !!o || !!(id && goneCardId);
       // "At this turn's next end of combat" (Venomous Breath): never on a later turn.
-      if (o && e.thisTurn && e.when === "endOfCombat") s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
+      if (made && e.thisTurn && e.when === "endOfCombat") s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
       // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
-      if (o && e.event) {
+      if (made && e.event) {
         const who = e.event.player ? players(s, e.event.player, ctx)[0] : undefined;
         if (e.event.player && who === undefined) s.delayed!.pop();
         else s.delayed![s.delayed!.length - 1]!.event = { ...(who !== undefined ? { player: who } : {}), ...(e.event.amount !== undefined ? { amount: amountNow(s, e.event.amount, ctx) } : {}) };

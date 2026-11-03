@@ -1,7 +1,7 @@
 # Roadmap
 
-29,703 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,540 of
+29,713 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,550 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2040,7 +2040,7 @@ line blocks.
    target permanents that share a permanent type" (Role Reversal: artifact, battle, creature, enchantment, land or
    planeswalker, CR 110.4, checked again as it resolves); "When you do, ~ deals X damage to each creature, where X is
    the greatest mana value among cards discarded this way" (Ill-Timed Explosion: "you may discard two cards" is offered
-   only with two cards in hand, as for Thrilling Discovery since round 183). +10, COUNT_PLACEHOLDER.
+   only with two cards in hand, as for Thrilling Discovery since round 183). +10, 29,713 of 31,936.
    Out after round 273 (looked at, not done): Filigree Vector (two "any number of target" groups in one ability: the
    target picker expands only one); Mirrormind Crown and Moonlit Meditation ("you may instead create that many tokens
    that are copies of ...": an optional token replacement, the same gap as Jinnie Fay's); Doors of Durin ("you may

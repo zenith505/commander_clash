@@ -1721,6 +1721,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = addTarget(ctx, { kind: "object", types: [], distinctFrom: [a], sharesCardTypeWith: [a], sharesCardTypeAmong: ["Artifact", "Creature"], text: "another target permanent that shares one of those types with it" });
     return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
   }
+  // Role Reversal: "Exchange control of two target permanents that share a permanent type": a permanent type in common
+  // (CR 110.4: artifact, battle, creature, enchantment, land, planeswalker; supertypes don't count, rulings), as they're
+  // chosen and again as it resolves (CR 608.2b); either illegal, or both under one player's control, and nothing happens.
+  if (/^[Ee]xchange control of two target permanents that share a permanent type$/.test(s)) {
+    const types = ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"];
+    const a = addTarget(ctx, { kind: "object", types: [], text: "target permanent" });
+    const b = addTarget(ctx, { kind: "object", types: [], distinctFrom: [a], sharesCardTypeWith: [a], sharesCardTypeAmong: types, text: "another target permanent that shares a permanent type with it" });
+    return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
+  }
   // "Exchange control of two target creatures" (Switcheroo), "... two target lands" (Shifting Borders), "... two other
   // target creatures controlled by different players" (Kitsune, Dragon's Daughter); "Exchange control of ~ and target
   // nonland permanent" (Avarice Totem): whoever controls them; with both under one player's control, or either target

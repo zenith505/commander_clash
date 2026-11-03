@@ -2863,7 +2863,7 @@ function spareTappers(s: GameState, pid: PlayerId, spell: ObjectId, n: number, b
 function chooseGiftee(s: GameState, pid: PlayerId, c: CompiledCard): PlayerId | undefined {
   if (!["a card", "a Food", "a Treasure", "a tapped Fish"].includes(c.gift!.what)) return undefined;
   const bodies = [...(c.spell ? [c.spell] : []), ...c.triggers.filter((t) => !(t.ifGift && t.body.effects === c.gift!.effects)).map((t) => ({ ...t.body, ifGift: t.ifGift }))];
-  const better = bodies.some((b) => ("ifGift" in b && b.ifGift) || allEffects(b.effects).some((e) => e.type === "if" && e.cond.kind === "gift" && e.effects.length > 0 && e.effects !== c.gift!.effects));
+  const better = bodies.some((b) => ("ifGift" in b && b.ifGift) || allEffects(b.effects).some((e) => ((e.type === "if" && e.cond.kind === "gift" && e.effects.length > 0 && e.effects !== c.gift!.effects) || (e.type === "takeFromHand" && !!e.youMay?.ifGift))));
   if (!better) return undefined;
   return [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life)[0];
 }

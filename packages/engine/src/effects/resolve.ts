@@ -706,6 +706,16 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const was = s.resolving?.hostControllerWas;
       return was !== undefined && !player(s, was).lost ? [was] : [];
     }
+    case "linkedExileOwners": {
+      // The leaves ability triggered after the source moved, so the object its exile ability belongs to is the one before
+      // (CR 400.7, 607.2a), as for Skyclave Apparition's token.
+      const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
+      const owners = (s.linkedExile?.[key] ?? []).flatMap((l) => {
+        const o = s.objects[l.id];
+        return o?.zone === "exile" && (o.zoneChanges ?? 0) === l.zc ? [o.owner] : [];
+      });
+      return apnap(s, [...new Set(owners)]).filter((pid) => !player(s, pid).lost);
+    }
     case "selfController": {
       // The source's controller now, or as it last existed on the battlefield (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

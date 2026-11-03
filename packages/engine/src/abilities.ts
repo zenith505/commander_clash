@@ -1339,6 +1339,7 @@ export type PlayerRef =
   | { ref: "attackedThisTurnBySelf" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
   | { ref: "subjectOwner" } // "its owner": whose the object the trigger was about is (CR 108.3)
+  | { ref: "sourceOwner" } // "~'s owner" (Mirror-Mad Phantasm): whose the ability's source is (CR 108.3)
   /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */
   | { ref: "target"; index: number; n?: number }
   | { ref: "eachOpponent" }
@@ -4004,7 +4005,7 @@ export type Effect =
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
   | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true }
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
   /**
@@ -4276,7 +4277,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -4348,6 +4349,8 @@ export type SpellCondition =
    * `cards`: "When ~ dies, exile it. When you do, ..." (Glissa's Retriever): they exiled a card from a graveyard instead. */
   | { kind: "exiledThisWay"; cards?: true }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
+  /** "~'s owner shuffles it into their library. If that player does, ..." (Mirror-Mad Phantasm): its shuffleIntoLibrary of the source put it into a library (a token too: it went there before ceasing to exist, rulings). */
+  | { kind: "shuffledInThisWay" }
   | { kind: "bouncedThisWay"; subtype?: string; another?: true; /** Mistbreath Elder: "Return another creature you control to its owner's hand. If you do, ...": one went to its owner's hand (not a commander sent to the command zone instead). */ returned?: true }
   /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
   | { kind: "returnedYoursAtLeast"; n: number }
@@ -6361,7 +6364,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */

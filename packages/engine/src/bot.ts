@@ -772,6 +772,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = ok.sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
+    // The Mimeoplasm: the other card exiled gives +1/+1 counters equal to its power, so the one with the greatest power.
+    if (pend.kind === "chooseOption" && pend.what === "copyOther") {
+      const pw = (x: string) => characteristics(s, obj(s, x)).power;
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => pw(b) - pw(a))[0]! }];
+    }
     // Assist (CR 702.132a): everyone else is an opponent, so we don't help pay for their spells.
     if (pend.kind === "assist") return [{ type: "assist", player: pid, n: 0 }];
     if (pend.kind === "assistCast") {
@@ -4440,6 +4445,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
+      // Mirror-Mad Phantasm: shuffling itself into its owner's library, then revealing until a card of its name with the
+      // rest milled, which for a bot is only its own library put into the graveyard.
+      if (ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "self") && allEffects(ab.body.effects).some((e) => e.type === "revealUntil" && e.rest === "graveyard")) continue;
       // Gomazoa: shuffling itself away is only worth it to take an attacker it blocks along, one that costs at least as much.
       const takesBlocked = ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "inCombatWithSelf" && e.what.andSelf);
       if (takesBlocked && !(o.blocking ?? []).some((a) => s.objects[a]?.attacking !== undefined && mv(s, a) >= mv(s, id))) continue;

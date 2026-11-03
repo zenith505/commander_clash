@@ -2014,6 +2014,23 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
         },
       };
     }
+    // Kaito, Dancing Shadow: "you may return one of them to its owner's hand. If you do, you may activate loyalty abilities
+    // of ~ twice this turn rather than only once." One of the creatures that dealt it, chosen as it resolves; "if you do":
+    // it went to its owner's hand (as Mistbreath Elder's); twice at most however often it resolves (rulings, CR 606.3).
+    if (phrase === "creatures" && m[2] === "a player" && bodyText === "you may return one of them to its owner's hand. If you do, you may activate loyalty abilities of ~ twice this turn rather than only once.") {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      return {
+        event,
+        body: {
+          targets: [],
+          effects: [
+            { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, action: "bounce", fromGroup: true }], text: "return one of them to its owner's hand" },
+            { type: "if", cond: { kind: "bouncedThisWay", returned: true }, effects: [{ type: "turnRules", rules: ["loyaltyTwice"], self: true }] },
+          ],
+          text: bodyText,
+        },
+      };
+    }
     // Combat damage to a player always goes to an opponent here: attacks only go to opponents. "That opponent" is that
     // player, "each other opponent" each opponent but them (Parapet Thrasher).
     toOpponent = m[2] === "an opponent";

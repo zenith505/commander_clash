@@ -796,6 +796,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
       return o && !player(s, o.owner).lost ? [o.owner] : [];
     }
+    case "sourceOwner": {
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
     case "targetOwner": {
       const t = ctx.targets[ref.index];
       const o = ctx.legal[ref.index] && t?.kind === "object" ? s.objects[t.id] : undefined;
@@ -859,6 +863,7 @@ export const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   event: ctx.event,
   ...(ctx.cause !== undefined ? { cause: ctx.cause } : {}),
   lki: ctx.lki,
+  ...(ctx.subject ? { subject: ctx.subject } : {}),
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,
   treasureSpent: ctx.treasureSpent,

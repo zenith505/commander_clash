@@ -1,7 +1,7 @@
 # Roadmap
 
-29,519 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,474 of
+29,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,479 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1867,11 +1867,22 @@ line blocks.
    noZeroLifeLossAttached, X 0 if the draw was replaced); "Whenever that creature deals combat damage this turn, you may
    exile it. If you do, return it to the battlefield under its owner's control" (Long River Lurker: a floating trigger
    about the target, the creature its subject). +4 (29,507 of 31,936; 29,519 with B93).
-   Rules gaps round 262 saw, for the next round: a delayed trigger made by a dies trigger of a token is dropped when the
-   token has ceased to exist (run-spells "delayed": `if (o) addDelayed`; Ochre Jelly's token is handled, a token's
-   "When ~ dies, at the beginning of the next end step, ..." in general isn't); a floating trigger whose source has ceased
-   to exist (a token Long River Lurker that left the battlefield) no longer triggers (triggers.ts fromFloating skips it),
-   though a delayed trigger doesn't need its source (CR 603.7).
+   Round 263 fixed the two rules gaps round 262 saw (delayed triggers work on their own once made, CR 603.7): a token's
+   "When ~ dies, ... at the beginning of the next end step" makes its delayed trigger though the token has ceased to
+   exist (CR 704.5d, 111.7; run-spells "delayed", the ability's card definition its source), and a floating trigger whose
+   token source is gone still triggers (triggers.ts fromFloating stands in the object it was, a new object, so none of its
+   own "self" events match). Then from the top: "Look at the top X cards of your library, where X is ... You may cast a
+   spell with mana value 3 or less (less than X) from among them without paying its mana cost" (Perception Bobblehead,
+   Kiora, Sovereign of the Deep; CAST_TRIGGER now takes "a Kraken, Leviathan, Octopus, or Serpent spell from your hand");
+   "As long as you have 0 or less life, all damage is dealt to you as though its source had infect" (Phyrexian Unlife:
+   CompiledCard.damageAsInfectAtZero, damage dealt at the same time all as the player was before any of it, rulings);
+   "Whenever ~ attacks a player who controls eight or more lands, ... onto the battlefield tapped and attacking that
+   player" (Owlbear Cub: TriggeredAbility.attacksPlayerLands, dig attackingEvent); "you may cast a permanent spell with
+   equal or lesser mana value from your hand without paying its mana cost" in a cast trigger (Kellan, the Kid: the
+   triggering spell's mana value with its X, rulings). +5 (29,524 of 31,936 with B93; 29,539 with B94).
+   Out after round 263 (looked at, not done): Protean Hydra ("Whenever a +1/+1 counter is removed from ~", for any reason,
+   once per counter, rulings: counters are removed in dozens of places with no one event for it yet; its "prevent that
+   damage and remove that many +1/+1 counters" even with none on it is close to Ugin's Conjurant's counterShield).
    Out after round 262 (looked at, not done): Dragon's Fire ("reveal a Dragon card from your hand or choose a Dragon you
    control" as an additional cost, the damage that card's or creature's power: a new cast-time choice for the UI and bots,
    and the chosen Dragon's last known power); Soul Immolation (blight X as an additional cost, X capped by the greatest

@@ -4262,6 +4262,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, owner: "you", ...(anyUntilEnd[1] ? { notSource: true } : {}), text: `${anyUntilEnd[1] ?? ""}${anyUntilEnd[2]!} you own and control` }, n: 1, action: "flicker", anyNumber: true }, { type: "flicker", what: { ref: "created" }, under: "you", at: "nextEndStep" });
       continue;
     }
+    // Nahiri's Resolve: "exile any number of nontoken artifacts and/or creatures you control. Return those cards to the
+    // battlefield under their owner's control at the beginning of your next upkeep": chosen as it resolves, exiled
+    // together, returned together by one delayed trigger (CR 603.7) under their owners' control.
+    const anyUntilUpkeep = !ctx.spell ? /^[Ee]xile any number of (.+?) you control$/.exec(s) : null;
+    if (anyUntilUpkeep && /^Return those cards to the battlefield under their owner's control at the beginning of your next upkeep$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      // "Artifacts and/or creatures": an artifact or creature, each one chosen.
+      const filter = pickFilter(`${anyUntilUpkeep[1]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (/^(artifacts|creatures|enchantments|planeswalkers|permanents)$/.test(w) ? w.slice(0, -1) : w)).join(" ")} you control`);
+      if (filter?.kind !== "object") return null;
+      si++;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${anyUntilUpkeep[1]!} you control` }, n: 1, action: "flicker", anyNumber: true, prompt: `click any number of your ${anyUntilUpkeep[1]!} to exile, then exile them. They return at the beginning of your next upkeep.` }, { type: "flicker", what: { ref: "created" }, under: "owner", at: "yourNextUpkeep" });
+      continue;
+    }
     // Another Round: "Exile any number of creatures you control, then return them to the battlefield under their owner's
     // control. Then repeat this process X more times." Chosen as it resolves, each time anew (rulings), exiled and
     // returned together; a token doesn't come back (CR 111.7).

@@ -579,7 +579,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const n = Number(/^blight (\d+)/.exec(pend.prompt!)![1]);
       return [{ type: "pickPermanents", player: pid, ids: [blightHost(s, pid, pend.options, n) ?? [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     }
-    if (pend.kind === "pickPermanents" && pend.action === "flicker") return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options) }];
+    // Nahiri's Resolve: gone until our next upkeep, a creature can't block meanwhile: only noncreature ones then.
+    if (pend.kind === "pickPermanents" && pend.action === "flicker") {
+      const next = s.resolving?.body.effects[s.resolving.next + 1];
+      const untilUpkeep = next?.type === "flicker" && next.at === "yourNextUpkeep";
+      return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options).filter((id) => !untilUpkeep || !objIsType(s, obj(s, id), "Creature")) }];
+    }
     // Birthing Ritual: sacrifice a creature (never a commander) for a better one among the cards looked at, one with
     // mana value 1 more (or a token for one with mana value 1 or less), the cheapest such creature first.
     if (pend.kind === "pickPermanents" && pend.looked && pend.action === "sacrifice") {
@@ -4483,6 +4488,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       // "Remove X ki counters from ~" (the Bakus): as many as it has, or as the mana for an {X} allows (Talon of Pain).
       const counterX = ab.removeCounters?.x ? Math.min(removableCounters(s, o, ab.removeCounters.counter), parseManaCost(ab.manaCost).hasX ? Math.max(0, availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(parseManaCost(ab.manaCost))) : Infinity) : 0;
+      // Sidisi, Regent of the Mire: our least useful creature (never our commander) for the biggest creature card in our
+      // graveyard with one more mana value.
+      if (ab.costs?.some((c) => c.kind === "sacrifice" && c.mvX)) {
+        const plan = sacrificeMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
@@ -5263,6 +5275,30 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else return null;
   }
   return out;
+}
+
+/**
+ * "{T}, Sacrifice a creature you control with mana value X other than ~: Return target creature card with mana value X plus 1
+ * from your graveyard to the battlefield" (Sidisi, Regent of the Mire): each X a creature of ours has, its least useful one
+ * (never our commander), for the creature card with the most power and toughness among the legal targets; the biggest
+ * card first.
+ */
+function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
+  if (ab.body.modal || ab.body.targets.length !== 1 || parseManaCost(ab.manaCost).hasX) return null;
+  const size = (id: ObjectId) => { const d = defOf(s, obj(s, id)); return Number(d.power ?? 0) + Number(d.toughness ?? 0); };
+  const cards = [...player(s, pid).graveyard].filter((c) => isType(defOf(s, obj(s, c)), "Creature")).sort((a, b) => size(b) - size(a));
+  const mine = s.battlefield.map((x) => obj(s, x)).filter((c) => c.id !== o.id && controllerOf(s, c) === pid && !c.isCommander && objIsType(s, c, "Creature")).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  for (const card of cards) {
+    for (const c of mine) {
+      const x = characteristics(s, c).manaValue;
+      const t: TargetChoice[] = [{ kind: "object", id: card }];
+      if (size(card) <= power(s, c) + toughness(s, c)) continue;
+      if (abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] })) continue;
+      const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] });
+      if (plan) return plan;
+    }
+  }
+  return null;
 }
 
 /** Blight N for a payment: our least useful creature among `options` that survives N -1/-1 counters, never our commander; null if none. */

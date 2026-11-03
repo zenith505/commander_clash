@@ -2,8 +2,8 @@
 // permanent"; "Equipped creature gets +3/+0 as long as it's legendary").
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, applyAction, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+import { act, addEffect, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { abilitiesOf, abilityProblem, applyAction, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -368,5 +368,122 @@ describe("Territorial Hellkite: an opponent at random it didn't attack during yo
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hk, defender: target }] });
     expect(s.objects[hk]!.attackedInCombat).toEqual({ turn: s.turn, combat: s.combatsThisTurn, player: target });
     expect(s.players[ap]!.combatsBegun).toEqual([{ turn: s.turn, combat: s.combatsThisTurn }]);
+  });
+});
+
+const resolve = (): CardDef => ({"oracleId":"12bd2051-297b-4bab-ac64-6eb26a42e3e2","name":"Nahiri's Resolve","manaCost":"{3}{R}{W}","cmc":5,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"Creatures you control get +1/+0 and have haste.\nAt the beginning of your end step, exile any number of nontoken artifacts and/or creatures you control. Return those cards to the battlefield under their owner's control at the beginning of your next upkeep.","colors":["R","W"],"colorIdentity":["R","W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/0/4/0443321b-e999-4bdd-8d8e-65fbaa6cabb4.jpg?1783916442","artUrl":"https://cards.scryfall.io/art_crop/front/0/4/0443321b-e999-4bdd-8d8e-65fbaa6cabb4.jpg?1783916442","commanderLegal":"legal","set":"mat","releasedAt":"2023-05-12","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+describe("Nahiri's Resolve: exile any number until your next upkeep", () => {
+  it("is fully supported", () => {
+    expect(isFullySupported(resolve())).toBe(true);
+  });
+
+  it("exiles the nontoken artifacts and creatures you pick at your end step and returns them under their owners' control at your next upkeep (CR 603.7)", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const opp = opps(s, ap)[0]!;
+    putOnBattlefield(s, ap, resolve());
+    const bear = putOnBattlefield(s, ap, card("Test Bear", "Creature — Bear", "{1}", { power: "2", toughness: "2" }));
+    const rock = putOnBattlefield(s, ap, card("Test Rock", "Artifact", "{1}"));
+    const kept = putOnBattlefield(s, ap, card("Test Kept", "Creature — Bear", "{1}", { power: "2", toughness: "2" }));
+    // One you control but don't own: it returns under its owner's control.
+    const borrowed = putOnBattlefield(s, opp, card("Test Borrowed", "Creature — Bear", "{1}", { power: "2", toughness: "2" }));
+    addEffect(s, ap, [borrowed], [{ kind: "control" }], "game");
+    const tok = putOnBattlefield(s, ap, card("Test Token", "Creature — Bear", "{1}", { power: "1", toughness: "1" }));
+    s.objects[tok]!.isToken = true;
+    s = passTo(s, "end");
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "flicker", min: 0 });
+    const options = (s.pending as { options: ObjectId[] }).options;
+    expect(options).toEqual(expect.arrayContaining([bear, rock, kept, borrowed]));
+    expect(options).not.toContain(tok);
+    const cardOf = (id: ObjectId) => s.objects[id]!.cardId;
+    const ids = [bear, rock, borrowed].map(cardOf);
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [bear, rock, borrowed] }));
+    const exiled = Object.values(s.objects).filter((o) => o.zone === "exile" && ids.includes(o.cardId));
+    expect(exiled).toHaveLength(3);
+    expect(s.objects[kept]!.zone).toBe("battlefield");
+    s = passUntil(s, "upkeep", ap);
+    s = settle(s);
+    const back = s.battlefield.map((id) => s.objects[id]!).filter((o) => ids.includes(o.cardId));
+    expect(back).toHaveLength(3);
+    expect(back.find((o) => o.cardId === cardOf(borrowed) || s.cards[o.cardId]!.name === "Test Borrowed")!.controller).toBe(opp);
+    expect(back.filter((o) => o.owner === ap).every((o) => controllerOf(s, o) === ap)).toBe(true);
+  });
+
+  it("is answered by a bot without exiling its creatures (they couldn't block meanwhile)", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, resolve());
+    const bear = putOnBattlefield(s, ap, card("Test Bear", "Creature — Bear", "{1}", { power: "2", toughness: "2", oracleText: "When this creature enters, you gain 1 life." }));
+    s = passTo(s, "end");
+    s = settle(s);
+    expect(s.pending?.kind).toBe("pickPermanents");
+    s = settle(run(s, botActions(s, ap)));
+    expect(s.objects[bear]!.zone).toBe("battlefield");
+  });
+});
+
+const sidisi = (): CardDef => ({"oracleId":"72074972-418d-4dce-83cf-ce8cf310fc42","name":"Sidisi, Regent of the Mire","manaCost":"{1}{B}","cmc":2,"typeLine":"Legendary Creature — Zombie Snake Warlock","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Zombie","Snake","Warlock"],"oracleText":"{T}, Sacrifice a creature you control with mana value X other than Sidisi: Return target creature card with mana value X plus 1 from your graveyard to the battlefield. Activate only as a sorcery.","power":"1","toughness":"3","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/7/47374d23-662b-4ba7-a94f-37c9bc759cc6.jpg?1783907370","artUrl":"https://cards.scryfall.io/art_crop/front/4/7/47374d23-662b-4ba7-a94f-37c9bc759cc6.jpg?1783907370","commanderLegal":"legal","set":"tdm","releasedAt":"2025-04-11","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const critter = (name: string, cost: string) => card(name, "Creature — Bear", cost, { power: "2", toughness: "2" });
+const toYard = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = "graveyard";
+  s.players[pid]!.graveyard.push(id);
+  invalidateCharacteristics(s);
+  return id;
+};
+
+describe("Sidisi, Regent of the Mire: sacrifice a creature with mana value X, return one with mana value X plus 1", () => {
+  it("is fully supported", () => {
+    expect(isFullySupported(sidisi())).toBe(true);
+  });
+
+  it("returns a creature card with mana value X plus 1 for a creature with mana value X (CR 107.3a, 602.2b)", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const sd = putOnBattlefield(s, ap, sidisi());
+    const two = putOnBattlefield(s, ap, critter("Test Two", "{1}{G}"));
+    const three = putOnBattlefield(s, ap, critter("Test Three", "{2}{G}"));
+    const back = toYard(s, ap, critter("Test Back", "{2}{G}"));
+    const four = toYard(s, ap, critter("Test Four", "{3}{G}"));
+    expect(abilityProblem(s, ap, sd, 0)).toBeNull();
+    // X 2: the mana value 3 card, paid with the mana value 2 creature, not the 3.
+    expect(abilityProblem(s, ap, sd, 0, [{ kind: "object", id: four }], undefined, undefined, 2, { sacrifice: [two] })).not.toBeNull();
+    expect(abilityProblem(s, ap, sd, 0, [{ kind: "object", id: back }], undefined, undefined, 2, { sacrifice: [three] })).not.toBeNull();
+    s = settle(run(s, planActivate(s, ap, sd, 0, [{ kind: "object", id: back }], undefined, undefined, 2, { sacrifice: [two] })));
+    expect(s.objects[two]!.zone).toBe("graveyard");
+    expect(s.objects[three]!.zone).toBe("battlefield");
+    expect(s.battlefield.some((id) => s.objects[id]!.cardId === s.objects[back]!.cardId)).toBe(true);
+  });
+
+  it("can't sacrifice itself, and can't be activated with no pair of mana values that works", () => {
+    const { s: s0, ap } = setup([]);
+    const s = s0;
+    const sd = putOnBattlefield(s, ap, sidisi());
+    // Sidisi's own mana value is 2: a 3 in the graveyard doesn't make it activatable on its own.
+    toYard(s, ap, critter("Test Back", "{2}{G}"));
+    expect(abilityProblem(s, ap, sd, 0)).not.toBeNull();
+  });
+
+  it("is activated by a bot trading a lesser creature for a better one", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const sd = putOnBattlefield(s, ap, sidisi());
+    const one = putOnBattlefield(s, ap, critter("Test One", "{G}"));
+    const big = toYard(s, ap, card("Test Big", "Creature — Beast", "{1}{G}", { power: "4", toughness: "4" }));
+    s.players[ap]!.hand = [];
+    s.players[ap]!.command = [];
+    // Bots use activated abilities in their second main phase.
+    s = passTo(s, "main2");
+    for (let i = 0; i < 10 && s.objects[one]!.zone === "battlefield"; i++) {
+      const plan = botActions(s, ap);
+      if (!plan.length || plan.every((a) => a.type === "passPriority")) break;
+      s = settle(run(s, plan));
+    }
+    expect(s.objects[one]!.zone).toBe("graveyard");
+    expect(s.objects[big]!.zone).not.toBe("graveyard");
+    void sd;
   });
 });

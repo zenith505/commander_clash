@@ -7100,12 +7100,12 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
     const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
-    return xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
+    return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
-const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
+const mvXCost = (c: AdditionalCost) => (c.kind === "discard" || c.kind === "sacrifice") && !!c.mvX && !!c.filter;
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
 export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
@@ -7852,7 +7852,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
   // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
-  if (x === undefined && ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+  // Sidisi, Regent of the Mire: "Sacrifice a creature you control with mana value X" the same way.
+  if (x === undefined && ab.costs?.some((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX)) {
     for (let n = 0; n <= 20; n++) {
       if (abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs)) continue;
       // Without targets chosen, the check above lets any X target; here the target must have mana value n too.

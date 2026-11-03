@@ -1947,10 +1947,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         delete s.linkedExile?.[key];
       }
       const cards = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
-      if (e.dest === "hand") {
+      if (e.dest === "hand" || e.dest === "graveyard") {
         for (const c of cards) {
-          log(s, `${src} returns ${defOf(s, c).name} to its owner's hand.`);
-          moveObject(s, c.id, "hand");
+          log(s, `${src} returns ${defOf(s, c).name} to its owner's ${e.dest}.`);
+          moveObject(s, c.id, e.dest);
         }
         return;
       }

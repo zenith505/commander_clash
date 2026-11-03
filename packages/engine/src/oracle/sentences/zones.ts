@@ -1369,6 +1369,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
   if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Gravegouger: "When ~ leaves the battlefield, return the exiled cards to their owner's graveyard": the cards its enters
+  // ability exiled, while they're still in exile (CR 607.2a, 400.7); compile() links the two.
+  if (/^Return the exiled cards to their owner's graveyard$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "graveyard" }];
   // Parallax Wave: "When ~ leaves the battlefield, each player returns to the battlefield all cards they own exiled with
   // it": the same, the cards its own exile ability took, under their owners' control (CR 607.2a, 610.3).
   if ((m = /^[Ee]ach player returns to (the battlefield|their hand) all cards they own exiled with (?:it|~)$/.exec(s)) && ctx.selfCard)

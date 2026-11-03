@@ -57,8 +57,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
   // Nicol Bolas, the Arisen: "Exile all but the bottom card of target player's library": the top cards, as many as there
-  // are less one.
-  if ((m = /^Exile all but the bottom card of (target player|target opponent)'s library$/.exec(s))) {
+  // are less one. Jace, Reality Sculptor: "of each opponent's library", each one's own.
+  if ((m = /^Exile all but the bottom card of (target player|target opponent|each opponent)'s library$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "exileTop", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, plus: -1 } }] : null;
   }
@@ -1310,9 +1310,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     }
     const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
     const spellSpec = spellUpTo ? parseTargetPhrase(spellUpTo[1]!) : undefined;
-    // Temporal Cleansing: "puts it into their library second from the top or on the bottom", a permanent only.
+    // Temporal Cleansing: "puts it into their library second from the top or on the bottom", a permanent only. Wan Shi
+    // Tong, All-Knowing: "target nonland permanent's owner puts it ...", the same.
     const second = /second from the top/.test(m[3]!);
-    if (second && (m[1] || spellUpTo)) return null;
+    if (second && spellUpTo) return null;
     if (spellUpTo) return spellSpec?.kind === "spell" && !spellSpec.orPermanent && !spellSpec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, { ...spellSpec, optional: true, text: `up to one ${spellSpec.text}` }), bounce: true, libraryChoice: true }] : null;
     const what = parseObject(m[1] ?? m[2] ?? "it", ctx);
     if (what?.ref !== "target" || (what.n ?? 1) !== 1) return null;

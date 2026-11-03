@@ -402,8 +402,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     }
     return out;
   }
-  if (ref.ref === "tokensCreatedWithSelf")
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.createdWith?.id === ctx.sourceId && o.createdWith?.zc === ctx.sourceZc && !s.resolving?.created?.includes(o.id));
+  if (ref.ref === "tokensCreatedWithSelf") {
+    // Dance of Many's "When ~ leaves the battlefield, exile the token": a leaves-the-battlefield trigger's source is the
+    // object it became (CR 603.10a, 400.7), so the tokens are those the permanent it was created, one zone change before.
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const zc = me && me.zone !== "battlefield" && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) === ctx.sourceZc ? ctx.sourceZc - 1 : ctx.sourceZc;
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.createdWith?.id === ctx.sourceId && o.createdWith?.zc === zc && !s.resolving?.created?.includes(o.id));
+  }
   if (ref.ref === "selfCard") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // An Aura's card in the graveyard it went to from the battlefield, as its creature died or since (Angelic Destiny
@@ -1039,6 +1044,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "radiation":
     case "poison":
     case "loseAllCounters":
+    case "banCounters":
     case "doublePlayerCounters":
     case "emblem":
     case "becomeMonarch":

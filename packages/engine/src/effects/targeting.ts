@@ -166,6 +166,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
+  if (spec.turnedFaceUpThisTurn && (o.zone !== "battlefield" || o.turnedFaceUpTurn !== s.turn)) return false;
   if (spec.enteredUnderYou && !(s.turnLog?.entered ?? []).some((e) => e.id === o.id && e.zc === (o.zoneChanges ?? 0) && e.controller === controller)) return false;
   if (spec.notEnteredThisTurn && o.enteredTurn === s.turn) return false;
   if (spec.enteredSinceYourLastTurn) {

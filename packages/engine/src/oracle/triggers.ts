@@ -256,7 +256,8 @@ function otherMeansSubject(body: AbilityBody): AbilityBody | null {
  */
 function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever enchanted land becomes tapped": an Aura on something other than a creature can only see that.
-  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line);
+  // Darksteel Garrison: "Whenever fortified land becomes tapped" (CR 301.6).
+  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line) ?? /^When(?:ever)? (~ or )?fortified (land) (.+)$/.exec(line);
   if (!m) return null;
   // "Whenever equipped creature deals combat damage during your turn, ..." (The Aetherspark): it triggers only during
   // its controller's turn.
@@ -1438,6 +1439,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const blockingSelf = !damaged && / blocking ~$/.exec(phrase);
   if (blockingSelf) phrase = phrase.slice(0, blockingSelf.index);
   if (blockingSelf && (m![1]!.toLowerCase() !== "a" || leaves || hadKw || wasPT || wasAttached || hadCounter)) return "fail";
+  // Dance of Many: "Whenever a token created with ~ leaves the battlefield" (compile.ts reads "the token" so).
+  const createdWithSelf = !damaged && !blockingSelf && phrase === "token created with ~";
+  if (createdWithSelf) phrase = "token";
+  if (createdWithSelf && (m![1]!.toLowerCase() !== "a" || !leaves || hadKw || wasPT || wasAttached || hadCounter)) return "fail";
   // "A creature of the chosen type" (Species Specialist): the type chosen as the watcher entered.
   const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, / of the chosen type$/.test(phrase) ? { chosen: true } : undefined);
   if (!filter || filter.kind !== "object") return "fail";
@@ -1455,6 +1460,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
       ...(blockingSelf ? { blockingSelf: true as const } : {}),
+      ...(createdWithSelf ? { createdWithSelf: true as const } : {}),
       ...(leaves ? { leaves: true as const } : {}),
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : diesOrCommand ? { toZones: ["graveyard", "command"] as ("graveyard" | "command")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
@@ -1625,6 +1631,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // stays true once it is, so it's the same as a creature that entered this turn dealing the damage.
   const enteredIf = /^(Whenever (?:another|an?) .+? you control deals combat damage to a player), if that creature entered this turn, (.+)$/.exec(line);
   if (enteredIf) line = `${enteredIf[1]}, ${enteredIf[2]}`;
+  // Kaust, Eyes of the Glade: "Whenever a creature you control that was turned face up this turn deals combat damage to a
+  // player": turned face up this turn as it deals the damage (CR 708.8).
+  const turnedUp = !enteredIf && /^Whenever a creature you control that was turned face up this turn (deals combat damage to a player, .+)$/.exec(line);
+  if (turnedUp) line = `Whenever a creature you control ${turnedUp[1]}`;
   // "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix, Guided by Fate): this
   // creature, enchanted or not, or another that matches; each one that deals the damage triggers it once.
   // "Whenever ~ or another nontoken Spirit you control ... deals combat damage to a player" (Millicent): the same, ~
@@ -1650,9 +1660,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
   if (enteredIf && (orSelf || filter.enteredThisTurn)) return "fail";
+  if (turnedUp && (orSelf || withKw)) return "fail";
   return {
     event: "creatureYouControlDealsCombatDamageToPlayer",
-    dealer: { filter: { ...filter, controller: "you", ...(enteredIf ? { enteredThisTurn: true as const } : {}), text: `${m[2]} you control${enteredIf ? " that entered this turn" : ""}` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
+    dealer: { filter: { ...filter, controller: "you", ...(enteredIf ? { enteredThisTurn: true as const } : {}), ...(turnedUp ? { turnedFaceUpThisTurn: true as const } : {}), text: `${m[2]} you control${enteredIf ? " that entered this turn" : turnedUp ? " that was turned face up this turn" : ""}` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
     ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
@@ -2185,6 +2196,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "exiled" };
     yourTurn = !!m[1];
     rest = m[2]!;
+  } else if ((m = /^Whenever one or more cards are put into a library from anywhere, (.+)$/.exec(line))) {
+    // Wan Shi Tong, All-Knowing: anyone's cards (not tokens, CR 111.1) into any library, once for each event; not a scry,
+    // surveil or other reordering within a library (rulings).
+    batch = { what: "toLibrary" };
+    rest = m[1]!;
   } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
     // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
     batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };

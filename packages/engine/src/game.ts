@@ -1174,8 +1174,9 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
-  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere.
-  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile"))
+  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere. Wan Shi Tong, All-Knowing: "into a library
+  // from anywhere", not from a library (rulings).
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile") || (to === "library" && fromZone !== "library"))
     (s.zoneBatch ??= []).push({
       id,
       zc: o.zoneChanges,
@@ -11434,6 +11435,15 @@ function attachmentSBAs(s: GameState): boolean {
         log(s, `${c.name} becomes unattached.`);
         changed = true;
       }
+    } else if (c.subtypes.includes("Fortification") && o.attachedTo) {
+      // A Fortification: unattached from anything but a land, and when it becomes a creature itself (CR 301.6, 704.5n).
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Land") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host))) {
+        if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
+        o.attachedTo = undefined;
+        invalidateCharacteristics(s);
+        log(s, `${c.name} becomes unattached.`);
+        changed = true;
+      }
     } else if (o.attachedTo || o.attachedToPlayer !== undefined) {
       // A creature, or anything that's no longer an Aura or Equipment, can't stay attached (CR 704.5p).
       o.attachedTo = undefined;
@@ -12121,6 +12131,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
  */
 function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId) {
   o.faceDown = undefined;
+  o.turnedFaceUpTurn = s.turn;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);

@@ -2277,13 +2277,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Zara: from another player's hand (looked at just before), under your control.
       const from = e.fromHandOf ? players(s, e.fromHandOf, ctx)[0] : p.id;
       if (from === undefined || player(s, from).lost) return;
+      // Aura swap (CR 702.65): the source, still on the battlefield as the same object, yours (you own and control it),
+      // and what it's attached to; with neither half of the exchange possible, nothing happens (702.65b).
+      const swapper = e.auraSwap && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const swapFrom = swapper?.zone === "battlefield" && (ctx.sourceZc === undefined || (swapper.zoneChanges ?? 0) === ctx.sourceZc) && swapper.owner === p.id && controllerOf(s, swapper) === p.id ? swapper : undefined;
+      const swapHost: AuraHost | undefined = swapFrom?.attachedTo && s.objects[swapFrom.attachedTo]?.zone === "battlefield" ? { attachTo: swapFrom.attachedTo } : swapFrom?.attachedToPlayer !== undefined ? { attachToPlayer: swapFrom.attachedToPlayer } : undefined;
+      const swapFits = (id: ObjectId) => !!swapHost && auraHostOptions(s, obj(s, id), p.id).some((h) => auraHostKey(h) === auraHostKey(swapHost));
+      if (e.auraSwap && !swapHost) {
+        s.resolving!.did = false;
+        log(s, `${src} can't be exchanged.`);
+        return;
+      }
       if (!sc.found) {
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         // "With lesser power" (Shadowfax): its power in your hand, less than the source's, or the source's as it last
         // existed on the battlefield (rulings).
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
-        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;
@@ -2291,10 +2302,22 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? (e.any || e.upTo !== undefined ? " from your hand and/or graveyard" : " from your hand or graveyard") : ""}`;
         // Another player's hand: all of it shown, the cards that fit to choose from.
         if (from !== p.id) s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: 1, hand: from, dig: { looked: [...player(s, from).hand], to: `from ${player(s, from).name}'s hand to put onto the battlefield under your control${e.tapped ? ", tapped" : ""}${e.attacking ? " and attacking" : ""}`, rest: `stay in ${player(s, from).name}'s hand` } };
-        else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true };
+        else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}) };
         return "paused";
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === from);
+      if (e.auraSwap) {
+        // The exchange happens at once (rulings): the source to its owner's hand, the Aura card attached to what it enchanted.
+        const card = cards.find((o) => swapFits(o.id));
+        s.resolving!.did = !!card;
+        if (!card || !swapFrom || !swapHost) return;
+        log(s, `${p.name} exchanges ${defOf(s, swapFrom).name} with ${defOf(s, card).name} from their hand, enchanting ${auraHostName(s, swapHost)}.`);
+        enterTogether(s, () => {
+          moveObject(s, swapFrom.id, "hand");
+          moveObject(s, card.id, "battlefield", { controller: p.id, ...swapHost });
+        });
+        return;
+      }
       // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
       // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
       // "Attacking that opponent" (Kaalia): the player its creature attacked, even if it's attacking something else now, and

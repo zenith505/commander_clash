@@ -931,6 +931,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
+  // Suncleanser: "It can't have counters put on it for as long as ~ remains on the battlefield" (CR 611.2b).
+  if ((m = /^(It|That creature) can't have counters put on it for as long as ~ remains on the battlefield$/.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    return what && !isGroup(what) ? [{ type: "banCounters", what }] : null;
+  }
   // Aether Snap: "Remove all counters from all permanents": from each of them at once.
   if (/^Remove all counters from all permanents$/i.test(s)) return [{ type: "removeAllCounters", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }];
   // "Move all counters from target creature onto another target creature" (CR 122.5).

@@ -6829,7 +6829,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Faerie Artisans: "Then exile all other tokens created with this creature": those its abilities created, as that
     // object (rulings), not the one just created.
-    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s)) {
+    // Dance of Many: "exile all tokens created with ~" as it leaves the battlefield, the same tokens.
+    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s) || /^[Ee]xile all tokens created with ~$/.test(s)) {
       effects.push({ type: "exile", what: { ref: "tokensCreatedWithSelf" } });
       continue;
     }

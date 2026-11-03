@@ -1057,6 +1057,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0bc7f093-bef0-4f1a-852c-4b75ebf54838",
+  "name": "Arcane Signet",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff5caed4-0276-476d-8fae-edae2536df7f",
   "name": "Archangel of Tithes",
   "manaCost": "{1}{W}{W}{W}",
@@ -8166,6 +8195,32 @@
   "set": "eos",
   "releasedAt": "2025-08-01",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "80e72437-0c17-44c0-b0a7-eab075a64569",
+  "name": "Genesis Storm",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "When you cast this spell, copy it for each time you've cast your commander from the command zone this game.\nReveal cards from the top of your library until you reveal a nonland permanent card. You may put that card onto the battlefield. Then put all cards revealed this way that weren't put onto the battlefield on the bottom of your library in a random order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19530,6 +19585,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "71d2a0fe-5426-4fa3-85a4-564c37184996",
+  "name": "Smelting Vat",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}, {T}, Sacrifice another artifact: Reveal the top eight cards of your library. Put up to two noncreature artifact cards with total mana value less than or equal to the sacrificed artifact's mana value from among them onto the battlefield and the rest on the bottom of your library in a random order.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "brc",
+  "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "49136bdc-bc50-49a2-999a-1ef9c16ea130",
   "name": "Smuggler's Copter",
   "manaCost": "{2}",
@@ -19759,6 +19836,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "00c0543c-2a1f-4425-8283-4062d74a1637",
+  "name": "Solemn Simulacrum",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "When this creature enters, you may search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\nWhen this creature dies, you may draw a card.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dcb9c2a7-ae54-4ddc-a567-640bf4bf4366",
   "name": "Solitude",
   "manaCost": "{3}{W}{W}",
@@ -19974,6 +20078,39 @@
   "set": "m19",
   "releasedAt": "2018-07-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "aba60536-ffbd-480c-8e8f-9639bdc53d4b",
+  "name": "Spectral Arcanist",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Spirit Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Wizard"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may cast an instant or sorcery spell with mana value less than or equal to the number of Spirits you control from a graveyard without paying its mana cost. If that spell would be put into a graveyard, exile it instead.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

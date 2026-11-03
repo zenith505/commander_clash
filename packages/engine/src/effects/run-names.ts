@@ -2,6 +2,7 @@ import type { Effect, SameNameRef } from "../abilities";
 import { defOf, isType, objIsType } from "../cards";
 import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
+import { defMv } from "../faces";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId, PlayerId } from "../types";
@@ -144,20 +145,25 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // nothing has moved yet, so resuming reveals the same cards.
       const sc = (s.resolving!.scratch ??= {});
       // Hei Bai, Forest Guardian: "You may put that card onto the battlefield. Then shuffle.": if you don't, it stays.
-      if ((e.mayElseHand || e.mayStay) && hits.length && sc.may === undefined) {
-        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, hits[0]!)).name} onto the battlefield`, otherwise: e.mayStay ? "If you don't, it stays in your library." : "If you don't, it goes into your hand.", source: src, card: hits[0]! };
+      // Genesis Storm: "You may put that card onto the battlefield. Then put all cards revealed this way that weren't put onto
+      // the battlefield on the bottom of your library in a random order."
+      if ((e.mayElseHand || e.mayStay || e.mayElseBottom) && hits.length && sc.may === undefined) {
+        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, hits[0]!)).name} onto the battlefield`, otherwise: e.mayStay ? "If you don't, it stays in your library." : e.mayElseBottom ? "If you don't, it goes on the bottom of your library with the other revealed cards." : "If you don't, it goes into your hand.", source: src, card: hits[0]! };
         return "paused";
       }
-      const declined = e.mayStay && !sc.may ? hits.splice(0) : [];
-      const found = e.mayElseHand && !sc.may ? "hand" : e.found;
+      const declined = (e.mayStay || e.mayElseBottom) && !sc.may ? hits.splice(0) : [];
+      // Part in Friendship: onto the battlefield only with a mana value (X as 0, rulings) at most the amount, else the hand.
+      const found = (e.mayElseHand && !sc.may) || (e.ontoIfMvAtMost && hits[0] && defMv(defOf(s, obj(s, hits[0]))) > Math.max(0, amountNow(s, e.ontoIfMvAtMost, ctx))) ? "hand" : e.found;
       // An Aura found for the battlefield: its new controller chooses what it enchants as it enters (CR 303.4f), or it
       // stays in the library (303.4g); with a hand to go to instead, it goes there (rulings on Songbirds' Blessing).
       const hosts = found === "battlefield" ? chooseAuraHosts(s, hits.map((id) => ({ o: obj(s, id), under: e.yours ? ctx.controller : p.id })), src) : new Map<ObjectId, AuraHost>();
       if (hosts === "paused") return "paused";
       const unattached = hits.filter((id) => found === "battlefield" && defOf(s, obj(s, id)).subtypes.includes("Aura") && !hosts.has(id));
-      const stays = e.mayElseHand ? [] : unattached;
+      const stays = e.mayElseHand || e.mayElseBottom ? [] : unattached;
       const toHand = e.mayElseHand ? unattached : [];
-      for (const id of [...stays, ...toHand]) hits.splice(hits.indexOf(id), 1);
+      // Genesis Storm: an Aura with nothing to enchant isn't put onto the battlefield, so it goes to the bottom (CR 303.4g).
+      const bottomed = e.mayElseBottom ? unattached : [];
+      for (const id of [...stays, ...toHand, ...bottomed]) hits.splice(hits.indexOf(id), 1);
       // "Tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its
       // controller chooses as it enters (rulings), never declared as an attacker; outside combat only tapped (CR 506.3d).
       // Asked before anything moves, so resuming reveals the same cards.
@@ -198,7 +204,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, id, "hand");
       }
       if (e.mayElseHand && found === "hand") for (const id of hits) log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand.`);
-      for (const id of declined) log(s, `${p.name} leaves ${defOf(s, obj(s, id)).name} in their library.`);
+      for (const id of declined) log(s, e.mayElseBottom ? `${p.name} doesn't put ${defOf(s, obj(s, id)).name} onto the battlefield.` : `${p.name} leaves ${defOf(s, obj(s, id)).name} in their library.`);
+      for (const id of bottomed) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it isn't put onto the battlefield.`);
       const rest = seen.filter((id) => !hits.includes(id) && !stays.includes(id) && !toHand.includes(id));
       if (e.rest === "bottomOrder") {
         if (toBottom(s, p.id, rest, src, false) === "paused") return "paused";

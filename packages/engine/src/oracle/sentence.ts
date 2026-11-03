@@ -139,6 +139,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // together, a card with {X} in its mana cost counting X as 0 (CR 202.3e).
       const total = how === "any number of" ? / with total mana value (\d+) or less$/.exec(what) : null;
       if (total) what = what.slice(0, total.index);
+      // Smelting Vat: "up to two noncreature artifact cards with total mana value less than or equal to the sacrificed
+      // artifact's mana value": all the cards taken together, the count as it resolves.
+      const totalCount = /^up to /.test(how) && count > 1 ? / with total mana value less than or equal to (.+)$/.exec(what) : null;
+      const totalAmount = totalCount ? parseCount(totalCount[1]!, ctx ?? null) : undefined;
+      if (totalCount && (!totalAmount || typeof totalAmount !== "object")) return null;
+      if (totalCount) what = what.slice(0, totalCount.index);
       const mvX = / with mana value X or less$/.exec(what);
       // "With mana value less than or equal to the number of lands you control" (Loot): counted as it resolves.
       const mvCount = / with mana value less than or equal to (.+)$/.exec(what);
@@ -159,8 +165,9 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter) return null;
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
+      if (totalCount) Object.assign(filter, { text: `${filter.text} with total mana value less than or equal to ${totalCount[1]}` });
       if (attacking && (count !== 1 || !filter.types?.includes("Creature"))) return null;
-      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), ...(random ? { pickRandom: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), ...(random ? { pickRandom: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : totalAmount ? { totalMv: totalAmount } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
       // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
       else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });

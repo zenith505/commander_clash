@@ -402,8 +402,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     }
     return out;
   }
-  if (ref.ref === "tokensCreatedWithSelf")
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.createdWith?.id === ctx.sourceId && o.createdWith?.zc === ctx.sourceZc && !s.resolving?.created?.includes(o.id));
+  if (ref.ref === "tokensCreatedWithSelf") {
+    // Dance of Many's "When ~ leaves the battlefield, exile the token": a leaves-the-battlefield trigger's source is the
+    // object it became (CR 603.10a, 400.7), so the tokens are those the permanent it was created, one zone change before.
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const zc = me && me.zone !== "battlefield" && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) === ctx.sourceZc ? ctx.sourceZc - 1 : ctx.sourceZc;
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.createdWith?.id === ctx.sourceId && o.createdWith?.zc === zc && !s.resolving?.created?.includes(o.id));
+  }
   if (ref.ref === "selfCard") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // An Aura's card in the graveyard it went to from the battlefield, as its creature died or since (Angelic Destiny
@@ -569,7 +574,18 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const filter0 = bindAttachedToSource(bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx)), ctx.sourceId);
     // "Named ~" (Gruff Triplets): its name now, or as it last existed (CR 201.5, 608.2h).
     const me0 = filter0.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const filter1 = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    const filter1a = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    // Dual Nature: the subject's name as it is, or last was, on the battlefield; none (face down, or not known) matches nothing.
+    let filter1 = filter1a;
+    if (ref.sameNameAsSubject) {
+      const subj = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      const here = subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === ctx.subject!.zc;
+      const lk = !here && ctx.subject ? s.lastKnown?.[ctx.subject.id] : undefined;
+      // Gone from the battlefield, the subject is the card in its new zone, one zone change on from what last existed.
+      const name = here ? (subj!.faceDown ? "" : characteristics(s, subj!).name) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) ? (lk.source?.name ?? "") : "";
+      if (!name) return [];
+      filter1 = { ...filter1a, named: name };
+    }
     // Sanguine Praetor, Endemic Plague: the sacrificed creature as it last existed; none matches without one.
     const sacked = ref.sacrificedKin ? (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1)) : undefined;
     if (ref.sacrificedKin && !sacked) return [];
@@ -1041,6 +1057,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "radiation":
     case "poison":
     case "loseAllCounters":
+    case "banCounters":
     case "doublePlayerCounters":
     case "emblem":
     case "becomeMonarch":
@@ -1365,6 +1382,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "shuffleZones":
     case "search":
     case "revealPick":
+    case "opponentSplitsTargets":
     case "piles":
     case "dig":
     case "vault":

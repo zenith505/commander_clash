@@ -57,8 +57,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Zimone, Mystery Unraveler: "you may turn a permanent you control face up": only a face-down one can be (CR 708.8;
   // a face-up one has no face-up side to turn to), so it's the same choice.
-  if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control|permanent you control) face up$/.exec(s))) {
-    const filter = parseTargetPhrase(fu[1]!.replace(/^permanent/, "face-down permanent"));
+  // Bustle: "You may turn a creature you control face up": a face-down one, likewise.
+  if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control|(?:creature|permanent) you control) face up$/.exec(s))) {
+    const filter = parseTargetPhrase(fu[1]!.replace(/^(creature|permanent)/, "face-down $1"));
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;
   }
   // Nahiri, Heir of the Ancients: "You may attach an Equipment you control to it", the token just created; Goldwardens'
@@ -941,6 +942,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Remove all counters from (~|it|that creature|enchanted creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
+  }
+  // Suncleanser: "It can't have counters put on it for as long as ~ remains on the battlefield" (CR 611.2b).
+  if ((m = /^(It|That creature) can't have counters put on it for as long as ~ remains on the battlefield$/.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    return what && !isGroup(what) ? [{ type: "banCounters", what }] : null;
   }
   // Aether Snap: "Remove all counters from all permanents": from each of them at once.
   if (/^Remove all counters from all permanents$/i.test(s)) return [{ type: "removeAllCounters", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }];

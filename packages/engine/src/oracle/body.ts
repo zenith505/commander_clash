@@ -3312,7 +3312,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|destroy all other creatures and planeswalkers\.?$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then (?:reveals|exiles) the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|destroy all other creatures and planeswalkers\.?$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -3416,6 +3416,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!auraHas) return null;
       s = `${s} with ${auraHas[1]!}`;
       si++;
+    }
+    // Wake to Slaughter: "Choose up to two target creature cards in your graveyard. An opponent chooses one of them. Return
+    // that card to your hand. Return the other to the battlefield under your control. It gains haste. Exile it at the
+    // beginning of the next end step." One instruction (Effect opponentSplitsTargets).
+    if (ctx.spell && /^Choose up to two target creature cards in your graveyard$/.test(s) && sentences.slice(si + 1, si + 6).map((x) => x.replace(/\.$/, "")).join("|") === "An opponent chooses one of them|Return that card to your hand|Return the other to the battlefield under your control|It gains haste|Exile it at the beginning of the next end step") {
+      const what = parseObject("up to two target creature cards in your graveyard", ctx, true);
+      if (what?.ref !== "target" || what.n !== 2) return null;
+      effects.push({ type: "opponentSplitsTargets", what });
+      si += 5;
+      continue;
+    }
+    // Sift Through Sands: "If you've cast a spell named Peer Through Depths and a spell named Reach Through Mists this turn,
+    // you may search ...": a spell with each name cast by you this turn (copies aren't cast, CR 707.10), checked as it
+    // resolves.
+    const castNamed = /^If you've cast a spell named ([A-Z][^,]+?) and a spell named ([A-Z][^,]+?) this turn, you may (search your library for .+)$/.exec(s);
+    if (castNamed) {
+      const found = parseOne(capital(castNamed[3]!), ctx);
+      if (!found) return null;
+      const inner: Effect[] = [{ type: "may", effects: found, text: castNamed[3]! }];
+      const cast = (name: string): SpellCondition => ({ kind: "amountNow", amount: { count: { kind: "spellsCastThisTurn", filter: { kind: "card", named: name, text: `spell named ${name}` } } }, min: 1 });
+      effects.push({ type: "if", cond: cast(castNamed[1]!), effects: [{ type: "if", cond: cast(castNamed[2]!), effects: inner }] });
+      continue;
     }
     const last = effects[effects.length - 1];
     // Unexpected Results: "Shuffle your library, then reveal the top card. If it's a nonland card, you may cast it without
@@ -6986,7 +7008,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Faerie Artisans: "Then exile all other tokens created with this creature": those its abilities created, as that
     // object (rulings), not the one just created.
-    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s)) {
+    // Dance of Many: "exile all tokens created with ~" as it leaves the battlefield, the same tokens.
+    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s) || /^[Ee]xile all tokens created with ~$/.test(s)) {
       effects.push({ type: "exile", what: { ref: "tokensCreatedWithSelf" } });
       continue;
     }
@@ -8106,6 +8129,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target" || what.n || !filter) return null;
       effects.push({ type: "shuffleIntoLibrary", what }, { type: "revealTop", who: { ref: "targetOwner", index: what.index } }, { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" }, owner: true }] });
       si++;
+      continue;
+    }
+    // Audacious Swap: "The owner of target nonenchantment permanent shuffles it into their library, then exiles the top card
+    // of their library. If it's a land card, they put it onto the battlefield. Otherwise, they may cast it without paying its
+    // mana cost." That owner's library; a land enters under their control, any other card they may cast as this resolves
+    // (CR 608.2g), or it stays exiled. Nothing happens if the target is illegal (CR 608.2b).
+    const swap = /^The owner of (target .+?) shuffles it into their library, then exiles the top card of their library$/.exec(s);
+    if (swap && sentences[si + 1]?.replace(/\.$/, "") === "If it's a land card, they put it onto the battlefield" && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, they may cast it without paying its mana cost") {
+      const what = parseObject(swap[1]!, ctx);
+      if (what?.ref !== "target" || what.n) return null;
+      const land: TargetSpec = { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" };
+      effects.push(
+        { type: "shuffleIntoLibrary", what },
+        { type: "exileTop", who: { ref: "targetOwner", index: what.index }, n: 1 },
+        { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter: land } }, min: 1 }, effects: [{ type: "putOntoBattlefield", what: { ref: "exiledTop" }, owner: true }], otherwise: [{ type: "castTargetFree", what: { ref: "exiledTop" }, byOwner: true }] },
+      );
+      si += 2;
       continue;
     }
     // Goblin Guide: "defending player reveals the top card of their library. If it's a land card, that player puts it into

@@ -103,6 +103,8 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
 export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n: number): number {
   if (n <= 0) return n;
   if (playerCountersBanned(s)) return 0;
+  // Suncleanser: "That player can't get counters for as long as ~ remains on the battlefield".
+  if (counterBans(s).some((b) => b.player === pid)) return 0;
   // Melira, Sylvok Outcast: "You can't get poison counters" (the ones already there stay, rulings).
   if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPoisonForYou && controllerOf(s, s.objects[id]!) === pid)) return 0;
   const putter = putterNow ?? pid;
@@ -316,6 +318,8 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
   if (s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)))) return true;
   // Tatterkite: "~ can't have counters put on it": none of any kind, by an effect, as a cost or as it enters (rulings).
   if (abilitiesOf(s, o).selfNoCounters) return true;
+  // Suncleanser: "It can't have counters put on it for as long as ~ remains on the battlefield".
+  if (counterBans(s).some((b) => b.id === o.id && b.objZc === (o.zoneChanges ?? 0))) return true;
   // Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." The ones already there stay;
   // one entering with them gets none, and a cost putting them can't be paid (rulings).
   if (kind === undefined || !types.includes("Creature")) return false;
@@ -324,6 +328,9 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
   // (the ones already there stay, rulings).
   return s.battlefield.some((id) => (abilitiesOf(s, s.objects[id]!).opponentsCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) !== pid) || (abilitiesOf(s, s.objects[id]!).yourCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) === pid));
 }
+
+/** Suncleanser's bans whose source is still on the battlefield as the object that made them (CR 611.2b). */
+const counterBans = (s: GameState) => s.battlefield.flatMap((id) => (s.objects[id]!.bansCounters ?? []).filter((b) => b.zc === (s.objects[id]!.zoneChanges ?? 0)));
 
 /**
  * Blight N (CR 701.68a): the creatures `pid` controls that can have the -1/-1 counters put on them; none means they

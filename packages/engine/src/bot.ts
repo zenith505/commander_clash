@@ -122,6 +122,7 @@ import {
   walkersFreeToAttack,
   attackTargetScore,
   discardKeywordKinds,
+  auraHostOptions,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -4518,6 +4519,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Dragon Whelp: not a fourth time, which would sacrifice it at the end step.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "activatedTimes" && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= e.cond.n - 1)) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
+      // Aura swap (CR 702.65a): only with an Aura card in hand that could take its place.
+      if (ab.body.effects.some((e) => e.type === "putFromHand" && e.auraSwap) && !(o.attachedTo && player(s, pid).hand.some((h) => defOf(s, obj(s, h)).subtypes.includes("Aura") && auraHostOptions(s, obj(s, h), pid).some((x) => "attachTo" in x && x.attachTo === o.attachedTo)))) continue;
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       // "Equip planeswalker" (Luxior): bots keep their planeswalkers planeswalkers.

@@ -270,9 +270,10 @@ function fusedSupported(d: CardDef): boolean {
   const [left, right] = d.faces!.map((_, i) => compileCard(faceDef(d, i)).spell);
   const whole = compileCard(fused).spell;
   if (!whole || !left || !right || left.modal || right.modal || whole.modal) return false;
-  // The right half's targets come after the left half's (an effect names its target by `index`).
+  // The right half's targets come after the left half's (an effect names its target by `index`, a damage source by
+  // `target`: Blood's "Target creature you control deals damage", Flesh // Blood).
   const shift = (x: unknown): unknown =>
-    Array.isArray(x) ? x.map(shift) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === "index" && typeof v === "number" ? v + left.targets.length : shift(v)])) : x;
+    Array.isArray(x) ? x.map(shift) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, (k === "index" || k === "target") && typeof v === "number" ? v + left.targets.length : shift(v)])) : x;
   const strip = (b: AbilityBody) => JSON.stringify({ targets: b.targets.map((t) => ({ ...t, text: "" })), effects: b.effects });
   return strip(whole) === strip({ ...whole, targets: [...left.targets, ...right.targets], effects: [...left.effects, ...(shift(right.effects) as Effect[])] });
 }
@@ -406,7 +407,8 @@ export function normalizeSelf(d: CardDef): string {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
     // Not "each Garruk you control" in Garruk, Cursed Huntsman: there it's the planeswalker type (CR 205.3j).
-    const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an) )" : "";
+    // Nor "Empower Jace X" in Jace, Reality Sculptor: a Jace planeswalker token (CR 701.71a), not ~ itself (rulings).
+    const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an|Empower) )" : "";
     // Lizard, Connors's Curse: "becomes a green Lizard creature" is the creature type its short name also is (CR 205.3m).
     const shortTyped = CREATURE_TYPES.has(short) ? "(?! creatures?\\b)" : "";
     const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first || firstUsed ? "(?!'s [A-Z])" : ""}`, "gu");
@@ -526,8 +528,13 @@ export function compile(d: CardDef): CompiledCard {
   let repeat = false;
   let cipher = false;
   let uncopyableSpell = false;
+  // Dance of Many: "the token" in its other abilities is the one token its enters ability creates (linked abilities, CR
+  // 607.2): the tokens created with ~, of which there is only that one.
+  const oneToken = /^When ~ enters, create a token that's a copy of [^\n]+$/m.test(normalizeSelf(d)) && (normalizeSelf(d).match(/\bcreate\b/g) ?? []).length === 1;
   const all = joinModes(
     normalizeSelf(d)
+      .replace(/^When ~ leaves the battlefield, exile the token\.$/m, (l) => (oneToken ? "When ~ leaves the battlefield, exile all tokens created with ~." : l))
+      .replace(/^When the token leaves the battlefield, sacrifice ~\.$/m, (l) => (oneToken ? "Whenever a token created with ~ leaves the battlefield, sacrifice ~." : l))
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
       // the choice, then the counters, two abilities in one paragraph.
       .replace(/^(As ~ enters, choose a creature type\.) (~ enters with .+)$/m, "$1\n$2")
@@ -4818,6 +4825,34 @@ export function compile(d: CardDef): CompiledCard {
         ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
         ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
         ...(equipOnce ? { oncePerTurn: true } : {}),
+      });
+      continue;
+    }
+    // Arcanum Wings: "Aura swap {2}{U}" means "{2}{U}: You may exchange this permanent with an Aura card in your hand."
+    // (CR 702.65a).
+    const auraSwap = /^Aura swap ((?:\{[^}]+\})+)$/.exec(line);
+    if (auraSwap && d.subtypes.includes("Aura")) {
+      out.activated.push({
+        manaCost: auraSwap[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        body: { targets: [], effects: [{ type: "putFromHand", filter: { kind: "card", subtypes: ["Aura"], text: "Aura card" }, may: true, auraSwap: true }], text: "You may exchange ~ with an Aura card in your hand." },
+        text: line,
+      });
+      continue;
+    }
+    // Darksteel Garrison: "Fortify {3}" means "{3}: Attach this Fortification to target land you control. Activate only as
+    // a sorcery." (CR 702.67a). Not an equip ability.
+    const fortify = /^Fortify ((?:\{[^}]+\})+)$/.exec(line);
+    if (fortify && d.subtypes.includes("Fortification")) {
+      out.activated.push({
+        manaCost: fortify[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        body: { targets: [{ kind: "object", types: ["Land"], controller: "you", text: "target land you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target land you control." },
+        text: line,
       });
       continue;
     }

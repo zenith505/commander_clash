@@ -530,6 +530,22 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} gets ${n === 1 ? "a poison counter" : `${n} poison counters`}.`);
       }
       return;
+    case "banCounters": {
+      // Suncleanser: for as long as the source remains on the battlefield; if it has already left, the duration has ended
+      // and this does nothing (CR 611.2b).
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!src || src.zone !== "battlefield" || (ctx.sourceZc !== undefined && (src.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const bans = (src.bansCounters ??= []);
+      for (const o of e.what ? objects(s, e.what, ctx).filter((x) => x.zone === "battlefield") : []) {
+        bans.push({ zc: src.zoneChanges ?? 0, id: o.id, objZc: o.zoneChanges ?? 0 });
+        log(s, `${defOf(s, o).name} can't have counters put on it for as long as ${src ? defOf(s, src).name : "its source"} remains on the battlefield.`);
+      }
+      for (const pid of e.who ? players(s, e.who, ctx) : []) {
+        bans.push({ zc: src.zoneChanges ?? 0, player: pid });
+        log(s, `${player(s, pid).name} can't get counters for as long as ${defOf(s, src).name} remains on the battlefield.`);
+      }
+      return;
+    }
     case "loseAllCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);

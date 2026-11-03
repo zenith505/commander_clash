@@ -137,8 +137,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (matches(p.library[i]!) && hits.push(p.library[i]!) === want) end = i + 1;
       const seen = p.library.slice(0, end);
       // Fathom Trawl: "the rest ... on the bottom of your library in any order": their owner orders them (CR 401.4), asked
-      // before anything moves, so resuming reveals the same cards.
-      if (e.rest === "bottomOrder" && e.found === "hand" && seen.filter((id) => !hits.includes(id)).length > 1 && !s.resolving!.scratch?.arranged) {
+      // before anything moves, so resuming reveals the same cards. Proteus Staff: the same with the card found entering.
+      if (e.rest === "bottomOrder" && seen.filter((id) => !hits.includes(id)).length > 1 && !s.resolving!.scratch?.arranged) {
         s.pending = { kind: "arrangeTop", player: p.id, how: "bottom", cards: seen.filter((id) => !hits.includes(id)), source: src };
         return "paused";
       }

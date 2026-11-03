@@ -1283,7 +1283,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "continuous", what: { ref: "subject" }, mods: [{ kind: "control" }], duration: m[1] === " until end of turn" ? "endOfTurn" : m[1] ? "endOfYourNextTurn" : "game" }];
   // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
   // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
-  if ((m = /^(Target player|Target opponent) gains control of (target .+)$/.exec(s))) {
+  // Stiltzkin, Moogle Merchant: "... of another target permanent you control": not the source.
+  if ((m = /^(Target player|Target opponent) gains control of ((?:another )?target .+)$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
@@ -1319,6 +1320,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."
   if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
   // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
+  // Discerning Financier: "Choose another player. That player gains control of target Treasure you control": the one chosen
+  // as it resolves, for the rest of the game (layer 2).
+  if ((m = /^That player gains control of (target .+ you control)$/.exec(s)) && ctx.chosenOpponent && !ctx.eventPlayer) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }] : null;
+  }
   if (/^That player gains control of ~$/.test(s) && ctx.chosenOpponent && !ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // Act of Authority: "you may exile target artifact or enchantment. If you do, its controller gains control of ~": who
   // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).

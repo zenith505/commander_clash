@@ -13374,6 +13374,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "04cf02dc-f053-414e-87d8-1537f25bcbf4",
+  "name": "Lotus Bloom",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Suspend 3—{0} (Rather than cast this card from your hand, pay {0} and exile it with three time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)\n{T}, Sacrifice this artifact: Add three mana of any one color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Suspend"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01fc5bb3-ebd7-4ab4-8aef-2ece1e1d9b7c",
   "name": "Lotus Vale",
   "manaCost": "",
@@ -17385,6 +17416,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "97024e8e-dfde-4769-bc27-c3d6fad19e7c",
+  "name": "Proteus Staff",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}{U}, {T}: Put target creature on the bottom of its owner's library. That creature's controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield and the rest on the bottom of their library in any order. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7f3b6c25-b855-4ea5-a8ad-d954a6cdffb7",
   "name": "Prototype Portal",
   "manaCost": "{4}",
@@ -17431,6 +17486,32 @@
   "set": "nph",
   "releasedAt": "2011-05-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2903bd66-6948-445b-a18a-12e2ce1a86c3",
+  "name": "Pull from Eternity",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put target face-up exiled card into its owner's graveyard.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -18611,6 +18692,46 @@
   "commanderLegal": "legal",
   "set": "bfz",
   "releasedAt": "2015-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "101f06f8-7980-41d1-98fa-3cb959380737",
+  "name": "Rootcoil Creeper",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Plant Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Plant",
+   "Horror"
+  ],
+  "oracleText": "{T}: Add one mana of any color.\n{T}: Add two mana of any one color. Spend this mana only to cast spells from your graveyard.\n{G}{U}, {T}, Exile this creature: Return target card with flashback you own from exile to your hand.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -20772,6 +20893,37 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "945e56b9-709f-4bb3-8a6b-0a04d9202a03",
+  "name": "Sorceress's Schemes",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target instant or sorcery card from your graveyard or exiled card with flashback you own to your hand. Add {R}.\nFlashback {4}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -23023,6 +23175,34 @@
   "set": "znr",
   "releasedAt": "2020-09-25",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fa85c5a2-8e83-4624-a35a-a0bbf17ecbb4",
+  "name": "Think Twice",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

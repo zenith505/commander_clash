@@ -1227,6 +1227,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
   // (rulings), the same as "Choose an opponent. That player gains control of ~."
   if (opts.selfIt || !/\bit\b/.test(text)) text = text.replace(/^[Aa]n opponent gains control of (?:~|it)\.$/, "Choose an opponent. That player gains control of ~.");
+  // Discerning Financier: "Choose another player. That player gains control of target Treasure you control.": with no teams,
+  // every other player is an opponent (CR 102.3), so the same as "Choose an opponent."
+  text = text.replace(/^Choose another player\. (?=That player gains control of target [^.]+ you control\.)/, "Choose an opponent. ");
   // Liliana's Triumph: "Each opponent sacrifices a creature of their choice. If you control a Liliana planeswalker, each
   // opponent also discards a card.": "also" says only that it's in addition to the sacrifice.
   text = text.replace(/(\. If you control an? [A-Z][a-z]+ planeswalker, each opponent) also (discards a card\.)$/, "$1 $2");
@@ -1511,7 +1514,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Search your library for (an? [a-z ]+? card)\. If evidence was collected, instead search your library for (an? [a-z ]+? card)\. Reveal that card, put it into your hand, then shuffle\.$/, "Search your library for $1, reveal it, put it into your hand, then shuffle. If evidence was collected, instead search your library for $2, reveal it, put it into your hand, then shuffle.");
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
-  text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
+  text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
   text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");
@@ -13729,6 +13733,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Stiltzkin, Moogle Merchant: "Target opponent gains control of another target permanent you control. If they do, you
+    // draw a card": only if that player controls it now (not with either target illegal, CR 608.2b).
+    const theyGain = /^If they do, (.+)$/.exec(s);
+    const gave = effects[effects.length - 1];
+    if (theyGain && gave?.type === "continuous" && gave.giveTo?.ref === "target" && gave.what.ref === "target" && !gave.what.n && gave.mods.length === 1 && gave.mods[0]!.kind === "control" && !gave.setsDid) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(theyGain[1]!), ctx);
+      if (!inner?.length || ctx.targets.length !== before) return null;
+      gave.setsDid = true;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -14801,7 +14817,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // library until a creature card is revealed": the same, "that player" being the target's controller.
     const theirs = /^(Its controller|That creature's controller|That permanent's controller|That player) reveals cards from the top of their library until (?:they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?|a (creature card) is revealed)$/.exec(s);
     if (theirs?.[4]) theirs[2] = theirs[4];
-    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|They put that card onto the battlefield and (the rest on the bottom of their library in a random order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Proteus Staff: "The player puts that card onto the battlefield and the rest on the bottom of their library in any
+    // order": they order them (CR 401.4).
+    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|(?:They|The player) put(?:s)? that card onto the battlefield and (the rest on the bottom of their library in (?:a random|any) order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     const thatPlayerOf = theirs?.[1] === "That player" ? ctx.targets.length === 1 && /^target (?:creature|permanent) an opponent controls$/.test(ctx.targets[0]!.text ?? "") : true;
     if (theirs && theirPut && thatPlayerOf) {
       const who = parsePlayer(theirs[1] === "That player" ? "its controller" : theirs[1]!.toLowerCase(), ctx);
@@ -14814,7 +14832,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Shape Anew: "an artifact card" (no artifact card is an Aura, so none needs a choice as it enters).
       const artifact = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Artifact" && !filter.anyOf && !filter.subtypes?.length;
       if (!permanent && !creature && !artifact) return null;
-      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1]?.endsWith("any order") ? "bottomOrder" : theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
       si++;
       continue;
     }

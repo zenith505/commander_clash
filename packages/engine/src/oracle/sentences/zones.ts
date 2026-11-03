@@ -455,6 +455,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "The owner of target nonland permanent shuffles it into their library."
   // Ice Magic: "Target creature's owner shuffles it into their library": the same.
+  // Riftsweeper: "Choose target face-up exiled card. Its owner shuffles it into their library": a card in exile (CR 406).
+  if ((m = /^The owner of (target face-up exiled card) shuffles it into their library$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || !ctx.targets[i]?.inExile) {
+      ctx.targets.length = i;
+      return null;
+    }
+    return [{ type: "shuffleIntoLibrary", what }];
+  }
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s) ?? /^([Tt]arget [a-z ]+?)'s owner shuffles it into their library$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
@@ -1185,6 +1195,29 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
+  // A card in exile back to its owner's hand (CR 406): "Return target exiled card with flashback you own to your hand"
+  // (Runic Repetition), "... target card with flashback you own from exile ..." (Rootcoil Creeper), "... target instant or
+  // sorcery card from your graveyard or exiled card with flashback you own ..." (Sorceress's Schemes).
+  if ((m = /^Return (target (?:.+ )?(?:exiled card .+ you own|card .+ you own from exile)) to (your|its owner's) hand$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    const t = ctx.targets[i];
+    if (what?.ref !== "target" || !(t?.inExile || t?.orExile) || t.owner !== "you") {
+      ctx.targets.length = i;
+      return null;
+    }
+    return [{ type: "bounce", what }];
+  }
+  // Pull from Eternity: "Put target face-up exiled card into its owner's graveyard", whoever exiled it (CR 406).
+  if ((m = /^Put (target face-up exiled card) into its owner's graveyard$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || !ctx.targets[i]?.inExile) {
+      ctx.targets.length = i;
+      return null;
+    }
+    return [{ type: "putInGraveyard", what }];
+  }
   // Bronzebeak Foragers: "Put target card with mana value X exiled with ~ into its owner's graveyard": a card its exile
   // ability exiled (CR 607.2a), with the X it's activated with.
   if ((m = /^Put (target (?:[a-z]+ )?card(?: with mana value X)? exiled with ~) into its owner's graveyard$/.exec(s))) {
@@ -1315,6 +1348,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library(?: in any order)?$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
+  }
+  // Blade of the Swarm: "Put target exiled card with warp on the bottom of its owner's library": a face-up card in exile,
+  // whoever exiled it (CR 406, rulings: not only one its warp exiled).
+  if ((m = /^Put (target (?:face-up )?exiled card(?: with [a-z]+)?) on (top|the bottom) of its owner's library$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || !ctx.targets[i]?.inExile) {
+      ctx.targets.length = i;
+      return null;
+    }
+    return [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom" }];
   }
   // Misinformation: "Put up to three target cards from an opponent's graveyard on top of their library in any order": all
   // from one opponent's graveyard (into "their" library), in the order the spell's controller chooses (rulings), not

@@ -373,8 +373,10 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
     if (en.orSelf) return true;
     if (en.other) return false;
   }
+  // Gladewalker Ritualist: "another creature you control named ~": the watcher's name now (CR 201.5).
+  const filter = en.filter.named === "~" ? { ...en.filter, named: o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name } : en.filter;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for the watcher.
-  return objectMatches(s, bindChosen(bindEnchanted(en.filter, o), o.chosen), entering, you, false);
+  return objectMatches(s, bindChosen(bindEnchanted(filter, o), o.chosen), entering, you, false);
 }
 
 /**

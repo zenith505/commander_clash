@@ -273,12 +273,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const id = st.pick ?? st.ids[0];
       if (!id || s.objects[id]?.zone !== "graveyard") return;
       log(s, `${player(s, ctx.controller).name} returns ${defOf(s, obj(s, id)).name} to the battlefield.`);
-      moveObject(s, id, "battlefield", { controller: ctx.controller });
+      // "It's a ... in addition to its other types": it has that as it enters (CR 614.12, rulings on Chainer, Dementia Master).
+      moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.alsoMods ? { entersAs: e.alsoMods, entersAsBy: { controller: ctx.controller, source: src } } : {}) });
       const o = obj(s, id);
-      if (e.alsoMods && o.zone === "battlefield") {
-        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
-        invalidateCharacteristics(s);
-      }
       // A delayed trigger about the permanent it became (CR 603.7c, 400.7).
       if (e.atEndStep && o.zone === "battlefield") addDelayed(s, e.atEndStep, ctx.controller, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~." });
       return;

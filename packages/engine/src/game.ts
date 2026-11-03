@@ -739,6 +739,9 @@ export function moveObject(
     becomes?: { types: string[]; subtypes: string[]; name?: string; ability?: string };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
     entersAs?: Modification[];
+    /** Who and what made `entersAs` ("It's a 3/3 Robot artifact creature", "They're black Zombies"), and "for as long as it has
+     * a ... counter on it" (CR 611.2c, 614.12): the effect's controller, source and duration. Defaults: its controller, itself. */
+    entersAsBy?: { controller: PlayerId; source: string; whileCounter?: string };
     /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
     faceDown?: FaceDownKind;
     /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
@@ -795,7 +798,7 @@ export function moveObject(
     const priest = s.battlefield.find((b) => b !== id && abilitiesOf(s, obj(s, b)).exileUncastCreatures);
     // Mistcaller: the same until end of turn (CR 614.1a), whatever became of it.
     const mist = s.exileUncastTurn === s.turn;
-    if ((priest || mist) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown)) {
+    if ((priest || mist) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
       log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is exiled instead of entering: it wasn't cast (${priest ? characteristics(s, obj(s, priest)).name : "this turn"}).`);
       to = "exile";
     }
@@ -1142,7 +1145,7 @@ export function moveObject(
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", types: opts.becomes.types, subtypes: opts.becomes.subtypes }, ...(opts.becomes.name ? [{ kind: "setName" as const, name: opts.becomes.name }] : []), ...(opts.becomes.ability ? [{ kind: "addAbility" as const, text: opts.becomes.ability }] : [])] });
   if (to === "battlefield" && opts.entersAs)
-    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs });
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: opts.entersAsBy?.controller ?? o.controller, sourceName: opts.entersAsBy?.source ?? defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs, ...(opts.entersAsBy?.whileCounter ? { whileCounter: opts.entersAsBy.whileCounter } : {}) });
   // The Volvers: kicked with that kicker, it enters with those abilities (CR 614.1c), from an effect as it enters.
   if (to === "battlefield" && o.kicked?.length)
     for (const k of compileCard(defOf(s, o)).entersKicked ?? [])
@@ -1862,8 +1865,9 @@ export function entersRulesOf(s: GameState, pid: PlayerId, id: ObjectId): Compil
   }
 }
 
-/** Would this card be a creature on the battlefield under `pid`, face down as `faceDown` says (CR 614.12)? */
-function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?: FaceDownKind): boolean {
+/** Would this card be a creature on the battlefield under `pid`, face down as `faceDown` says, with the effect it enters
+ * with (`entersAs`: "it's a 3/3 Robot artifact creature", CR 614.12)? */
+function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?: FaceDownKind, entersAs?: Modification[]): boolean {
   if (o.zone === "battlefield") return objIsType(s, o, "Creature");
   const was = { zone: o.zone, controller: o.controller, timestamp: o.timestamp, faceDown: o.faceDown };
   o.zone = "battlefield";
@@ -1871,10 +1875,12 @@ function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?:
   o.timestamp = s.nextTimestamp;
   if (faceDown) o.faceDown = faceDown;
   s.battlefield.unshift(o.id);
+  if (entersAs) s.effects.push({ id: "entersAs", timestamp: s.nextTimestamp, controller: pid, sourceName: "", duration: "game", affected: [o.id], mods: entersAs });
   invalidateCharacteristics(s);
   try {
     return objIsType(s, o, "Creature");
   } finally {
+    if (entersAs) s.effects.pop();
     s.battlefield.shift();
     Object.assign(o, was);
     if (was.faceDown === undefined) delete o.faceDown;
@@ -9381,7 +9387,7 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
       n++;
       continue;
     }
-    log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} ${devour?.defines || devour?.n === 1 ? "as" : "to"} ${d.name}${devour?.defines || devour?.n === 1 ? " enters" : "'s devour"}.`);
+    log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} ${devour?.defines || devour?.n === 1 || devour?.all ? "as" : "to"} ${d.name}${devour?.defines || devour?.n === 1 || devour?.all ? " enters" : "'s devour"}.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
     n++;
   }
@@ -9515,9 +9521,9 @@ function askEntersChoice(s: GameState): boolean {
       const devour = compileCard(defOf(s, o)).devour;
       const you = controllerOf(s, o);
       const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false) && (devour.bounce || canBeSacrificed(s, obj(s, id)))) : [];
-      if (!options.length) {
+      if (!options.length || devour!.all) {
         q.shift();
-        devourChosen(s, o, [], c.enters);
+        devourChosen(s, o, devour?.all ? options : [], c.enters);
         continue;
       }
       // Not devour itself (Wood Elemental, Dracoplasm, Shimatsu): what the sacrifice does, said in the prompt.
@@ -11851,7 +11857,7 @@ export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): stri
   if (!compileCard(d).foretell && grantedForetell(s, pid, o) === undefined) return `${d.name} doesn't have foretell`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (s.activePlayer !== pid) return "you can only foretell during your own turn";
-  if (!canPayFromPool(s, pid, parseManaCost("{2}"), "other")) return `not enough mana to foretell ${d.name} ({2})`;
+  if (!canPayFromPool(s, pid, parseManaCost("{2}"), { ability: o, foretell: true })) return `not enough mana to foretell ${d.name} ({2})`;
   return null;
 }
 
@@ -11866,7 +11872,7 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   const d = defOf(s, o);
   // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
   const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
-  spendFromPool(s, p.id, parseManaCost("{2}"), "other");
+  spendFromPool(s, p.id, parseManaCost("{2}"), { ability: o, foretell: true });
   moveObject(s, id, "exile");
   o.foretold = true;
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };

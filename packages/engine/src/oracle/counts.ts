@@ -103,6 +103,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // Jadeheart Attendant: "the mana value of the exiled card used to craft it" (CR 702.167c): the cards its craft cost exiled.
+  if (/^the mana value of the exiled card used to craft (?:it|~)$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "linkedExiledMv" } };
   // Wood Elemental: "the number of Forests sacrificed as it entered", what its "As ~ enters, sacrifice any number of
   // untapped Forests" sacrificed (CompiledCard.devour), as devour's count. Only its own abilities know it.
   if (/^the number of Forests sacrificed as (?:it|~) entered$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "devoured" } };
@@ -173,6 +175,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
   // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
   if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
+  // Bound: "Sacrifice a creature. ... where X is the number of colors that creature was" (rewritten in body.ts).
+  if (ctx && /^the number of colors of the creature sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayColors" } };
   // Corpse Cobble: "the total power of the sacrificed creatures", those sacrificed to cast the spell (compile checks it has
   // that cost), as each last existed (CR 608.2h).
   if (ctx?.costSacrificedX && /^the total power of the sacrificed creatures$/.test(p)) return { count: { kind: "costSacrificedTotalPower" } };

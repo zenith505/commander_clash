@@ -444,6 +444,9 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only to pay cumulative upkeep costs.") return { cumulativeUpkeep: true, text: sentence };
   // Quinjet Technician: "Spend this mana only to activate power-up abilities" (CR 702.193).
   if (sentence === "Spend this mana only to activate power-up abilities.") return { powerUpAbilities: true, text: sentence };
+  // Niko Defies Destiny: "to foretell cards" (the special action's {2}, CR 702.143a, 116.2h) "or cast spells that have
+  // foretell", from anywhere (rulings).
+  if (sentence === "Spend this mana only to foretell cards or cast spells that have foretell.") return { foretell: true, text: sentence };
   // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
   // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.

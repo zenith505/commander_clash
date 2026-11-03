@@ -625,9 +625,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Uncle's Musings: "Return up to X permanent cards from your graveyard to your hand, where X is the number of colors of
   // mana spent to cast ~": chosen as it resolves, as many as that (replaced in body.ts), not targeted.
   if ((m = /^[Rr]eturn up to X (.+?) from your graveyard to your hand$/.exec(s)) && ctx.whereX && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
+    // Bound: "up to X cards", any cards.
     const filter = parseSearchFilter(m[1]!.replace(/ and\/or /g, " or "));
-    if (!filter) return null;
-    return [{ type: "chooseFromGraveyard", n: 0, nAmount: { count: { kind: "x" } }, upTo: true, filter }];
+    if (filter === null || (!filter && m[1] !== "cards")) return null;
+    return [{ type: "chooseFromGraveyard", n: 0, nAmount: { count: { kind: "x" } }, upTo: true, ...(filter ? { filter } : {}) }];
   }
   // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
   // and/or sorcery cards ...": chosen as it resolves, not targeted.

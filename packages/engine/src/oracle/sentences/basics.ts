@@ -517,6 +517,18 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const penalty = `Let ~ ${m[1]!.toLowerCase()} it${m[3] ?? ""}`;
     return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx, penalty }];
   }
+  // Carrionette: "Exile ~ and target creature unless that creature's controller pays {2}": paid, neither is exiled (rulings:
+  // ~ is exiled by the effect, not the cost, so it can be activated again); that controller decides as it resolves (CR 608.2d).
+  // From the graveyard ("Activate only if ~ is in your graveyard"), ~ is the card there (CR 113.6j, 400.7).
+  if ((m = /^Exile ~ and target creature unless that creature's controller (pays (?:\{[^}]+\})+)$/.exec(s)) && ctx.selfCard) {
+    const before = ctx.targets.length;
+    const fx = parseSentence("Exile ~ and target creature", ctx);
+    const options = parsePunisherOptions(m[1]!, ctx);
+    if (fx?.length !== 2 || !options || ctx.targets.length !== before + 1) return null;
+    const [self, them] = fx;
+    if (self?.type !== "exile" || self.what.ref !== "self" || them?.type !== "exile" || them.what.ref !== "target") return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: [{ ...self, what: { ref: "selfCard", yours: true } }, them], penalty: "Let ~ exile itself and it" }];
+  }
   // Combustion Man: "destroy target permanent unless its controller has ~ deal damage to them equal to ~'s power": that
   // permanent's controller decides as it resolves (CR 608.2d), and ~ deals the damage.
   if ((m = /^([Dd]estroy target (?:nonland )?permanent) unless its controller (has ~ deal damage to them equal to ~'s power)$/.exec(s))) {
@@ -1390,6 +1402,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
+  // Determined: "Other spells you control can't be countered this turn": from when it resolves, when it's no longer a spell
+  // (rulings: spells may be countered while it's on the stack), so every spell you control.
+  if (ctx.spell && /^Other spells you control can't be countered this turn$/.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn".
   if ((m = /^Spells you control can't be countered by (white|blue|black|red|green) or (white|blue|black|red|green) spells this turn$/i.exec(s)) && m[1] !== m[2])
     return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [COLOR_WORDS[m[1]!.toLowerCase()]!, COLOR_WORDS[m[2]!.toLowerCase()]!] }];

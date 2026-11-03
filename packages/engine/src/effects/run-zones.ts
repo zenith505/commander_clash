@@ -1240,12 +1240,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Wondrous Crucible: one card at random; a copy of that card only.
         const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
         const gone: ObjectId[] = [];
-        if (pool.length) {
-          const id = pool[Math.floor(nextRandom(s) * pool.length)]!;
+        // Capricious Hellraiser: "exile three cards at random": that many, each chosen at random from those left.
+        const had = pool.length;
+        for (let k = 0; k < (e.fromYard.n ?? 1) && pool.length; k++) {
+          const id = pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!;
           moveObject(s, id, "exile");
           log(s, `${you.name} exiles ${defOf(s, obj(s, id)).name}, chosen at random, from their graveyard.`);
           if (obj(s, id).zone === "exile") gone.push(id);
-        } else log(s, `${you.name} has no ${e.fromYard.filter!.text} in their graveyard.`);
+        }
+        if (!had) log(s, `${you.name} has no ${e.fromYard.filter!.text} in their graveyard.`);
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong && e.fromYard?.randomEachOpponent) {
@@ -1275,6 +1278,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Kaya the Inexorable's emblem: the cards you own in exile too, those you can look at (rulings).
         const exiled = e.andExile ? you.exile.filter((id) => obj(s, id).owner === you.id && !hiddenInExile(obj(s, id), you.id)) : [];
         sc.castAmong = { ids: [...you.hand, ...you.graveyard, ...exiled].map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
+      }
+      if (!sc.castAmong && e.anyYard) {
+        // Spectral Arcanist: a card from any graveyard, cast from there as this resolves (rulings, CR 608.2g); the mana value
+        // limit counted now.
+        sc.castAmong = { ids: apnap(s, livingPlayers(s)).flatMap((pid) => player(s, pid).graveyard).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
       }
       if (!sc.castAmong && e.yourYard) {
         // Chandra Ablaze: the cards in your graveyard, cast from there one after another as this resolves, ignoring timing
@@ -1317,7 +1325,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const maxCast = st.max ?? e.max;
       const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
       // Still where they were put: in exile, or revealed in the library (`reveal`).
-      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && (e.handAndYard ? (e.andExile ? ["hand", "graveyard", "exile"] : ["hand", "graveyard"]).includes(s.objects[id]?.zone ?? "") : s.objects[id]?.zone === (e.yourYard ? "graveyard" : e.fromHand ? "hand" : e.reveal ? "library" : "exile")) && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && (e.handAndYard ? (e.andExile ? ["hand", "graveyard", "exile"] : ["hand", "graveyard"]).includes(s.objects[id]?.zone ?? "") : s.objects[id]?.zone === (e.yourYard || e.anyYard ? "graveyard" : e.fromHand ? "hand" : e.reveal ? "library" : "exile")) && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
       // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
       const finish = (): "paused" | undefined => {
@@ -1483,7 +1491,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : "")), "Done"], prompt: e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from a graveyard without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
       return "paused";
     }
     case "exileCastEachType": {

@@ -2150,7 +2150,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
   // Roar of Resistance: "planeswalkers they control" after "your opponents" is about those players, not the creatures.
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/\bcreatures attacking your opponents and\/or planeswalkers they control\b/g, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
@@ -2166,7 +2166,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let text = bodyText;
   // "Draw that many cards" (The Ur-Dragon), "search your library for up to that many basic land cards" (The Earth King):
   // how many of the matching creatures attacked, as they were declared.
-  const thatMuch = (event === "creaturesYouControlDealCombatDamageToPlayer" || (event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander)) && (/\bthat (?:much|many)\b/.test(text) || damageX);
+  const thatMuch = (event === "creaturesYouControlDealCombatDamageToPlayer" || (event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander)) && (/\bthat (?:much|many)\b/.test(text.replace(/ unless that creature's controller has ~ deal that much damage to them\.?$/, "")) || damageX);
   // Fangorn, Tree Shepherd: "add twice that much {G}": two for each of them.
   const twice = thatMuch && !damageX && /^add twice that much \{[WUBRGC]\}\.?$/.test(text);
   if (thatMuch && !damageX) {
@@ -3302,6 +3302,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (/\b(?:it|its|that creature)\b/.test(selfOrCmdAlone[1]!)) return "fail";
     const body = parseBody(selfOrCmdAlone[1]!, { defending: true });
     return body ? { event: "creatureYouControlAttacksAlone", body, subjectFilter: { kind: "object", types: ["Creature"], commander: true, text: "commander you control" }, subjectOrSelf: true } : "fail";
+  }
+  // Jin Sakai, Ghost of Tsushima: "Whenever a creature you control attacks a player, if no other creatures are attacking that
+  // player, ...": it triggers only for the one creature declared attacking that player, as "attacks a player alone" does,
+  // and checks again as it resolves that no other creature attacks them (CR 603.4: one put onto the battlefield attacking
+  // that player since stops it).
+  const noOthers = /^Whenever an? (.+?) you control attacks a player, if no other creatures are attacking that player, (?!if )(.+)$/.exec(line);
+  if (noOthers) {
+    const t = parseTrigger(`Whenever a ${noOthers[1]} you control attacks a player alone, ${noOthers[2]}`);
+    if (!t || t === "fail" || t.event !== "creatureYouControlAttacksPlayerAlone" || t.ifCond) return "fail";
+    return { ...t, ifCond: { kind: "noOtherAttackingEventPlayer" } };
   }
   // Yuriko, Blade of the Mighty and Jiang Yanggu, Alone: "Whenever a creature you control attacks a player alone": no other
   // creature was declared as an attacker attacking that player; attackers of their planeswalkers or battles, or of other

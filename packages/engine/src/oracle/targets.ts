@@ -1637,6 +1637,13 @@ export function parseTargetPhrase(
     extra.combat = "attackedLastTurn";
     p = p.slice(0, attackedLast.index);
   }
+  // Jabari's Influence: "target nonartifact, nonblack creature that attacked you this turn": declared as an attacker of
+  // you this turn (CR 508.1a), not of a planeswalker you control.
+  const attackedYou = / that attacked you this turn$/.exec(p);
+  if (attackedYou) {
+    extra.combat = "attackedYouThisTurn";
+    p = p.slice(0, attackedYou.index);
+  }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);
   if (attacked) {

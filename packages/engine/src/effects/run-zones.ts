@@ -172,7 +172,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const options1 = !e.filter.blockingSubject ? options0 : attacker && attacker.zone === "battlefield" && (attacker.zoneChanges ?? 0) === ctx.subject!.zc && attacker.attacking !== undefined ? options0.filter((id) => !!attacker.blockedBy?.includes(id) && obj(s, id).blocking?.includes(attacker.id)) : [];
     // Fugitive of the Judoon: "exile a Human you control and an artifact you control": the Human picked first leaves an
     // artifact to pick next, when one can (an artifact Human can't be both).
-    const options = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
+    const options2 = e.leaving ? pickLeaving(s, e, options1, pid, ctx) : options1;
+    // Feast of Worms: "another land": not the target, if it survived (an indestructible one).
+    const other = e.otherThanTarget !== undefined ? objects(s, { ref: "target", index: e.otherThanTarget }, ctx).map((o) => o.id) : [];
+    const options = other.length ? options2.filter((id) => !other.includes(id)) : options2;
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

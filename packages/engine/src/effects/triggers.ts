@@ -2537,9 +2537,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (!pair) return;
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
-    const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.monarchsTurn || s.monarch === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
-    for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    const stepPred = (o: GameObject, you: PlayerId) => (e: string, t: TriggeredAbility) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.monarchsTurn || s.monarch === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1));
+    const stepWatch = (o: GameObject, you: PlayerId) => add(o, you, stepPred(o, you), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+      // Aggression: "that creature" is the one it enchanted as the ability triggered (TriggeredAbility.hostSubject).
+      if (host?.zone === "battlefield" && abilitiesOf(s, o).triggers.some((t) => t.hostSubject)) {
+        const you = controllerOf(s, o);
+        add(o, you, (e, t) => !!t.hostSubject && e === each && hostController(s, o) === ev.active, undefined, undefined, host, undefined, undefined, undefined, { player: ev.active });
+        // The rest as usual.
+        add(o, you, (e, t) => !t.hostSubject && stepPred(o, you)(e, t), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+        continue;
+      }
+      stepWatch(o, controllerOf(s, o));
+    }
     fromGraveyards(stepWatch);
     fromEmblems(stepWatch);
     // "At the beginning of each combat this turn" (Full Throttle): a delayed trigger made by a spell (CR 603.7b).

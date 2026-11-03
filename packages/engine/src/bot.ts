@@ -952,6 +952,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Zada's copies: the order hardly matters to a bot, so battlefield order.
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Sword-Point Diplomacy: the cheapest revealed card first (its opponents pay life for the costly ones later).
+    if (pend.kind === "chooseOption" && pend.what === "nextRevealed") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, a) - mv(s, b))[0]! }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
@@ -2722,6 +2724,8 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
     if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
+    // Distant Memories: the one card it found, rather than the three cards it draws if no one does.
+    if ("allow" in w) return 1;
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };
@@ -3935,6 +3939,12 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
  */
 function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[], card?: CardDef): string {
   const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  // Rites of Initiation: cards discarded at random for +1/+0 each, so all of a small hand (three or fewer) while our creatures
+  // are attacking, else none.
+  if (s.resolving && /^Discard any number of cards at random\./.test(card?.oracleText ?? "")) {
+    const attackers = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && obj(s, id).attacking !== undefined);
+    return String(attackers && r.max <= 3 ? r.max : r.min);
+  }
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
   if (forSpell !== undefined) return String(forSpell);
@@ -4008,6 +4018,9 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   // Illusionary Presence, Barbarian Guides, Traveler's Cloak, Giant Slug: landwalk of the chosen type, so the type most
   // opponents control a land of (a snow one for snow landwalk).
   if ((what === "landType" || what === "basicLandType") && /landwalk of the chosen type/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, /snow landwalk of the chosen type/.test(card?.oracleText ?? ""));
+  // Roots of Life: life whenever a land of the chosen type an opponent controls becomes tapped, so the type most opponents
+  // control a land of.
+  if (what === "basicLandType" && /land of the chosen type an opponent controls/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, false);
   if (what === "basicLandType" || what === "landType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   // "The color or colors of your choice": one color is enough, the one it would choose alone.
@@ -4050,6 +4063,16 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
       return n + (controllerOf(s, o) === pid ? -1 : 1) * (hurts ? 1 : -1) * Math.max(1, worth(s, pid, o));
     }, 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
+  // Darigaaz, the Igniter: damage for each card of the chosen color in the damaged player's hand, so the color most of
+  // the cards they've shown have (their nonland permanents, graveyard and commander), not knowing their hand.
+  if (what === "color" && /cards of that color revealed this way/.test(card?.oracleText ?? "") && s.resolving?.item.event?.player !== undefined) {
+    const them = s.resolving.item.event.player;
+    const shown = new Map<string, number>();
+    const add = (d: CardDef) => !isType(d, "Land") && d.colors.forEach((col) => shown.set(COLOR_NAMES[col], (shown.get(COLOR_NAMES[col]) ?? 0) + 1));
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === them) add(defOf(s, obj(s, id)));
+    for (const id of [...player(s, them).graveyard, ...player(s, them).command]) add(defOf(s, obj(s, id)));
+    return [...options].sort((a, b) => (shown.get(b) ?? 0) - (shown.get(a) ?? 0))[0]!;
   }
   // Selective Obliteration: the color of our own most worthy monocolored permanents, the ones it would spare.
   if (what === "color" && c && JSON.stringify(c.spell ?? null).includes('"notOnlyControllersColor":true')) {

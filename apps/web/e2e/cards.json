@@ -5683,6 +5683,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12c78cc4-7fbe-4639-bef7-bf959a0d6d68",
+  "name": "Distant Memories",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for a card, exile it, then shuffle. Any opponent may have you put that card into your hand. If no player does, you draw three cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mbs",
+  "releasedAt": "2011-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "273b339c-964b-4a18-8eb5-ceb8abcdfd9e",
   "name": "Divination",
   "manaCost": "{2}{U}",
@@ -17897,6 +17923,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "77aa591d-efb5-48b5-98aa-5c8912ede11b",
+  "name": "Rites of Initiation",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Discard any number of cards at random. Creatures you control get +1/+0 until end of turn for each card discarded this way.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9c47888b-28a5-4c43-9ee4-a9059e3c367d",
   "name": "Rolling Thunder",
   "manaCost": "{X}{R}{R}",
@@ -19053,6 +19105,48 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "92eae6af-b915-4eb8-93c4-527f732bb712",
+  "name": "Shattered Seraph",
+  "manaCost": "{4}{W}{U}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel",
+   "Rogue"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you gain 3 life.\n{2}, Exile this card from your hand: Target land gains \"{T}: Add {W}, {U}, or {B}\" until this card is cast from exile. You may cast this card for as long as it remains exiled.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": [
+   "B",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20885,6 +20979,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac5585ce-2959-4eaf-af56-5dca8cdfb2d6",
+  "name": "Sword-Point Diplomacy",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top three cards of your library. For each of those cards, put that card into your hand unless any opponent pays 3 life. Then exile the rest.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

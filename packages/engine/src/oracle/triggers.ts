@@ -2650,6 +2650,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // targeted; with none to move to, the Aura is left attached to nothing and state-based actions bin it).
     .replace(/^(When enchanted land becomes tapped, destroy it)\. That land's controller may attach ~ to a land of their choice\.$/, "$1. Its controller may attach ~ to a land of their choice.")
     .replace(/^(When enchanted land becomes tapped, destroy it) and ~ deals (\w+) damage to that land's controller\. That player attaches ~ to a land of their choice\.$/, "$1. ~ deals $2 damage to its controller. Its controller attaches ~ to a land of their choice.")
+    // Darigaaz, the Igniter: "If you do, choose a color, then that player reveals their hand and ~ deals damage to the
+    // player equal to the number of cards of that color revealed this way.": the color chosen as it resolves (rulings), then
+    // the damaged player's whole hand revealed and counted.
+    .replace(/^(Whenever ~ deals combat damage to a player, you may pay (?:\{[^}]+\})+\. If you do, choose a color), then that player reveals their hand and ~ deals damage to the player equal to the number of cards of that color revealed this way\.$/, "$1. That player reveals their hand. ~ deals damage to that player equal to the number of cards of the chosen color in their hand.")
     // Psychic Venom: "Whenever enchanted land becomes tapped, ~ deals 2 damage to that land's controller": the tapped land's
     // controller, as Pooling Venom's "its controller" (rulings: tapped for any reason).
     .replace(/^(Whenever enchanted land becomes tapped, ~ deals \w+ damage to) that land's controller\.$/, "$1 its controller.")
@@ -3823,6 +3827,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (youTap) {
     const body = parseBody(youTap[1]!, { subjectIt: true });
     return body ? { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: ["Creature"], controller: "opponent", text: "creature an opponent controls" }, tappedByYou: true, body } : "fail";
+  }
+  // Roots of Life: "Whenever a land of the chosen type an opponent controls becomes tapped": a land with the basic land type
+  // chosen as it entered (Chosen.landType, bound as the trigger is checked), for any reason (for mana, too: rulings).
+  const chosenLand = /^Whenever a land of the chosen type (you|an opponent) controls becomes tapped, (.+)$/.exec(line);
+  if (chosenLand) {
+    const body = parseBody(chosenLand[2]!, { subjectIt: true });
+    return body ? { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: ["Land"], controller: chosenLand[1] === "you" ? "you" : "opponent", chosen: "landType", text: `land of the chosen type ${chosenLand[1]} control${chosenLand[1] === "you" ? "" : "s"}` }, body } : "fail";
   }
   const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {

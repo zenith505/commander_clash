@@ -880,7 +880,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const x = item?.x ?? (countered?.zc === (o.zoneChanges ?? 0) ? countered.x : 0);
         return manaValue(cost) + x * cost.symbols.filter((x) => x.kind === "x").length;
       }
-      if (o.zone !== "battlefield") {
+      // "That card's power" of a card revealed from a library (Amplifire): the card as it is there.
+      if (o.zone !== "battlefield" && c.of.ref !== "revealed") {
         // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
         const lk = s.lastKnown?.[o.id];
         if (lk && lk.zc === (o.zoneChanges ?? 0) - 1) return lk[c.kind];

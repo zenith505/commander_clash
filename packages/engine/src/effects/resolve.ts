@@ -1052,6 +1052,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cantBeBlockedRule":
     case "keepManaThisTurn":
     case "manaTriggerThisTurn":
+    case "stealDrawsThisTurn":
     case "costModThisTurn":
     case "fight":
     case "createdFightEach":
@@ -1163,6 +1164,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendCast":
     case "siegeDefeated":
     case "exileSelfWithTime":
+    case "mayCastExiledSelf":
     case "exileSpell":
     case "warpExile":
     case "playExiled":
@@ -1325,6 +1327,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "duelReveal":
     case "revealTop":
     case "revealedUntilToBottom":
+    case "forEachRevealed":
     case "parleyReveal":
     case "revealRevealed":
     case "spellToHand":

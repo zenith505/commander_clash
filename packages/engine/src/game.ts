@@ -2533,22 +2533,27 @@ let notionUsed: ObjectId[] = [];
  * draws already (CR 614.5). With several, the first in turn order applies first (the drawing player's choice, CR 616.1,
  * isn't asked); it applies before the player's own replacements (dredge, Alhammarret's Archive).
  */
-function notionThief(s: GameState, pid: PlayerId): GameObject | undefined {
+function notionThief(s: GameState, pid: PlayerId): Thief | undefined {
   const p = player(s, pid);
-  if (s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn) return undefined;
-  const thieves = s.battlefield.map((id) => obj(s, id)).filter((o) => !notionUsed.includes(o.id) && controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && abilitiesOf(s, o).stealsDraws);
-  const seat = (o: GameObject) => (s.turnOrder.indexOf(controllerOf(s, o)) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
+  const thieves: Thief[] = firstInDrawStep ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => !notionUsed.includes(o.id) && controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && abilitiesOf(s, o).stealsDraws).map((o) => ({ id: o.id, controller: controllerOf(s, o), name: nameOf(s, o.id) }));
+  // Plagiarize: every draw of that player's this turn, the first in their draw step too.
+  for (const d of s.drawSteals ?? []) if (d.victim === pid && !notionUsed.includes(d.id) && !player(s, d.by).lost) thieves.push({ id: d.id, controller: d.by, name: d.source });
+  const seat = (t: Thief) => (s.turnOrder.indexOf(t.controller) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
   return thieves.sort((a, b) => seat(a) - seat(b))[0];
 }
+
+/** A replacement that has another player draw instead: a Notion Thief (its object id) or a Plagiarize (its drawSteals id). */
+type Thief = { id: string; controller: PlayerId; name: string };
 
 /**
  * "Instead that player skips that draw and you draw a card": the Thief's controller's draw, which their own replacement
  * effects and other Notion Thieves can replace in turn; dredge and Scion of Halaster's look, which would ask them, aren't
  * offered for it (the card is just drawn).
  */
-function stealDraw(s: GameState, pid: PlayerId, thief: GameObject) {
-  const to = controllerOf(s, thief);
-  log(s, `${player(s, pid).name} skips that draw and ${player(s, to).name} draws a card instead (${nameOf(s, thief.id)}).`);
+function stealDraw(s: GameState, pid: PlayerId, thief: Thief) {
+  const to = thief.controller;
+  log(s, `${player(s, pid).name} skips that draw and ${player(s, to).name} draws a card instead (${thief.name}).`);
   notionUsed.push(thief.id);
   try {
     drawWithoutAsking(s, to);
@@ -2939,7 +2944,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   if (look !== undefined) out.push({ key: "look", label: `Look at the top two cards, one into your graveyard, then draw (${nameOf(s, look)})` });
   const abundance = mine((a) => a.drawAbundance)[0];
   if (abundance !== undefined) for (const k of ["land", "nonland"]) out.push({ key: `abundance:${k}`, label: `Choose ${k}, reveal until you reveal a ${k} card and put it into your hand (${nameOf(s, abundance)})` });
-  if (thief) out.push({ key: "thief", label: `${player(s, controllerOf(s, thief)).name} draws a card instead (${nameOf(s, thief.id)})` });
+  if (thief) out.push({ key: "thief", label: `${player(s, thief.controller).name} draws a card instead (${thief.name})` });
   // A Notion Thief with nothing else to choose from goes on as before.
   if (!shields.length && digs.length < 2 && out.length < 2) return undefined;
   return out;
@@ -3891,6 +3896,7 @@ function finishCleanup(s: GameState) {
   // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
+  s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
@@ -6373,6 +6379,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const castMv = spellManaValue(s, item);
   if (p.id === s.activePlayer) p.actedTurn = s.turn; // Arboria: a spell cast during their own turn
   if (castFrom === "exile" && !o.spellCopy) notePlayedFromExile(s, p.id);
+  // "Until this card is cast from exile" (Shattered Seraph): over now that it has become cast (CR 601.2i), after its costs
+  // were paid, so its granted mana ability could help pay them (rulings).
+  // A spell on the stack keeps the zone-change count it had in exile (it's counted as it leaves the stack).
+  if (castFrom === "exile" && s.effects.some((e) => e.untilCast?.id === o.id && (o.zoneChanges ?? 0) === e.untilCast.zc)) {
+    s.effects = s.effects.filter((e) => !(e.untilCast?.id === o.id && (o.zoneChanges ?? 0) === e.untilCast.zc));
+    invalidateCharacteristics(s);
+  }
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
@@ -9114,6 +9127,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "nextRevealed") {
+    const st = r.scratch?.eachRevealed;
+    if (!st) throw new RulesError("no revealed cards to order");
+    st.next = choice;
     continueResolution(s);
     return;
   }

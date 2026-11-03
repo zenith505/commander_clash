@@ -1559,6 +1559,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${s.cards[registerFace(s, o, 1)]!.name} can't be cast; it stays in exile.`);
       return;
     }
+    case "mayCastExiledSelf": {
+      // Shattered Seraph: the card its cost exiled, while it's still that object in exile (CR 400.7), with its usual timing
+      // and costs; its owner, who activated it from their hand, casts it.
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "exile" || ctx.sourceZc === undefined || (o.zoneChanges ?? 0) !== ctx.sourceZc + 1) return;
+      o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true };
+      log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} for as long as it remains exiled.`);
+      return;
+    }
     case "exileSpell":
     case "exileSelfWithTime": {
       const item = s.resolving?.item;

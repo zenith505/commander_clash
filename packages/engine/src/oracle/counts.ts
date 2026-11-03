@@ -699,6 +699,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter = parseSearchFilter(m[1]!.replace(/s$/, ""));
     return who && filter ? count({ kind: "cardsInHand", who, filter }) : null;
   }
+  // Darigaaz, the Igniter: "the number of cards of the chosen color in their hand": the color chosen as it resolves.
+  if ((m = /^cards of the chosen color in (that player's|their) hand$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "cardsInHand", who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } });
+  }
   // Dark Suspicions: "the number of cards in that player's hand minus the number of cards in your hand", 0 if fewer.
   // Mr. Foxglove: "the number of cards in defending player's hand minus the number of cards in your hand" (rulings: none
   // if that's 0 or less).

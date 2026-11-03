@@ -624,6 +624,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return "paused";
       }
       if (e.choice === "number") {
+        // Rites of Initiation: how many cards to discard at random, none to all of them (CR 107.1c); with none in hand, 0.
+        if (r.chosen?.number === undefined && e.upToHand) {
+          const most = player(s, ctx.controller).hand.length;
+          if (!most) {
+            r.chosen = { ...r.chosen, number: 0 };
+            return;
+          }
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: ["0"], numberRange: { min: 0, max: most }, prompt: `discard how many cards at random (0 to ${most})?` };
+          return "paused";
+        }
         if (r.chosen?.number !== undefined || !e.range) return;
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
         return "paused";
@@ -1134,6 +1144,7 @@ export function punisherLabel(o: PunisherOption): string {
   if ("discard" in o) return o.filter ? `Discard ${o.discard === 1 ? (/^[aeiou]/i.test(o.filter.text) ? "an" : "a") : o.discard} ${o.filter.text}` : o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
   if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${o.sacrifice.sourceHost ? "the" : /^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
+  if ("allow" in o) return o.allow;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }

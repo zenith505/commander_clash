@@ -246,7 +246,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage", "dealsDamageToYou"]);
+const FLOATING_EVENTS = new Set<string>(["selfIsDealtDamage", "creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "playerGainsLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks", "permanentIsDealtDamage", "dealsDamageToYou"]);
 const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "dealtFilter", "body", "group", "damagesYou"]);
 
 /**
@@ -275,6 +275,22 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${rest}.`);
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: that[2] === "combat" ? "endOfCombat" : "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
+  // Arcbond: "Choose target creature. Whenever that creature is dealt damage this turn, it deals that much damage to each
+  // other creature and each player." A delayed trigger about that creature (CR 603.7b-c), each time it's dealt damage this
+  // turn, lethal damage too; the creature is the source of the new damage, noncombat damage (rulings), dealt as it last
+  // existed if it has died since (CR 608.2h).
+  const bond = ctx?.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !after.length && s === "Whenever that creature is dealt damage this turn, it deals that much damage to each other creature and each player";
+  if (bond) {
+    const trigger: TriggeredAbility = {
+      event: "selfIsDealtDamage",
+      body: {
+        targets: [],
+        effects: [{ type: "damage", amount: { count: { kind: "eventAmount" } }, to: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "each other creature" }, otherThanSubject: true }, also: [{ ref: "eachPlayer" }], by: "subject" }],
+        text: "it deals that much damage to each other creature and each player.",
+      },
+    };
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
   // Vigorous Charge: "Whenever that creature deals combat damage this turn, if this spell was kicked, you gain life equal to
   // that damage": a delayed trigger about the target (CR 603.7b-c), to a player or a creature, each time; whether the spell
@@ -1187,6 +1203,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Estrid, the Masked: "Return all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for
   // Aura cards": two returns, one after the other, so the Auras may enchant what the first put there (rulings).
   text = text.replace(/\bReturn all non-Aura enchantment cards from your graveyard to the battlefield, then do the same for Aura cards\./, "Return all non-Aura enchantment cards from your graveyard to the battlefield. Return all Aura cards from your graveyard to the battlefield.");
+  // Omo, Queen of Vesuva: "put an everything counter on each of up to one target land and up to one target creature": one
+  // counter on each target chosen (a land creature chosen as both gets two, CR 115.3).
+  text = text.replace(/^[Pp]ut an? ([a-z]+) counter on each of up to one target (land|creature|artifact|enchantment) and up to one target (land|creature|artifact|enchantment)\.$/, "Put a $1 counter on up to one target $2. Put a $1 counter on up to one target $3.");
   // Dust: "Exile any number of target creatures that have -1/-1 counters on them": "with -1/-1 counters on them".
   text = text.replace(/^Exile any number of target creatures that have -1\/-1 counters on them\.$/, "Exile any number of target creatures with -1/-1 counters on them.");
   // Rise: "Return target creature card from a graveyard and target creature on the battlefield to their owners' hands": two

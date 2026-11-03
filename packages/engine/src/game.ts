@@ -2133,7 +2133,35 @@ export function tapPermanent(
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
   o.tapsThisTurn = { turn: s.turn, zc, n: before + 1 };
-  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}), ...(teamwork ? { teamwork } : {}) });
+  if (o.zone !== "battlefield") return;
+  fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}), ...(by !== undefined ? { by } : {}), ...(teamwork ? { teamwork } : {}) });
+  if (tapBatch) tapBatch.push(o.id);
+  else fireEvent(s, { type: "tappedTogether", ids: [o.id] });
+}
+
+/** The permanents tapped so far in the batchTaps going on, if one is. */
+let tapBatch: ObjectId[] | null = null;
+
+/**
+ * Permanents tapped during `fn` become tapped at the same time, one event for "whenever one or more ... become tapped"
+ * (Deeproot Pilgrimage: the creatures tapped for one cost trigger it once, rulings): the attackers declared together (CR
+ * 508.1f), one cost's taps (CR 601.2h, 602.2b), one instruction's ("tap all creatures", CR 608.2c).
+ */
+export function batchTaps<T>(s: GameState, fn: () => T, /** An event of its own even inside another batch: a mana ability activated while paying (CR 605.3a). */ separate = false): T {
+  const outer = tapBatch;
+  const mine: ObjectId[] = [];
+  tapBatch = mine;
+  let out: T;
+  try {
+    out = fn();
+  } finally {
+    tapBatch = outer;
+  }
+  if (mine.length) {
+    if (outer && !separate) outer.push(...mine);
+    else fireEvent(s, { type: "tappedTogether", ids: mine });
+  }
+  return out;
 }
 
 /**
@@ -3229,17 +3257,22 @@ function advanceStep(s: GameState): void {
     s.blockLimits = undefined;
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
+  // An added beginning phase with only an upkeep step ends with it (Obeka, Splitter of Seconds).
+  const upkeepPhaseEnds = s.step === "upkeep" && !!s.upkeepPhase;
+  s.upkeepPhase = undefined;
   // Added phases come directly after the phase they were added after (CR 500.8); then the turn goes on as it would
   // have from there.
-  if (PHASE_ENDS.has(s.step)) {
+  if (PHASE_ENDS.has(s.step) || upkeepPhaseEnds) {
     const added = s.addedPhases?.shift();
     if (!s.addedPhases?.length) s.addedPhases = undefined;
     if (added) {
       s.resumeStep ??= next;
-      log(s, added === "beginning" ? "An additional beginning phase begins." : added !== "main" ? "An additional combat phase begins." : "An additional main phase begins.");
+      log(s, added === "beginning" || added === "upkeep" ? "An additional beginning phase begins." : added !== "main" ? "An additional combat phase begins." : "An additional main phase begins.");
       s.thatCombat = typeof added === "object" ? added.combat : undefined;
+      // Obeka's: its untap and draw steps are skipped (rulings), so it's only an upkeep step.
+      if (added === "upkeep") s.upkeepPhase = true;
       // An additional beginning phase has its untap, upkeep and draw steps (CR 500.8, 501.1; Sphinx of the Second Sun rulings).
-      return beginStep(s, added === "beginning" ? "untap" : added !== "main" ? "beginCombat" : "main2");
+      return beginStep(s, added === "beginning" ? "untap" : added === "upkeep" ? "upkeep" : added !== "main" ? "beginCombat" : "main2");
     }
     if (s.resumeStep) {
       const resume = s.resumeStep;
@@ -3278,6 +3311,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.resumeStep = undefined;
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
+  s.upkeepPhase = undefined;
   s.cleanupAgain = undefined;
   beginStep(s, "cleanup");
 }
@@ -3310,7 +3344,7 @@ const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
  * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
  * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
  */
-export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat" | "secondMain", combatKey?: number): boolean {
+export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning" | "upkeep")[], after?: "main" | "combat" | "secondMain", combatKey?: number): boolean {
   const added = phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p));
   // "After the second main phase this turn" (World at War): before it begins, they wait for it, the most recently created
   // first (CR 500.8; rulings); during it, they come after it; after it has ended, there are none.
@@ -3511,6 +3545,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.turnLog = undefined;
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
+  s.upkeepPhase = undefined;
   // "Until the end of your next turn, you may cast an instant or sorcery spell from among those exiled cards" (Chandra,
   // Hope's Beacon): a group whose permission lasts past this turn stays used up.
   s.oneOfUsed = s.oneOfUsed?.filter((g) => Object.values(s.objects).some((o) => o.zone === "exile" && o.mayPlay?.oneOf === g && o.mayPlay.until !== "thisTurn"));
@@ -4786,12 +4821,14 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? manaAbilityCost(s, p.id, o, ab.manaCost) : null;
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
-  if (ab.tap) tapPermanent(s, o);
-  if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
-  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
-  // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
-  if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
-  for (const t of tap ?? []) tapPermanent(s, obj(s, t));
+  batchTaps(s, () => {
+    if (ab.tap) tapPermanent(s, o);
+    if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
+    // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
+    // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
+    if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    for (const t of tap ?? []) tapPermanent(s, obj(s, t));
+  }, true);
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) payLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
@@ -6159,7 +6196,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
-  for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
+  batchTaps(s, () => {
+    for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
+  });
   if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
   // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
@@ -6373,7 +6412,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Teamwork: "you may tap any number of creatures you control with total power N or more".
   if (choices.teamwork?.length) {
-    for (const c of choices.teamwork) tapPermanent(s, obj(s, c), undefined, undefined, true);
+    batchTaps(s, () => {
+      for (const c of choices.teamwork!) tapPermanent(s, obj(s, c), undefined, undefined, true);
+    });
     log(s, `${p.name} taps ${choices.teamwork.map((c) => nameOf(s, c)).join(", ")} (teamwork).`);
     o.teamwork = true;
   }
@@ -6384,7 +6425,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Conspire: "you may tap two untapped creatures you control that each share a color with it" (CR 702.78a).
   if (choices.conspire?.length) {
-    for (const c of choices.conspire) tapPermanent(s, obj(s, c));
+    batchTaps(s, () => {
+      for (const c of choices.conspire!) tapPermanent(s, obj(s, c));
+    });
     log(s, `${p.name} taps ${choices.conspire.map((c) => nameOf(s, c)).join(" and ")} (conspire).`);
     item.conspired = true;
     // Two instances or more paid (CR 702.78b): each copies it for its own payment.
@@ -8248,30 +8291,33 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
-  if (ab.tap) tapPermanent(s, o);
-  if (ab.untapSelf) untapPermanent(s, o);
-  if (ab.exertCost && o.zone === "battlefield") {
-    o.skipNextUntap = true; // CR 701.43a
-    o.exertedTurn = s.turn;
-    log(s, `${p.name} exerts ${d.name}.`);
-    fireEvent(s, { type: "exerted", id: o.id });
-  }
-  if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
-  if (ab.unattachCost && o.attachedTo) {
-    log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
-    fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
-    o.attachedTo = undefined;
-    invalidateCharacteristics(s);
-  }
-  // "Unattach Leonin Bola" (CR 701.3d); "Sacrifice Blazing Torch" comes with the other sacrifices below.
   const granter = ab.grantSourceCost?.id ? s.objects[ab.grantSourceCost.id] : undefined;
-  if (ab.grantSourceCost?.action === "unattach" && granter?.attachedTo === o.id) {
-    log(s, `${p.name} unattaches ${nameOf(s, granter.id)} from ${d.name}.`);
-    fireEvent(s, { type: "unattached", id: granter.id, host: o.id });
-    granter.attachedTo = undefined;
-    invalidateCharacteristics(s);
-  }
-  for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
+  // The cost's taps happen at the same time (CR 602.2b): "one or more ... become tapped" triggers once.
+  batchTaps(s, () => {
+    if (ab.tap) tapPermanent(s, o);
+    if (ab.untapSelf) untapPermanent(s, o);
+    if (ab.exertCost && o.zone === "battlefield") {
+      o.skipNextUntap = true; // CR 701.43a
+      o.exertedTurn = s.turn;
+      log(s, `${p.name} exerts ${d.name}.`);
+      fireEvent(s, { type: "exerted", id: o.id });
+    }
+    if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
+    if (ab.unattachCost && o.attachedTo) {
+      log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
+      fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
+      o.attachedTo = undefined;
+      invalidateCharacteristics(s);
+    }
+    // "Unattach Leonin Bola" (CR 701.3d); "Sacrifice Blazing Torch" comes with the other sacrifices below.
+    if (ab.grantSourceCost?.action === "unattach" && granter?.attachedTo === o.id) {
+      log(s, `${p.name} unattaches ${nameOf(s, granter.id)} from ${d.name}.`);
+      fireEvent(s, { type: "unattached", id: granter.id, host: o.id });
+      granter.attachedTo = undefined;
+      invalidateCharacteristics(s);
+    }
+    for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
+  });
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
   // +1 gone before it resolves makes a Horror as big as her loyalty after the +1.
@@ -9811,7 +9857,9 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
     const paid = spendFromPool(s, p.id, due.cost, "other", due.extra, payableLife(s, p.id) - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
     if (tap?.length) {
-      for (const id of tap) tapPermanent(s, obj(s, id));
+      batchTaps(s, () => {
+        for (const id of tap) tapPermanent(s, obj(s, id));
+      });
       log(s, `${p.name} taps ${tap.map((id) => nameOf(s, id)).join(", ")} to waterbend.`);
     }
     payLife(s, p.id, paid.lifePaid + life);
@@ -10363,19 +10411,22 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     payLife(s, p.id, paid.lifePaid);
     log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
   }
-  for (const a of attacks) {
-    const o = obj(s, a.attacker);
-    o.attacking = a.defender;
-    if (a.planeswalker !== undefined) o.attackingPermanent = attackingPermanentOf(s, a.planeswalker);
-    if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o, true); // CR 508.1f
-    const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
-    const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
-    const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
-    o.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
-    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
-    if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
-    log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
-  }
+  // The attackers become tapped at the same time (CR 508.1f): "one or more ... become tapped" triggers once.
+  batchTaps(s, () => {
+    for (const a of attacks) {
+      const o = obj(s, a.attacker);
+      o.attacking = a.defender;
+      if (a.planeswalker !== undefined) o.attackingPermanent = attackingPermanentOf(s, a.planeswalker);
+      if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o, true); // CR 508.1f
+      const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
+      const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
+      const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
+      o.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
+      if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
+      log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
+    }
+  });
   // Attacking and "each time it has attacked this turn" (Moraug) change what the layers give it.
   if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
@@ -10388,7 +10439,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const c = characteristics(s, obj(s, a.attacker));
     kinds[`${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`] = c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t));
   }
-  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds };
+  // Whom each attacked: players only, not their planeswalkers (Ramses, Assassin Lord rulings).
+  const to = { ...(p.attackedWith?.turn === s.turn ? p.attackedWith.to : {}) };
+  for (const a of attacks) {
+    const key = `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`;
+    if (a.planeswalker === undefined && !to[key]?.includes(a.defender)) to[key] = [...(to[key] ?? []), a.defender];
+  }
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])], kinds, ...(Object.keys(to).length ? { to } : {}) };
   // Declared as attackers in this combat; not ones put onto the battlefield attacking (Kytheon rulings, CR 508.4).
   p.attackedCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, n: attacks.length };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;

@@ -2101,7 +2101,7 @@ export type StaticCondition =
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
-  | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string; /** In this combat only, not this turn (Kytheon, Hero of Akros). */ combat?: true }
+  | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string; /** In this combat only, not this turn (Kytheon, Hero of Akros). */ combat?: true; /** "If they were attacked this turn by an Assassin you controlled" (Ramses, Assassin Lord): only attackers declared attacking the event's player, not a planeswalker of theirs (rulings). */ eventPlayer?: true }
   /** Pack tactics: "if you attacked with creatures with total power 6 or greater this combat": their total power as they were declared as attackers (PlayerState.attackPower; AFR release notes). */
   | { kind: "attackPower"; n: number }
   /** "If you lost life last turn" (First Response, Paladin of Atonement): during the turn before this one (GameState.lastTurn). */
@@ -4157,7 +4157,12 @@ export type Effect =
    */
   | { type: "addEndStep" }
   /** "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8): only during an upkeep. */
-  | { type: "addUpkeepStep" }
+  | { type: "addUpkeepStep"; /** "You get ..." (The Ninth Doctor): only during your own upkeep. */ you?: true }
+  /**
+   * "You get that many additional upkeep steps after this phase" (Obeka, Splitter of Seconds): that many additional
+   * beginning phases after this phase, each only an upkeep step (rulings, CR 500.8); only during your own turn.
+   */
+  | { type: "addUpkeepPhases"; n: Amount }
   | {
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
@@ -4691,6 +4696,7 @@ export type TriggerEvent =
   | "spellDealsDamageToSelf" // "Whenever a spell deals damage to ~" (Tephraderm): once for each spell dealing it damage; "that player" is that spell's controller
   | "creatureDealsCombatDamageToSelf" // "Whenever a creature deals combat damage to ~" (Vraska the Unseen): once for each creature dealing it combat damage, which "that creature" means
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
+  | "permanentsBecomeTapped" // "Whenever one or more nontoken Merfolk you control become tapped" (Deeproot Pilgrimage): once for the permanents tapped at the same time, any of them matching TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
   | "permanentTurnedFaceUp" // "Whenever a permanent is turned face up" (Aven Farseer): see TriggeredAbility.tappedFilter
@@ -5098,6 +5104,8 @@ export interface TriggeredAbility {
   firstEachTurn?: true;
   /** "Whenever ~ becomes tapped to pay a teamwork cost" (Agent Maria Hill): only a tap paying a spell's teamwork cost. */
   forTeamwork?: true;
+  /** "Whenever ~ becomes untapped during your untap step" (The Ninth Doctor): with "selfBecomesUntapped", only as its controller's untap step untaps it (CR 502.3). */
+  inYourUntapStep?: true;
   /** For "selfBecomesCrewed": "if it was crewed by exactly two creatures" (an intervening if about the crewing, CR 603.4). */
   crewedBy?: number;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
@@ -5125,7 +5133,7 @@ export interface TriggeredAbility {
    */
   manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
   /**
-   * For "permanentBecomesTapped", "permanentBecomesUntapped", "permanentTurnedFaceUp" and "permanentTransformsInto": which permanent ("a Dwarf you control"); it's the subject
+   * For "permanentBecomesTapped", "permanentsBecomeTapped", "permanentBecomesUntapped", "permanentTurnedFaceUp" and "permanentTransformsInto": which permanent ("a Dwarf you control"); it's the subject
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;

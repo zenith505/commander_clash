@@ -1142,8 +1142,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         return c?.turn === s.turn && c.combat === (s.combatsThisTurn ?? 0) && c.n >= cond.n;
       }
       const w = s.players[you]?.attackedWith;
-      if (cond.subtype) return w?.turn === s.turn && w.keys.filter((k) => w.kinds?.[k] === "all" || !!(w.kinds?.[k] as string[] | undefined)?.includes(cond.subtype!)).length >= cond.n;
-      return w?.turn === s.turn && w.keys.length >= cond.n;
+      // Ramses, Assassin Lord: only the ones declared attacking the event's player.
+      if (cond.eventPlayer && (eventPlayer === undefined || w?.turn !== s.turn)) return false;
+      const keys = cond.eventPlayer ? w!.keys.filter((k) => !!w!.to?.[k]?.includes(eventPlayer!)) : (w?.keys ?? []);
+      if (cond.subtype) return w?.turn === s.turn && keys.filter((k) => w.kinds?.[k] === "all" || !!(w.kinds?.[k] as string[] | undefined)?.includes(cond.subtype!)).length >= cond.n;
+      return w?.turn === s.turn && keys.length >= cond.n;
     }
     case "attackPower": {
       const w = s.players[you]?.attackPower;

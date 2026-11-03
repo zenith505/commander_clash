@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AmountExpr, DamageRecipient, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { NUM, num, counterKind, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
+import { NUM, num, counterKind, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseSearchFilter } from "./search";
@@ -1604,6 +1604,14 @@ export function parseTargetPhrase(
   if (crewed) {
     extra.crewedSource = true;
     p = p.slice(0, crewed.index);
+  }
+  // Admiral Beckett Brass: "controlled by a player who was dealt combat damage by three or more Pirates this turn".
+  const pirates = / controlled by a player who was dealt combat damage by (two|three|four|five) or more ([a-z]+) this turn$/.exec(p);
+  if (pirates) {
+    const st = capital(singularWord(pirates[2]!));
+    if (!CREATURE_TYPES.has(st)) return null;
+    extra.controllerCombatDamagedBy = { subtype: st, min: num(pirates[1]!) };
+    p = p.slice(0, pirates.index);
   }
   // Witch-king of Angmar: "a creature of their choice that dealt combat damage to you this turn".
   const dealtYou = / that dealt combat damage to you this turn$/.exec(p);

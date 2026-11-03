@@ -855,6 +855,12 @@ export interface TargetSpec {
    * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
    */
   dealtCombatDamageToYou?: true;
+  /**
+   * "Target nonland permanent controlled by a player who was dealt combat damage by three or more Pirates this turn"
+   * (Admiral Beckett Brass): its controller was dealt combat damage this turn by at least `min` different creatures of
+   * this creature type, anyone's, each a Pirate as it dealt it (turnLog.combatDamagedByTypes, rulings).
+   */
+  controllerCombatDamagedBy?: { subtype: string; min: number };
   /** "Target creature that dealt damage to you this turn" (Spear of Heliod): any damage, by this object as a creature then (turnLog.damagedBy). */
   dealtDamageToYou?: true;
   /** "Enchanted creature deals damage ... to any other target" (Pain for All): not the permanent the source is attached to. */
@@ -4310,7 +4316,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": "choose an opponent at random that ~ didn't attack during your last combat" (Territorial Hellkite): not the player this source attacked in its controller's combat before the one going on (GameObject.attackedInCombat, Player.combatsBegun); none chosen if there's no other. */ notAttackedLastCombat?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -4523,6 +4529,8 @@ export type SpellCondition =
   | { kind: "cycledSelfNamed"; n: number }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
   | { kind: "subjectWasAttacking" }
+  /** "If you can't choose an opponent this way" (Territorial Hellkite): this resolution chose no player. */
+  | { kind: "noPlayerChosen" }
   /** Auntie Ool, Cursewretch: "if you control that creature": the trigger's subject is the ability's controller's, as it is now or last existed on the battlefield (CR 608.2h). */
   | { kind: "subjectYours" }
   /** Silumgar Scavenger: "if it exploited that creature": the creature a dies trigger is about was sacrificed for this source's exploit, this object (CR 702.110a, 400.7). */

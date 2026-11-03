@@ -460,6 +460,8 @@ export interface GameObject {
   /** The last combat it was declared as an attacker or blocker in (GameState.combatsThisTurn), as this object (CR 400.7):
    *  "if ~ attacked or blocked this combat" (Kjeldoran Home Guard). */
   declaredInCombat?: { turn: number; combat: number };
+  /** The last combat it was declared as an attacker in, as this object (CR 400.7), and the player it attacked then, if a player (not a planeswalker or battle): Territorial Hellkite's "an opponent ... that ~ didn't attack during your last combat". */
+  attackedInCombat?: { turn: number; combat: number; player?: PlayerId };
   /** The turn it last became blocked (CR 509.1h), as this object (CR 400.7): "if it was blocked this turn" (Fyndhorn Druid). */
   becameBlockedTurn?: number;
   /** The turn it last dealt combat damage to a player, as this object (CR 400.7): "for the first time each turn" (Raphael, Tag Team Tough). */
@@ -885,6 +887,8 @@ export interface Player {
   attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The players this player attacked with creatures in any combat of its latest turn that had one (Weathered Sentinels). */
   attackedInTurn?: { turn: number; players: PlayerId[] };
+  /** The latest two combat phases of this player's turns (GameState.combatsThisTurn), the latest last: Territorial Hellkite's "your last combat". */
+  combatsBegun?: { turn: number; combat: number }[];
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
   /** An enduring story (CR 702.195b): from storied, kept for the rest of the game. */
@@ -1592,6 +1596,11 @@ export interface TurnLog {
   combatDamageSubtypes?: string[];
   /** Prowl (CR 702.76a): for each player, the creature types of the sources they controlled that dealt a player combat damage, as they dealt it ("*": every creature type). */
   combatDamageTypesBy?: Record<number, string[]>;
+  /**
+   * For each player, the creatures (`id@zoneChanges`) that dealt them combat damage and their creature types as they dealt
+   * it ("*": every creature type), each creature once (Admiral Beckett Brass: "dealt combat damage by three or more Pirates").
+   */
+  combatDamagedByTypes?: Record<number, { key: string; types: string[] }[]>;
   /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
   legendaryCombatDamaged?: PlayerId[];
   /**

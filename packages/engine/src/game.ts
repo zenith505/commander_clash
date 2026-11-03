@@ -838,6 +838,7 @@ export function moveObject(
   o.combatHitTurn = undefined;
   o.blockedTurn = undefined;
   o.declaredInCombat = undefined;
+  o.attackedInCombat = undefined;
   o.attackedTurns = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
@@ -3842,6 +3843,8 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
+      // Territorial Hellkite: "your last combat" is the one before this one.
+      player(s, ap).combatsBegun = [...(player(s, ap).combatsBegun ?? []), { turn: s.turn, combat: s.combatsThisTurn }].slice(-2);
       // "Attacks this combat if able" holds in one combat only.
       invalidateCharacteristics(s);
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -10396,6 +10399,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
       const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
       const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
       o.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      o.attackedInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, ...(a.planeswalker === undefined ? { player: a.defender } : {}) };
       o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
       if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
       log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);

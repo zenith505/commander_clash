@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, applyAction, botActions, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+import { abilitiesOf, applyAction, botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -242,5 +242,131 @@ describe("Auntie Ool, Cursewretch: Ward—Blight 2 and -1/-1 counters put on a c
     s = settle(s);
     expect(s.objects[creatures[1]!]!.counters["-1/-1"]).toBe(2);
     expect(s.objects[creatures[0]!]!.zone).toBe("battlefield");
+  });
+});
+
+const brass = (): CardDef => ({"oracleId":"43b5e462-d860-473d-828f-6c513fc7768a","name":"Admiral Beckett Brass","manaCost":"{1}{U}{B}{R}","cmc":4,"typeLine":"Legendary Creature — Human Pirate","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Pirate"],"oracleText":"Other Pirates you control get +1/+1.\nAt the beginning of your end step, gain control of target nonland permanent controlled by a player who was dealt combat damage by three or more Pirates this turn.","power":"3","toughness":"3","colors":["B","R","U"],"colorIdentity":["B","R","U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/b/1/b13e2b43-bf51-47e1-bc4e-fa80fa50f607.jpg?1783913428","artUrl":"https://cards.scryfall.io/art_crop/front/b/1/b13e2b43-bf51-47e1-bc4e-fa80fa50f607.jpg?1783913428","commanderLegal":"legal","set":"sld","releasedAt":"2023-12-06","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const pirate = (name: string, extra: Partial<CardDef> = {}) => card(name, "Creature — Human Pirate", "{1}", { power: "1", toughness: "1", ...extra });
+/** Pass priority (answering blockers with none) until the game reaches `step`, stopping at any other question. */
+const passTo = (s: GameState, step: GameState["step"], max = 400) => {
+  for (let i = 0; i < max && s.step !== step && !s.over; i++) {
+    const p = s.pending;
+    if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+    else if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: p.player, attacks: [] });
+    else if (p) return s;
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+
+describe("Admiral Beckett Brass: a player dealt combat damage by three or more Pirates this turn", () => {
+  it("is fully supported", () => {
+    expect(isFullySupported(brass())).toBe(true);
+  });
+
+  const attackWith = (n: number, extra: Partial<CardDef> = {}) => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const [o1, o2] = opps(s, ap);
+    putOnBattlefield(s, ap, brass());
+    const ps = Array.from({ length: n }, (_, i) => putOnBattlefield(s, ap, pirate(`Test Pirate ${i}`, i === 0 ? extra : {})));
+    const prize = putOnBattlefield(s, o1!, card("Test Prize", "Artifact", "{3}"));
+    const other = putOnBattlefield(s, o2!, card("Other Prize", "Artifact", "{3}"));
+    s = toAttack(s);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: ps.map((attacker) => ({ attacker, defender: o1! })) });
+    s = passTo(s, "end");
+    return { s, ap, o1: o1!, o2: o2!, prize, other };
+  };
+
+  it("gains control of a nonland permanent that player controls at your end step, not another player's", () => {
+    let { s, ap, prize, other } = attackWith(3);
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: other }] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: prize }] }));
+    expect(controllerOf(s, s.objects[prize]!)).toBe(ap);
+  });
+
+  it("counts a double-striking Pirate once (rulings): two Pirates aren't enough", () => {
+    let { s, prize } = attackWith(2, { oracleText: "Double strike", keywords: ["Double strike"] });
+    s = settle(s);
+    expect(s.pending).toBeFalsy();
+    expect(controllerOf(s, s.objects[prize]!)).not.toBe(s.activePlayer);
+  });
+});
+
+const hellkite = (): CardDef => ({"oracleId":"1c772df4-bd88-4f7e-853c-5dd06f4cf70e","name":"Territorial Hellkite","manaCost":"{2}{R}{R}","cmc":4,"typeLine":"Creature — Dragon","supertypes":[],"types":["Creature"],"subtypes":["Dragon"],"oracleText":"Flying, haste\nAt the beginning of combat on your turn, choose an opponent at random that this creature didn't attack during your last combat. This creature attacks that player this combat if able. If you can't choose an opponent this way, tap this creature.","power":"6","toughness":"5","colors":["R"],"colorIdentity":["R"],"keywords":["Flying","Haste"],"imageUrl":"https://cards.scryfall.io/normal/front/3/c/3c44e5c2-fddb-47cb-825f-c57b49f181ba.jpg?1783935942","artUrl":"https://cards.scryfall.io/art_crop/front/3/c/3c44e5c2-fddb-47cb-825f-c57b49f181ba.jpg?1783935942","commanderLegal":"legal","set":"c17","releasedAt":"2017-08-25","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+describe("Territorial Hellkite: an opponent at random it didn't attack during your last combat", () => {
+  it("is fully supported", () => {
+    expect(isFullySupported(hellkite())).toBe(true);
+  });
+
+  /** To the beginning of combat with the Hellkite's trigger resolved. */
+  const begin = (seed: number, prep?: (s: GameState, ap: PlayerId, hk: ObjectId) => void) => {
+    const { s: s0, ap } = setup([], seed);
+    let s = s0;
+    const hk = putOnBattlefield(s, ap, hellkite());
+    prep?.(s, ap, hk);
+    s = passTo(s, "beginCombat");
+    s = settle(s);
+    return { s, ap, hk };
+  };
+
+  it("with no last combat, any opponent; it must attack that player if able, not another (CR 508.1d)", () => {
+    let { s, ap, hk } = begin(5);
+    const chosen = s.effects.flatMap((e) => e.mods).find((m) => m.kind === "mustAttackPlayer");
+    expect(chosen).toMatchObject({ kind: "mustAttackPlayer" });
+    const target = (chosen as { player: PlayerId }).player;
+    expect(opps(s, ap)).toContain(target);
+    s = toAttack(s);
+    const other = opps(s, ap).find((p) => p !== target)!;
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hk, defender: other }] })).toThrow();
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [] })).toThrow();
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hk, defender: target }] });
+    expect(s.objects[hk]!.attacking).toBe(target);
+  });
+
+  it("never picks the player it attacked during your last combat (rulings)", () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const { s } = begin(seed, (s, ap, hk) => {
+        const o1 = opps(s, ap)[0]!;
+        s.players[ap]!.combatsBegun = [{ turn: s.turn - 4, combat: 1 }];
+        s.objects[hk]!.attackedInCombat = { turn: s.turn - 4, combat: 1, player: o1 };
+      });
+      const m = s.effects.flatMap((e) => e.mods).find((x) => x.kind === "mustAttackPlayer") as { player: PlayerId };
+      expect(m.player).not.toBe(opps(s, s.activePlayer)[0]);
+    }
+  });
+
+  it("a planeswalker it attacked doesn't count as attacking its controller", () => {
+    for (const seed of [1, 2, 3]) {
+      const { s } = begin(seed, (s, ap, hk) => {
+        s.players[ap]!.combatsBegun = [{ turn: s.turn - 4, combat: 1 }];
+        s.objects[hk]!.attackedInCombat = { turn: s.turn - 4, combat: 1 };
+      });
+      expect(s.effects.flatMap((e) => e.mods).some((x) => x.kind === "mustAttackPlayer")).toBe(true);
+    }
+  });
+
+  it("is tapped when it can't choose an opponent: the only one left is the one it attacked last combat", () => {
+    const { s, hk } = begin(5, (s, ap, hk) => {
+      const [o1, o2, o3] = opps(s, ap);
+      s.players[o2!]!.lost = true;
+      s.players[o3!]!.lost = true;
+      s.players[ap]!.combatsBegun = [{ turn: s.turn - 4, combat: 1 }];
+      s.objects[hk]!.attackedInCombat = { turn: s.turn - 4, combat: 1, player: o1! };
+    });
+    expect(s.objects[hk]!.tapped).toBe(true);
+    expect(s.effects.flatMap((e) => e.mods).some((x) => x.kind === "mustAttackPlayer" && x.player !== "chosen")).toBe(false);
+  });
+
+  it("remembers the player it attacked for its controller's next combat", () => {
+    let { s, ap, hk } = begin(5);
+    const target = (s.effects.flatMap((e) => e.mods).find((m) => m.kind === "mustAttackPlayer") as { player: PlayerId }).player;
+    s = toAttack(s);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hk, defender: target }] });
+    expect(s.objects[hk]!.attackedInCombat).toEqual({ turn: s.turn, combat: s.combatsThisTurn, player: target });
+    expect(s.players[ap]!.combatsBegun).toEqual([{ turn: s.turn, combat: s.combatsThisTurn }]);
   });
 });

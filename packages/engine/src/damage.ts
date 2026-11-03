@@ -334,6 +334,15 @@ export function dealDamage(
         const seen = ((s.turnLog ??= {}).combatDamageSubtypes ??= []);
         // A changeling has every creature type (CR 702.73a): "*".
         for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!seen.includes(t)) seen.push(t);
+        // Admiral Beckett Brass: each creature dealing this player combat damage once, its creature types as it dealt it.
+        if (from) {
+          const zc = from.zone === "battlefield" ? (from.zoneChanges ?? 0) : (s.lastKnown?.[from.id]?.zc ?? from.zoneChanges ?? 0);
+          const typed = ((s.turnLog.combatDamagedByTypes ??= {})[p.id] ??= []);
+          const types = from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes;
+          const e = typed.find((x) => x.key === `${from.id}@${zc}`);
+          if (!e) typed.push({ key: `${from.id}@${zc}`, types: [...types] });
+          else for (const t of types) if (!e.types.includes(t)) e.types.push(t);
+        }
         // Prowl (CR 702.76a): the source's creature types as it dealt the damage, for the player who controlled it.
         const mine = ((s.turnLog.combatDamageTypesBy ??= {})[src.controller] ??= []);
         for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!mine.includes(t)) mine.push(t);

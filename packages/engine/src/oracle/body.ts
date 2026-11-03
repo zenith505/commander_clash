@@ -14518,6 +14518,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 3;
       continue;
     }
+    // Territorial Hellkite: "choose an opponent at random that ~ didn't attack during your last combat. ~ attacks that
+    // player this combat if able. If you can't choose an opponent this way, tap ~.": the requirement to attack that player
+    // (CR 508.1d), or tapped when every opponent was attacked then (rulings: any of them if it didn't attack then).
+    if (/^[Cc]hoose an opponent at random that ~ didn't attack during your last combat$/.test(s) && /^~ attacks that player this combat if able\.?$/.test(sentences[si + 1] ?? "") && /^If you can't choose an opponent this way, tap ~\.?$/.test(sentences[si + 2] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined || ctx.spell) return null;
+      effects.push(
+        { type: "choose", choice: "opponent", random: true, notAttackedLastCombat: true },
+        { type: "continuous", what: { ref: "self" }, mods: [{ kind: "mustAttackPlayer", player: "chosen", combat: "this" }], duration: "endOfTurn" },
+        { type: "if", cond: { kind: "noPlayerChosen" }, effects: [{ type: "tap", what: { ref: "self" } }] },
+      );
+      ctx.chosenOpponent = true;
+      si += 2;
+      continue;
+    }
     if (/^[Cc]hoose an opponent at random$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
       effects.push({ type: "choose", choice: "opponent", random: true });

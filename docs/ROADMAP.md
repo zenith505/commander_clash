@@ -1,6 +1,6 @@
 # Roadmap
 
-29,524 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,479 of
 9,979 (94%).
 
@@ -1879,7 +1879,7 @@ line blocks.
    "Whenever ~ attacks a player who controls eight or more lands, ... onto the battlefield tapped and attacking that
    player" (Owlbear Cub: TriggeredAbility.attacksPlayerLands, dig attackingEvent); "you may cast a permanent spell with
    equal or lesser mana value from your hand without paying its mana cost" in a cast trigger (Kellan, the Kid: the
-   triggering spell's mana value with its X, rulings). +5 (29,524 of 31,936 with B93).
+   triggering spell's mana value with its X, rulings). +5 (29,524 of 31,936 with B93; 29,539 with B94).
    Out after round 263 (looked at, not done): Protean Hydra ("Whenever a +1/+1 counter is removed from ~", for any reason,
    once per counter, rulings: counters are removed in dozens of places with no one event for it yet; its "prevent that
    damage and remove that many +1/+1 counters" even with none on it is close to Ugin's Conjurant's counterShield).
@@ -5020,6 +5020,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permanents of that type phase out" (Teferi's Realm, with a browser test); Juxtapose (the greatest mana value creatures,
   then artifacts, exchanged; a tie chosen by its controller, with a browser test). +12 (29,494 of 31,936 with B92 and
   rounds 257 and 258; 29,512 with rounds 259 and 260).
+- Round B94 (one-line templates from the bottom of the list): "As ~ enters, choose Island or Swamp. Whenever a land of
+  the chosen type an opponent controls becomes tapped" (Roots of Life); "Discard any number of cards at random.
+  Creatures you control get +1/+0 until end of turn for each card discarded this way" (Rites of Initiation, the number
+  chosen as it resolves, with a browser test); Darigaaz, the Igniter (pay {2}{R}, then the color chosen and the hand
+  revealed, rulings); "If it's a Bison card, you may put it onto the battlefield. If it's a creature card, you may reveal
+  it and put it into your hand. Otherwise, ..." (Bison Whistle: the second only if the card is still on top); "The
+  controller of target instant or sorcery spell copies it" (Meletis Charlatan, CR 707.10); "Until end of turn, if target
+  player would draw a card, instead that player skips that draw and you draw a card" (Plagiarize, the draw step's draw
+  included, CR 614.1a); Amplifire (base power and toughness twice the revealed creature's until your next turn, 0/0 if
+  none, the cards to the bottom at random); "Any opponent may have you put that card into your hand. If no player does,
+  you draw three cards" (Distant Memories, with a browser test); "For each of those cards, put that card into your hand
+  unless any opponent pays 3 life. Then exile the rest" (Sword-Point Diplomacy, card by card in the order you choose,
+  rulings, with a browser test); "{2}, Exile this card from your hand: Target land gains "{T}: Add ..." until this card
+  is cast from exile. You may cast this card for as long as it remains exiled" (Shattered Seraph, Emrakul, the Exigent
+  Doom, Glamorous Outlaw, Masked Bandits, Rakish Revelers, Spara's Adjudicators: ends as it's cast, after its costs are
+  paid, and never if the card leaves exile another way, rulings; with a browser test). Also: "{N}, Exile ~ from your
+  hand" with any other effect used to compile with the exile cost dropped; it now only compiles for these. +15 (29,509 of
+  31,936 with B93 and rounds 257 and 258; 29,527 with rounds 259 and 260; 29,534 with rounds 261 and 262).
+- Out after round B94 (looked at, not done): Forgotten Lore and Shrouded Lore (an opponent chooses a card in your
+  graveyard, repeated while you pay, none chosen twice), Graceful Takedown ("any number of target enchanted creatures you
+  control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with
+  mana value X, then X divided), Clay Champion (counters for each {G}{G} and each {W}{W} spent), Sutured Ghoul (power and
+  toughness from the cards exiled as it enters), Soul Separator (a copy token "except it's 1/1" plus a token with that
+  card's power and toughness), Magus of the Mind (play lands and cast spells from among the exiled cards free this turn),
+  Hallowed Moonlight ("if a creature would enter and it wasn't cast"), Welcome to the Fold (a madness-paid X changing the
+  toughness limit), Obstinate Familiar (a may skip of each draw). Bot gaps: bots never use the Shattered Seraph cycle's
+  hand ability (bots skip "Exile ~ from your hand" abilities).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
   Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card

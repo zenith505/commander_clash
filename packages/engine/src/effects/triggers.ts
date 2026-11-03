@@ -1250,7 +1250,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e, t) => e === "selfBecomesTapped" && (!t.firstEachTurn || firstTap) && (!t.forTeamwork || !!ev.teamwork));
     addHosted(o, (e, t) => e === "selfBecomesTapped" && !t.firstEachTurn && !t.forTeamwork);
     // "Whenever you tap an untapped creature an opponent controls" (Hylda of the Icy Crown): only one an effect had you tap.
-    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, bindChosen(t.tappedFilter, w.chosen), o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(tapWatch);
     // Don't Move: "Until your next turn, whenever a creature becomes tapped, destroy it" (a delayed trigger, CR 603.7b).

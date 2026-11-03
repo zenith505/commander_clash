@@ -703,6 +703,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.manaTriggersThisTurn ??= []).push({ controller: ctx.controller, source: src, trigger: e.trigger });
       log(s, `Until end of turn, ${e.trigger.text.replace(/^W/, "w").replace(/\.$/, "")}.`);
       return;
+    case "stealDrawsThisTurn":
+      // Plagiarize: each of that player's draws this turn is replaced (game.ts notionThief), until the cleanup step.
+      for (const pid of players(s, e.who, ctx)) {
+        (s.drawSteals ??= []).push({ id: `steal:${s.turn}:${(s.drawSteals ?? []).length}`, victim: pid, by: ctx.controller, source: src });
+        log(s, `Until end of turn, if ${player(s, pid).name} would draw a card, ${player(s, ctx.controller).name} draws instead.`);
+      }
+      return;
     case "keepManaThisTurn":
       (s.keepManaThisTurn ??= []).push({ player: ctx.controller, ...(e.color ? { color: e.color } : {}) });
       log(s, `Until end of turn, ${player(s, ctx.controller).name} doesn't lose unspent ${e.color ? `${COLOR_NAMES[e.color].toLowerCase()} ` : ""}mana as steps and phases end.`);

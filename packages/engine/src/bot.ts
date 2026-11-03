@@ -970,6 +970,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
+    // Storage Matrix: the type with the most of our tapped permanents; lands first on a tie (mana for the turn).
+    if (pend.kind === "chooseOption" && pend.what === "untapType") {
+      const tapped = s.battlefield.map((id) => obj(s, id)).filter((o) => o.tapped && controllerOf(s, o) === pid && !o.skipNextUntap && !characteristics(s, o).doesntUntap);
+      const count = (t: string) => tapped.filter((o) => characteristics(s, o).types.includes(t)).length * 10 + (t === "Land" ? 2 : t === "Creature" ? 1 : 0);
+      const best = [...pend.options].sort((a, b) => count(b) - count(a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
+    }
     // Juxtapose: the tied permanent we give away: our least useful one.
     if (pend.kind === "chooseOption" && pend.what === "greatestTie") {
       const least = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
@@ -2146,7 +2153,7 @@ function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
   const me = player(s, pid);
   const shields = me.hand.filter((id) => {
     const body = compileCard(defOf(s, obj(s, id))).spell;
-    return !!body && body.effects.some((e) => e.type === "playerGains" && (e.lifeCantChange || e.keywords.some((k) => /^protection from everything$/i.test(k))));
+    return !!body && body.effects.some((e) => e.type === "playerGains" && !e.who && (e.lifeCantChange || e.keywords.some((k) => /^protection from everything$/i.test(k))));
   });
   if (!shields.length) return null;
   const top = s.stack[s.stack.length - 1];

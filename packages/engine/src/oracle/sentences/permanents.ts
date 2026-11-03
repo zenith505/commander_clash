@@ -1509,6 +1509,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = parsePermanentsSentence(capital(m[2]!), ctx);
     return a && b ? [...a, ...b] : null;
   }
+  // Teferi's Reproach (body.ts): "Until target opponent's next turn, that player gains protection from everything and their
+  // life total can't change": both end as that player's next turn begins (CR 702.16j, 119.7-8, 611.2b).
+  if ((m = /^Until (target opponent)'s next turn, that player gains (protection from everything) and their life total can't change$/.exec(s))) {
+    const k = canonicalKeyword(m[2]!);
+    if (!k) return null;
+    const index = addTarget(ctx, { kind: "player", opponent: true, text: m[1]! });
+    ctx.lastPlayerTarget = index;
+    return [{ type: "playerGains", keywords: [k], untilYourNextTurn: true, lifeCantChange: true, who: { ref: "target", index } }];
+  }
   // "You gain protection from everything until your next turn" (The One Ring); "Until your next turn, your life total
   // can't change and you gain protection from everything" (Teferi's Protection).
   if ((m = /^You gain (hexproof|shroud|protection from [a-z ]+?) until your next turn$/i.exec(s)) || (m = /^Until your next turn, (.+)$/i.exec(s))) {

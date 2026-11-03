@@ -853,7 +853,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (n <= 0) return;
       const by = e.by && players(s, e.by, ctx)[0];
       // "A +1/+1 counter or a loyalty counter": its controller chooses which as this resolves (rulings on Elspeth Conquers Death).
-      let kind = e.counter;
+      // Bold Plagiarist: the kind its trigger's event put.
+      let kind = e.eventCounter ? ctx.event?.counter : e.counter;
+      if (kind === undefined) return;
       if (e.orCounter) {
         const sc = (s.resolving!.scratch ??= {});
         const on = objects(s, e.what, ctx)[0];
@@ -1687,7 +1689,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `Players gain ${keywords.map((k) => k.toLowerCase()).join(" and ")} until end of turn.`);
         return;
       }
-      const p = player(s, ctx.controller);
+      // Teferi's Reproach: the target player (none if it's gone, CR 608.2b).
+      const gainer = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (gainer === undefined) return;
+      const p = player(s, gainer);
       if (e.lifeCantChange) {
         p.lifeCantChange = true;
         log(s, `${p.name}'s life total can't change until their next turn.`);

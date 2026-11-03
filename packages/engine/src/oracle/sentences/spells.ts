@@ -325,10 +325,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Disciple of Phenax, Cabal Interrogator (joined in body.ts): "Target player reveals a number of cards from their hand
   // equal to your devotion to black and discards the one of them you choose": they reveal that many of their choice, you
   // choose one (CR 701.9b), counted as it resolves (rulings).
-  if ((m = /^(.+?) reveals (X cards|a number of cards) from their hand(?: equal to (.+?))? and discards the one of them you choose$/.exec(s))) {
+  // Blackmail, Noggin Whack: "reveals three cards from their hand. You choose two of them. That player discards those
+  // cards.": three of their choice, or all of them if they have fewer, then you choose two (rulings).
+  if ((m = /^(.+?) reveals (X cards|a number of cards|three cards) from their hand(?: equal to (.+?))? and discards the (one|two) of them you choose$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    const n = m[2] === "X cards" ? (m[3] ? null : X) : m[3] ? parseCount(m[3], ctx) : null;
-    return who && n ? [{ type: "takeFromHand", who, action: "discard", reveal: n }] : null;
+    const n = m[2] === "three cards" ? (m[3] ? null : 3) : m[2] === "X cards" ? (m[3] ? null : X) : m[3] ? parseCount(m[3], ctx) : null;
+    return who && n ? [{ type: "takeFromHand", who, action: "discard", reveal: n, ...(m[4] === "two" ? { n: 2 } : {}) }] : null;
   }
   // Rag Man: "Target opponent reveals their hand and discards a creature card at random": one of the creature cards in it,
   // chosen at random (none if there are none).

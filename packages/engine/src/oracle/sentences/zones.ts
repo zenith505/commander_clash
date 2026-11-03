@@ -1839,9 +1839,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "libraryTop" }];
   }
   // (Sea Drake's "return two target lands you control" targets: sentences/permanents.ts.)
-  if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
-    const filter = pickFilter(m[2]!);
-    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  // Kazandu Stomper: "return up to two lands you control to their owner's hand": none to that many, chosen as it resolves.
+  if ((m = new RegExp(`^Return (up to )?${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s)) && !/\btarget\b/.test(m[3]!)) {
+    const filter = pickFilter(m[3]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[2]!), action: "bounce", ...(m[1] ? { upTo: true as const } : {}) }];
   }
   // Killing Wave: "For each creature, its controller sacrifices it unless they pay X life": each player chooses which of
   // theirs to keep, paying X life for each, the active player first and each knowing the choices before theirs; then

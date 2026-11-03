@@ -1,7 +1,7 @@
 # Roadmap
 
-29,671 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,534 of
+29,684 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,535 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -5287,6 +5287,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   test), Weight of Spires (nonbasic lands that creature's controller controls), Devour Flesh ("That player gains life equal
   to that creature's toughness"), Sudden Insight (different mana values among nonland cards in your graveyard), Gladewalker
   Ritualist ("Whenever another creature named ~ enters"). +10 (29,663 of 31,936 with B99, B100 and rounds 268 to 270).
+- Round B102 (templates from the bottom of the list and its skip lists): Feast of Worms ("If that land was legendary, its
+  controller sacrifices another land of their choice": not the target if it survived), Aggression ("destroy that creature if
+  it didn't attack this turn": the creature it enchanted as the ability triggered, even if the Aura moves, rulings), Angel's
+  Trumpet (taps the active player's untapped creatures that didn't attack, damage for each one tapped), Jabari's Influence
+  ("target creature that attacked you this turn"), Noggin Whack, Blackmail and Pulse of the Dross (the target player reveals
+  three cards of their choice, you choose one or two; Pulse returns to your hand if that player has more cards in hand than
+  you; with a browser test), Thieving Sprite ("reveals X cards ..., where X is ..."), Alaborn Zealot ("When ~ blocks a
+  creature, destroy both creatures"), Hellhole Rats ("that card's mana value": the discarded card's), Liability ("a player's
+  graveyard ... that player": the card's owner, CR 400.3), Landscaper Colos ("the bottom of their library": its owner's),
+  Kazandu Stomper ("return up to two lands you control", none too). +13 (29,684 of 31,936 with rounds 269 to 271).
+- Out after round B102 (looked at, not done): Lichenthrope and Phytohydra (damage replaced by counters: its controller
+  orders it with prevention shields and with damage-increasing replacements, CR 616.1, and the best order differs between
+  the two, so it needs that choice), Mausoleum Turnkey, Erithizon and Ley Line (a target chosen by another player),
+  Thirsting Axe (combat damage the equipped creature dealt to creatures this turn), Maddening Imp ("each of those creatures
+  that didn't attack": the group remembered for a delayed trigger), Time to Reflect ("blocked or was blocked by a Zombie":
+  its creature types as it blocked).
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
   of Littjara (damage from each creature with power 4 or greater), Founding the Third Path and Helmut Zemo (casting with mana
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,

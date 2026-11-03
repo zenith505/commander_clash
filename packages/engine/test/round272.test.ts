@@ -256,9 +256,10 @@ describe("Stiltzkin, Moogle Merchant: target opponent gains control of another t
 
   it("bots don't give their permanents away with it", () => {
     const { s, ap } = setup([]);
-    putOnBattlefield(s, ap, C.stiltzkin);
+    const stiltzkin = putOnBattlefield(s, ap, C.stiltzkin);
     putOnBattlefield(s, ap, bear());
-    expect(botActions(s, ap).some((a) => a.type === "activate")).toBe(false);
+    expect(waitingOn(s)).toBe(ap);
+    expect(botActions(s, ap).some((a) => a.type === "activateAbility" && a.objectId === stiltzkin)).toBe(false);
   });
 });
 

@@ -7,9 +7,9 @@ import { card, menu, resolveUntil } from "./ui";
 
 test("Sorceress's Schemes: return Think Twice from exile, picked beside your graveyard", async ({ page }) => {
   const s = scene({ hand: ["Sorceress's Schemes"], board: LANDS, yard: ["Lightning Bolt"], exile: ["Think Twice", "Shock"] });
-  const [bolt] = idsOf(s, "Lightning Bolt", "graveyard", 0);
-  const [twice] = idsOf(s, "Think Twice", "exile", 0);
-  const [shock] = idsOf(s, "Shock", "exile", 0);
+  const bolt = idsOf(s, "Lightning Bolt", "graveyard", 0)[0]!;
+  const twice = idsOf(s, "Think Twice", "exile", 0)[0]!;
+  const shock = idsOf(s, "Shock", "exile", 0)[0]!;
   await open(page, s);
   await card(page, "Sorceress's Schemes", s).click();
   const modal = page.locator(".modal");
@@ -26,7 +26,7 @@ test("Sorceress's Schemes: return Think Twice from exile, picked beside your gra
 
 test("Pull from Eternity: put an opponent's exiled card into their graveyard", async ({ page }) => {
   const s = scene({ hand: ["Pull from Eternity"], board: LANDS }, [{ exile: ["Lotus Bloom"] }]);
-  const [bloom] = idsOf(s, "Lotus Bloom", "exile", 1);
+  const bloom = idsOf(s, "Lotus Bloom", "exile", 1)[0]!;
   await open(page, s);
   await card(page, "Pull from Eternity", s).click();
   const modal = page.locator(".modal");
@@ -39,8 +39,8 @@ test("Pull from Eternity: put an opponent's exiled card into their graveyard", a
 
 test("Rootcoil Creeper: exile it to return Think Twice from exile to your hand", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Rootcoil Creeper"], exile: ["Think Twice"] });
-  const [creeper] = idsOf(s, "Rootcoil Creeper", "battlefield", 0);
-  const [twice] = idsOf(s, "Think Twice", "exile", 0);
+  const creeper = idsOf(s, "Rootcoil Creeper", "battlefield", 0)[0]!;
+  const twice = idsOf(s, "Think Twice", "exile", 0)[0]!;
   await open(page, s);
   await page.locator(`[data-obj="${creeper}"]`).first().click();
   await menu(page).locator("button", { hasText: "Return target card with flashback" }).click();
@@ -54,8 +54,8 @@ test("Rootcoil Creeper: exile it to return Think Twice from exile to your hand",
 // the bottom of your library in the arrange prompt.
 test("Proteus Staff: put Grizzly Bears on the bottom, Hill Giant enters, order the lands under it", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Proteus Staff", "Grizzly Bears"], library: ["Island", "Mountain", "Hill Giant"] });
-  const [staff] = idsOf(s, "Proteus Staff", "battlefield", 0);
-  const [bears] = idsOf(s, "Grizzly Bears", "battlefield", 0);
+  const staff = idsOf(s, "Proteus Staff", "battlefield", 0)[0]!;
+  const bears = idsOf(s, "Grizzly Bears", "battlefield", 0)[0]!;
   const [island, mountain, giant] = s.players[0]!.library.slice(0, 3);
   await open(page, s);
   await page.locator(`[data-obj="${staff}"]`).first().click();

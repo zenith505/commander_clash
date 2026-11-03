@@ -421,6 +421,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // the rest of the turn, whatever kills it (rulings: none if it left before then); back face up (CR 712.14a).
   if (/^When ~ dies this turn, return it to the battlefield transformed under your control$/.test(s) && ctx.activated && !ctx.spell)
     return [{ type: "delayed", when: "dies", of: { ref: "self" }, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, transformed: true }], text: "return it to the battlefield transformed under your control", thisTurn: true }];
+  // Rushed Rebirth: "Choose target creature. When that creature dies this turn, search your library for a creature card
+  // with lesser mana value, put it onto the battlefield tapped, then shuffle." A delayed trigger about the target (CR
+  // 603.7), for the rest of this turn; lesser than its mana value as it last existed (CR 608.2h), an X in either counted
+  // as 0 (rulings, CR 202.3b); with a mana value 0 creature nothing can be found.
+  if ((m = /^When that creature dies this turn, search your library for (an? [a-z ]+ card) with lesser mana value, put it onto the battlefield( tapped)?, then shuffle$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many) {
+    const found = parseSentence(`Search your library for ${m[1]!}, put it onto the battlefield${m[2] ?? ""}, then shuffle`, ctx);
+    const e = found?.length === 1 ? found[0]! : null;
+    if (e?.type !== "search" || !e.filter || e.filter.bound || e.filter.manaValue) return null;
+    const filter: TargetSpec = { ...e.filter, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1, signed: true } }, text: `${e.filter.text} with lesser mana value` };
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ ...e, filter }], text: s.replace(/^When that creature dies this turn, /, ""), thisTurn: true }];
+  }
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)

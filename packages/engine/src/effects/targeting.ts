@@ -849,7 +849,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const colorsBound = (t: TargetSpec) => t.bound?.amount.count.kind === "colorsSpent" && !t.bound.amount.count.of;
   // Astelli Reclaimer: "where X is the amount of mana spent to cast ~" in its enters trigger, as it was cast.
   const spentBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaSpent";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t) || spentBound(t);
+  // Venerable Warsinger: "with mana value X or less, where X is the amount of damage ~ dealt to that player": the trigger's
+  // damage, known as it's put on the stack.
+  const eventBound = (t: TargetSpec) => t.bound?.amount.count.kind === "eventAmount";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t) || colorsBound(t) || spentBound(t) || eventBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -872,6 +875,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     if (spentBound(t)) {
       const n = bindBound(s, t, { ...ctx, manaSpent: ctx.event?.manaSpent ?? 0 });
       t = { ...n, text: n.text.replace(/ mana value x or less\b/i, ` mana value ${ctx.event?.manaSpent ?? 0} or less`) };
+    }
+    if (eventBound(t) && ctx.event) {
+      const n = bindBound(s, t, ctx);
+      t = { ...n, text: n.text.replace(/ mana value X or less\b/, ` mana value ${n.manaValue?.max ?? 0} or less`) };
     }
     if (subjectBound(t)) {
       // Lesser than 0 is nothing (rulings: a mana value can't be less than 0).

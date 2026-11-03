@@ -824,7 +824,12 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   // with Unsettled Mariner.
   const taxed = m[2] && /^counter that spell or ability unless its controller pays (\{\d+\})\.?$/.exec(m[5]!);
   if (taxed) return { event: "permanentBecomesTarget", targeted: { ...targeted, ...(other ? { other } : {}) }, subjectFilter: { ...filter, text: what }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: taxed[1]! } }], text: `counter that spell or ability unless its controller pays ${taxed[1]}.` } };
-  const body = parseBody(m[5]!.replace(/\bthat (?:permanent|creature)\b/g, "it"), { subjectIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
+  // Pawpatch Recruit: "put a +1/+1 counter on target creature you control other than that creature": any but the one
+  // targeted (TargetSpec.notSubject, fixed as the trigger is put on the stack).
+  const otherThanIt = /^put an? \+1\/\+1 counter on target creature you control other than that creature\.$/.test(m[5]!);
+  const body0 = parseBody((otherThanIt ? m[5]!.replace(/ other than that creature\./, ".") : m[5]!).replace(/\bthat (?:permanent|creature)\b/g, "it"), { subjectIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
+  if (otherThanIt && body0?.targets.length !== 1) return "fail";
+  const body = otherThanIt && body0 ? { ...body0, targets: [{ ...body0.targets[0]!, notSubject: true as const, text: `${body0.targets[0]!.text} other than that creature` }], text: m[5]! } : body0;
   return body ? { event: "permanentBecomesTarget", targeted: { ...targeted, ...(other ? { other } : {}) }, subjectFilter: { ...filter, text: what }, body } : "fail";
 }
 
@@ -1539,6 +1544,12 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // Curse of Stalked Prey: "Whenever a creature deals combat damage to enchanted player, put a +1/+1 counter on that
   // creature": anyone's creature, the enchanted player's own too (rulings).
   const toEnch = /^Whenever a creature deals combat damage to enchanted player, (.+)$/.exec(line);
+  // Curse of Hospitality: "that player exiles the top card of their library. Until end of turn, that creature's controller
+  // may play that card and they may spend mana as though it were mana of any color to cast that spell": once for each
+  // creature (rulings), the permission its controller's (as it last existed if it has left, CR 608.2h), mana of any type
+  // spendable as though any color (CR 609.4b).
+  if (toEnch?.[1] === "that player exiles the top card of their library. Until end of turn, that creature's controller may play that card and they may spend mana as though it were mana of any color to cast that spell.")
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body: { targets: [], effects: [{ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, player: { ref: "subjectController" }, anyType: true }], text: toEnch[1] }, toEnchanted: true };
   if (toEnch) {
     if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(toEnch[1]!)) return "fail";
     const body = parseBody(toEnch[1]!, { subjectIt: true, eventPlayer: true });
@@ -4774,6 +4785,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         // Neheb, Dreadhorde Champion: "you may discard any number of cards. If you do, draw that many cards and add that
         // much {R}": how many were discarded, not the damage.
         .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
+      // Venerable Warsinger: "return target creature card with mana value X or less from your graveyard to the battlefield,
+      // where X is the amount of damage ~ dealt to that player": that combat damage, known as the target is chosen (CR
+      // 603.3d) and the same as it resolves (TargetSpec.bound with eventAmount).
+      const dealtMv = event === "selfDealsCombatDamageToPlayer" && /^(?:you may )?return target [a-z ]+ card with mana value X or less from your graveyard to the battlefield, where X is the amount of damage ~ dealt to that player\.$/.test(text);
+      if (dealtMv) text = text.replace(/ with mana value X or less\b/, "").replace(/, where X is the amount of damage ~ dealt to that player\.$/, ".");
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
       // Jagged Poppet: "that player discards cards equal to the damage": that many, the combat damage dealt to them.
@@ -4849,6 +4865,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         const [tg, ...more] = body.targets;
         if (!tg || more.length || tg.kind !== "card" || tg.bound || tg.power) return "fail" as const;
         body = { ...body, targets: [{ ...tg, bound: { key: "power", at: "most", amount: { count: { kind: "power", of: { ref: "self" } } } }, text: `${tg.text} with equal or lesser power` }], text: body0 };
+      }
+      if (body && dealtMv) {
+        const [tg, ...more] = body.targets;
+        if (!tg || more.length || tg.kind !== "card" || tg.bound || tg.manaValue) return "fail" as const;
+        body = { ...body, targets: [{ ...tg, bound: { key: "manaValue", at: "most", amount: { count: { kind: "eventAmount" } } }, text: tg.text.replace(/ from your graveyard$/, " with mana value X or less from your graveyard") }], text: body0 };
       }
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.

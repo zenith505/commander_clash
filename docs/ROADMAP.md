@@ -1,7 +1,7 @@
 # Roadmap
 
-29,628 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,506 of
+29,636 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,514 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1950,6 +1950,28 @@ line blocks.
    more times, choose up to that many —" (Tranquil Frillback, and Hawkeye, Master Marksman's "When you do": payX
    times with a max, the modal reflexive trigger's modes capped by its X as it's put on the stack, CR 603.12, rulings;
    with a browser test). +9 (29,579 of 31,936; 29,599 with B96 and B97).
+   Round 268 went back over earlier skips from the top whose missing pieces now exist. "Exile the top four cards of your
+   library. Until end of turn, you may cast noncreature spells from among those cards without paying their mana costs"
+   (Narset, Enlightened Master: spells noncreature as they're cast, normal timing, no lands, the rest stay exiled,
+   rulings); "return target creature card with mana value X or less from your graveyard to the battlefield, where X is the
+   amount of damage ~ dealt to that player" (Venerable Warsinger: the trigger's damage bounds the target as it's put on
+   the stack, CR 603.3d); "Choose target creature. When that creature dies this turn, search your library for a creature
+   card with lesser mana value, put it onto the battlefield tapped" (Rushed Rebirth: its mana value as it last existed,
+   CR 608.2h, nothing below 0); "you may cast an instant or sorcery spell from that player's graveyard without paying its
+   mana cost. If that spell would be put into a graveyard, exile it instead" (Sorcerous Squall: the whole graveyard, timing
+   ignored, rulings; with a browser test); "Creatures attacking enchanted player have trample" and "Whenever a creature
+   deals combat damage to enchanted player, that player exiles the top card of their library. Until end of turn, that
+   creature's controller may play that card ..." (Curse of Hospitality: once for each creature, rulings; mana of any type,
+   CR 609.4b); "Non-Human Werewolves you control can't transform" (Immerwolf: daybound and nightbound too, CR 701.28f);
+   "put a +1/+1 counter on target creature you control other than that creature" (Pawpatch Recruit); "Each player may
+   discard a card. Each player who discarded a card this way draws a card. If a creature card was discarded this way, ...
+   Then if a noncreature card was discarded this way, ..." (Mog, Moogle Warrior: each in turn order, CR 101.4; one with an
+   empty hand isn't asked, 101.3). +8 (29,587 of 31,936; 29,607 with B96 and B97; 29,617 with B98).
+   Out after round 268 (looked at, not done): Eruth, Tormented Prophet ("If you would draw a card, exile the top two cards
+   of your library instead": a draw replacement that has to join the choice among the other draw replacements, CR 616.1,
+   and the draws a resolution counts); Quintorius Kand's −6 ("You may play those cards this turn" about the cards its own
+   "any number of target cards" exile took); Archelos, Lagoon Mystic (an untapped Archelos makes permanents put onto the
+   battlefield tapped by an instruction enter untapped, rulings: every such path, not only enters-tapped replacements).
    Out after round 267 (looked at, not done): The Infamous Cruelclaw ("You may cast that card by discarding a card
    rather than paying its mana cost": an alternative cost of discarding for a card cast as a trigger resolves, a new
    cast-time cost for the UI and bots); Espers to Magicite (a reflexive target among the cards exiled this way, and a
@@ -5188,8 +5210,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Samite Master ("Spend only white mana on X" in each mode), Suncleanser (no counters on that creature, or for that player,
   for as long as Suncleanser remains, CR 611.2b), Wan Shi Tong, All-Knowing and Dutiful Knowledge Seeker ("whenever one or
   more cards are put into a library from anywhere", once for each event, not from a library), Kaust, Eyes of the Glade (a
-  creature turned face up this turn, CR 708.8; "target face-down attacking creature you control"). +10 (29,619 of 31,936
-  with B96 to B98 and rounds 263 to 267).
+  creature turned face up this turn, CR 708.8; "target face-down attacking creature you control"). +10 (29,627 of 31,936
+  with B96 to B98 and rounds 263 to 268).
 - Round B100 (templates from the bottom of the list): Hustle // Bustle ("Target creature attacks or blocks this turn if able",
   both requirements, CR 508.1d, 509.1c; "You may turn a creature you control face up", a face-down one), Flesh // Blood ("where
   X is the power of the card you exiled", as it last existed in the graveyard, rulings; fused, Blood's "Target creature you
@@ -5202,7 +5224,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   one as it last existed, not targeted, CR 303.4f; none, and it stays), Stick, Fearless Mentor ("Whenever a source you control
   deals damage to you", "it" the exiled card), Wake to Slaughter (an opponent you choose picks which target goes to your hand,
   the other returns with haste and is exiled at the next end step; with one target, it goes to your hand, rulings; with a
-  browser test). +9 (29,628 of 31,936 with B96 to B99 and rounds 263 to 267).
+  browser test). +9 (29,636 of 31,936 with B96 to B99 and rounds 263 to 268).
 - Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
   ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a

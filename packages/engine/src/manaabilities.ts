@@ -398,6 +398,8 @@ export interface ManaTriggerResult {
   extra: ManaType[];
   adds: ManaType[];
   from: ManaOrigin[][];
+  /** Winter's Night (ManaTrigger.landSkipsUntap): the permanent tapped for mana doesn't untap during its controller's next untap step. */
+  skipUntap?: true;
 }
 
 /**
@@ -440,7 +442,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     }
     // Each mana's source is the triggered ability's source (CR 106.3), as it is now.
     const from = src ? manaOriginsOf(s, src) : [];
-    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)] })));
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}) })));
   }
   return results;
 }

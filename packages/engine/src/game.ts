@@ -3608,6 +3608,16 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
       o.skipNextUntap = o.skipMoreUntaps ? true : undefined;
       o.skipMoreUntaps = o.skipMoreUntaps && o.skipMoreUntaps > 1 ? o.skipMoreUntaps - 1 : undefined;
     } else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) {
+      // Freyalise's Winds: a tapped permanent that would untap with such counters on it loses them all instead (CR 614.1a;
+      // rulings: only one that would untap, not one kept tapped).
+      const winds = o.tapped ? s.battlefield.map((b) => abilitiesOf(s, obj(s, b)).untapRemovesCounters).find((k) => k && (o.counters[k] ?? 0) > 0) : undefined;
+      if (winds) {
+        o.counters[winds] = 0;
+        invalidateCharacteristics(s);
+        log(s, `${nameOf(s, o.id)} doesn't untap: its ${winds} counters are removed instead.`);
+        fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: winds });
+        continue;
+      }
       if (o.tapped) untapped++;
       untapPermanent(s, o); // CR 502.3
     }
@@ -4774,6 +4784,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
+  // Winter's Night: the land tapped for mana doesn't untap during its controller's next untap step.
+  if (picked.skipUntap && o.zone === "battlefield") o.skipNextUntap = true;
   // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
   if (ab.nextCast) {
     const e = ab.nextCast;
@@ -9097,6 +9109,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "unlockDoor") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the locked doors");
     (r.scratch ??= {}).door = choice;
+    continueResolution(s);
+    return;
+  }
+  // Juxtapose: which tied permanent (Effect juxtapose).
+  if (pend.what === "greatestTie") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the tied permanents");
+    (r.scratch ??= {}).tieChoice = choice;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} (${pend.source}).`);
     continueResolution(s);
     return;
   }

@@ -1,6 +1,6 @@
 # Roadmap
 
-29,507 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,519 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,474 of
 9,979 (94%).
 
@@ -1856,7 +1856,7 @@ line blocks.
    entersAsCopy exileTwo, the second pick a new "copyOther" prompt, with a browser test); "~'s owner shuffles it into their
    library. If that player does, they reveal cards ... until a card named ~ is revealed ..." (Mirror-Mad Phantasm:
    PlayerRef sourceOwner, SpellCondition shuffledInThisWay, the card's printed name for a granted copy of the ability;
-   bots never activate it). +3 (29,503 of 31,936).
+   bots never activate it). +3 (29,503 of 31,936; 29,515 with B93).
    Round 262 (top of the list, from the "Out" lists): "When its power becomes 20 this way, it deals 20 damage to any
    target" (Inferno of the Star Mounts: the pump notes ~'s power first, SpellCondition powerBecame, a reflexive trigger
    whose target is chosen only then); "if it had two or more +1/+1 counters on it, create a token that's a copy of it at
@@ -1866,7 +1866,7 @@ line blocks.
    having 0 or less life" and "draw a card and reveal it. The creature gets +X/+X ... and you lose X life" (Pact Weapon:
    noZeroLifeLossAttached, X 0 if the draw was replaced); "Whenever that creature deals combat damage this turn, you may
    exile it. If you do, return it to the battlefield under its owner's control" (Long River Lurker: a floating trigger
-   about the target, the creature its subject). +4 (29,507 of 31,936).
+   about the target, the creature its subject). +4 (29,507 of 31,936; 29,519 with B93).
    Rules gaps round 262 saw, for the next round: a delayed trigger made by a dies trigger of a token is dropped when the
    token has ceased to exist (run-spells "delayed": `if (o) addDelayed`; Ochre Jelly's token is handled, a token's
    "When ~ dies, at the beginning of the next end step, ..." in general isn't); a floating trigger whose source has ceased
@@ -4992,6 +4992,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player" (Ms. Marvel, Elastic Ally, CR 208.4b); "Whenever a creature becomes blocked by (blocks) a creature with lesser
   power" (No Quarter, once for each pair as blockers are declared, CR 509.3c-d). +14 (29,466 of 31,936 with B91 and
   rounds 254 to 256; 29,475 with round 257).
+- Round B93 (one-line templates from the bottom of the list): "target player, planeswalker, or Sliver creature" (Cautery
+  Sliver: a creature only if it has that type); "Simultaneously, all phased-out creatures phase in and all creatures with
+  phasing phase out" (Time and Tide, with what phased out indirectly coming back with its host, CR 702.26g); "Whenever a
+  player taps a snow land for mana, that player adds one mana of any type that land produced. That land doesn't untap
+  during its controller's next untap step" (Winter's Night); "If a permanent with a wind counter on it would untap during
+  its controller's untap step, remove all wind counters from it instead" (Freyalise's Winds, only a tapped permanent that
+  would untap, rulings); Remove Enchantments (the enchantments and Auras you own among them to your hand, then the rest
+  destroyed); "You and target opponent each gain control of all creatures the other controls until end of turn. Untap
+  those creatures" (Twist Allegiance: untapped after the exchange); "Each player skips their untap step" and "that player
+  simultaneously untaps each tapped artifact, creature, and land they control and taps each untapped ..." (Sands of
+  Time); "When enchanted land becomes tapped, destroy it. That land's controller may attach ~ to a land of their choice"
+  (Kudzu, Steam Vines: the land's controller as it last existed picks any land, with a browser test); "discard a card at
+  random. If you discard a creature card this way, return it from your graveyard to the battlefield unless any player
+  pays 5 life" (Aether Rift); "that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken
+  permanents of that type phase out" (Teferi's Realm, with a browser test); Juxtapose (the greatest mana value creatures,
+  then artifacts, exchanged; a tie chosen by its controller, with a browser test). +12 (29,494 of 31,936 with B92 and
+  rounds 257 and 258; 29,512 with rounds 259 and 260).
+- Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
+  +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
+  Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card
+  types, then three rounds of sacrifices), Tariff (a punisher whose cost is the chosen creature's mana cost), Powerleech
+  and Haunting Wind ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
+  controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
+  types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
+  controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal, Planar Overlay, Worldpurge,
+  Call to Arms.
 - Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'

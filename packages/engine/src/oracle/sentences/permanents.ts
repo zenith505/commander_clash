@@ -648,6 +648,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("them", ctx);
     return what?.ref === "target" ? [{ type: "phaseOut", what, anyNumber: true }] : null;
   }
+  // Kudzu, Steam Vines: "Its controller (may) attach(es) ~ to a land of their choice": the trigger's land's controller.
+  if ((m = /^Its controller (may attach|attaches) ~ to a land of their choice$/.exec(s)) && ctx.subjectIt)
+    return [{ type: "attachToChosen", source: { ref: "self" }, filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "a land" }, chooser: { ref: "subjectController" }, ...(m[1] === "may attach" ? { may: true as const } : {}) }];
+  // Sands of Time: "that player simultaneously untaps each tapped artifact, creature, and land they control and taps each
+  // untapped artifact, creature, and land they control".
+  if ((m = /^(that player|you) simultaneously untaps? each tapped artifact, creature, and land (?:they|you) control and taps? each untapped artifact, creature, and land (?:they|you) control$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "toggleTapped", who, filter: { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], text: "artifact, creature, or land" } }] : null;
+  }
+  // Time and Tide: both lists are read first, then the two happen together (CR 702.26).
+  if (/^Simultaneously, all phased-out creatures phase in and all creatures with phasing phase out$/.test(s)) return [{ type: "phaseSwap" }];
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   // Shape Stealer: "~'s base power and toughness become equal to that creature's power and toughness until end of turn": the
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).

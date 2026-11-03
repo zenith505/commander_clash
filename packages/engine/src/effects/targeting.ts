@@ -1,4 +1,4 @@
-import { ANY_COUNTER, isRealKicker } from "../abilities";
+import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
@@ -332,6 +332,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   // "Of a type chosen this way" (Patriarch's Bidding): any of the types the players chose.
   if ((kind === "typesChosen" || kind === "notTypesChosen") && chosen?.types?.length)
     return kind === "typesChosen" ? { ...rest, subtypes: [...(rest.subtypes ?? []), ...chosen.types] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), ...chosen.types] };
+  if (kind === "cardType" && chosen?.cardType === NON_AURA_ENCHANTMENT) return { ...rest, types: [...(rest.types ?? []), "Enchantment"], notSubtypes: [...(rest.notSubtypes ?? []), "Aura"] };
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
@@ -681,6 +682,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker", "Battle"];
     // Coalborn Entity: a creature only if it's a token (TargetSpec.creatureTokens).
     if (spec.creatureTokens && !o.isToken && !objIsType(s, o, "Planeswalker")) return false;
+    // Cautery Sliver: a creature only if it has that creature type (TargetSpec.creatureSubtype).
+    if (spec.creatureSubtype && !objIsType(s, o, "Planeswalker") && !((t) => t === "all" || t.has(spec.creatureSubtype!))(creatureTypesOf(s, o))) return false;
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   // "Target spell or nonland permanent": a permanent fits the permanent half.

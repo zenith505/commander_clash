@@ -6,7 +6,7 @@ import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, C
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
-import type { CardDef, PlayerId } from "../types";
+import type { CardDef, ManaType, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -2820,6 +2820,13 @@ export function compile(d: CardDef): CompiledCard {
       out.dampsLandMana = true;
       continue;
     }
+    // Infernal Darkness, Ritual of Subdual: "If a land is tapped for mana, it produces {B} (colorless mana) instead of any other
+    // type": as much mana, of this type; Contamination: "... instead of any other type and amount": one mana (CR 614.1a).
+    const landAs = /^If a land is tapped for mana, it produces (\{[WUBRGC]\}|colorless mana) instead of any other type( and amount)?\.$/.exec(line);
+    if (landAs) {
+      (out.landManaAs ??= []).push({ mana: landAs[1] === "colorless mana" ? "C" : (landAs[1]![1] as ManaType), ...(landAs[2] ? { one: true as const } : {}) });
+      continue;
+    }
     const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
     if (plusLife) {
       out.lifeGainPlus = (out.lifeGainPlus ?? 0) + Number(plusLife[1]);
@@ -2984,6 +2991,13 @@ export function compile(d: CardDef): CompiledCard {
       const what = `${sacInstead[2] ?? ""}${sacTwo ? "land" : sacInstead[3]!}`;
       out.entersSacrificeInstead = { kind: "object", types: sacTwo ? ["Land"] : [], notTypes: [], notColors: [], ...(sacTwo ? {} : { subtypes: [sacInstead[3]!] }), controller: "you", ...(sacInstead[2] ? { tapped: false } : {}), text: what };
       if (sacTwo) out.entersSacrificeInsteadN = 2;
+      continue;
+    }
+    // Sheltered Valley: "If ~ would enter, instead sacrifice each other permanent named ~ you control, then put ~ onto the
+    // battlefield" (CR 614.1a): it isn't on the battlefield yet, so it isn't one of them.
+    if (line === "If ~ would enter, instead sacrifice each other permanent named ~ you control, then put ~ onto the battlefield." && !out.entersSacrificeInstead && !out.entersDiscardInstead) {
+      out.entersSacrificeInstead = { kind: "object", types: [], notTypes: [], notColors: [], named: "~", controller: "you", text: "permanent named ~" };
+      out.entersSacrificeInsteadAll = true;
       continue;
     }
     if (line === "If a nontoken creature would enter and it wasn't cast, exile it instead.") {

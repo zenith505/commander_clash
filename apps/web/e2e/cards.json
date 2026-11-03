@@ -2589,6 +2589,72 @@
   "gameChanger": true
  },
  {
+  "oracleId": "d6d72f5f-8f5d-4180-b514-f22ff5482902",
+  "name": "Bonecrusher Giant // Stomp",
+  "manaCost": "{2}{R} // {1}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Giant // Instant — Adventure",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant"
+  ],
+  "oracleText": "Whenever this creature becomes the target of a spell, this creature deals 2 damage to that spell's controller.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eld",
+  "releasedAt": "2019-10-04",
+  "rarity": "rare",
+  "layout": "adventure",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Bonecrusher Giant",
+    "manaCost": "{2}{R}",
+    "typeLine": "Creature — Giant",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Giant"
+    ],
+    "oracleText": "Whenever this creature becomes the target of a spell, this creature deals 2 damage to that spell's controller.",
+    "power": "4",
+    "toughness": "3",
+    "colors": [
+     "R"
+    ]
+   },
+   {
+    "name": "Stomp",
+    "manaCost": "{1}{R}",
+    "typeLine": "Instant — Adventure",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [
+     "Adventure"
+    ],
+    "oracleText": "Damage can't be prevented this turn. Stomp deals 2 damage to any target.",
+    "colors": [
+     "R"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "452e3f5f-ce17-4682-966b-5cc100210aee",
   "name": "Bonesplitter",
   "manaCost": "{1}",
@@ -13248,6 +13314,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1d60e2a7-2059-48cb-a6ab-36ba25b80b3a",
+  "name": "Memory Theft",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose a nonland card from it. That player discards that card. You may put a card that has an Adventure that player owns from exile into that player's graveyard.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eld",
+  "releasedAt": "2019-10-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "75e9ac31-5993-4039-93b2-9380ced2499a",
   "name": "Memory's Journey",
   "manaCost": "{1}{U}",
@@ -13684,6 +13776,32 @@
   "commanderLegal": "legal",
   "set": "grn",
   "releasedAt": "2018-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e78673c4-a969-443f-b1a4-0eb37b8111af",
+  "name": "Mist of Stagnation",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Permanents don't untap during their controllers' untap steps.\nAt the beginning of each player's upkeep, that player chooses a permanent for each card in their graveyard, then untaps those permanents.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21103,6 +21221,36 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a0f25ffa-0e53-4e38-8001-d595fd2c2045",
+  "name": "Temporal Firestorm",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Kicker {1}{W} and/or {1}{U} (You may pay an additional {1}{W} and/or {1}{U} as you cast this spell.)\nChoose up to X creatures and/or planeswalkers you control, where X is the number of times this spell was kicked. Those permanents phase out.\nTemporal Firestorm deals 5 damage to each creature and each planeswalker.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

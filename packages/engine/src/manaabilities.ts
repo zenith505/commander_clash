@@ -98,7 +98,8 @@ export function landCouldProduce(s: GameState, land: GameObject, asking: Readonl
     if (ab.activeIf && !staticConditionNow(s, ab.activeIf, land.id, ctrl)) continue;
     const p = ab.produces;
     const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, asking, p.subtype, p.basic) : manaChoices(s, land, ab);
-    made.forEach((m) => out.add(m));
+    // Replacement effects on the mana it's tapped for count, in any order (CR 106.7): with Infernal Darkness, only {B}.
+    (ab.tap ? made.flatMap((m) => couldProduceAfterReplacements(s, land, [m])) : made).forEach((m) => out.add(m));
   }
   // Its activated mana abilities too ("{T}, Sacrifice a creature: Add {B}{B}"): whatever their costs (CR 106.7).
   for (const ab of abilitiesOf(s, land).activated) if (ab.mana) activatedManaTypes(s, land, ab).forEach((m) => out.add(m));
@@ -234,19 +235,80 @@ export function tapManaTimes(s: GameState, pid: PlayerId, tapped?: GameObject): 
 export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1 ? mana : mana.flatMap((m) => Array<ManaType>(n).fill(m)));
 
 /**
+ * One replacement effect on the mana a permanent is tapped for (CR 106.12b, 614.1a): "times", Mana Reflection's "twice as
+ * much"; "damp", Damping Sphere's "If a land is tapped for two or more mana, it produces {C} instead of any other type and
+ * amount"; "as", Infernal Darkness's "it produces {B} instead of any other type" (`one`: "... and amount", Contamination;
+ * `only`: Quarum Trench Gnomes's "colorless mana instead of white mana", only mana of that type changes).
+ */
+type ManaReplacement = { kind: "times"; n: number } | { kind: "damp" } | { kind: "as"; mana: ManaType; one?: true; only?: ManaType };
+
+/** The replacement effects that apply to mana `tapped` is tapped for by `pid`, in timestamp order (statics in battlefield order, then effects with a duration). */
+function manaReplacements(s: GameState, pid: PlayerId, tapped: GameObject | undefined): ManaReplacement[] {
+  const out: ManaReplacement[] = [];
+  const onField = !!tapped && tapped.zone === "battlefield";
+  const land = onField && objIsType(s, tapped!, "Land");
+  const basic = onField && characteristics(s, tapped!).supertypes.includes("Basic");
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const ab = abilitiesOf(s, o);
+    if (controllerOf(s, o) === pid) {
+      if (ab.tapManaTimes) out.push({ kind: "times", n: ab.tapManaTimes });
+      if (basic && land && ab.tapBasicManaTimes) out.push({ kind: "times", n: ab.tapBasicManaTimes });
+    }
+    if (!land) continue;
+    if (ab.dampsLandMana) out.push({ kind: "damp" });
+    for (const r of ab.landManaAs ?? []) out.push({ kind: "as", mana: r.mana, ...(r.one ? { one: true as const } : {}) });
+  }
+  if (land) {
+    for (const r of s.landManaRules ?? []) if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player)) out.push({ kind: "as", mana: r.mana });
+    for (const r of tapped!.manaReplaced ?? []) out.push({ kind: "as", mana: r.to, only: r.from });
+  }
+  return out;
+}
+
+const applicable = (r: ManaReplacement, made: ManaType[]): boolean => made.length > 0 && (r.kind === "damp" ? made.length >= 2 : r.kind === "as" && r.only ? made.includes(r.only) : true);
+const applyReplacement = (r: ManaReplacement, made: ManaType[]): ManaType[] =>
+  r.kind === "times" ? timesAsMuch(made, r.n) : r.kind === "damp" ? ["C"] : r.one ? [r.mana] : made.map((m) => (!r.only || m === r.only ? r.mana : m));
+
+/**
+ * Every result of applying these replacement effects in an order the player could choose (CR 616.1): each time one that
+ * applies now (CR 616.1e, a land that makes one mana only becomes "tapped for two or more mana" after a multiplier), and
+ * each one only once (CR 614.5). In the order they're listed first.
+ */
+function replacedResults(made: ManaType[], effects: ManaReplacement[], used: boolean[] = effects.map(() => false)): ManaType[][] {
+  const out: ManaType[][] = [];
+  effects.forEach((r, i) => {
+    if (used[i] || !applicable(r, made)) return;
+    const next = used.slice();
+    next[i] = true;
+    out.push(...replacedResults(applyReplacement(r, made), effects, next));
+  });
+  return out.length ? out : [made];
+}
+
+/**
  * The mana a permanent tapped for mana produces after the replacement effects on it (CR 106.12b, 614.1a): Mana
- * Reflection's multipliers, and Damping Sphere's "If a land is tapped for two or more mana, it produces {C} instead of
- * any other type and amount". The player chooses the order (CR 616.1; rulings on Damping Sphere): Damping Sphere first
- * when the land makes two or more, then the multipliers (it can't apply to the event twice, CR 614.5); a land that
- * makes one only becomes two or more by a multiplier, after which Damping Sphere applies (CR 616.1e).
+ * Reflection's multipliers, Damping Sphere's "If a land is tapped for two or more mana, it produces {C} instead of any
+ * other type and amount", and the changes of type (Infernal Darkness, Contamination, Pale Moon, Quarum Trench Gnomes).
+ * The player chooses the order (CR 616.1; rulings on Damping Sphere): the order that gives the most mana, and of those the
+ * one closest to timestamp order, so a later change of type is the one that shows (the engine picks for the player).
  */
 export function tappedForMana(s: GameState, pid: PlayerId, tapped: GameObject | undefined, made: ManaType[]): ManaType[] {
-  const n = tapManaTimes(s, pid, tapped);
-  const land = !!tapped && tapped.zone === "battlefield" && objIsType(s, tapped, "Land");
-  if (!land || !made.length || !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).dampsLandMana)) return timesAsMuch(made, n);
-  if (made.length >= 2) return timesAsMuch(["C"], n);
-  const more = timesAsMuch(made, n);
-  return more.length >= 2 ? ["C"] : more;
+  if (!made.length) return made;
+  const effects = manaReplacements(s, pid, tapped);
+  if (!effects.length) return made;
+  let best: ManaType[] | undefined;
+  for (const r of replacedResults(made, effects)) if (!best || r.length > best.length) best = r;
+  return best!;
+}
+
+/**
+ * The types of mana tapping `land` for `made` could give after the replacement effects on it, in any possible order (CR
+ * 106.7): what "could produce" reads (landCouldProduce).
+ */
+function couldProduceAfterReplacements(s: GameState, land: GameObject, made: ManaType[]): ManaType[] {
+  const effects = manaReplacements(s, controllerOf(s, land), land).filter((r) => r.kind === "as" || r.kind === "damp");
+  return effects.length ? [...new Set(replacedResults(made, effects).flat())] : made;
 }
 
 /**

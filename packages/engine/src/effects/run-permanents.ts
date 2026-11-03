@@ -6,7 +6,7 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { setFace } from "../faces";
+import { isDoubleFacedDef, setFace } from "../faces";
 import { becomePrepared, unprepare } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
@@ -53,6 +53,27 @@ export function canTransform(s: GameState, o: GameObject, byDayNight = false): b
   if (!byDayNight && (objHasKeyword(s, o, "Daybound") || objHasKeyword(s, o, "Nightbound"))) return false;
   const to = o.face === 1 ? 0 : 1;
   return !d.faces[to]!.types.some((t) => t === "Instant" || t === "Sorcery");
+}
+
+/**
+ * Turn a face-up permanent face down (Cyber Conversion): it's what `as` says, a 2/2 Cyberman artifact creature with no
+ * name, color or other text (CR 708.2), still the same object with its counters, attachments and the effects on it
+ * (708.8 for the other way), and a new timestamp (613.7f). A face-down one stays as it is (708.2b); a double-faced one
+ * (a melded one, a double-faced token, CR 707.8a) can't be turned face down (712.16), nor a merged permanent with one
+ * among its components, since each of them would be (730.2f).
+ */
+function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morph", src: string) {
+  if (o.zone !== "battlefield" || o.faceDown) return;
+  const doubleFaced = (x: GameObject) => !!x.melded || !!x.tokenBackUp || (!!s.cards[x.cardId] && (isDoubleFacedDef(s.cards[x.cardId]!) || !!s.cards[x.cardId]!.tokenBack));
+  const name = defOf(s, o).name;
+  if ([o, ...(o.merged?.parts ?? []).map((id) => obj(s, id))].some(doubleFaced)) {
+    log(s, `${src}: ${name} is double-faced and can't be turned face down.`);
+    return;
+  }
+  o.faceDown = as;
+  o.timestamp = s.nextTimestamp++;
+  invalidateCharacteristics(s);
+  log(s, `${src} turns ${name} face down: it's a 2/2 ${as === "cyberman" ? "Cyberman artifact " : ""}creature.`);
 }
 
 /**
@@ -232,6 +253,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, e.no ? `${defOf(s, o).name} is no longer suspected.` : `${src} suspects ${defOf(s, o).name}.`);
       }
       invalidateCharacteristics(s);
+      return;
+    case "turnFaceDown":
+      for (const o of objects(s, e.what, ctx)) turnFaceDown(s, o, e.as, src);
       return;
     case "turnFaceUp":
       for (const o of objects(s, e.what, ctx)) {

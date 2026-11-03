@@ -3136,6 +3136,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
+  // Cyber Conversion: "Turn target creature face down. It's a 2/2 Cyberman artifact creature." One instruction: it's turned
+  // face down as that (FaceDownKind "cyberman", rulings).
+  text = text.replace(/\b([Tt]urn target creature face down)\. It's a 2\/2 Cyberman artifact creature\./, "$1 as a 2/2 Cyberman artifact creature.");
   // Death in Heaven: "Put all creature cards exiled with ~ onto the battlefield face down under your control. They're 2/2
   // Cyberman artifact creatures." One instruction: they enter that way (FaceDownKind "cyberman", rulings).
   text = text.replace(/([Pp]ut all creature cards exiled with ~) onto the battlefield face down under your control\. They're 2\/2 Cyberman artifact creatures\./, "$1 onto the battlefield under your control as face-down 2/2 Cyberman artifact creatures.");

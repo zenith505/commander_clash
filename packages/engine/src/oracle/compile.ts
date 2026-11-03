@@ -3140,9 +3140,10 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Torpor Orb, Hushwing Gryff, Doorkeeper Thrull, Elesh Norn, Mother of Machines.
-    const lock = /^(Creatures|Artifacts and creatures|Permanents) entering(?: the battlefield)? don't cause abilities( of permanents your opponents control)? to trigger\.$/.exec(line);
-    if (lock) {
-      out.enterLock = { ...(lock[1] === "Creatures" ? { types: ["Creature"] } : lock[1] === "Artifacts and creatures" ? { types: ["Artifact", "Creature"] } : {}), ...(lock[2] ? { opponents: true as const } : {}) };
+    // Hushbringer: "Creatures entering or dying don't cause abilities to trigger": dying too (see triggers.ts, rulings).
+    const lock = /^(Creatures|Artifacts and creatures|Permanents) entering( or dying)?(?: the battlefield)? don't cause abilities( of permanents your opponents control)? to trigger\.$/.exec(line);
+    if (lock && !(lock[2] && lock[1] !== "Creatures")) {
+      out.enterLock = { ...(lock[1] === "Creatures" ? { types: ["Creature"] } : lock[1] === "Artifacts and creatures" ? { types: ["Artifact", "Creature"] } : {}), ...(lock[3] ? { opponents: true as const } : {}), ...(lock[2] ? { dies: true as const } : {}) };
       continue;
     }
     const again = triggersAgainLine(line);

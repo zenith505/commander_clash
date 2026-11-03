@@ -1,7 +1,7 @@
 # Roadmap
 
-29,663 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,529 of
+29,671 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,534 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -26,8 +26,7 @@ line blocks.
 
 00. Most played first (`npm run popular`). Out after round 156, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
-   spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
-   batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
+   spells), Hushbringer (done in round 271), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
    colors", spendable only on Dragons: the mana mix needs a picker per X and the spend restriction); Thrilling Discovery
    and Old One Eye ("you may discard two cards. If you do": no ruling on discarding with fewer in hand); Wildfire
    Devils, Arcane Proxy, Don & Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature
@@ -68,9 +67,8 @@ line blocks.
    piece of its own: Possibility Storm (the spell cast from a hand is exiled by its trigger, then cards until one that
    shares a card type with it), Izzet Generatorium (an energy replacement and "if you've paid or lost four or more {E}
    this turn"), Triple Triad (every player's exiled top card, playable for free by mana value), Mm'menon, the Right Hand
-   (mana spendable only on a spell cast from anywhere but your hand), Arvinox, the Mind Flail ("isn't a creature unless
-   you control three or more permanents you don't own", face-down cards you may cast), Cyber Conversion (turning a
-   permanent face down, rulings: not a double-faced one), Sothera, the Supervoid (each opponent chooses a creature to
+   (done in round 271), Arvinox, the Mind Flail ("isn't a creature unless
+   you control three or more permanents you don't own", face-down cards you may cast), Cyber Conversion (done in round 271), Sothera, the Supervoid (each opponent chooses a creature to
    exile, a card exiled with it returns), Tempt with Mayhem (each opponent may copy a spell they don't control, then
    you copy it for each who did), Sin, Unending Cataclysm (removing counters from any number of permanents as it
    enters), Doors of Durin (reveal the top card, then trample or hexproof until your next turn by what you control),
@@ -689,7 +687,7 @@ line blocks.
    held backspace characters instead of `\b` now work (no card changed). A browser test clicks through Search for
    Blex's picker.
    Out after round 201 (looked at, not done): Dauntless Bodyguard ("choose another creature you control" as it
-   enters), Lord of the Forsaken and Mm'menon (mana that can only be spent on spells cast from a given zone), Choco,
+   enters), Lord of the Forsaken and Mm'menon (done in round 271), Choco,
    Seeker of Paradise (two different picks from one look), Doomsday Confluence ("choose X" modes tied to X), Scrap
    Welder (targets "with mana value less than X", X set by a sacrifice cost), The Ancient One ("its mana value" about
    the card discarded, in a reflexive trigger), Savage Summoning (flash and "can't be countered" for the next creature
@@ -1996,6 +1994,26 @@ line blocks.
    its toughness instead" (its toughness as it last existed, rulings) and "Return each creature card from your graveyard
    to the battlefield with a finality counter on it. Those creatures are Vampires in addition to their other types"
    (Shilgengar, Sire of Famine). +9 (29,653 of 31,936 with B96 to B100).
+   Round 271 went back over earlier skips from the top. "Creatures entering or dying don't cause abilities to trigger"
+   (Hushbringer, rulings: a dying creature's own and other permanents' dies, "put into a graveyard from the battlefield"
+   and leaves-the-battlefield abilities, one-or-more batches and delayed triggers too; leaves-the-battlefield abilities
+   look back, CR 603.10a, so a Hushbringer dying at the same time still stops them, but "put into a graveyard from
+   anywhere" abilities look at the game after the event, so a Hushbringer leaving with it doesn't, and a dying creature's
+   own "from anywhere" ability still triggers; what caused the dying, a sacrifice or a destruction, still triggers; an
+   Equipment's "becomes unattached" isn't stopped); mana spendable only on "a spell from anywhere other than your hand"
+   (Mm'menon, the Right Hand, granted to artifacts), on "a spell from your graveyard" (Lord of the Forsaken: only your own
+   graveyard, CR 404.1), "to turn permanents face up" (Overgrown Zealot) and "to cast an enchantment spell, unlock a door,
+   or turn a permanent face up" (Creeping Peeper); turning a permanent face down (CR 708.2): "Turn target creature face
+   down. It's a 2/2 Cyberman artifact creature" (Cyber Conversion: the same object with its counters and effects, a new
+   timestamp, CR 613.7f; a face-down one or a double-faced one doesn't change, 708.2b and 712.16, nor a merged permanent
+   with a double-faced card among its components, our reading of 730.2f; a morph ability turns it face up, rulings),
+   "Turn ~ face down" (Wall of Deceit) and "If you lose the flip, turn ~ face down" (Skittish Valesk). +8 (29,671 of
+   31,936 with B96 to B101).
+   Out after round 271 (looked at, not done): Rootcoil Creeper (its mana is supported, but "target card with flashback you
+   own from exile" needs a target in exile); Mischievous Quanar ("When ~ is turned face up, copy target instant or sorcery
+   spell"); Obscuring Aether ("Face-down creature spells you cast cost {1} less": the cost filters see the card, not the
+   face-down spell); Backslide ("target creature with a morph ability", megamorph included, CR 702.37b, isn't a target
+   filter yet); Ixidron and Illithid Harvester (turning other creatures face down as plain 2/2s or Horrors, as it enters).
    Out after round 270 (looked at, not done): Dauntless Bodyguard (still no choice of a permanent as something enters);
    Tegwyll's Scouring ("cast as though it had flash by tapping three untapped creatures you control with flying": an
    extra cost only when cast at instant speed); Osgir, the Reconstructor ("Exile an artifact card with mana value X from
@@ -5393,7 +5411,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B79 (looked at, not done): Aquamorph Entity (a choice as it's turned face up: the special action
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,
-  Bronze Horse, Mister Immortal (activated from exile), Wall of Deceit and Backslide (turn a creature face down),
+  Bronze Horse, Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
   Sarkhan's Whelp, Dredging Claw, Defiant Vanguard. Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no

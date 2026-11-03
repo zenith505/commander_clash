@@ -474,6 +474,17 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only to cast spells with flashback from a graveyard.") return { spells: { kind: "spell", text: "spells with flashback from a graveyard" }, flashbackFromGraveyard: true, text: sentence };
   // Interdimensional Web Watch: "Spend this mana only to cast spells from exile" (CR 106.6): any spell cast from exile.
   if (sentence === "Spend this mana only to cast spells from exile.") return { spells: { kind: "spell", text: "spells from exile" }, fromExile: true, text: sentence };
+  // Mm'menon, the Right Hand: "Spend this mana only to cast a spell from anywhere other than your hand" (CR 106.6): a spell
+  // cast from any zone but a hand (the library, a graveyard, exile, the command zone), on none of an ability's costs.
+  if (sentence === "Spend this mana only to cast a spell from anywhere other than your hand.") return { spells: { kind: "spell", text: "spells from anywhere other than your hand" }, notFromHand: true, text: sentence };
+  // Lord of the Forsaken, Rootcoil Creeper: "Spend this mana only to cast a spell from your graveyard" (CR 106.6): a spell
+  // cast from its caster's own graveyard (CR 404.1), by any permission.
+  if (/^Spend this mana only to cast (?:a spell|spells) from your graveyard\.$/.test(sentence)) return { spells: { kind: "spell", text: "spells from your graveyard" }, fromOwnGraveyard: true, text: sentence };
+  // Overgrown Zealot: "Spend this mana only to turn permanents face up": the special action of turning a face-down
+  // permanent face up by any of its ways (CR 116.2b; rulings: morph or disguise costs, a manifested or cloaked permanent's
+  // costs). Creeping Peeper: "... to cast an enchantment spell, unlock a door, or turn a permanent face up" (CR 709.5e too).
+  if (sentence === "Spend this mana only to turn permanents face up.") return { faceUp: ["morph", "megamorph", "disguise", "manifest", "cloak"], text: sentence };
+  if (sentence === "Spend this mana only to cast an enchantment spell, unlock a door, or turn a permanent face up.") return { spells: { kind: "spell", types: ["Enchantment"], text: "enchantment spells" }, unlockDoors: true, faceUp: ["morph", "megamorph", "disguise", "manifest", "cloak"], text: sentence };
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand": on anything else (CR 106.6).
   if (sentence === "This mana can't be spent to cast spells from your hand.") return { spells: { kind: "spell", text: "spells" }, notFromHand: true, abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).

@@ -49,6 +49,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[2]!.toLowerCase() === "opponent" ? { opponent: true } : {}), ...(pw[1] ? { optional: true } : {}), text: p.toLowerCase().replace(/^up to one /, "") }) };
   // Coalborn Entity: "target creature token, player, or planeswalker": a player, a planeswalker, or a creature that's a token.
   if (/^target creature token, player, or planeswalker$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], creatureTokens: true, text: p.toLowerCase() }) };
+  // Cautery Sliver: "target player, planeswalker, or Sliver creature": a player, a planeswalker, or a creature only if it
+  // has that creature type (rulings: "the second ability can affect only Slivers").
+  const typedCreature = /^target player, planeswalker, or ([A-Z][a-z]+) creature$/.exec(p);
+  if (typedCreature && CREATURE_TYPES.has(typedCreature[1]!)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], creatureSubtype: typedCreature[1]!, text: p.toLowerCase() }) };
   // All Will Be One, Nicol Bolas, God-Pharaoh: "target opponent, creature an opponent controls, or planeswalker an opponent
   // controls".
   if (/^target opponent, creature an opponent controls, or planeswalker an opponent controls$/i.test(p))

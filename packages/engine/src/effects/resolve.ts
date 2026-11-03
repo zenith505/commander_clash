@@ -267,6 +267,7 @@ function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): v
   const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));
   if (!picked) throw new RulesError(`choose the mana that tapping ${defOf(s, o).name} also adds`);
   addTriggeredMana(s, item.controller, picked);
+  if (picked.skipUntap && o.zone === "battlefield") o.skipNextUntap = true; // Winter's Night
   if (picked.adds.length) log(s, `${player(s, item.controller).name} adds ${picked.adds.map((x) => `{${x}}`).join("")}.`);
 }
 
@@ -1204,6 +1205,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cantBlockSource":
     case "blockLimitThisCombat":
     case "phaseOut":
+    case "phaseSwap":
+    case "toggleTapped":
     case "proliferate":
     case "timeTravel":
     case "removeTimeSuspended":
@@ -1244,6 +1247,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ownersGainControl":
     case "scrambleControl":
     case "swapCreatures":
+    case "juxtapose":
     case "exchangeControl":
     case "playerGains":
     case "attackBanNextTurn":

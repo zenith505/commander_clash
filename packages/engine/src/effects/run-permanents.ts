@@ -15,7 +15,7 @@ import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards, discardToTop } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
-import { phaseOut } from "../phasing";
+import { phaseIn, phaseOut } from "../phasing";
 import { isSuspended } from "./run-zones";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
 
@@ -425,6 +425,27 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${defOf(s, o).name} becomes saddled.`);
       }
       return;
+    case "toggleTapped": {
+      // Sands of Time: the tapped ones and the untapped ones, found first, then flipped together.
+      for (const pid of players(s, e.who, ctx)) {
+        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        const [tapped, untapped] = [mine.filter((id) => obj(s, id).tapped), mine.filter((id) => !obj(s, id).tapped)];
+        for (const id of tapped) untapPermanent(s, obj(s, id));
+        for (const id of untapped) tapPermanent(s, obj(s, id));
+        log(s, `${player(s, pid).name} untaps ${tapped.length} and taps ${untapped.length} of their artifacts, creatures and lands.`);
+      }
+      return;
+    }
+    case "phaseSwap": {
+      // Time and Tide: what phased out directly and is a creature (as printed: a phased-out permanent is treated as though
+      // it doesn't exist, CR 702.26b), with what's attached to it (702.26g), and the creatures with phasing, both found
+      // first and then phasing at once.
+      const back = (s.phasedOut ?? []).filter((id) => !s.objects[id]!.phased?.indirect && objIsType(s, obj(s, id), "Creature"));
+      const out = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && objHasKeyword(s, obj(s, id), "Phasing"));
+      phaseOut(s, out);
+      phaseIn(s, back);
+      return;
+    }
     case "phaseOut": {
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
       const ids = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
@@ -1488,18 +1509,65 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (s.resolving) s.resolving.did = true;
       return;
     }
+    case "juxtapose": {
+      // Juxtapose: for each type in turn, each of the two players' permanents of it with the greatest mana value (a tie
+      // chosen by its controller), then the two exchanged (CR 701.12a); with either player having none, or both being the
+      // same player, nothing happens for that type (rulings). An artifact creature can be in both exchanges (rulings).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const them = players(s, e.who, ctx)[0];
+      if (them === undefined || player(s, them).lost || them === ctx.controller) return;
+      const pair = [ctx.controller, them];
+      const jux = (sc.jux ??= { stage: 0, picked: {} });
+      for (; jux.stage < e.types.length; jux.stage++, jux.picked = {}) {
+        const type = e.types[jux.stage]!;
+        for (const pid of pair) {
+          if (pid in jux.picked) continue;
+          const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), type));
+          const top = Math.max(-1, ...mine.map((id) => characteristics(s, obj(s, id)).manaValue));
+          const tied = mine.filter((id) => characteristics(s, obj(s, id)).manaValue === top);
+          if (tied.length > 1) {
+            if (sc.tieChoice === undefined || !tied.includes(sc.tieChoice)) {
+              sc.tieChoice = undefined;
+              s.pending = { kind: "chooseOption", player: pid, source: src, what: "greatestTie", options: tied, labels: tied.map((id) => defOf(s, obj(s, id)).name), prompt: `choose which of your ${type === "Creature" ? "creatures" : "artifacts"} with the greatest mana value (${top}) to exchange` };
+              return "paused";
+            }
+            jux.picked[pid] = sc.tieChoice;
+            sc.tieChoice = undefined;
+          } else jux.picked[pid] = tied[0] ?? null;
+        }
+        const [a, b] = pair.map((pid) => jux.picked[pid]);
+        const oa = a ? s.objects[a] : undefined;
+        const ob = b ? s.objects[b] : undefined;
+        if (!oa || !ob || oa.zone !== "battlefield" || ob.zone !== "battlefield") {
+          log(s, `${src}: no ${type.toLowerCase()} exchange (a player controls none).`);
+          continue;
+        }
+        const [ca, cb] = [controllerOf(s, oa), controllerOf(s, ob)];
+        if (ca === cb) continue;
+        for (const [o, to] of [[oa, cb], [ob, ca]] as const) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
+        invalidateCharacteristics(s);
+        log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, oa).name} and ${defOf(s, ob).name}.`);
+      }
+      return;
+    }
     case "swapCreatures": {
       // Each group is what each player controls as it resolves (CR 611.2c): the creatures are untapped, then each player
       // gains control of the other's at once, until end of turn, and all of them gain haste (rulings on Reins of Power).
       const opp = players(s, e.who, ctx)[0];
       if (opp === undefined || player(s, opp).lost) return;
       const creaturesOf = (pid: PlayerId) => s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid);
-      for (const id of [...creaturesOf(ctx.controller), ...creaturesOf(opp)]) untapPermanent(s, obj(s, id));
+      if (!e.untapAfter) for (const id of [...creaturesOf(ctx.controller), ...creaturesOf(opp)]) untapPermanent(s, obj(s, id));
       const mine = creaturesOf(ctx.controller);
       const theirs = creaturesOf(opp);
       const base = { sourceName: src, sourceId: ctx.sourceId, duration: "endOfTurn" as const };
       if (mine.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: opp, ...base, affected: mine, mods: [{ kind: "control" }] });
       if (theirs.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, ...base, affected: theirs, mods: [{ kind: "control" }] });
+      if (e.untapAfter) {
+        // Twist Allegiance: "Untap those creatures" once they've changed hands.
+        invalidateCharacteristics(s);
+        for (const id of [...mine, ...theirs]) if (obj(s, id).zone === "battlefield") untapPermanent(s, obj(s, id));
+      }
       if (mine.length + theirs.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, ...base, affected: [...mine, ...theirs], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       invalidateCharacteristics(s);
       log(s, `${player(s, ctx.controller).name} and ${player(s, opp).name} exchange control of their creatures until end of turn (${mine.length} and ${theirs.length}).`);
@@ -1876,6 +1944,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "attachToChosen": {
       const sc = (s.resolving!.scratch ??= {});
+      // Kudzu: another player chooses (the destroyed land's controller as it last existed, CR 608.2h).
+      const chooser = e.chooser ? players(s, e.chooser, ctx)[0] : ctx.controller;
+      if (chooser === undefined) return;
       const hosts = (sc.auraHosts ??= {});
       // "For each Aura and Equipment you control" (Inventory Management): each of those there as it resolves, one at a
       // time, each attached as its creature is chosen.
@@ -1913,8 +1984,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           if (options.length > 1 || may) {
             sc.auraAsking = me.id;
             const choices = [...options, ...(may ? ["none"] : [])];
-            const labels = choices.map((x) => (x === "none" ? (each && me.attachedTo ? "Leave it where it is" : "Don't attach it") : `${defOf(s, obj(s, x)).name}${controllerOf(s, obj(s, x)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, x))).name})`}`));
-            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${may ? ", or none" : ""}` };
+            const labels = choices.map((x) => (x === "none" ? (each && me.attachedTo ? "Leave it where it is" : "Don't attach it") : `${defOf(s, obj(s, x)).name}${controllerOf(s, obj(s, x)) === chooser ? "" : ` (${player(s, controllerOf(s, obj(s, x))).name})`}`));
+            s.pending = { kind: "chooseOption", player: chooser, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${may ? ", or none" : ""}` };
             return "paused";
           }
           hosts[me.id] = options[0]!;

@@ -11135,6 +11135,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a52ccb40-e950-4cd0-93ab-50daa52b03f3",
+  "name": "Juxtapose",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You and target player exchange control of the creature you each control with the greatest mana value. Then exchange control of artifacts the same way. If two or more permanents a player controls are tied for greatest, their controller chooses one of them.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "395a7bd6-7c2d-448e-842c-ca53256d7008",
   "name": "Kaho, Minamo Historian",
   "manaCost": "{2}{U}{U}",
@@ -12094,6 +12120,36 @@
   "set": "znc",
   "releasedAt": "2020-09-25",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "51ca5965-ae39-4e51-8948-9a230a03f906",
+  "name": "Kudzu",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant land\nWhen enchanted land becomes tapped, destroy it. That land's controller may attach this Aura to a land of their choice.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21328,6 +21384,34 @@
   "set": "atq",
   "releasedAt": "1994-03-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9851d934-2e07-49c8-b08b-15f96d0f3f0c",
+  "name": "Teferi's Realm",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "World Enchantment",
+  "supertypes": [
+   "World"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken permanents of that type phase out. (While they're phased out, they're treated as though they don't exist. Each one phases in before its controller untaps during their next untap step.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

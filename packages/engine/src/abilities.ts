@@ -2807,6 +2807,12 @@ export type Effect =
    * is a creature card as printed (rulings: effects on the permanent don't count).
    */
   | { type: "turnFaceUp"; what: ObjRef; revealOnly?: true; ifCreatureCard?: true }
+  /**
+   * Turn a permanent face down: Cyber Conversion's "Turn target creature face down. It's a 2/2 Cyberman artifact
+   * creature." (CR 708.2, FaceDownKind "cyberman"); Wall of Deceit's "Turn ~ face down": a 2/2 with no text (708.2a, `as` "morph": turned face up again only by a morph
+   * ability it has, 702.37e). Not one that's face down already (708.2b), nor a double-faced one (712.16).
+   */
+  | { type: "turnFaceDown"; what: ObjRef; as: "cyberman" | "morph" }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Amy Pond: "choose a suspended card you own and remove that many time counters from it", chosen as it resolves. */
@@ -5975,6 +5981,8 @@ export interface ManaSpend {
   notFromHand?: true;
   /** "Spend this mana only to cast spells from exile" (Interdimensional Web Watch): only on a spell cast from exile (ManaUse.fromExile). */
   fromExile?: true;
+  /** "Spend this mana only to cast a spell from your graveyard" (Lord of the Forsaken): only on a spell cast from the paying player's own graveyard (ManaUse.fromGraveyard, ManaUse.owner). */
+  fromOwnGraveyard?: true;
   /** "Spend this mana only to cast spells you don't own" (Thieving Varmint): only on a spell another player owns (ManaUse.owner, CR 108.3). */
   notOwnSpells?: true;
   /** "Spend this mana only to cast spells with flashback from a graveyard" (Altar of the Lost): ManaUse.flashbackFromGraveyard. */
@@ -7232,9 +7240,10 @@ export interface CompiledCard {
   firstEquipFreeWhile?: StaticCondition;
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
-   * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
+   * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`). Hushbringer's "Creatures
+   * entering or dying" (`dies`): a creature dying doesn't cause abilities to trigger either (effects/triggers.ts dyingLocked).
    */
-  enterLock?: { types?: string[]; opponents?: true };
+  enterLock?: { types?: string[]; opponents?: true; dies?: true };
   /**
    * "If an artifact or creature entering causes a triggered ability of a permanent you control to trigger, that ability
    * triggers an additional time" (Panharmonicon), "if a triggered ability of a legendary creature you control triggers,

@@ -1193,6 +1193,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "turnFaceUp":
+    case "turnFaceDown":
     case "suspect":
     case "untap":
     case "untapUpTo":

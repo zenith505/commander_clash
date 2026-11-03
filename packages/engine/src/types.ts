@@ -1715,6 +1715,8 @@ export interface ZoneMove {
   createdBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
   locks?: { by: PlayerId; opponents?: boolean }[];
+  /** Hushbringer: this creature died while a creature dying couldn't cause abilities to trigger (effects/triggers.ts). */
+  diesLocked?: true;
   /** Leaving the battlefield: it as it last existed there, whether it had its abilities then, and those granted to it. */
   snapshot?: GameObject;
   chars?: Characteristics;

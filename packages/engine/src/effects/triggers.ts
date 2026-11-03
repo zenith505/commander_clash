@@ -805,6 +805,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Earthbend's "when that land dies or is put into exile" (CR 701.66a): it triggers once, for that object only; gone
     // anywhere else, it never will.
     const was = ev.snapshot?.zoneChanges ?? 0;
+    // Hushbringer: a creature dying doesn't cause abilities to trigger (rulings): the creature as it last existed (a land
+    // that had become a creature too), whatever the ability says it watches for ("put into a graveyard from the
+    // battlefield", "leaves the battlefield"); one leaving at the same time, itself included, still stops them.
+    const diesLocked = ev.wasCreature && ev.to === "graveyard" && dyingLocked(s, true);
+    if (diesLocked) {
+      const move = [...(s.zoneBatch ?? [])].reverse().find((m) => m.id === ev.id && m.from === "battlefield" && m.to === "graveyard");
+      if (move) move.diesLocked = true;
+    }
     for (const d of [...(s.delayed ?? [])]) {
       if (d.when !== "leaves" || d.subject.id !== ev.id || d.subject.zc !== was) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
@@ -814,13 +822,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.underControl && ev.controller !== d.controller) continue;
       if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.ifHadCounter && !((ev.counters[d.ifHadCounter] ?? 0) > 0)) continue;
-      if (d.to?.includes(ev.to))
+      if (d.to?.includes(ev.to) && !diesLocked)
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
     const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
+    if (diesLocked) locked = () => true;
     add(
       o,
       ev.controller,
@@ -835,6 +844,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
     );
+    // "Whenever ~ becomes unattached from a permanent": an Aura's or Equipment's own event, not the creature's dying (as
+    // "whenever you sacrifice" isn't, rulings), so Hushbringer doesn't stop it.
+    locked = null;
     // "Whenever ~ becomes unattached from a permanent": it left while attached (looking back in time, CR 603.10a), or what
     // was attached to it stayed.
     const host = ev.snapshot?.attachedTo ? s.objects[ev.snapshot.attachedTo] : undefined;
@@ -843,6 +855,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const att = s.objects[a];
       if (att?.zone === "battlefield") add(att, controllerOf(s, att), (e) => e === "selfBecomesUnattached", undefined, undefined, o);
     }
+    if (diesLocked) locked = () => true;
     // "When the creature ~ haunts dies": the cards in exile haunting it as it was on the battlefield (CR 702.55b-c),
     // under their owners' control (CR 108.4a, 113.8). Dying means going to a graveyard, creature or not (CR 700.4).
     if (ev.to === "graveyard")
@@ -896,6 +909,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner, undefined);
       });
     }
+    // Hushbringer: an ability that triggers on what caused the dying (destroying, sacrificing) still triggers (rulings).
+    locked = null;
     // "Whenever a spell or ability an opponent controls destroys a noncreature permanent you control" (Karmic Justice): the
     // permanents on the battlefield and the ones destroyed at the same time (this one too), as they last existed (CR
     // 603.10a); "that opponent" is the destroying spell's or ability's controller.
@@ -2922,6 +2937,9 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   }
   if (b.what === "leaves") {
     if (m.from !== "battlefield" || !m.snapshot || !m.chars) return false;
+    // Hushbringer: a creature dying caused nothing to trigger, but "whenever you sacrifice one or more" is about the
+    // sacrifice that caused it (rulings).
+    if (m.diesLocked && !b.sacrificed) return false;
     if (b.dies && m.to !== "graveyard") return false;
     if (b.notDies && m.to === "graveyard" && m.chars.types.includes("Creature")) return false; // CR 700.4
     if (b.sacrificed && !m.sacrificed) return false;
@@ -2943,8 +2961,25 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "exiledFromGraveyardsOrBattlefield") return m.to === "exile" && (m.from === "battlefield" || m.from === "graveyard");
   if (b.what === "exiled") return m.to === "exile" && m.from !== "exile";
+  // Hushbringer: a creature dying doesn't cause "put into a graveyard from anywhere" abilities to trigger either, but those
+  // look at the game after the event (they aren't leaves-the-battlefield abilities, CR 603.10a), so a Hushbringer that left
+  // at the same time, or is the card, doesn't stop them (rulings).
+  if (b.what === "toGraveyard" && m.from === "battlefield" && m.to === "graveyard" && m.chars?.types.includes("Creature") && dyingLocked(s, false)) return false;
   if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
+}
+
+/**
+ * Hushbringer: "Creatures ... dying don't cause abilities to trigger". One on the battlefield (with its abilities) stops
+ * them; with `lookBack` (leaves-the-battlefield abilities, CR 603.10a) so does one that left the battlefield at the same
+ * time as the dying creature, itself included, as it last existed (rulings).
+ */
+function dyingLocked(s: GameState, lookBack: boolean): boolean {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (compileCard(defOf(s, o)).enterLock?.dies && characteristics(s, o).hasPrintedAbilities) return true;
+  }
+  return lookBack && (s.leftTogether ?? []).some((l) => l.hadAbilities && !!l.card && s.objects[l.id]?.zone !== "battlefield" && !!compileCard(s.cards[l.card]!).enterLock?.dies);
 }
 
 /** The current event is over: its "one or more" triggers trigger (CR 603.2c). */

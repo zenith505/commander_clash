@@ -5,7 +5,7 @@ import { planMana } from "../autopay";
 import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
-import type { Color, GameState, ObjectId, PlayerId } from "../types";
+import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
@@ -292,6 +292,25 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
       if (e.forage) fireEvent(s, { type: "foraged", player: ctx.controller });
+      return;
+    }
+    case "splitTargets": {
+      // Retribution: one of the two targets picked as it resolves (CR 608.2d), among those still legal (CR 608.2b,
+      // rulings: with one left, it's that one), by their controller or by the spell's controller (Cannibalize).
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.either === undefined) {
+        const ids = [0, 1].map((i) => (s.resolving!.legal[i] ? objects(s, { ref: "target", index: i }, ctx)[0] : undefined));
+        const can = [0, 1].filter((i) => ids[i]?.zone === "battlefield");
+        if (!can.length) return;
+        if (can.length === 1) sc.either = can[0]!;
+        else {
+          const chooser = e.chooser === "you" ? ctx.controller : controllerOf(s, ids[0]!);
+          const name = (o: GameObject) => defOf(s, o).name;
+          s.pending = { kind: "chooseOption", player: chooser, source: src, what: "splitTargets", options: can.map(String), labels: can.map((i) => e.label.replace("{0}", name(ids[i]!)).replace("{1}", name(ids[1 - i]!))), prompt: "choose one of the two creatures" };
+          return "paused";
+        }
+      }
+      for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
     }
     case "villainous": {
@@ -605,7 +624,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
         return "paused";
       }
-      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
+      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : {}) };

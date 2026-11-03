@@ -1757,6 +1757,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = parsePlayer("target opponent", ctx);
     return who ? [{ type: "attackWalkerNextTurn", who }] : null;
   }
+  // Taunt: "During target player's next turn, creatures that player controls attack you if able": whatever they control as
+  // attackers are declared that turn (CR 508.1d); one that can't attack you needn't attack at all.
+  if (/^[Dd]uring target player's next turn, creatures that player controls attack you if able$/.test(s)) {
+    const who = parsePlayer("target player", ctx);
+    return who ? [{ type: "attackYouNextTurn", who }] : null;
+  }
   // "Until your next turn, creatures your opponents control attack each combat if able and attack a player other than you
   // if able" (Kardur, Doomscourge), "until your next turn, each creature attacks ..." (Maximum Carnage): goad's
   // requirements (CR 701.15b, 508.1d) without goading them, for every creature in the group at any time, those that

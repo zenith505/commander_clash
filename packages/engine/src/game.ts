@@ -2458,10 +2458,14 @@ function almsCollector(s: GameState, pid: PlayerId): GameObject | undefined {
  */
 export function mustAttackPlayers(s: GameState, o: GameObject): PlayerId[] {
   const c = characteristics(s, o);
-  if (!c.mustAttackMostLife) return c.mustAttack;
-  const opps = opponents(s, controllerOf(s, o));
+  // Taunt: this turn is its target's next turn, for each creature they control now (CR 508.1d).
+  const ctl = controllerOf(s, o);
+  const taunts = (s.attackPlayerNextTurn ?? []).filter((r) => r.turn === s.turn && r.player === ctl && r.attack !== ctl).map((r) => r.attack);
+  const must = taunts.length ? [...new Set([...c.mustAttack, ...taunts])] : c.mustAttack;
+  if (!c.mustAttackMostLife) return must;
+  const opps = opponents(s, ctl);
   const most = Math.max(...opps.map((p) => player(s, p).life));
-  return [...new Set([...c.mustAttack, ...opps.filter((p) => player(s, p).life === most)])];
+  return [...new Set([...must, ...opps.filter((p) => player(s, p).life === most)])];
 }
 
 /**
@@ -3463,6 +3467,12 @@ function startNextTurn(s: GameState, skipping = false) {
     s.attackWalkerNextTurn = s.attackWalkerNextTurn.filter((r) => r.turn === undefined && same(r.pw, r.pwZc) && same(r.id, r.zc));
     for (const r of s.attackWalkerNextTurn) if (s.turn > r.since && (r.id !== undefined ? controllerOf(s, obj(s, r.id)) : r.player) === ap.id) r.turn = s.turn;
     if (!s.attackWalkerNextTurn.length) s.attackWalkerNextTurn = undefined;
+  }
+  // Taunt: this turn is the next turn of the player it named, and any earlier one is over.
+  if (s.attackPlayerNextTurn) {
+    s.attackPlayerNextTurn = s.attackPlayerNextTurn.filter((r) => r.turn === undefined);
+    for (const r of s.attackPlayerNextTurn) if (s.turn > r.since && r.player === ap.id) r.turn = s.turn;
+    if (!s.attackPlayerNextTurn.length) s.attackPlayerNextTurn = undefined;
   }
   // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
   for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
@@ -9038,6 +9048,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "unlockDoor") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the locked doors");
     (r.scratch ??= {}).door = choice;
+    continueResolution(s);
+    return;
+  }
+  // Retribution: the target picked (Effect splitTargets).
+  if (pend.what === "splitTargets") {
+    (r.scratch ??= {}).either = Number(choice);
+    log(s, `${p.name} chooses: ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} (${pend.source}).`);
     continueResolution(s);
     return;
   }

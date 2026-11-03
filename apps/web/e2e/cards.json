@@ -1504,6 +1504,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e3cd53c1-86bd-4177-adb0-a1fa693b44c6",
+  "name": "Auntie Ool, Cursewretch",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Goblin Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warlock"
+  ],
+  "oracleText": "Ward—Blight 2. (To blight 2, a player puts two -1/-1 counters on a creature they control.)\nWhenever one or more -1/-1 counters are put on a creature, draw a card if you control that creature. If you don't control it, its controller loses 1 life.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Blight",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecc",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4f452ce7-1166-4810-afed-ea5e156a6f52",
   "name": "Aurelia's Vindicator",
   "manaCost": "{2}{W}{W}",

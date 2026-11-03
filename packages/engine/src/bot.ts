@@ -132,7 +132,7 @@ import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
-import { removableCounters } from "./counters";
+import { blightOptions, removableCounters } from "./counters";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -308,6 +308,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "payUnless" && pend.discardRandom) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discardRandom }];
     // Poison counters as a payment: only while we'd stay well short of ten (CR 704.5c).
     if (pend.kind === "payUnless" && pend.poison) return [{ type: "payUnless", player: pid, pay: (player(s, pid).poison ?? 0) + pend.poison < 8 }];
+    // "Ward—Blight 2": pay with a creature of ours that survives the -1/-1 counters, never our commander.
+    if (pend.kind === "payUnless" && pend.blight) return [{ type: "payUnless", player: pid, pay: blightHost(s, pid, blightOptions(s, pid, pend.blight), pend.blight) !== null }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),
       // and a sacrifice only with enough permanents that aren't our commander.
@@ -571,6 +573,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const giver = s.resolving?.item.controller;
       const others = opponents(s, pid).filter((p) => p !== giver);
       return [{ type: "pickPermanents", player: pid, ids: giver === pid || others.length ? choosePicks(s, pid, pend.options, 1, "counters", pend.counter) : [] }];
+    }
+    // Blighting for ward (see payUnless): the least useful creature that survives the counters, else the least useful.
+    if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.counter === "-1/-1" && /^blight \d+:/.test(pend.prompt ?? "")) {
+      const n = Number(/^blight (\d+)/.exec(pend.prompt!)![1]);
+      return [{ type: "pickPermanents", player: pid, ids: [blightHost(s, pid, pend.options, n) ?? [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     }
     if (pend.kind === "pickPermanents" && pend.action === "flicker") return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options) }];
     // Birthing Ritual: sacrifice a creature (never a commander) for a better one among the cards looked at, one with
@@ -5256,6 +5263,12 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else return null;
   }
   return out;
+}
+
+/** Blight N for a payment: our least useful creature among `options` that survives N -1/-1 counters, never our commander; null if none. */
+function blightHost(s: GameState, pid: PlayerId, options: ObjectId[], n: number): ObjectId | null {
+  const pool = options.map((x) => obj(s, x)).filter((o) => !o.isCommander && toughness(s, o) > n).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  return pool[0]?.id ?? null;
 }
 
 /**

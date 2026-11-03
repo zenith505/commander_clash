@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
+import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -9836,6 +9836,22 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       const chosen: ObjectId[] = [];
       for (let k = 0; k < pend.discardRandom; k++) chosen.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
       r.scratch = { ...r.scratch, queue: [p.id], chosen: { [p.id]: chosen } };
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
+    if (pend.blight) {
+      // "Ward—Blight 2": then which creature gets the -1/-1 counters, all on one (CR 701.68a, rulings), put on it as the
+      // counter effect carries on (see paidUnless). With none they can't choose to blight (701.68b).
+      const options = blightOptions(s, p.id, pend.blight);
+      if (!options.length) throw new RulesError(`you control no creature to blight ${pend.blight}`);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
+      if (options.length > 1) {
+        const n = pend.blight;
+        s.pending = { kind: "pickPermanents", player: p.id, source: pend.source, action: "counters", counter: "-1/-1", what: "creature", options, count: 1, prompt: `blight ${n}: click a creature of yours to put ${n === 1 ? "a -1/-1 counter" : `${n} -1/-1 counters`} on.` };
+        return;
+      }
+      r.scratch.chosen![p.id] = options;
       s.pending = null;
       continueResolution(s);
       return;

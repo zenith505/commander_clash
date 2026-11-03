@@ -18,4 +18,5 @@ export * from "./damage";
 export * from "./shortcuts";
 export * from "./scryfall";
 export { partySize, PARTY_TYPES } from "./amounts";
+export { blightOptions } from "./counters";
 export { keywordLabel } from "./keywords";

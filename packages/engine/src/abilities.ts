@@ -76,6 +76,8 @@ export interface UnlessPays {
   discardRandom?: number;
   /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
   poison?: number;
+  /** "Ward—Blight 2" (Auntie Ool, Cursewretch): this many -1/-1 counters on one creature they control as the payment (CR 701.68a); not with none (701.68b). */
+  blight?: number;
 }
 
 /**
@@ -1362,6 +1364,8 @@ export type PlayerRef =
   | { ref: "votedWithYou" }
   /** "Each of those opponents" (Breeches, Brazen Plunderer): the players a "one or more ... deal damage to your opponents" event was about (TriggerEventInfo.players). */
   | { ref: "eventPlayers" }
+  /** "You and those players" (Zurzoth, Chaos Rider): you and the event's players, in turn order from the active player (CR 101.4). */
+  | { ref: "youAndEventPlayers" }
   /** "That attacking player" (Breena): the player who attacked, for "playerAttacksYourOpponent" (TriggerEventInfo.attacker). */
   | { ref: "attackingPlayer" }
   /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
@@ -4519,6 +4523,8 @@ export type SpellCondition =
   | { kind: "cycledSelfNamed"; n: number }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
   | { kind: "subjectWasAttacking" }
+  /** Auntie Ool, Cursewretch: "if you control that creature": the trigger's subject is the ability's controller's, as it is now or last existed on the battlefield (CR 608.2h). */
+  | { kind: "subjectYours" }
   /** Silumgar Scavenger: "if it exploited that creature": the creature a dies trigger is about was sacrificed for this source's exploit, this object (CR 702.110a, 400.7). */
   | { kind: "subjectExploitedBySelf" }
   /** Pulse of the Forge: "if that player or that planeswalker's controller has more life than you", as it resolves. */
@@ -5267,6 +5273,12 @@ export interface TriggeredAbility {
   perPlayer?: true;
   /** With `perPlayer`: "Whenever you attack a player or planeswalker with ..." (Rigo, Streetwise Mentor): once for each planeswalker attacked too. */
   perWalker?: true;
+  /**
+   * For "creaturesYouControlAttack": "Whenever one or more Devils you control attack one or more players" (Zurzoth, Chaos
+   * Rider): once for the declaration, counting only those attacking a player, not a planeswalker or battle (CR 508.3e,
+   * rulings); the event's players are the players they attack ("those players").
+   */
+  attacksPlayers?: true;
   /**
    * With `anyoneAttacks`: "Whenever one or more creatures attack one of your opponents (or a planeswalker they control)"
    * (Frontier Warmonger): once for each of its controller's opponents attacked; the event's player is that opponent, its

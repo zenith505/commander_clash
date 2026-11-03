@@ -635,6 +635,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "youAndEventPlayer":
       return s.turnOrder.filter((p) => (p === ctx.controller || p === ctx.event?.player) && !player(s, p).lost);
+    case "youAndEventPlayers":
+      return apnap(s, livingPlayers(s).filter((p) => p === ctx.controller || !!ctx.event?.players?.includes(p)));
     case "attackingPlayer":
       return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":

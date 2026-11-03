@@ -177,6 +177,7 @@ import {
   FACE_DOWN_WARD,
   faceDef,
   pickOptions,
+  blightOptions,
   shareLandType,
   oneOfEachFits,
   activatedCosts,
@@ -5457,7 +5458,9 @@ function Controls({
     // "Ward—Sacrifice a creature": you pick which after choosing to pay.
     const sac = pending.sacrifice;
     const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
-    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // "Ward—Blight 2": only with a creature to put the counters on (CR 701.68b); you pick it after choosing to pay.
+    const canBlight = !pending.blight || blightOptions(s, HUMAN, pending.blight).length > 0;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice && canBlight ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     // Ward—Waterbend: mana first, then your artifacts and creatures pay {1} each of the rest (CR 701.67a).
     const water = !taps && pending.waterbend ? autoWaterbend(s, HUMAN, parseManaCost(pending.cost), 0, pending.waterbend, []) : null;
     return (
@@ -5472,6 +5475,8 @@ function Controls({
             "exile all cards from your graveyard"
           ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
+          ) : pending.blight ? (
+            `blight ${pending.blight} (put ${pending.blight === 1 ? "a -1/-1 counter" : `${pending.blight} -1/-1 counters`} on a creature you control)`
           ) : pending.poison ? (
             `get ${pending.poison} poison counter${pending.poison === 1 ? "" : "s"}`
           ) : pending.cost === "{0}" && life ? (
@@ -5481,7 +5486,7 @@ function Controls({
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life && !(pending.cost === "{0}" && !discard && !sac) ? ` and ${life} life` : ""}
+          {life && !(pending.cost === "{0}" && !discard && !sac && !pending.blight) ? ` and ${life} life` : ""}
           {pending.waterbend ? ` (waterbend: your artifacts and creatures can each pay {1} of up to ${pending.waterbend})` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
         <button disabled={!taps && !water} onClick={() => dispatch(water ? [...water.taps, { type: "payUnless", player: HUMAN, pay: true, tap: water.tapped }] : [...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>

@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from ".
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { compileCard } from "./oracle";
-import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
+import { bindChosen, isSuspended, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
@@ -1116,6 +1116,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "notedAmount":
       return s.resolving?.notedAmount ?? 0;
+    case "timeCountedObjects": {
+      // Rose Tyler: suspended cards its controller owns (in exile, with suspend and a time counter, CR 702.62b), and the
+      // other permanents they control with a time counter on them.
+      const you = ctx.controller;
+      const suspended = s.players[you]!.exile.filter((id) => s.objects[id]!.owner === you && isSuspended(s, s.objects[id]!)).length;
+      const perms = s.battlefield.filter((id) => id !== ctx.sourceId && (s.objects[id]!.counters.time ?? 0) > 0 && view(s.objects[id]!)?.controller === you).length;
+      return suspended + perms;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
@@ -1422,6 +1430,8 @@ function describeCount(c: Count): string {
     case "attachedToAffected":
     case "attachedToHost":
       return `#${c.subtypes.join("/")} attached`;
+    case "timeCountedObjects":
+      return "#suspended cards and other permanents with time counters";
     case "basicLandTypes":
       return "#basic land types";
     case "colorPairs":

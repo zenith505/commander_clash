@@ -2247,6 +2247,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Discard all the cards in your hand\. Add (\{[WUBRGC]\}) for each card discarded this way, then draw that many cards plus one\./, "$1Discard your hand. Add $2 for each card discarded this way. Draw cards equal to the number of cards discarded this way plus one.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
+  // Confession Dial, Desdemona: "... gains escape until end of turn. The escape cost is equal to its mana cost plus exile
+  // three other cards from your graveyard." is one instruction.
+  text = text.replace(/ gains escape until end of turn\. The escape cost is equal to its mana cost plus exile (two|three|four|five) other cards from your graveyard\./g, " gains escape with its mana cost and exile $1 other cards until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   // Flubs, the Fool: "draw a card if you have no cards in hand. Otherwise, discard a card." is "If you have no cards in
@@ -7489,7 +7492,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const what = parseCardTarget(castTarget[1]!, ctx, theirs || anyYard ? undefined : "you");
       const t = ctx.targets[before];
       // A land card can't be cast (CR 305.9).
-      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : anyYard ? t.owner || t.controller : t.owner !== (theirs ? "opponent" : "you")) || !t.types?.length || t.types.includes("Land")) return null;
+      // Vadrok, Apex of Thunder: "you may cast target noncreature card with mana value 3 or less from your graveyard without
+      // paying its mana cost", no rider: the spell goes where it would after (rulings). A land card can be the target (mana
+      // value 0) but can't be cast (CR 305.9), so nothing happens then.
+      const noncreature = castTarget[2] === "your" && !exileAfter && !rider?.startsWith("If ") && t?.kind === "card" && !t.types?.length && t.notTypes?.length === 1 && t.notTypes[0] === "Creature" && !!t.manaValue;
+      if (!what || (!exileAfter && !theirs && !noncreature) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : anyYard ? t.owner || t.controller : t.owner !== (theirs ? "opponent" : "you")) || (!noncreature && !t.types?.length) || t.types?.includes("Land")) return null;
       effects.push({ type: "castTargetFree", what, ...(exileAfter ? { exileAfter } : {}) });
       if (exileAfter) si++;
       continue;

@@ -49,3 +49,25 @@ test("Rootcoil Creeper: exile it to return Think Twice from exile to your hand",
   expect(after.objects[creeper]!.zone).toBe("exile");
   expect(pageErrors(page)).toEqual([]);
 });
+
+// Proteus Staff on your own creature: you reveal until a creature card, it enters, and you order the revealed lands on
+// the bottom of your library in the arrange prompt.
+test("Proteus Staff: put Grizzly Bears on the bottom, Hill Giant enters, order the lands under it", async ({ page }) => {
+  const s = scene({ board: [...LANDS, "Proteus Staff", "Grizzly Bears"], library: ["Island", "Mountain", "Hill Giant"] });
+  const [staff] = idsOf(s, "Proteus Staff", "battlefield", 0);
+  const [bears] = idsOf(s, "Grizzly Bears", "battlefield", 0);
+  const [island, mountain, giant] = s.players[0]!.library.slice(0, 3);
+  await open(page, s);
+  await page.locator(`[data-obj="${staff}"]`).first().click();
+  await menu(page).locator("button", { hasText: "Put target creature on the bottom" }).click();
+  await page.locator(`[data-obj="${bears}"]`).first().click();
+  const asked = await resolveUntil(page, (st) => st.pending?.kind === "arrangeTop" && st.pending.player === 0);
+  const order = asked.pending?.kind === "arrangeTop" ? asked.pending.cards : [];
+  expect(new Set(order)).toEqual(new Set([island, mountain]));
+  const arrange = page.locator(".modal.arrange");
+  await arrange.locator(".arrange-card", { has: page.locator(`[data-arrange="${order[0]}"]`) }).getByRole("button", { name: "Move deeper" }).click();
+  await arrange.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.objects[giant!]!.zone === "battlefield");
+  expect(after.players[0]!.library.slice(-3)).toEqual([bears, order[1], order[0]]);
+  expect(pageErrors(page)).toEqual([]);
+});

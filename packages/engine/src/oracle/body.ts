@@ -14697,7 +14697,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // library until a creature card is revealed": the same, "that player" being the target's controller.
     const theirs = /^(Its controller|That creature's controller|That permanent's controller|That player) reveals cards from the top of their library until (?:they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?|a (creature card) is revealed)$/.exec(s);
     if (theirs?.[4]) theirs[2] = theirs[4];
-    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|They put that card onto the battlefield and (the rest on the bottom of their library in a random order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Proteus Staff: "The player puts that card onto the battlefield and the rest on the bottom of their library in any
+    // order": they order them (CR 401.4).
+    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|(?:They|The player) put(?:s)? that card onto the battlefield and (the rest on the bottom of their library in (?:a random|any) order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     const thatPlayerOf = theirs?.[1] === "That player" ? ctx.targets.length === 1 && /^target (?:creature|permanent) an opponent controls$/.test(ctx.targets[0]!.text ?? "") : true;
     if (theirs && theirPut && thatPlayerOf) {
       const who = parsePlayer(theirs[1] === "That player" ? "its controller" : theirs[1]!.toLowerCase(), ctx);
@@ -14710,7 +14712,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Shape Anew: "an artifact card" (no artifact card is an Aura, so none needs a choice as it enters).
       const artifact = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Artifact" && !filter.anyOf && !filter.subtypes?.length;
       if (!permanent && !creature && !artifact) return null;
-      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1]?.endsWith("any order") ? "bottomOrder" : theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
       si++;
       continue;
     }

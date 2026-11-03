@@ -4,7 +4,7 @@
 // Schemes (a card from your graveyard or an exiled one, one target), Pull from Eternity and Riftsweeper ("target face-up
 // exiled card"), Blade of the Swarm ("target exiled card with warp"); and giving a permanent away: Stiltzkin, Moogle
 // Merchant ("If they do, you draw a card") and Discerning Financier ("Choose another player. That player gains control of
-// target Treasure you control").
+// target Treasure you control"); Proteus Staff ("the rest on the bottom of their library in any order").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, putOnBattlefield, setup } from "./helpers";
@@ -24,6 +24,7 @@ const C = {
   stalker: {"oracleId":"da9ec010-8b42-4927-b602-4e96bced4e99","name":"All-Fates Stalker","manaCost":"{3}{W}","cmc":4,"typeLine":"Creature — Drix Assassin","supertypes":[],"types":["Creature"],"subtypes":["Drix","Assassin"],"oracleText":"When this creature enters, exile up to one target non-Assassin creature until this creature leaves the battlefield.\nWarp {1}{W} (You may cast this card from your hand for its warp cost. Exile this creature at the beginning of the next end step, then you may cast it from exile on a later turn.)","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Warp"],"imageUrl":"https://cards.scryfall.io/normal/front/8/2/82ae4f7b-8122-4af6-8079-888eabf1a11e.jpg?1783906001","artUrl":"https://cards.scryfall.io/art_crop/front/8/2/82ae4f7b-8122-4af6-8079-888eabf1a11e.jpg?1783906001","commanderLegal":"legal","set":"eoe","releasedAt":"2025-08-01","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
   stiltzkin: {"oracleId":"958c2a27-9fb1-42b4-a0ef-296584763a98","name":"Stiltzkin, Moogle Merchant","manaCost":"{W}","cmc":1,"typeLine":"Legendary Creature — Moogle","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Moogle"],"oracleText":"Lifelink\n{2}, {T}: Target opponent gains control of another target permanent you control. If they do, you draw a card.","power":"1","toughness":"2","colors":["W"],"colorIdentity":["W"],"keywords":["Lifelink"],"imageUrl":"https://cards.scryfall.io/normal/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","artUrl":"https://cards.scryfall.io/art_crop/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef,
   financier: {"oracleId":"734a5186-caa6-4811-b6d7-91b7b32fc403","name":"Discerning Financier","manaCost":"{2}{W}","cmc":3,"typeLine":"Creature — Human Noble","supertypes":[],"types":["Creature"],"subtypes":["Human","Noble"],"oracleText":"At the beginning of your upkeep, if an opponent controls more lands than you, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{2}{W}: Choose another player. That player gains control of target Treasure you control. You draw a card.","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Treasure"],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","artUrl":"https://cards.scryfall.io/art_crop/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","commanderLegal":"legal","set":"woe","releasedAt":"2023-09-08","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
+  staff: {"oracleId":"97024e8e-dfde-4769-bc27-c3d6fad19e7c","name":"Proteus Staff","manaCost":"{3}","cmc":3,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{2}{U}, {T}: Put target creature on the bottom of its owner's library. That creature's controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield and the rest on the bottom of their library in any order. Activate only as a sorcery.","colors":[],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/5/55e5c69c-43d0-4f5b-8720-40074eb122bb.jpg?1783944506","artUrl":"https://cards.scryfall.io/art_crop/front/5/5/55e5c69c-43d0-4f5b-8720-40074eb122bb.jpg?1783944506","commanderLegal":"legal","set":"mrd","releasedAt":"2003-10-02","rarity":"rare","layout":"normal","gameChanger":false} as CardDef,
 };
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -61,7 +62,7 @@ const choices = (s: GameState, def: CardDef, pid: PlayerId, which: "spell" | num
 
 describe("round 272 cards", () => {
   it("all compile fully", () => {
-    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade, C.stiltzkin, C.financier]) expect(isFullySupported(def), def.name).toBe(true);
+    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade, C.stiltzkin, C.financier, C.staff]) expect(isFullySupported(def), def.name).toBe(true);
   });
 });
 
@@ -274,5 +275,51 @@ describe("Discerning Financier: choose another player; that player gains control
     expect(to).not.toBe(ap);
     expect(s.turnOrder).toContain(to);
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Proteus Staff: put target creature on the bottom; its controller reveals until a creature card and puts it onto the battlefield", () => {
+  /** `pid`'s library starts with two lands and then a creature card; returns their ids. */
+  const stack = (s: GameState, pid: PlayerId) => {
+    const lib = s.players[pid]!.library;
+    const lands = lib.filter((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Land")).slice(0, 2);
+    const beast = lib.find((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Creature"))!;
+    s.players[pid]!.library = [...lands, beast, ...lib.filter((id) => !lands.includes(id) && id !== beast)];
+    return { lands, beast };
+  };
+
+  it("an opponent's creature goes to the bottom, they put their first creature card onto the battlefield and order the rest under it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const staff = putOnBattlefield(s0, ap, C.staff);
+    const victim = putOnBattlefield(s0, opp, bear({ name: "Victim Bear" }));
+    const { lands, beast } = stack(s0, opp);
+    let s = run(s0, planActivate(s0, ap, staff, 0, [tgt(victim)]));
+    for (let i = 0; i < 50 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // The two lands are ordered by the player who revealed them (CR 401.4).
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", player: opp, how: "bottom" });
+    expect([...(s.pending as { cards: string[] }).cards].sort()).toEqual([...lands].sort());
+    s = settle(s);
+    expect(zone(s, beast)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[beast]!)).toBe(opp);
+    const lib = s.players[opp]!.library;
+    expect(lib.slice(-3, -2)).toEqual([victim]);
+    expect([...lib.slice(-2)].sort()).toEqual([...lands].sort());
+  });
+
+  it("a creature you control but don't own goes to its owner's library; you reveal from yours", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const staff = putOnBattlefield(s0, ap, C.staff);
+    const stolen = putOnBattlefield(s0, opp, bear({ name: "Stolen Bear" }));
+    s0.objects[stolen]!.controller = ap;
+    invalidateCharacteristics(s0);
+    const { beast } = stack(s0, ap);
+    const s = settle(run(s0, planActivate(s0, ap, staff, 0, [tgt(stolen)])));
+    expect(s.players[opp]!.library.at(-1)).toBe(stolen);
+    expect(zone(s, beast)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[beast]!)).toBe(ap);
+  });
+
+  it("bots aim it at an opponent's creature", () => {
+    expect(harmfulTargets(compileCard(C.staff).activated[0]!.body)).toEqual([true]);
   });
 });

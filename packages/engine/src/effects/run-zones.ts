@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf, toughness } from "../cards";
+import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
 import { hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -197,9 +197,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
       // The Horus Heresy: anyone's creature, in the ability's own words.
       const fate = tied ?? (e.anyController && e.prompt ? undefined : (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
+      // Chaos Defiler: you pick among each opponent's permanents in turn ("{player}": whose these are).
+      const picker = e.youChoose ? ctx.controller : pid;
       // The ability's own words otherwise (Sunder the Gateway: "click an Incubator token you control to transform it").
-      const own = e.prompt?.replace(/~/g, src);
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, ...(fate ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}) };
+      const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`);
+      s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, ...(fate && picker === pid ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}) };
       return "paused";
     }
     sc.chosen![pid] = options;
@@ -542,7 +544,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}), ...(e.payLife !== undefined ? { payLife: lifeEach } : {}), ...(e.sparesTypeOfKept ? { sparesKin: true as const } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -565,7 +567,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
     // Killing Wave: the life is paid as the creatures are sacrificed, all at once (rulings).
     if (e.payLife !== undefined && kept.size && lifeEach > 0) payLife(s, pid, lifeEach * kept.size);
     keptAll.push(...kept);
-    gone.push(...among(pid).filter((id) => !kept.has(id)));
+    // Winnowing: only those sharing no creature type with the kept one (CR 702.73a: a changeling shares them all).
+    const keptTypes = e.sparesTypeOfKept ? [...kept].filter((id) => s.objects[id]?.zone === "battlefield").map((id) => creatureTypesOf(s, obj(s, id))) : [];
+    gone.push(...among(pid).filter((id) => !kept.has(id) && !(e.sparesTypeOfKept && keptTypes.some((t) => shareCreatureType(t, creatureTypesOf(s, obj(s, id)))))));
   }
   if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
   if (e.destroy) {
@@ -1917,7 +1921,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         else log(s, `${e.ownersControl ? "" : `${p.name} puts `}${cards.map((c) => defOf(s, c).name).join(", ")} ${e.ownersControl ? `${cards.length === 1 ? "returns" : "return"} to the battlefield under ${cards.length === 1 ? "its owner's" : "their owners'"} control` : "onto the battlefield"} from exile (${src}).`);
         const ids = cards.map((c) => c.id);
         enterTogether(s, () => {
-          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}) });
+          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}), ...(e.faceDown ? { faceDown: e.faceDown } : {}), ...(e.tapped ? { tapped: true } : {}) });
         });
         const now = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });
@@ -2544,7 +2548,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "destroyRandomTarget": {
       // Wild Swing: chosen at random among the legal targets left, then destroyed at once (CR 701.8).
-      const left = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
+      const left0 = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
+      // Chaos Defiler: one without indestructible, while any of them lacks it (rulings, CR 702.12b).
+      const breakable = e.destroyable ? left0.filter((o) => !objHasKeyword(s, o, "indestructible")) : [];
+      const left = breakable.length ? breakable : left0;
       if (!left.length) return;
       const o = left[Math.floor(nextRandom(s) * left.length)]!;
       const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
@@ -2698,6 +2705,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
           // "Another permanent card" than the one you sacrificed this way (rulings on Rise of the Witch-king).
           (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller)) &&
+          // Blood for Bones: "another creature card" than the one chosen for the battlefield.
+          (!e.another || !s.resolving!.yardToBattlefield?.includes(id)) &&
           // Starfall Invocation: a card that died to this destroy and hasn't moved since (CR 400.7).
           (!e.destroyedThisWay || !!s.resolving!.destroyed?.some((d) => d.died && d.o.id === id && (obj(s, id).zoneChanges ?? 0) === (d.o.zoneChanges ?? 0) + 1));
         const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
@@ -2742,6 +2751,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: e.youChoose || e.underYours ? ctx.controller : p.id })), src);
         if (hosts === "paused") return "paused";
         const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
+        (s.resolving!.yardToBattlefield ??= []).push(...found);
         if (e.youChoose || e.underYours) {
           // Realmbreaker: under your control; "it" afterwards is the permanent it became (CR 400.7).
           const me = player(s, ctx.controller);

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,475 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,452 of
+29,482 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,459 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1802,6 +1802,25 @@ line blocks.
    the player guessed wrong, you may cast the card without paying its mana cost" (Master of Predicaments, with two browser
    tests); "Reveal the top five cards of your library. Put one of them into your hand. Then choose an opponent. They put one
    on the bottom of your library. Then you put one into your hand ..." (Memories Returning, with a browser test). +9 (29,447 of 31,936); 29,461 with B91).
+   Round 258 (skipped cards from the top of the list): "Roll a d10. Put target artifact, creature, or planeswalker into
+   its owner's library just beneath the top X cards of that library, where X is the result" (Underdark Rift); "for each
+   opponent, choose a nonland permanent that player controls. Destroy one of them chosen at random" (Chaos Defiler: you
+   choose, none targeted, one without indestructible if any, with a browser test); "Choose any number of target creature
+   and/or planeswalker cards in graveyards. ~ deals damage to you equal to the total mana value of those cards. Put them
+   onto the battlefield under your control" (Command the Dreadhorde: the damage first; bots keep the total well below
+   their life); "For each player, you choose a creature that player controls. Then each player sacrifices all other
+   creatures they control that don't share a creature type with the chosen creature they control" (Winnowing: changelings
+   share every type, with a browser test); "search your library for up to five land cards that have different names,
+   exile them" and "choose a card at random exiled with ~ and put it onto the battlefield tapped" (Omenpath Journey);
+   "Return a creature card from your graveyard to the battlefield, then return another creature card from your graveyard
+   to your hand" (Blood for Bones); "Flip a coin until you lose a flip or choose to stop flipping. If you lose a flip, ~
+   has no effect. If you win one or more flips, ..." (Fiery Gambit: asked after each flip won, with a browser test). +7
+   (29,468 of 31,936 with B91).
+   Out after round 258 (looked at, not done): Green Sun's Twilight ("Choose a creature card and/or a land card from among
+   them": at least one if there is one, and with X 5 or more both onto the battlefield or both into your hand; the dig
+   has no "at least one" pick yet); Canoptek Wraith ("you may pay {3} and sacrifice it. If you do, choose a land you
+   control. Then search ... basic land cards which have the same name as the chosen land"); Stiltzkin, Moogle Merchant and
+   Discerning Financier still out (giving a permanent away: no bot sense for it).
    Out after round 257 (looked at, not done): Vaevictis Asmadi, the Dire and Guff Rewrites History (one target for each
    player: no per-player target spec yet); Thieves' Auction (players draft exiled cards one by one until all are chosen);
    Deceiver of Form (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants

@@ -5088,6 +5088,8 @@ function Controls({
                 ? `click the creatures of yours to keep, paying ${pending.payLife} life for each (up to ${pending.count}). The rest are sacrificed.`
                 : pending.action === "keep" && pending.maxTotalPower !== undefined
                 ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
+                : pending.action === "keep" && pending.sparesKin
+                ? `click a creature ${pending.of === undefined ? "of yours" : `for ${s.players[pending.of]!.name}`} to keep. The rest that share no creature type with it are sacrificed.`
                 : pending.action === "keep"
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : pending.bounce ? "returned to their owners' hands" : "sacrificed"}.`
                 : pending.owned
@@ -5423,6 +5425,19 @@ function Controls({
       </div>
     );
   }
+  // Fiery Gambit: flip again, or stop with the flips won so far.
+  if (pending?.kind === "chooseMay" && pending.flipAgain)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> you've won {pending.flipAgain.wins === 1 ? "a flip" : `${pending.flipAgain.wins} flips in a row`}. Flip another coin? If you lose a flip, {pending.source} has no effect{pending.flipAgain.wins >= pending.flipAgain.enough ? ` (more wins than ${pending.flipAgain.enough} do nothing more)` : ""}.
+        </span>
+        <button onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: true }])}>Flip again</button>
+        <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
+          Stop flipping
+        </button>
+      </div>
+    );
   if (pending?.kind === "chooseMay")
     return (
       <div className="controls">

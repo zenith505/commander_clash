@@ -3455,6 +3455,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed68160e-5e3d-44f2-ac7a-3749fda10119",
+  "name": "Catastrophe",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all lands or all creatures. Creatures destroyed this way can't be regenerated.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
   "name": "Cavalier of Night",
   "manaCost": "{2}{B}{B}{B}",
@@ -19001,6 +19027,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4ebce651-ef95-4a96-b720-a23757d641c8",
+  "name": "Scrap Welder",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Artificer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Artificer"
+  ],
+  "oracleText": "{T}, Sacrifice an artifact with mana value X: Return target artifact card with mana value less than X from your graveyard to the battlefield. It gains haste until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fcb7c93c-46ab-49b5-a6e0-35d73f3be8f0",
   "name": "Screaming Nemesis",
   "manaCost": "{2}{R}",
@@ -23961,6 +24018,35 @@
   ]
  },
  {
+  "oracleId": "b6114962-035e-4e7f-9009-4739bf83a05a",
+  "name": "Urborg",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {B}.\n{T}: Target creature loses first strike or swampwalk until end of turn.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff0ab867-b710-4b1a-baed-95fc3cf68f79",
   "name": "Valakut Awakening // Valakut Stoneforge",
   "manaCost": "{2}{R}",
@@ -25226,6 +25312,40 @@
   "set": "sld",
   "releasedAt": "2025-02-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ddb021df-ae4a-4ac1-8353-d0b375761714",
+  "name": "White Knight",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from black (This creature can't be blocked, targeted, dealt damage, or enchanted by anything black.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "First strike",
+   "Protection"
+  ],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -186,12 +186,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[2]!);
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[2]} with different names` }, n: num(c[1]!), differentNames: true });
-    } else if ((c = /^Sacrifice an? (creature|artifact) you control with mana value X other than ~$/.exec(part))) {
+    } else if ((c = /^Sacrifice an? (creature|artifact)( you control)? with mana value X( other than ~)?$/.exec(part)) && (c[2] || !c[3])) {
       // Sidisi, Regent of the Mire: X announced as it's activated, then a creature with that mana value, not this one
       // (CR 107.3a, 602.2b); one with {X} in its mana cost has X as 0 there (CR 202.3e).
+      // Scrap Welder: "Sacrifice an artifact with mana value X", one you control (CR 701.21a).
       const filter = pickFilter(c[1]!);
       if (!filter) return "fail";
-      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} with mana value X other than ~` }, n: 1, other: true, mvX: true });
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} with mana value X${c[3] ?? ""}` }, n: 1, ...(c[3] ? { other: true as const } : {}), mvX: true });
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|X|${NUM}) (other )?(.+)$`).exec(part))) {
       // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
       const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;

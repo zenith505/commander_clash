@@ -4665,6 +4665,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: counterKind(aNumber[1]!), n: { count: { kind: "manaSpent" } } };
       continue;
     }
+    // Ancient Imperiosaur: "~ enters with two +1/+1 counters on it for each creature that convoked it": the creatures tapped
+    // to pay for the spell it was (CR 702.51a), none if it wasn't cast, as it enters (CR 614.1c).
+    const eachConvoked = new RegExp(`^~ enters with (a|an|two|three) ${COUNTER} counters? on it for each creature that convoked it\\.$`).exec(line);
+    if (eachConvoked) {
+      const per = eachConvoked[1] === "two" ? 2 : eachConvoked[1] === "three" ? 3 : 1;
+      if (out.entersWithCounters || !out.convoke) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(eachConvoked[2]!), n: { count: { kind: "convokedCount" }, ...(per > 1 ? { times: per } : {}) } };
+      continue;
+    }
     // Verazol, the Split Current: "~ enters with a +1/+1 counter on it for each mana spent to cast it": the same, none if
     // it wasn't cast (rulings), commander tax and other additional costs counted.
     const eachSpent = new RegExp(`^~ enters with an? ${COUNTER} counter on it for each mana spent to cast it\\.$`).exec(line);

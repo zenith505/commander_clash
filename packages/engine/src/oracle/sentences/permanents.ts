@@ -1560,6 +1560,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || !up || !down) return null;
     return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
   }
+  // Urborg: "Target creature loses first strike or swampwalk until end of turn": which one is chosen as it resolves, and
+  // with both it loses just that one (rulings; CR 608.2d). Losing first strike leaves double strike alone (rulings).
+  if ((m = /^(target creature) loses ([a-z]+(?: [a-z]+)?) or ([a-z]+(?: [a-z]+)?) until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    const a = parseChanges(`loses ${m[2]}`);
+    const b = parseChanges(`loses ${m[3]}`);
+    if (!what || a?.length !== 1 || b?.length !== 1 || a[0]!.kind !== "removeKeywords" || b[0]!.kind !== "removeKeywords") return null;
+    return [{ type: "either", options: [[{ type: "continuous", what, mods: a, duration: "endOfTurn" }], [{ type: "continuous", what, mods: b, duration: "endOfTurn" }]], labels: [`It loses ${m[2]} until end of turn`, `It loses ${m[3]} until end of turn`] }];
+  }
   // "Enchanted creature gets +1/-1 or -1/+1 until end of turn" (Pemmin's Aura): which one is chosen as it resolves
   // (CR 608.2d), like the above. Shaper Parasite: "target creature gets +2/-2 or -2/+2 until end of turn", the target
   // chosen as the trigger is put on the stack, the bonus as it resolves (rulings).

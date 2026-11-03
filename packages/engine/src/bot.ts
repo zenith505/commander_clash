@@ -989,6 +989,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       };
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
     }
+    // Urborg: "loses first strike or swampwalk": one an opponent's creature has (one ours doesn't, for ours).
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.every((o) => o.length === 1 && o[0]!.type === "continuous" && o[0]!.what.ref === "target" && o[0]!.mods.length === 1 && o[0]!.mods[0]!.kind === "removeKeywords")) {
+      const t = s.resolving?.item.targets?.[0];
+      const c = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const has = (o: string) => {
+        const e = either.options[Number(o)]![0]!;
+        return !!c && e.type === "continuous" && e.mods[0]!.kind === "removeKeywords" && e.mods[0]!.keywords.some((k) => objHasKeyword(s, c, k));
+      };
+      const mine = !!c && controllerOf(s, c) === pid;
+      return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => has(o) !== mine) ?? pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

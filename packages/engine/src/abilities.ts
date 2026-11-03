@@ -457,6 +457,8 @@ export type Count =
    * "enters with" (the spell it was); 0 if it wasn't cast.
    */
   | { kind: "manaSpent" }
+  /** "Enters with two +1/+1 counters on it for each creature that convoked it" (Ancient Imperiosaur): how many creatures were tapped to convoke the spell it was (CR 702.51a); 0 if it wasn't cast. */
+  | { kind: "convokedCount" }
   /**
    * "The amount of mana spent to cast that spell" (Mana Sculpt): the target spell's (CR 601.2h), as it last existed on the
    * stack if this countered it; 0 for a copy, which wasn't cast (CR 707.10).
@@ -2428,7 +2430,7 @@ export type Effect =
   | { type: "exchangeLifeWithSelf"; who: PlayerRef; stat: "power" | "toughness" }
   /** "Exchange its power and the power of target creature it's blocking until end of combat" (Serene Master): CR 701.12g. */
   | { type: "exchangePower"; what: ObjRef; duration: "endOfTurn" | "endOfCombat" }
-  | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
+  | { type: "destroy"; what: ObjRef; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
   /**

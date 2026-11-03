@@ -562,7 +562,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (r.chosen?.player !== undefined) return keep();
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = e.mostLife === "least" ? Math.min(...living.map((x) => player(s, x).life)) : Math.max(...living.map((x) => player(s, x).life));
-        const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
+        // Wildfire Devils: "choose a player at random": any of them, you too (rulings).
+        const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : e.anyPlayer ? living : opponents(s, ctx.controller);
         // "At random": no one chooses (CR 608.2d doesn't apply).
         if (e.random && opps.length > 1) {
           const pick = opps[Math.floor(nextRandom(s) * opps.length)]!;

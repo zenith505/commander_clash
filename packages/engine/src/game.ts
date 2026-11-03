@@ -8661,6 +8661,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
+  if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
@@ -8953,6 +8954,27 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.impulseChoice;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the exiled cards");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "alternatePick") {
+    const st = r.scratch?.alternate;
+    if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "predicamentCard" || pend.what === "predicamentGuess") {
+    // Master of Predicaments: the card stays secret (rulings); the guess is announced.
+    const st = r.scratch?.predicament;
+    if (!st) throw new RulesError("nothing to choose");
+    if (pend.what === "predicamentCard") {
+      st.card = { id: choice, zc: obj(s, choice).zoneChanges ?? 0 };
+      log(s, `${p.name} chooses a card in their hand (${pend.source}).`);
+    } else {
+      st.guess = choice as "over" | "notOver";
+      log(s, `${p.name} guesses ${pend.labels?.[pend.options.indexOf(choice)]?.toLowerCase() ?? choice} (${pend.source}).`);
+    }
     continueResolution(s);
     return;
   }

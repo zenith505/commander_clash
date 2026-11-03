@@ -9011,6 +9011,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f4b30f6c-09ac-407e-9c72-da64d212ce93",
+  "name": "Guided Passage",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the cards in your library. An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "120e9013-b07b-49d9-8b86-f6c26315581d",
   "name": "Gustha's Scepter",
   "manaCost": "{0}",
@@ -12987,6 +13017,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "503447d9-2489-46d7-b5aa-a14bbb22dcc8",
+  "name": "Master of Predicaments",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, choose a card in your hand. That player guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without paying its mana cost.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m15",
+  "releasedAt": "2014-07-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1eb489d-104c-4801-b6d2-3f1a7ee73a75",
   "name": "Mechtitan Core",
   "manaCost": "{2}",
@@ -13062,6 +13124,34 @@
   "commanderLegal": "legal",
   "set": "som",
   "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6cdc6548-cb32-437f-850a-9002542ad3d5",
+  "name": "Memories Returning",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top five cards of your library. Put one of them into your hand. Then choose an opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the bottom of your library. Put the other into your hand.\nFlashback {7}{U}{U}",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -17469,6 +17559,43 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-04-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c027f369-e445-46a8-94ad-93396321295a",
+  "name": "Rip, Spawn Hunter",
+  "manaCost": "{2}{G}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Survivor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Survivor"
+  ],
+  "oracleText": "Survival — At the beginning of your second main phase, if Rip is tapped, reveal the top X cards of your library, where X is its power. Put any number of creature and/or Vehicle cards with different powers from among them into your hand. Put the rest on the bottom of your library in a random order.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Survival"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23928,6 +24055,36 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b446b485-c10b-4175-bb49-16ac2f9e7718",
+  "name": "Wildfire Devils",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Devil",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Devil"
+  ],
+  "oracleText": "When this creature enters and at the beginning of your upkeep, choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy that card. You may cast the copy without paying its mana cost.",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

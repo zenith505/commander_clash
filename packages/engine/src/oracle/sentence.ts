@@ -84,14 +84,19 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     } else if ((m = new RegExp(`^(?:Put|You may put) any number of (?:them|those cards) into your hand(?: and the rest ${REST})?$`).exec(s))) {
       // Search for Blex: "You may put any number of them into your hand and the rest into your graveyard": none to all.
       Object.assign(dig, { count: 99, upTo: true, into: "hand" }, m[1] ? restOf(m[1]) : {});
-    } else if ((m = new RegExp(`^(?:Put|You may put) (any number of|up to two|up to three) ([^,]+? cards) from among them into your hand(?: and the rest(?: of the revealed cards)? ${REST})?$`).exec(s))) {
+    } else if ((m = new RegExp(`^(?:Put|You may put) (any number of|up to two|up to three) ([^,]+? cards(?: with different powers)?) from among them into your hand(?: and the rest(?: of the revealed cards)? ${REST})?$`).exec(s))) {
       // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
       // Kruphix's Insight: "Put up to three enchantment cards from among them into your hand and the rest of the revealed
       // cards into your graveyard"; Glacial Revelation: "You may put any number of snow permanent cards from among them
       // into your hand. Put the rest into your graveyard."
-      const filter = parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
-      if (!filter || / of the chosen /.test(m[2]!)) return null;
-      Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand" }, m[3] ? restOf(m[3]) : {});
+      // Rip, Spawn Hunter: "any number of creature and/or Vehicle cards with different powers": each card either one, no
+      // two with the same power.
+      const different = m[1] === "any number of" && / with different powers$/.test(m[2]!);
+      const words = different ? m[2]!.replace(/ with different powers$/, "") : m[2]!;
+      const parsed = parseSearchFilter(words.replace(/\bcards\b/, "card").replace(/^([a-z]+) and\/or ([A-Za-z]+) card$/, "$1 or $2 card"));
+      if (!parsed || / of the chosen /.test(words) || (different && / and\/or /.test(words) && !/^[a-z]+ and\/or [A-Za-z]+ cards$/.test(words))) return null;
+      const filter = different ? { ...parsed, text: `${parsed.text} with different powers` } : parsed;
+      Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", ...(different ? { differentPowers: true as const } : {}) }, m[3] ? restOf(m[3]) : {});
     } else if (dig.reveal && (m = new RegExp(`^Put (an? .+? card) from among them into your hand(?: and the rest ${REST})?$`).exec(s))) {
       // "Reveal the top six cards ... Put an Assassin, Pirate, or Vehicle card from among them into your hand and the rest
       // on the bottom" (Adéwalé, Breaker of Chains): one that fits must be taken, if there's one (the cards are revealed).

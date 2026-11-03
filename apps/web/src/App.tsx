@@ -3532,7 +3532,9 @@ function GraveyardPicker({
   const legal = legalTargets(s, spec, HUMAN, undefined, undefined, sourceId)
     .map((t) => t.id as string)
     .filter(allowed);
-  const owners = [...new Set(legal.map((id) => s.objects[id]!.owner))];
+  // Grouped by owner and zone: Sorceress's Schemes offers graveyard and exiled cards together (TargetSpec.orExile).
+  const groupOf = (id: string) => `${s.objects[id]!.owner}:${s.objects[id]!.zone === "exile" ? "exile" : "graveyard"}`;
+  const owners = [...new Set(legal.map(groupOf))];
   return (
     <div className="modal-backdrop">
       <div className="modal">
@@ -3548,23 +3550,27 @@ function GraveyardPicker({
         </header>
         {owners.length === 0 && <span className="muted">No legal targets.</span>}
         <div className="modal-body">
-          {owners.map((pid) => (
-            <div key={pid}>
-              <h4>{spec.linkedExile ? (pid === HUMAN ? "Your cards in exile" : `${s.players[pid]!.name}'s cards in exile`) : pid === HUMAN ? "Your graveyard" : `${s.players[pid]!.name}'s graveyard`}</h4>
-              <div className="modal-cards">
-                {legal
-                  .filter((id) => s.objects[id]!.owner === pid)
-                  .map((id) => {
-                    const d = cardOf(s, id);
-                    return (
-                      <div key={id} className="card big targetable" data-pick={id} onClick={() => onPick(id)} {...hoverProps(d, onHover)}>
-                        <CardFace d={d} />
-                      </div>
-                    );
-                  })}
+          {owners.map((g) => {
+            const [pidText, zone] = g.split(":");
+            const pid = Number(pidText);
+            return (
+              <div key={g}>
+                <h4>{zone === "exile" ? (pid === HUMAN ? "Your cards in exile" : `${s.players[pid]!.name}'s cards in exile`) : pid === HUMAN ? "Your graveyard" : `${s.players[pid]!.name}'s graveyard`}</h4>
+                <div className="modal-cards">
+                  {legal
+                    .filter((id) => groupOf(id) === g)
+                    .map((id) => {
+                      const d = cardOf(s, id);
+                      return (
+                        <div key={id} className="card big targetable" data-pick={id} onClick={() => onPick(id)} {...hoverProps(d, onHover)}>
+                          <CardFace d={d} />
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

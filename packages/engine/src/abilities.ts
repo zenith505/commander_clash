@@ -595,6 +595,13 @@ export interface TargetSpec {
   owner?: "you" | "opponent";
   /** For "card": a card in exile linked to the source instead ("target creature card exiled with ~", CR 607.2a). */
   linkedExile?: true;
+  /**
+   * For "card": a face-up card in exile instead, whoever exiled it ("target exiled card with flashback you own", Runic
+   * Repetition; "target face-up exiled card", Pull from Eternity; CR 406.3). `owner` as for a graveyard.
+   */
+  inExile?: true;
+  /** For "card": or a card in exile matching this ("target instant or sorcery card from your graveyard or exiled card with flashback you own", Sorceress's Schemes). */
+  orExile?: TargetSpec;
   /** For objects: owned by this player, a mutating creature spell's owner (CR 702.140a). */
   ownerIs?: PlayerId;
   /** For objects/spells: at least one of these card types (empty = any permanent). */

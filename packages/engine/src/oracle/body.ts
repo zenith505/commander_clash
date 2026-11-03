@@ -1508,7 +1508,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Search your library for (an? [a-z ]+? card)\. If evidence was collected, instead search your library for (an? [a-z ]+? card)\. Reveal that card, put it into your hand, then shuffle\.$/, "Search your library for $1, reveal it, put it into your hand, then shuffle. If evidence was collected, instead search your library for $2, reveal it, put it into your hand, then shuffle.");
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
-  text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
+  text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
   text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");

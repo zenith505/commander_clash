@@ -36,6 +36,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "damage" && "index" in e.to) mark(e.to.index, "n" in e.to ? e.to.n : 1);
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
+    // A card in exile put into a graveyard or library (Pull from Eternity, Riftsweeper, Blade of the Swarm): taken from an
+    // opponent, a suspended, plotted or adventuring card they'd have cast.
+    if ((e.type === "putInGraveyard" || e.type === "putInLibrary" || e.type === "shuffleIntoLibrary") && e.what.ref === "target" && body.targets[e.what.index]?.inExile) mark(e.what.index);
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
     // Quarum Trench Gnomes: a Plains that makes colorless mana instead of white is worse for its controller.
     if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut", "replaceLandMana", "turnFaceDown"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);

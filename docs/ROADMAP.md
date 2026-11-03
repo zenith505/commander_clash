@@ -1,7 +1,7 @@
 # Roadmap
 
-29,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,485 of
+29,553 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1918,7 +1918,7 @@ line blocks.
    the upkeep its trigger resolves in, rulings); everything counters (Omo, Queen of Vesuva: every land type with the
    basic types' mana abilities, CR 205.3i, 305.6; nonland creatures every creature type); "Whenever a player loses the
    game, if they were attacked this turn by an Assassin you controlled, you win the game" (Ramses, Assassin Lord:
-   Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7.
+   Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7 (29,553 of 31,936).
    Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
    would deal combat damage to a player, instead that player mills that many cards": a replacement, not a prevention,
    so it applies to damage that can't be prevented and the player orders it with the damage shields, CR 616.1; the

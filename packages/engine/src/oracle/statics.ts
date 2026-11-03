@@ -1864,6 +1864,9 @@ export function parseAffected(subject: string): Affects | null {
   // Triarch Stalker, Beckoning Will-o'-Wisp: "Creatures attacking the last chosen player": attacking that player (not
   // their planeswalkers or battles), the one its trigger chose last (kept on the permanent, compile.ts).
   if (x === "Creatures attacking the last chosen player") return { kind: "filter", types: ["Creature"], spec: { kind: "object", chosen: "attackingPlayer", text: "creature attacking the last chosen player" } };
+  // Curse of Hospitality: "Creatures attacking enchanted player": attacking that player, not their planeswalkers or
+  // battles, whoever controls the creatures.
+  if (x === "Creatures attacking enchanted player") return { kind: "filter", types: ["Creature"], spec: { kind: "object", attackingEnchanted: true, text: "creature attacking enchanted player" } };
   if (/^(?:Each creature that's|Creatures) attacking (?:one of )?your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
   // Lovisa Coldeyes: "Each creature that's a Barbarian, a Warrior, or a Berserker": any player's creature with any of those
   // creature types, counted once.
@@ -2275,6 +2278,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
   // Bound by Moonsilver: "can't attack, block, or transform".
   if (/^can't attack, block, or transform$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantTransform" }];
+  // Immerwolf: "Non-Human Werewolves you control can't transform": by any effect, daybound and nightbound too (CR 701.28f).
+  if (/^can't transform$/.test(rest)) return [{ kind: "cantTransform" }];
   // Revoke Privileges: "can't attack, block, or crew Vehicles".
   if (/^can't attack, block, or crew Vehicles$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantCrew" }];
   // "Can't block and can't be blocked" (Changeling Outcast).

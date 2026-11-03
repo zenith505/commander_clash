@@ -1418,7 +1418,9 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   const you = controllerOfInst(e, chars);
   const out: ObjectId[] = [];
   // "Creatures you control of the chosen type": the choice made as the source entered.
-  const spec = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
+  const spec0 = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
+  // Curse of Hospitality: "creatures attacking enchanted player": the player its source is attached to now.
+  const spec = spec0?.attackingEnchanted ? (({ attackingEnchanted: _, ...r }) => ({ ...r, attackingWhom: s.objects[e.sourceId!]?.attachedToPlayer ?? ("eventPlayer" as const) }))(spec0) : spec0;
   // Favor of the Mighty: the greatest mana value among creatures now (an {X} counts 0, CR 202.3e).
   const topMv = a.greatestManaValue ? Math.max(-Infinity, ...[...chars.values()].filter((c) => c.types.includes("Creature")).map((c) => c.manaValue ?? 0)) : undefined;
   for (const [id, c] of chars) {

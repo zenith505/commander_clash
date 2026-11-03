@@ -3808,6 +3808,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8dfa789d-ae1c-4f18-a55c-f49a363a5e33",
+  "name": "Chandra, Legacy of Fire",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "At the beginning of your end step, Chandra deals X damage to each opponent, where X is the number of planeswalkers you control.\n+1: Add {R} for each planeswalker you control.\n0: Remove a loyalty counter from each of any number of permanents you control. Exile that many cards from the top of your library. You may play them this turn.",
+  "loyalty": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "12cc800c-c7be-4811-8207-fd01a99cc892",
   "name": "Chandra, Torch of Defiance",
   "manaCost": "{2}{R}{R}",
@@ -23152,6 +23186,36 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e87a4461-f3d1-443f-ad4c-dba91a993809",
+  "name": "Tranquil Frillback",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "When this creature enters, you may pay {G} up to three times. When you pay this cost one or more times, choose up to that many —\n• Destroy target artifact or enchantment.\n• Exile target player's graveyard.\n• You gain 4 life.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

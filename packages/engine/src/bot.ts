@@ -605,7 +605,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
     const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > 0) }];
+      // Chandra, Legacy of Fire (loyalty counters, a card each): only planeswalkers that keep one, so none of ours dies.
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > (removing.counter === "loyalty" ? 1 : 0)) }];
     // Krenko's Buzzcrusher: for each player, up to one of their permanents to destroy: an opponent's best one, none of ours.
     const destroying = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && destroying?.type === "destroy" && destroying.what.ref === "created") {

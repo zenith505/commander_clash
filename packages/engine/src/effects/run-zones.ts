@@ -1289,6 +1289,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // (rulings, CR 608.2g).
         sc.castAmong = { ids: you.graveyard.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
+      if (!sc.castAmong && e.topYardHand) {
+        // Crabomination: the top card of that player's library, a card at random from their graveyard and one at random
+        // from their hand, all exiled at once (face up, CR 406.3); a zone with no card gives none.
+        const whose = players(s, e.who, ctx)[0];
+        if (whose === undefined) return;
+        const pl = player(s, whose);
+        const pick = (zone: ObjectId[]) => (zone.length ? zone[Math.floor(nextRandom(s) * zone.length)] : undefined);
+        const ids = [pl.library[0], pick(pl.graveyard), pick(pl.hand)].filter((id): id is ObjectId => id !== undefined);
+        for (const id of ids) moveObject(s, id, "exile");
+        const gone = ids.filter((id) => obj(s, id).zone === "exile");
+        log(s, gone.length ? `${pl.name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} (the top card of their library, a card at random from their graveyard and one at random from their hand).` : `${pl.name} has no cards to exile.`);
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromHand) {
         const whose = players(s, e.who, ctx)[0];
         if (whose === undefined) return;
@@ -1357,6 +1370,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${you.name} puts ${defOf(s, obj(s, toHand)).name} into their hand.`);
           }
           left = left.filter((id) => !(st.hits ?? []).includes(id));
+        }
+        // Kaervek, the Punisher: "If you do, you lose 2 life": after the copy is cast.
+        if (e.castLoseLife && st.cast && livingPlayers(s).includes(you.id)) {
+          log(s, `${you.name} loses ${e.castLoseLife} life (${src}).`);
+          loseLife(s, you.id, e.castLoseLife);
         }
         // Yennett: none cast, so you draw (the card revealed, still on top: rulings).
         if (e.noneCastDraw && !st.cast) draw(s, you.id, e.noneCastDraw);
@@ -3529,16 +3547,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {
-          const ids = e.graveyards ? player(s, pid).graveyard.filter((id) => !e.graveyardFilter || printedMatches(e.graveyardFilter, defOf(s, obj(s, id)))) : player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          const lib = player(s, pid).library;
+          // Dream Harvest: down to the card that brings the total mana value to the number (X as 0, CR 202.3e; a land
+          // counts 0), the whole library if it never gets there.
+          let total = 0;
+          const at = e.untilTotalMv !== undefined ? lib.findIndex((id) => (total += defMv(defOf(s, obj(s, id)))) >= e.untilTotalMv!) : -1;
+          const ids = e.graveyards ? player(s, pid).graveyard.filter((id) => !e.graveyardFilter || printedMatches(e.graveyardFilter, defOf(s, obj(s, id)))) : e.untilTotalMv !== undefined ? lib.slice(0, at < 0 ? lib.length : at + 1) : lib.slice(0, amountNow(s, e.n, ctx));
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
-            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
+            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
           }
           all.push(...ids);
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
-        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? (e.who.ref === "target" ? `${players(s, e.who, ctx).map((pid) => player(s, pid).name).join("")}'s graveyard` : "each opponent's graveyard") : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "exiled" ? " for as long as they remain exiled" : ""}.`);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? (e.who.ref === "target" ? `${players(s, e.who, ctx).map((pid) => player(s, pid).name).join("")}'s graveyard` : "each opponent's graveyard") : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.free ? " without paying their mana costs" : ""}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "exiled" ? " for as long as they remain exiled" : ""}.`);
         return;
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;

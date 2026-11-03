@@ -3841,6 +3841,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // its controller puts (CR 122.6 and the rulings on Generous Patron: the player whose spell or ability puts them, the
   // controller of a wither or infect source, and for a permanent entering with counters its controller). It triggers
   // once for each permanent they're put on at the same time (rulings on Hapatra).
+  // Bold Plagiarist: "Whenever an opponent puts one or more counters on a creature they control, they put the same number
+  // and kind of counters on ~.": that opponent puts them (rulings: so their own Bold Plagiarist doesn't trigger on these).
+  if (/^Whenever an opponent puts one or more counters on a creature they control, they put the same number and kind of counters on ~\.?$/.test(line)) {
+    const text = "they put the same number and kind of counters on ~.";
+    return { event: "permanentCountersPut", tappedFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, countersByOpponentOnTheirs: true, body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", eventCounter: true, n: { count: { kind: "eventAmount" } }, by: { ref: "eventPlayer" } }], text } };
+  }
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
   // Axgard Artisan: "Whenever one or more +1/+1 counters are put on ~ for the first time each turn": that kind.
@@ -4147,6 +4153,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (shuffles) {
     const body = parseBody(theyAreThatPlayer(shuffles[1]!.replace(/\bthat library\b/g, "that player's library")), { eventPlayer: true });
     return body ? { event: "opponentShufflesLibrary", body: { ...body, text: shuffles[1]! } } : "fail";
+  }
+  const causes = /^Whenever a spell or ability causes (a player|its controller) to shuffle their library, (.+)$/.exec(line);
+  if (causes) {
+    const body = parseBody(causes[2]!, { eventPlayer: true });
+    return body ? { event: causes[1] === "a player" ? "effectShufflesLibrary" : "effectShufflesOwnLibrary", body: { ...body, text: causes[2]! } } : "fail";
   }
   const searches = /^Whenever an opponent searches their library, (.+)$/.exec(line);
   if (searches) {

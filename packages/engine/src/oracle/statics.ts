@@ -1009,6 +1009,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Tainted Indulgence: "there are five or more mana values among cards in your graveyard".
   // Path to the Festival: "if there are three or more basic land types among lands you control" (domain's count).
   if ((m = new RegExp(`^there are ${NUM} or more basic land types among lands you control$`).exec(text))) return { kind: "amount", amount: { count: { kind: "basicLandTypes" } }, min: num(m[1]!) };
+  // Nael, Avizoa Aeronaut: "if there are five basic land types among lands you control": all five there are (CR 205.3i).
+  if (/^there are five basic land types among lands you control$/.test(text)) return { kind: "amount", amount: { count: { kind: "basicLandTypes" } }, min: 5 };
   if ((m = new RegExp(`^there are ${NUM} or more mana values among cards in your graveyard$`).exec(text))) return { kind: "amount", amount: { count: { kind: "graveyardManaValues", who: { ref: "you" } } }, min: num(m[1]!) };
   // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
   // enchantment, land and planeswalker (CR 110.4a).

@@ -588,6 +588,12 @@ export function compile(d: CardDef): CompiledCard {
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
       .replace(/^Whenever you cast (an? [a-z]+ spell)(?: or| and whenever) (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
+      // Orcish Mine: "At the beginning of your upkeep and whenever enchanted land becomes tapped, remove an ore counter from
+      // ~": the same, an ability for each event (CR 603.1).
+      .replace(/^At the beginning of your upkeep and whenever enchanted land becomes tapped, ([^\n]+)$/m, "At the beginning of your upkeep, $1\nWhenever enchanted land becomes tapped, $1")
+      // Its "destroy enchanted land and ~ deals 2 damage to that land's controller": two instructions, the player the land's
+      // controller as it last existed (CR 608.2h, see "hostController").
+      .replace(/^(When the last ore counter is removed from ~), destroy enchanted land and ~ deals 2 damage to that land's controller\.$/m, "$1, destroy enchanted land. ~ deals 2 damage to enchanted land's controller.")
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")

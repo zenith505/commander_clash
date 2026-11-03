@@ -1546,6 +1546,9 @@ function chooseFlickers(s: GameState, pid: PlayerId, options: ObjectId[]): Objec
 function joinForcesAmount(s: GameState, pid: PlayerId, max: number): number {
   const r = s.resolving!;
   const fx = allEffects(r.body.effects);
+  // Errant Minion: enough to prevent the damage, no more.
+  const minion = fx.find((e) => e.type === "damage" && e.preventOf);
+  if (minion?.type === "damage") return Math.min(max, typeof minion.amount === "number" ? minion.amount : max);
   if (JSON.stringify(fx).includes('"whose"')) return max;
   const paid = r.scratch?.join?.paid ?? 0;
   const me = player(s, pid);

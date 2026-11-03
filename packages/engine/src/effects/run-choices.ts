@@ -346,14 +346,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (s.resolving!.scratch ??= {});
       // Liege of the Hollows: from the active player on instead (rulings).
       const i = s.turnOrder.indexOf(e.activeFirst ? s.activePlayer : ctx.controller);
-      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0, by: {} });
+      // Errant Minion: "that player may pay any amount of mana": only that player.
+      const j = (sc.join ??= { queue: e.who ? players(s, e.who, ctx).filter((pid) => !player(s, pid).lost).slice(0, 1) : [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0, by: {} });
       while (j.queue.length) {
         const pid = j.queue[0]!;
         if (j.asked === undefined && sc.payX === undefined) {
           const cap = Math.min(availableMana(s, pid), 40);
           if (cap > 0) {
             const options = ["none", ...Array.from({ length: cap }, (_, k) => String(k + 1))];
-            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana${e.activeFirst ? "" : ` (${j.paid} paid so far)`}` };
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana${e.activeFirst || e.who ? "" : ` (${j.paid} paid so far)`}` };
             return "paused";
           }
         } else if (j.asked === undefined && sc.payX !== "none") {

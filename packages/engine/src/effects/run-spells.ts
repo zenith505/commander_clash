@@ -169,10 +169,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // "When that creature leaves the battlefield this turn, sacrifice ~" (Kjeldoran Elite Guard): about that permanent as
         // it is now (CR 603.7c, 400.7), whatever zone it goes to (CR 603.6c); its instructions about this ability's source.
         const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        // War Barge: "When ~ leaves the battlefield this turn, destroy that creature": ~ watched, about the target as it is
+        // now (CR 603.7c, 400.7); none if that target is gone.
+        const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === "battlefield") : undefined;
+        if (e.about !== undefined && !about) return;
         for (const o of objects(s, e.of, ctx)) {
           if (o.zone !== "battlefield") continue;
           addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
-          Object.assign(s.delayed![s.delayed!.length - 1]!, { to: ["graveyard", "exile", "hand", "library", "command"], thisTurn: s.turn, ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
+          Object.assign(s.delayed![s.delayed!.length - 1]!, { to: ["graveyard", "exile", "hand", "library", "command"], thisTurn: s.turn, ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}), ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}) });
         }
         return;
       }
@@ -204,7 +208,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // About each of those permanents as it is now (CR 603.7c, 400.7).
         for (const o of objects(s, e.of, ctx))
           if (o.zone === "battlefield") {
-            addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+            // Shambling Swarm: as many removed as were put on that creature this way (the ones removed needn't be the same
+            // counters, rulings).
+            const put = e.perCounterPut ? (s.resolving?.countersPutThisWay ?? []).filter((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0) && (e.of!.ref !== "countersPutThisWay" || !e.of!.kind || c.kind === e.of!.kind)).reduce((a, c) => a + (c.n ?? 1), 0) : 0;
+            const own = e.perCounterPut ? { ...body, effects: body.effects.map((x): Effect => (x.type === "removeCounters" ? { ...x, n: put } : x)) } : body;
+            addDelayed(s, e.when, ctx.controller, o, own, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
             // Mysterio, Master of Illusion: "when ~ leaves the battlefield", for whatever zone it goes to (CR 603.6c).
             if (e.when === "leaves") s.delayed![s.delayed!.length - 1]!.to = ["graveyard", "exile", "hand", "library", "command"];
             // Goblin Sappers: "destroy it and ~": ~ as it is now, too; if it left, it's a new object (CR 400.7).

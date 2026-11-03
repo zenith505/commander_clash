@@ -176,7 +176,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfEchoPaid", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -3100,6 +3100,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled, ...": it works in exile (CR 113.6),
   // controlled by the card's owner (CR 113.8), once for each counter removed.
   // Riftmarked Knight: "When the last time counter is removed from ~ while it's exiled, ...": the same, for the last one.
+  // Orcish Mine: "When the last ore counter is removed from ~, ...": as the permanent's last counter of that kind is
+  // removed, by anything (CR 603.2, 122.1).
+  const lastCounter = /^When the last ([a-z]+) counter is removed from ~, (.+)$/.exec(line);
+  if (lastCounter && lastCounter[1] !== "time") {
+    const body = parseBody(capital(lastCounter[2]!));
+    return body ? { event: "selfLastCounterRemoved", countersKind: lastCounter[1]!, body } : "fail";
+  }
   const timeExiled = /^(Whenever a|When the last) time counter is removed from ~ while it's exiled, (.+)$/.exec(line);
   if (timeExiled) {
     const body = parseBody(capital(timeExiled[2]!));
@@ -3136,13 +3143,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Righteous Authority: "At the beginning of the draw step of enchanted creature's controller, that player draws an
   // additional card": a trigger, so they just draw one more.
   // Numbing Dose: "enchanted permanent's controller"; Feedback: "enchanted enchantment's controller": the same, whatever
-  // the Aura enchants.
+  // the Aura enchants. Power Leak's "Prevent X of that damage" is about the damage, not a permanent.
   const hostUpkeep = /^At the beginning of the (upkeep|draw step|end step) of (enchanted|equipped) (creature|permanent|enchantment|artifact|land)'s controller, (.+)$/.exec(line);
   // Erosion: "destroy that land unless that player pays {1} or 1 life"; Curse Artifact: "unless they sacrifice that
   // artifact": that one is the enchanted one.
   const hostWord = hostUpkeep?.[3];
   const hostRest = hostUpkeep && hostWord !== "creature" && hostWord !== "permanent" ? hostUpkeep[4]!.replace(new RegExp(`\\bthat ${hostWord}\\b`, "g"), `${hostUpkeep[2]} ${hostWord}`) : hostUpkeep?.[4];
-  if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostRest!.replace(/\bthat player\b/g, ""))))) {
+  if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostRest!.replace(/\bthat (?:player|damage)\b/g, ""))))) {
     const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostRest!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }

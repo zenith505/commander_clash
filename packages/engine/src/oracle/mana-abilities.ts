@@ -26,10 +26,12 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   // Metalworker: "{T}: Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." A
   // mana ability (rulings): how many is chosen as it's activated.
-  const reveal = /^(.+): Reveal any number of ([a-z]+) cards in your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
+  // Sacellum Godspeaker: "Reveal any number of creature cards with power 5 or greater from your hand. Add {G} for each
+  // card revealed this way." The same (rulings: a mana ability, none revealed adds nothing).
+  const reveal = /^(.+): Reveal any number of ([a-z]+) cards( with power \d+ or greater)? (?:in|from) your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
   if (reveal) {
-    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[3]}.`);
-    const filter = parseSearchFilter(`${reveal[2]} card`);
+    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[4]}.`);
+    const filter = parseSearchFilter(`${reveal[2]} card${reveal[3] ?? ""}`);
     if (!ab || !filter || ab.produces.kind !== "fixed") return null;
     return { ...ab, text: line0, produces: { kind: "revealX", filter, per: ab.produces.mana } };
   }

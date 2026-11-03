@@ -1056,7 +1056,7 @@ export interface DelayedTrigger {
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
   /**
-   * `lostControl` only: what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
+   * `lostControl` (and `leaves`: War Barge's target): what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
    * control of ~", Krovikan Vampire): it triggers even if the watched object left the battlefield (Khârn rulings).
    */
   about?: { id: ObjectId; zc: number };
@@ -2394,7 +2394,7 @@ export interface Resolving {
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
   /** "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents a pick put counters on. */
-  countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
+  countersPutThisWay?: { id: ObjectId; zc: number; kind?: string; /** How many were put (distributed counters, Shambling Swarm). */ n?: number }[];
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */

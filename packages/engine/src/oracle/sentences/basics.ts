@@ -471,6 +471,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = { ref: "blockHistory" as const, of, blocked: true as const, ...(m[1] === "blocked or were blocked by" ? { blockers: true as const } : {}) };
     return [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what }], text: `destroy all creatures that ${m[1]} it this turn` }];
   }
+  // Gaze of the Gorgon: "Regenerate target creature. At this turn's next end of combat, destroy all creatures that blocked
+  // or were blocked by it this turn.": the same, about the creature it targeted (rulings: those that blocked it before this
+  // was cast too, whether or not it's still on the battlefield then).
+  if ((m = /^At this turn's next end of combat, destroy all creatures that (blocked or were blocked by|were blocked by) it this turn$/.exec(s)) && ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many) {
+    const what = { ref: "blockHistory" as const, of: { ref: "target" as const, index: ctx.lastObjectTarget }, blocked: true as const, ...(m[1] === "blocked or were blocked by" ? { blockers: true as const } : {}) };
+    return [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what }], text: `destroy all creatures that ${m[1]} it this turn` }];
+  }
   // Heat Stroke: "At end of combat, destroy each creature that blocked or was blocked this turn": every creature still on
   // the battlefield that was declared as a blocker this turn or that a blocker was declared to block (CR 509.1), whatever
   // has happened since (TurnLog.blocks).

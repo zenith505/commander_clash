@@ -875,6 +875,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
     // Slippery Bogbonder: onto an opponent's creature, our harmful counters (-1/-1, stun); onto ours, none.
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":")) && pend.onto === undefined) {
+      // Eventide's Shadow: removing them costs us a card's worth of life each (and gives a card), so a few at most, while
+      // our life stays well up: helpful ones off opponents' permanents, harmful ones off ours.
+      const so = Object.values(s.resolving?.scratch?.gathered ?? {}).reduce((a, b) => a + b, 0);
+      const room = Math.min(4, player(s, pid).life - 10);
+      const worth = pend.options.find((o) => {
+        if (!o.includes(":")) return false;
+        const x = s.objects[o.slice(0, o.indexOf(":"))];
+        return !!x && harmfulCounter(o.slice(o.indexOf(":") + 1)) === (controllerOf(s, x) === pid);
+      });
+      return [{ type: "chooseOption", player: pid, choice: worth && so < room ? worth : "done" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":"))) {
       const onto = pend.onto !== undefined ? s.objects[pend.onto] : undefined;
       const bad = onto && controllerOf(s, onto) !== pid ? pend.options.find((o) => o.includes(":") && harmfulCounter(o.slice(o.indexOf(":") + 1))) : undefined;

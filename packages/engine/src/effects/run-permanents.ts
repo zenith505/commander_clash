@@ -1161,13 +1161,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "gatherCounters": {
       // Slippery Bogbonder: one counter at a time from any creature it may come from (not the one they go onto, rulings),
       // then all moved at once (CR 122.5); none if the target is gone.
-      const to = objects(s, e.onto, ctx)[0];
+      // Eventide's Shadow (no `onto`): removed from any of them instead, all at once.
+      const to = e.onto ? objects(s, e.onto, ctx)[0] : undefined;
+      const removing = !e.onto;
       const sc = (s.resolving!.scratch ??= {});
       const picked = (sc.gathered ??= {});
-      const sources = () => (to?.zone === "battlefield" ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== to.id && objectMatches(s, e.from, o, ctx.controller, false)) : []);
+      const sources = () => (removing ? s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, e.from, o, ctx.controller, false)) : to?.zone === "battlefield" ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== to.id && objectMatches(s, e.from, o, ctx.controller, false)) : []);
       const left = (id: ObjectId, k: string) => (obj(s, id).counters[k] ?? 0) - (picked[`${id}:${k}`] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
-      while (to && !sc.countersDone) {
+      while ((to || removing) && !sc.countersDone) {
         if (sc.counterKind !== undefined) {
           if (sc.counterKind === "done") sc.countersDone = true;
           else {
@@ -1184,11 +1186,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           const k = opt.slice(opt.indexOf(":") + 1);
           return `A ${k} counter from ${characteristics(s, obj(s, id)).name} (${left(id, k)} left)`;
         };
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", onto: to.id, options: [...options, "done"], labels: [...options.map(label), count() ? "That's all" : "None"], prompt: `choose a counter to move onto ${characteristics(s, to).name} (${count()} so far)` };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", ...(to ? { onto: to.id } : {}), options: [...options, "done"], labels: [...options.map(label), count() ? "That's all" : "None"], prompt: to ? `choose a counter to move onto ${characteristics(s, to).name} (${count()} so far)` : `choose a counter to remove (${count()} so far)` };
         return "paused";
       }
       sc.gathered = undefined;
       sc.countersDone = undefined;
+      if (removing) {
+        let total = 0;
+        for (const [key, m] of Object.entries(picked)) {
+          const id = key.slice(0, key.indexOf(":"));
+          const k = key.slice(key.indexOf(":") + 1);
+          const o = obj(s, id);
+          const n = Math.min(m, removableCounters(s, o, k));
+          if (n <= 0 || o.zone !== "battlefield") continue;
+          const had = o.counters[k] ?? 0;
+          o.counters[k] = had - n;
+          total += n;
+          invalidateCharacteristics(s);
+          log(s, `${characteristics(s, o).name} loses ${n} ${k} counter${n > 1 ? "s" : ""}.`);
+          countersRemoved(s, o, k, n);
+          if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+        }
+        if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + total;
+        return;
+      }
       if (!to || to.zone !== "battlefield") return;
       for (const [key, m] of Object.entries(picked)) {
         const id = key.slice(0, key.indexOf(":"));

@@ -3068,7 +3068,12 @@ export type Effect =
    * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
    * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
    */
-  | { type: "gatherCounters"; onto: ObjRef; from: TargetSpec }
+  /**
+   * Slippery Bogbonder: "move any number of counters from among creatures you control onto that creature", one counter at
+   * a time. Without `onto`, removed instead (Eventide's Shadow: "Remove any number of counters from among permanents on the
+   * battlefield"), counted for "removed this way".
+   */
+  | { type: "gatherCounters"; onto?: ObjRef; from: TargetSpec }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */

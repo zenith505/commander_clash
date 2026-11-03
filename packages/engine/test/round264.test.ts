@@ -55,6 +55,8 @@ const reyhan = (): CardDef => ({"oracleId":"3e7df01c-75af-440d-97fd-1b1b794281b9
 
 const denial = (): CardDef => ({"oracleId":"ba9e129d-a3cf-431c-93af-f2e4902d40a0","name":"Whirlwind Denial","manaCost":"{2}{U}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"For each spell and ability your opponents control, counter it unless its controller pays {4}.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"thb","releasedAt":"2020-01-24","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 
+const shadow = (): CardDef => ({"oracleId":"92ac8aa4-e23c-4ed9-8317-c249a17ce3d2","name":"Eventide's Shadow","manaCost":"{4}{B}","cmc":5,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Remove any number of counters from among permanents on the battlefield. You draw cards and lose life equal to the number of counters removed this way.","colors":["B"],"colorIdentity":["B"],"keywords":[],"commanderLegal":"legal","set":"ecc","releasedAt":"2026-01-23","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
 /** A Protean Hydra with `n` +1/+1 counters, and an opponent's creature to deal damage with. */
 const withHydra = (n: number) => {
   const { s, ap } = setup([]);
@@ -455,5 +457,60 @@ describe("Whirlwind Denial", () => {
     s = act(s, { type: "payUnless", player: o2, pay: false });
     expect(s.objects[i1]!.zone).toBe("graveyard");
     expect(s.objects[i2]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Eventide's Shadow", () => {
+  it("removes any number of counters of any kinds from any player's permanents, one at a time; then that many cards and life", () => {
+    expect(isFullySupported(shadow())).toBe(true);
+    const { s: s0, ap, ids } = setup([shadow()]);
+    const opp = opps(s0, ap)[0]!;
+    const theirs = putOnBattlefield(s0, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    s0.objects[theirs]!.counters["+1/+1"] = 2;
+    const h = putOnBattlefield(s0, ap, hydra());
+    s0.objects[h]!.counters["+1/+1"] = 3;
+    const mine = putOnBattlefield(s0, ap, bear());
+    s0.objects[mine]!.counters.stun = 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "removeCounter" });
+    const opts = (s.pending as { options: string[] }).options;
+    expect(opts).toEqual(expect.arrayContaining([`${theirs}:+1/+1`, `${h}:+1/+1`, `${mine}:stun`, "done"]));
+    s = act(s, { type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    s = act(s, { type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    // None left there: no more options from it.
+    expect((s.pending as { options: string[] }).options).not.toContain(`${theirs}:+1/+1`);
+    s = act(s, { type: "chooseOption", player: ap, choice: `${mine}:stun` });
+    s = act(s, { type: "chooseOption", player: ap, choice: `${h}:+1/+1` });
+    const hand = s.players[ap]!.hand.length;
+    const life = s.players[ap]!.life;
+    s = act(s, { type: "chooseOption", player: ap, choice: "done" });
+    expect(s.objects[theirs]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[mine]!.counters.stun ?? 0).toBe(0);
+    expect(plus(s, h)).toBe(2);
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+    expect(s.players[ap]!.life).toBe(life - 4);
+    // Protean Hydra's counter was removed too: it triggers.
+    s = settle(s);
+    expect(s.delayed?.filter((d) => d.when === "nextEndStep").length).toBe(1);
+  });
+
+  it("removing none draws nothing; a bot takes helpful counters off opponents' permanents, a few at most", () => {
+    const { s: s0, ap, ids } = setup([shadow()]);
+    const opp = opps(s0, ap)[0]!;
+    const theirs = putOnBattlefield(s0, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    s0.objects[theirs]!.counters["+1/+1"] = 9;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])));
+    const a = botActions(s, ap);
+    expect(a[a.length - 1]).toEqual({ type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    for (let i = 0; i < 20 && s.pending?.kind === "chooseOption"; i++) s = run(s, botActions(s, ap));
+    expect(s.objects[theirs]!.counters["+1/+1"]).toBe(5);
+
+    const { s: t0, ap: ap2, ids: ids2 } = setup([shadow()]);
+    let t = settle(run(t0, planCast(t0, ap2, ids2[0]!, [])));
+    const hand = t.players[ap2]!.hand.length;
+    const life = t.players[ap2]!.life;
+    if (t.pending) t = act(t, { type: "chooseOption", player: ap2, choice: "done" });
+    expect(t.players[ap2]!.hand.length).toBe(hand);
+    expect(t.players[ap2]!.life).toBe(life);
   });
 });

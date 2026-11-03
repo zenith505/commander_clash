@@ -2848,6 +2848,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
         sc.found = [];
+        // Rat King, Verminister: only cards with target `sameNameAs`'s name, that card included (CR 201.2).
+        const t = e.sameNameAs !== undefined ? ctx.targets[e.sameNameAs] : undefined;
+        const name = t?.kind === "object" && s.objects[t.id]?.zone === "graveyard" ? defOf(s, obj(s, t.id)).name : undefined;
+        if (e.sameNameAs !== undefined && name === undefined) return;
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value X" (Fix What's Broken, Immortal Servitude): exactly X.
         // Demigod of Revenge: "all cards named ~", the source's name (CR 201.5).
@@ -2858,7 +2862,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(filter, d) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && !(e.notSacrificedThisWay && s.resolving!.sacrificedThisWay?.some((k) => k.id === id))) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d) && (name === undefined || sameName(d.name, name)) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && !(e.notSacrificedThisWay && s.resolving!.sacrificedThisWay?.some((k) => k.id === id))) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

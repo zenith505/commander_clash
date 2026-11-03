@@ -4032,6 +4032,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "920c4df3-9517-44cd-8304-28b1ef69d60e",
+  "name": "Colfenor's Urn",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a creature with toughness 4 or greater is put into your graveyard from the battlefield, you may exile it.\nAt the beginning of the end step, if three or more cards have been exiled with this artifact, sacrifice it. If you do, return those cards to the battlefield under their owner's control.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0bbcb563-09b3-499d-a9cc-3a6d7501dd81",
   "name": "Collected Company",
   "manaCost": "{3}{G}",
@@ -6619,40 +6641,6 @@
   "commanderLegal": "legal",
   "set": "khc",
   "releasedAt": "2021-02-05",
-  "rarity": "rare",
-  "layout": "normal",
-  "gameChanger": false
- },
- {
-  "oracleId": "65c32889-3d70-449f-af76-05385c78c5a9",
-  "name": "Evercoat Ursine",
-  "manaCost": "{4}{G}",
-  "cmc": 5,
-  "typeLine": "Creature — Elemental Bear",
-  "supertypes": [],
-  "types": [
-   "Creature"
-  ],
-  "subtypes": [
-   "Elemental",
-   "Bear"
-  ],
-  "oracleText": "Trample\nHideaway 3, hideaway 3 (When this creature enters, look at the top three cards of your library, exile one face down, then put the rest on the bottom in a random order. Then do it again.)\nWhenever this creature deals combat damage to a player, if there are cards exiled with it, you may play one of them without paying its mana cost.",
-  "power": "6",
-  "toughness": "5",
-  "colors": [
-   "G"
-  ],
-  "colorIdentity": [
-   "G"
-  ],
-  "keywords": [
-   "Trample",
-   "Hideaway"
-  ],
-  "commanderLegal": "legal",
-  "set": "blc",
-  "releasedAt": "2024-08-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21107,6 +21095,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "13da5255-2fc5-43a4-a44c-13a5d9ff77c3",
+  "name": "Temporal Extortion",
+  "manaCost": "{B}{B}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "When you cast this spell, any player may pay half their life, rounded up. If a player does, counter Temporal Extortion.\nTake an extra turn after this one.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cc4f1023-09e4-4f27-8712-be72e9694a80",
   "name": "Tempting Contract",
   "manaCost": "{4}",
@@ -22647,6 +22661,34 @@
   "set": "cns",
   "releasedAt": "2014-06-06",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "31cc5d9d-9384-4a9b-ba7f-6a4edbcb7a35",
+  "name": "Ultimate Magic: Meteor",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Ultimate Magic: Meteor deals 7 damage to each creature. If this spell was cast from exile, for each opponent, choose an artifact or land that player controls. Destroy the chosen permanents.\nForetell {5}{R} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

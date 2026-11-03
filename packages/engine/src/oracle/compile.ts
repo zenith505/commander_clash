@@ -5052,6 +5052,28 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Dog Umbra: "As long as another player controls enchanted creature, it can't attack or block. Otherwise, ~ has umbra
+    // armor.": who controls the creature compared with the Aura's controller, checked continuously (rulings, CR 611.3a);
+    // in a free-for-all game every other player is an opponent. Umbra armor is CR 702.89.
+    const dogUmbra = /^As long as another player controls enchanted creature, it (can't attack or block|can't attack|can't block)\. Otherwise, ~ has umbra armor\.$/.exec(line);
+    if (dogUmbra) {
+      const [a, b] = [parseStatic(`Enchanted creature ${dogUmbra[1]}.`), parseStatic("~ has umbra armor.")];
+      if (a?.affects.kind === "attached" && b?.affects.kind === "self" && !a.condition && !b.condition) {
+        const yours: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
+        const theirs: TargetSpec = { kind: "object", types: ["Creature"], controller: "opponent", text: "creature another player controls" };
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: theirs }, text: line }, { ...b, condition: { kind: "attachedIs", filter: yours }, text: line });
+        continue;
+      }
+    }
+    // Colfenor's Urn: "At the beginning of the end step, if three or more cards have been exiled with ~, sacrifice it. If you
+    // do, return those cards to the battlefield under their owner's control.": every end step (CR 513.1); the count is of
+    // every card it exiled over the game (rulings), checked as it triggers and resolves (CR 603.4); with no sacrifice,
+    // nothing returns (rulings). Only the cards still in exile return (CR 400.7). Its exile ability is linked below.
+    const urn = new RegExp(`^At the beginning of the end step, if ${NUM} or more cards have been exiled with ~, sacrifice it\\. If you do, return those cards to the battlefield under their owner's control\\.$`).exec(line);
+    if (urn) {
+      out.triggers.push({ event: "eachEndStep", ifCond: { kind: "amount", amount: { count: { kind: "linkedExiled", ever: true } }, min: num(urn[1]!) }, body: { targets: [], effects: [{ type: "sacrifice", what: { ref: "self" } }, { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "moveLinked", dest: "battlefield", ownersControl: true }] }], text: "sacrifice ~. If you do, return the cards exiled with ~ to the battlefield under their owners' control." } });
+      continue;
+    }
     // Varchild, Betrayer of Kjeldor: "Survivors your opponents control can't block, and they can't attack you or
     // planeswalkers you control": two restrictions on the same group, as two sentences.
     const cantBoth = /^([A-Z][a-z]+s your opponents control) can't block, and they (can't attack you or planeswalkers you control)\.$/.exec(line);
@@ -5870,7 +5892,8 @@ function linkExile(out: CompiledCard) {
   // Profane Procession: "Exile target creature. Then if there are three or more cards exiled with ~, transform it": the
   // same, in an ability's own condition.
   // Phyrexian Ingester: "the exiled creature card's power" is about what its one exile ability (imprint) exiled.
-  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+  // Colfenor's Urn: "if three or more cards have been exiled with ~", in its trigger's intervening "if".
+  if ((out.statics.some((st) => /"linkedExiled(?:PT)?"/.test(JSON.stringify(st.mods)) || JSON.stringify(st.condition ?? null).includes('"linkedExiled"')) || bodies.some((b) => JSON.stringify(b).includes('"linkedExiled"')) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('{"kind":"linkedExiled","ever":true}'))) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));

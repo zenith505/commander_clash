@@ -1725,8 +1725,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         return;
       }
       const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
-      c.attackTax += n;
-      if (m.planeswalkers) c.attackTaxPlaneswalkers += n;
+      if (!m.onlyPlaneswalkers) c.attackTax += n;
+      if (m.planeswalkers || m.onlyPlaneswalkers) c.attackTaxPlaneswalkers += n;
       if (m.mana) c.attackTaxMana = [...c.attackTaxMana, m.mana];
       if (m.mana && m.planeswalkers) c.attackTaxManaPlaneswalkers = [...c.attackTaxManaPlaneswalkers, m.mana];
       return;

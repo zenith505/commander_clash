@@ -726,6 +726,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (one?.type !== "bounce" || one.what.ref !== "target") return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", text: "card with the same name as that card" }, toHand: true, sameNameAs: one.what.index }];
   }
+  // Rat King, Verminister: "Return target creature card and all other cards with the same name as that card from your
+  // graveyard to the battlefield tapped": the same, onto the battlefield, all at once (CR 608.2c).
+  if ((m = /^Return (target .+? card) and all other cards with the same name as that card from your graveyard to the battlefield( tapped)?$/.exec(s))) {
+    const fx = parseZonesSentence(`Return ${m[1]} from your graveyard to the battlefield`, ctx);
+    const one = fx?.length === 1 ? fx[0] : undefined;
+    if (one?.type !== "putOntoBattlefield" || one.what.ref !== "target" || Object.keys(one).some((k) => !["type", "what"].includes(k))) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", text: "card with the same name as that card" }, sameNameAs: one.what.index, ...(m[2] ? { tapped: true } : {}) }];
+  }
   // Visions of Dread: "Target opponent puts a creature card of their choice from their graveyard onto the battlefield under
   // your control": that player chooses one of their own as it resolves, not targeted; it enters under your control.
   // Scrounge (body.ts makes it this sentence): "an artifact card" the same way.

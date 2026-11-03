@@ -686,6 +686,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "manaSpent":
       return ctx.manaSpent ?? 0;
+    case "convokedCount":
+      return ctx.sourceId !== undefined ? (s.objects[ctx.sourceId]?.convoked?.length ?? 0) : 0;
     case "manaSpentOn": {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) return 0;
@@ -1475,6 +1477,8 @@ function describeCount(c: Count): string {
       return "times it's been cast from the command zone";
     case "manaSpent":
       return "mana spent to cast it";
+    case "convokedCount":
+      return "creature that convoked it";
     case "manaSpentOn":
       return "mana spent to cast that spell";
     case "webSlungMv":

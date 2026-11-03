@@ -1855,6 +1855,11 @@ export function parseTargetPhrase(
     // can be negative, CR 107.1b).
     extra[m[1] as "power" | "toughness"] = { max: Number(m[2]) - 1 };
     p = p.slice(0, m.index);
+  } else if (opts.x && (m = / with (power|toughness|mana value) less than x$/.exec(p))) {
+    // Scrap Welder: "target artifact card with mana value less than X": X announced, and at most one less (an equal mana
+    // value isn't legal, rulings).
+    extra.xRange = { key: m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness"), at: "most", plus: -1 };
+    p = p.slice(0, m.index);
   } else if (opts.x && (m = / with mana value x plus (\d+)$/.exec(p))) {
     // Sidisi, Regent of the Mire: "target creature card with mana value X plus 1": X announced, and that much more.
     extra.xRange = { key: "manaValue", at: "exact", plus: Number(m[1]) };

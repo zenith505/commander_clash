@@ -864,7 +864,7 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       // "With mana value X" (Spell Blast): the X announced (CR 107.3a).
       const { xRange, ...rest } = t;
       const x = (ctx.x ?? 0) + (xRange.plus ?? 0);
-      t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: xRange.plus ? rest.text.replace(/ x plus \d+\b/, ` ${x}`) : rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
+      t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: / less than x\b/.test(rest.text) ? rest.text.replace(/ less than x\b/, ` less than ${ctx.x ?? 0}`) : xRange.plus ? rest.text.replace(/ x plus \d+\b/, ` ${x}`) : rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
     }
     // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
     // it was cast (rulings), which can't change.

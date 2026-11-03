@@ -874,6 +874,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.each) return mine > -Infinity && mine > theirs;
       return mine > -Infinity && mine >= all;
     }
+    case "noOtherAttackingEventPlayer":
+      // A creature attacking that player's planeswalker or battle isn't attacking that player (CR 506.3, 508.1b).
+      return eventPlayer !== undefined && !s.battlefield.some((id) => id !== subjectId && s.objects[id]!.attacking === eventPlayer && !s.objects[id]!.attackingPermanent);
     case "attackedPlayerPoisoned":
       return s.players.some((p) => !p.lost && (p.poison ?? 0) > 0 && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent));
     case "eventPlayerMoreThanAnotherOpponent":

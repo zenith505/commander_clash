@@ -1635,7 +1635,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         // "If that creature dies this way": it was put into a graveyard (CR 700.4), not exiled or moved elsewhere instead.
-        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
+        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen === "creatures" ? objIsType(s, o, "Creature") : !!e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
       return;
     case "regenerate":

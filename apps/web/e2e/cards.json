@@ -3486,6 +3486,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed68160e-5e3d-44f2-ac7a-3749fda10119",
+  "name": "Catastrophe",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all lands or all creatures. Creatures destroyed this way can't be regenerated.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
   "name": "Cavalier of Night",
   "manaCost": "{2}{B}{B}{B}",
@@ -15966,6 +15992,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "33c3a81a-6cea-48c9-b966-67084d96e74f",
+  "name": "Osseous Sticktwister",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Scarecrow",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Scarecrow"
+  ],
+  "oracleText": "Lifelink\nDelirium — At the beginning of your end step, if there are four or more card types among cards in your graveyard, each opponent may sacrifice a nonland permanent of their choice or discard a card. Then this creature deals damage equal to its power to each opponent who didn't sacrifice a permanent or discard a card this way.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Delirium",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "473a7998-669d-4181-83fe-f178a2e781f0",
   "name": "Out of the Tombs",
   "manaCost": "{2}{B}",
@@ -17725,6 +17785,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8f0738ce-1f07-422c-9895-8ac3c65f9054",
+  "name": "Ravenous Rotbelly",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Horror"
+  ],
+  "oracleText": "When this creature enters, you may sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each opponent sacrifices that many creatures of their choice.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
   "name": "Razorgrass Screen",
   "manaCost": "{1}",
@@ -18825,6 +18916,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "713bcfb6-e5ea-411e-b4b3-52e5eed5cdf1",
+  "name": "Sanctuary Warden",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel",
+   "Soldier"
+  ],
+  "oracleText": "Flying\nThis creature enters with two shield counters on it.\nWhenever this creature enters or attacks, you may remove a counter from a creature or planeswalker you control. If you do, draw a card and create a 1/1 green and white Citizen creature token.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "71cb48e2-2328-471c-a04a-7b6461f378f4",
   "name": "Sarkhan, Dragon Ascendant",
   "manaCost": "{1}{R}",
@@ -18976,6 +19100,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e0fefaf0-da20-4d58-8db7-019dba16c780",
+  "name": "Scathe Zombies",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff50d002-834e-4b5e-8db0-b0c8b4efb21f",
   "name": "Scent of Cinder",
   "manaCost": "{1}{R}",
@@ -19050,6 +19204,37 @@
   "set": "rna",
   "releasedAt": "2019-01-25",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4ebce651-ef95-4a96-b720-a23757d641c8",
+  "name": "Scrap Welder",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Artificer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Artificer"
+  ],
+  "oracleText": "{T}, Sacrifice an artifact with mana value X: Return target artifact card with mana value less than X from your graveyard to the battlefield. It gains haste until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24014,6 +24199,35 @@
   ]
  },
  {
+  "oracleId": "b6114962-035e-4e7f-9009-4739bf83a05a",
+  "name": "Urborg",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {B}.\n{T}: Target creature loses first strike or swampwalk until end of turn.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff0ab867-b710-4b1a-baed-95fc3cf68f79",
   "name": "Valakut Awakening // Valakut Stoneforge",
   "manaCost": "{2}{R}",
@@ -25309,6 +25523,40 @@
   "set": "sld",
   "releasedAt": "2025-02-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ddb021df-ae4a-4ac1-8353-d0b375761714",
+  "name": "White Knight",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from black (This creature can't be blocked, targeted, dealt damage, or enchanted by anything black.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "First strike",
+   "Protection"
+  ],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

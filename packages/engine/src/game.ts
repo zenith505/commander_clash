@@ -847,7 +847,7 @@ export function moveObject(
   o.exertedTurn = undefined;
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
-  if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
+  if (fromZone === "battlefield" && to === "graveyard" && (o.damagedBy?.length || o.wasDealtDamage) && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
@@ -1255,6 +1255,9 @@ export function moveObject(
   if (fromZone === "battlefield" && to === "graveyard") {
     const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
     for (const t of last.types) if (!mine.includes(t)) mine.push(t);
+    // The Lady of Otaria: "a land you controlled", by the player who controlled it as it left.
+    const ctl = ((s.turnLog.controlledTypesToYard ??= {})[lastController] ??= []);
+    for (const t of last.types) if (!ctl.includes(t)) ctl.push(t);
     if (last.types.includes("Artifact")) s.turnLog.artifactsToYard = (s.turnLog.artifactsToYard ?? 0) + 1;
   }
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
@@ -2112,12 +2115,18 @@ function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; cont
 /** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
 function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
   const by = o.damagedBy ?? [];
+  // Etching of Kumano: who controlled each source as it dealt `o` damage this turn.
+  const dealt = s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? [];
   for (const id of s.battlefield) {
     const w = obj(s, id);
     const how = abilitiesOf(s, w).exileWhatItDamaged;
-    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo))) return true;
+    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo)) || (how === "yours" && dealt.some((d) => d.controller === controllerOf(s, w)))) return true;
   }
-  return (s.leftTogether ?? []).some((l) => l.hadAbilities && by.includes(l.id) && withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged === "self");
+  return (s.leftTogether ?? []).some((l) => {
+    if (!l.hadAbilities) return false;
+    const how = withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged;
+    return (how === "self" && by.includes(l.id)) || (how === "yours" && dealt.some((d) => d.controller === l.controller));
+  });
 }
 
 /**

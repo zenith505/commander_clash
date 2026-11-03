@@ -1574,6 +1574,8 @@ export interface TurnLog {
   creaturesToYard?: { owner: PlayerId; token?: true }[];
   /** The card types, as they last existed, of the permanents put into each owner's graveyard from the battlefield this turn (Kami of Transience). */
   permanentTypesToYard?: Record<number, string[]>;
+  /** The same, by the player who controlled each permanent as it left (The Lady of Otaria: "a land you controlled"). */
+  controlledTypesToYard?: Record<number, string[]>;
   /** How many artifacts were put into graveyards from the battlefield this turn, tokens too (Structural Assault). */
   artifactsToYard?: number;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */

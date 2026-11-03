@@ -1174,8 +1174,11 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   // your control (CR 108.3).
   const owned = m[3] === " under your control" && / (?:an opponent|you don't) owns?$/.test(phrase);
   if (m[3] && !owned) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
+  // Gladewalker Ritualist: "Whenever another creature you control named ~ enters": with the watcher's name (CR 201.5).
+  const namedSelf = / named ~$/.test(phrase);
   const ench = ENCHANTED_CONTROLS.test(phrase);
-  const parsed = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  const parsed0 = ench ? enchantedControls(phrase) : parseTargetPhrase(namedSelf ? phrase.replace(/ named ~$/, "") : phrase, { chosen: true });
+  const parsed = namedSelf ? (parsed0?.kind === "object" && parsed0.named === undefined ? { ...parsed0, named: "~" } : null) : parsed0;
   const filter = owned && parsed?.kind === "object" && !parsed.controller && parsed.owner === "opponent" ? { ...parsed, controller: "you" as const } : owned ? null : parsed;
   if (!filter || filter.kind !== "object" || (filter.chosen && filter.chosen !== "type")) return "fail";
   // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the

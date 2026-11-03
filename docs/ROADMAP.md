@@ -5203,6 +5203,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   deals damage to you", "it" the exiled card), Wake to Slaughter (an opponent you choose picks which target goes to your hand,
   the other returns with haste and is exiled at the next end step; with one target, it goes to your hand, rulings; with a
   browser test). +9 (29,628 of 31,936 with B96 to B99 and rounds 263 to 267).
+- Round B101 (templates from the bottom of the list): Heirloom Mirror // Inherited Fiend ("Draw a card, mill a card, then put
+  a ritual counter on ~", then Brass's Tunnel-Grinder's "remove those counters" transform), Auditore Ambush (target player
+  searches their library and/or graveyard for a named card; they shuffle only if they searched the library), Teachings of the
+  Kirin // Kirin-Touched Orochi ("When you do" after exiling a card from a graveyard), Kumano Faces Kakkazan // Etching of
+  Kumano (a creature dealt damage this turn by a source you controlled is exiled instead of dying; the source's controller
+  when it dealt the damage, CR 614.1a), The Lady of Otaria (a land you controlled put into a graveyard from the battlefield this
+  turn, the controller as it left), Fugitive of the Judoon (a 1/1 Human token with ward {2}; "exile a Human you control and an
+  artifact you control": one permanent can't be both, so the Human picked must leave an artifact, CR 609.3; with a browser
+  test), Weight of Spires (nonbasic lands that creature's controller controls), Devour Flesh ("That player gains life equal
+  to that creature's toughness"), Sudden Insight (different mana values among nonland cards in your graveyard), Gladewalker
+  Ritualist ("Whenever another creature named ~ enters"). +10 (29,638 of 31,936).
+- Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
+  of Littjara (damage from each creature with power 4 or greater), Founding the Third Path and Helmut Zemo (casting with mana
+  paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,
+  Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
+  Ancient Hellkite ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
+  Steel and Oil (the chosen cards exiled at once), Jester's Mask, The Ruinous Wrecking Crew (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
   ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a

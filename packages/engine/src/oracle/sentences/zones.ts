@@ -2006,6 +2006,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!);
     return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
   }
+  // Fugitive of the Judoon: "You may exile a Human you control and an artifact you control. If you do, ...": two different
+  // permanents of yours, chosen as it resolves (not targeted); doing it means exiling both (CR 609.3).
+  if ((m = /^[Ee]xile an? ([A-Za-z]+) you control and an? ([A-Za-z]+) you control$/.exec(s))) {
+    const first = pickFilter(m[1]!);
+    const second = pickFilter(m[2]!);
+    if (first?.kind !== "object" || second?.kind !== "object") return null;
+    return [
+      { type: "pick", who: { ref: "you" }, filter: first, n: 1, action: "exile", leaving: second },
+      { type: "pick", who: { ref: "you" }, filter: second, n: 1, action: "exile" },
+    ];
+  }
   // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
   // targeted; with no more than that many, all of them (rulings).
   if ((m = new RegExp(`^(.+?) exiles ${NUMX} (.+?) they control$`).exec(s))) {

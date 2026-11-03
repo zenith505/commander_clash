@@ -3,11 +3,11 @@
 // card with flashback you own from exile"), Runic Repetition ("target exiled card with flashback you own"), Sorceress's
 // Schemes (a card from your graveyard or an exiled one, one target), Pull from Eternity and Riftsweeper ("target face-up
 // exiled card"), Blade of the Swarm ("target exiled card with warp"); and giving a permanent away: Stiltzkin, Moogle
-// Merchant ("If they do, you draw a card") and Discerning Financier ("Choose another player. That player gains control of
+// Merchant ("If they do, you draw a card"; Bill Ferny, Bree Swindler came with it) and Discerning Financier ("Choose another player. That player gains control of
 // target Treasure you control"); Proteus Staff ("the rest on the bottom of their library in any order").
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { botActions, canChooseTarget, compileCard, controllerOf, harmfulTargets, invalidateCharacteristics, isFullySupported, legalTargets, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const C = {
@@ -25,6 +25,7 @@ const C = {
   stiltzkin: {"oracleId":"958c2a27-9fb1-42b4-a0ef-296584763a98","name":"Stiltzkin, Moogle Merchant","manaCost":"{W}","cmc":1,"typeLine":"Legendary Creature — Moogle","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Moogle"],"oracleText":"Lifelink\n{2}, {T}: Target opponent gains control of another target permanent you control. If they do, you draw a card.","power":"1","toughness":"2","colors":["W"],"colorIdentity":["W"],"keywords":["Lifelink"],"imageUrl":"https://cards.scryfall.io/normal/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","artUrl":"https://cards.scryfall.io/art_crop/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef,
   financier: {"oracleId":"734a5186-caa6-4811-b6d7-91b7b32fc403","name":"Discerning Financier","manaCost":"{2}{W}","cmc":3,"typeLine":"Creature — Human Noble","supertypes":[],"types":["Creature"],"subtypes":["Human","Noble"],"oracleText":"At the beginning of your upkeep, if an opponent controls more lands than you, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{2}{W}: Choose another player. That player gains control of target Treasure you control. You draw a card.","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Treasure"],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","artUrl":"https://cards.scryfall.io/art_crop/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","commanderLegal":"legal","set":"woe","releasedAt":"2023-09-08","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
   staff: {"oracleId":"97024e8e-dfde-4769-bc27-c3d6fad19e7c","name":"Proteus Staff","manaCost":"{3}","cmc":3,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{2}{U}, {T}: Put target creature on the bottom of its owner's library. That creature's controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield and the rest on the bottom of their library in any order. Activate only as a sorcery.","colors":[],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/5/5/55e5c69c-43d0-4f5b-8720-40074eb122bb.jpg?1783944506","artUrl":"https://cards.scryfall.io/art_crop/front/5/5/55e5c69c-43d0-4f5b-8720-40074eb122bb.jpg?1783944506","commanderLegal":"legal","set":"mrd","releasedAt":"2003-10-02","rarity":"rare","layout":"normal","gameChanger":false} as CardDef,
+  bill: {"oracleId":"ebbe5d82-a7a4-4f4b-b038-095021d9a6a8","name":"Bill Ferny, Bree Swindler","manaCost":"{1}{U}","cmc":2,"typeLine":"Legendary Creature — Human Rogue","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Rogue"],"oracleText":"Whenever Bill Ferny becomes blocked, choose one —\n• Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\n• Target opponent gains control of target Horse you control. If they do, remove Bill Ferny from combat and create three Treasure tokens.","power":"2","toughness":"1","colors":["U"],"colorIdentity":["U"],"keywords":["Treasure"],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/2/0/20ac63cb-fa4d-4340-8062-1029c8bd5ec8.jpg?1783916321","artUrl":"https://cards.scryfall.io/art_crop/front/2/0/20ac63cb-fa4d-4340-8062-1029c8bd5ec8.jpg?1783916321","commanderLegal":"legal","set":"ltr","releasedAt":"2023-06-23","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
 };
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -62,7 +63,7 @@ const choices = (s: GameState, def: CardDef, pid: PlayerId, which: "spell" | num
 
 describe("round 272 cards", () => {
   it("all compile fully", () => {
-    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade, C.stiltzkin, C.financier, C.staff]) expect(isFullySupported(def), def.name).toBe(true);
+    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade, C.stiltzkin, C.financier, C.staff, C.bill]) expect(isFullySupported(def), def.name).toBe(true);
   });
 });
 
@@ -321,5 +322,25 @@ describe("Proteus Staff: put target creature on the bottom; its controller revea
 
   it("bots aim it at an opponent's creature", () => {
     expect(harmfulTargets(compileCard(C.staff).activated[0]!.body)).toEqual([true]);
+  });
+});
+
+describe("Bill Ferny, Bree Swindler: target opponent gains control of target Horse you control; if they do, remove it from combat", () => {
+  it("blocked, the second mode gives the Horse away, removes Bill Ferny from combat and makes three Treasures", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const bill = putOnBattlefield(s0, ap, C.bill);
+    const horse = putOnBattlefield(s0, ap, card("Test Horse", "Creature — Horse", "{1}", { power: "1", toughness: "1" }));
+    const blocker = putOnBattlefield(s0, opp, bear({ name: "Blocking Bear" }));
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: bill, defender: opp }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    while (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: s.pending.player === opp ? [{ blocker, attacker: bill }] : [] });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseModes", player: ap });
+    s = act(s, { type: "chooseModes", player: ap, modes: [1] });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }, tgt(horse)] }));
+    expect(controllerOf(s, s.objects[horse]!)).toBe(opp);
+    expect(s.objects[bill]!.attacking).toBeUndefined();
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && controllerOf(s, s.objects[id]!) === ap && s.objects[id]!.cardId.startsWith("token:Treasure:")).length).toBe(3);
   });
 });

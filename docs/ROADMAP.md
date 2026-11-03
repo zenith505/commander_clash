@@ -1,6 +1,6 @@
 # Roadmap
 
-29,573 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,583 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
@@ -5108,6 +5108,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Wight (each creature in combat with it at end of combat: a paralyzation counter, tapped, no untapping for as long as it
   has one, CR 611.2b, and "{4}: Remove a paralyzation counter"); Gaze of the Gorgon (regenerate, then destroy at end of
   combat what blocked it or it blocked this turn, rulings). +10 (29,566 of 31,936 with B95 and rounds 261 to 264; 29,573 with round 265).
+- Round B97 (templates from the bottom of the list): first the gap B96 found: a "*" power or toughness outside the
+  battlefield is what the card's characteristic-defining ability says (CR 604.3), its owner as "you" (a spell's controller
+  on the stack), so Sacellum Godspeaker reveals a Serra Avatar at 40 life and a Lhurgoyf in a graveyard counts itself
+  for "power 2 or less" (not while the layers themselves are being worked out). Then mana spent only on some costs:
+  Tin Street Gossip ("to cast face-down spells or to turn creatures face up", any way) and Qarsi Deceiver (a face-down
+  creature spell, a morph or megamorph cost, a manifested creature's mana cost; not a disguise cost or a cloaked one, CR
+  701.58a), Quinjet Technician ("to activate power-up abilities"), Adarkar Unicorn ("to pay cumulative upkeep costs",
+  the Pay button and bots too); Bortuk Bonerattle ("Return that card to the battlefield if its mana value is less than or
+  equal to the number of basic land types among lands you control. Otherwise, put it into your hand."), Circle of
+  Confinement (a Vampire spell with the same name as a card it exiled until it leaves), Blue, Loyal Raptor (each other
+  Dinosaur enters with a counter of each kind on it, CR 614.1c), Spikeshell Harrier (that opponent's speed drops by 1 if
+  it's greater than every other player's, never below 1), Skophos Maze-Warden (another creature targeted by an ability of
+  your Labyrinth of Skophos), Brilliance Unleashed (a noncreature artifact card returns as a 3/3 Robot artifact creature
+  with flying, keeping its other types and abilities, CR 205.1b). +10 (29,583 of 31,936 with B96 and rounds 263 to 265).
+- Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing, Master of the Hunt and the "bands with
+  other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
+  Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (an exchange that removes it from
+  combat), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
+  for a card exiled by a different ability), Split the Spoils (piles), Swindler's Scheme (counter and cast the revealed
+  card), Legion Angel (outside the game, as the Wishes). Brilliance Unleashed's robot becomes one after it enters, as other
+  "return ... It's a ..." cards here do (no ruling says it enters as a creature).
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
   unless they put a card from their hand on top of their library": a punisher option with a card from hand), Vortex
@@ -5116,8 +5137,6 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
   next combat damage to an opponent), Shifty Doppelganger (return the exiled card at end step if the creature was
   sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type).
-  Known gap: Sacellum Godspeaker and other in-hand power filters read printed power, so a characteristic-defining power
-  (*) in hand counts as 0 (CR 604.3 says it works there).
 - Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
   Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
   of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's

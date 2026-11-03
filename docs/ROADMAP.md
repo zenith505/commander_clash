@@ -1,7 +1,7 @@
 # Roadmap
 
-29,512 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,468 of
+29,515 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,470 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1846,10 +1846,25 @@ line blocks.
    then choose a card exiled this way. Until the end of your next turn, you may play that card" (End-Blaze Epiphany: its
    power as it last existed); "Put up to two noncreature artifact cards with total mana value less than or equal to the
    sacrificed artifact's mana value from among them onto the battlefield" (Smelting Vat, with a browser test). +9 (29,486
-   of 31,936; 29,500 with B92). Rules gap seen: a dies trigger's "its power" reads the card's printed power if the card has left the
-   graveyard again before the trigger resolves (effects/resolve.ts subjectEvenIfGone), not its last known power (CR 608.2h).
-   Out after round 260 (looked at, not done): Mirror-Mad Phantasm (owner shuffles it in, then reveals until a card named
-   it, the rest milled: compilable, but bots would activate it and mill themselves, so it needs a bot rule first); Over
+   of 31,936; 29,500 with B92). Round 261 fixed the rules gap it saw: a dies trigger's "its power" (Stalking Vengeance,
+   End-Blaze Epiphany's delayed trigger) is the creature's last known power on the battlefield also once the card has left
+   the graveyard before the trigger resolves (CR 603.10a, 608.2h, 113.7a), not the card's printed power.
+   Round 261 (top of the list): "you may return one of them to its owner's hand. If you do, you may activate loyalty
+   abilities of ~ twice this turn rather than only once" (Kaito, Dancing Shadow: TurnRule loyaltyTwice about the object,
+   twice at most, with a browser test); "As ~ enters, you may exile two creature cards from graveyards. If you do, it enters
+   as a copy of one of those cards with ... +1/+1 counters ... equal to the power of the other card" (The Mimeoplasm:
+   entersAsCopy exileTwo, the second pick a new "copyOther" prompt, with a browser test); "~'s owner shuffles it into their
+   library. If that player does, they reveal cards ... until a card named ~ is revealed ..." (Mirror-Mad Phantasm:
+   PlayerRef sourceOwner, SpellCondition shuffledInThisWay, the card's printed name for a granted copy of the ability;
+   bots never activate it). +3 (29,503 of 31,936; 29,515 with B93).
+   Out after round 261 (looked at, not done): Doors of Durin (a "may reveal the top card" whose creature card enters tapped
+   and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
+   attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library
+   with "remove a counter from a creature you control" as an additional cost: a cost choice for the cast, the autopay and
+   bots); Master of the Wild Hunt (each tapped Wolf deals damage, then the target's controller divides its damage among those
+   Wolves as it resolves); Secret of Bloodbending (controlling another player); Harold and Bob, First Numens (returns as an
+   Aura with a granted mana ability). Burning-Rune Demon and Moonlit Meditation still out, as before.
+   Out after round 260 (looked at, not done): Mirror-Mad Phantasm (done in round 261); Over
    the Top (each player reveals cards equal to their nonland permanents and all permanent cards revealed enter at once);
    Terminal Velocity (a permanent put from your hand gains a leaves-the-battlefield trigger and an end-step sacrifice);
    Hurkyl, Master Wizard (one revealed card for each card type among noncreature spells you cast this turn); Hew the

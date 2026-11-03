@@ -678,6 +678,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.digTook
             : e.cond.kind === "searchFound"
             ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
+            : e.cond.kind === "shuffledInThisWay"
+            ? !!s.resolving!.shuffledIn?.length
             : e.cond.kind === "bouncedThisWay"
             ? ((c) => !!s.resolving!.bouncedThisWay?.some((b) => (!c.subtype || b.subtypes.includes(c.subtype)) && (!c.another || b.id !== ctx.sourceId) && (!c.returned || !!(b as { returned?: true }).returned)))(e.cond as Extract<SpellCondition, { kind: "bouncedThisWay" }>)
             : e.cond.kind === "excessDealt"

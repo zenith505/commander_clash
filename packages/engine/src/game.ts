@@ -1219,7 +1219,7 @@ export function moveObject(
     const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
-    if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
@@ -8621,6 +8621,8 @@ function loyaltyPerTurn(s: GameState, o: GameObject): number {
   // The Chain Veil: one more for each time its ability resolved for this player this turn, planeswalkers only.
   const veil = objIsType(s, o, "Planeswalker") ? (s.turnRules ?? []).filter((r) => r.turn === s.turn && r.player === pid && r.rule === "extraLoyalty").length : 0;
   if (abilitiesOf(s, o).loyaltyTwice) return 2 + veil;
+  // Kaito, Dancing Shadow: twice this turn, not more however many times it resolved (rulings).
+  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.rule === "loyaltyTwice" && r.object?.id === o.id && r.object.zc === (o.zoneChanges ?? 0))) return 2 + veil;
   return (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1) + veil;
 }
 
@@ -8766,7 +8768,26 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
     if (pend.what === "copy") {
+      // The Mimeoplasm: the card it copies first, then the other card to exile with it.
+      if (compileCard(defOf(s, o)).entersAsCopy?.exileTwo && choice !== "none") {
+        if (!pend.options.includes(choice)) throw new RulesError("choose a creature card offered, or none");
+        (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "copyOther", options: [choice], ...(entry?.enterOpts ? { enterOpts: entry.enterOpts } : {}) });
+        return;
+      }
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
+      return;
+    }
+    if (pend.what === "copyOther") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose another creature card offered");
+      const first = entry!.options![0]!;
+      // Its power in the graveyard, before both are exiled (CR 208.3, 608.2h); a negative power puts none (CR 107.1b).
+      const n = Math.max(0, characteristics(s, obj(s, choice)).power);
+      log(s, `${p.name} exiles ${defOf(s, obj(s, first)).name} and ${defOf(s, obj(s, choice)).name} from graveyards.`);
+      moveObject(s, first, "exile");
+      moveObject(s, choice, "exile");
+      invalidateCharacteristics(s);
+      const opts = entry?.enterOpts ?? {};
+      enterAsCopy(s, o, first, n ? { ...opts, counters: { ...opts.counters, "+1/+1": (opts.counters?.["+1/+1"] ?? 0) + n } } : opts);
       return;
     }
     if (pend.what === "exchangeText") {
@@ -8911,7 +8932,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -9433,9 +9454,20 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "copy") {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
       // Not one that entered at the same time (CR 614.12, rulings on Clone).
-      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter).filter((id) => !c.together?.includes(id));
+      const own = compileCard(defOf(s, o)).entersAsCopy!;
+      const ids = copyCandidates(s, o, own.filter).filter((id) => !c.together?.includes(id));
       const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name}${obj(s, id).zone === "graveyard" ? "'s graveyard" : ""})`);
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
+      // The Mimeoplasm: two cards to exile, so none if there aren't two (rulings).
+      const offered = own.exileTwo && ids.length < 2 ? [] : ids;
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...offered, "none"], labels: [...labels.slice(0, offered.length), own.exileTwo ? "Don't exile" : "Don't copy"], objectId: o.id, ...(own.exileTwo ? { prompt: "you may exile two creature cards from graveyards: first the one it enters as a copy of" } : {}) };
+      return true;
+    }
+    if (c.what === "copyOther") {
+      // The other card exiled with the one it copies: +1/+1 counters equal to its power.
+      const first = c.options![0]!;
+      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter).filter((id) => id !== first && !c.together?.includes(id));
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name}'s graveyard, power ${Math.max(0, characteristics(s, obj(s, id)).power)})`);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copyOther", options: ids, labels, objectId: o.id, prompt: `a copy of ${defOf(s, obj(s, first)).name}: choose the other creature card to exile (+1/+1 counters equal to its power)` };
       return true;
     }
     if (c.what === "tribute") {

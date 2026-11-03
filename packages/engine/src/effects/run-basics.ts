@@ -328,6 +328,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, ctx.controller).name}'s opponents${e.rules.map((r) => (r === "noLoyalty" ? " can't activate planeswalkers' loyalty abilities" : "")).join(",")} this turn.`);
         return;
       }
+      if (e.self) {
+        // Kaito, Dancing Shadow: about its source, only while it's the same object (CR 400.7).
+        const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (!src || src.zone !== "battlefield" || (ctx.sourceZc !== undefined && (src.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+        for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, object: { id: src.id, zc: src.zoneChanges ?? 0 } });
+        log(s, `${player(s, ctx.controller).name} may activate loyalty abilities of ${defOf(s, src).name} twice this turn.`);
+        return;
+      }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, ...(e.byColors ? { byColors: e.byColors } : {}) });
       if (e.rules[0] === "seeHexproof") {
         log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);

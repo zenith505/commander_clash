@@ -2146,7 +2146,10 @@ export interface TurnRule {
   /** "noLoyalty": Revel in Silence's "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (CR 606.3). */
   /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree";
+  /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice";
+  /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
+  object?: { id: ObjectId; zc: number };
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
 }
@@ -2387,6 +2390,8 @@ export interface Resolving {
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   /** Starving Revenant: how many cards this resolution's surveil put on top of the library (Count surveilTopThisWay). */
   surveilTop?: number;
+  /** What its shuffleIntoLibrary instructions put into a library (SpellCondition shuffledInThisWay). */
+  shuffledIn?: ObjectId[];
   bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** As it last existed on the battlefield (Count bouncedThisWayPower). */ power?: number; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
   returnedToHand?: ObjectId[];

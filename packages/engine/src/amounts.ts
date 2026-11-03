@@ -33,6 +33,8 @@ export interface AmountCtx {
   amassedPower?: number;
   /** The source as it last existed, if it has left the battlefield (CR 608.2h). */
   lki?: LastKnown;
+  /** A triggered ability's subject as it triggered (a dies trigger's: the card in the graveyard, CR 603.10a). */
+  subject?: { id: ObjectId; zc: number };
   /** Kicker costs paid for the spell (or the spell its permanent was), CR 702.33d. */
   kicked?: number[];
   /** How many colors of mana were spent to cast the spell (or the spell its permanent was), CR 207.2c. */
@@ -852,6 +854,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // Not sacrificed for a cost: what the ability sacrificed as it resolved ("You may sacrifice another creature. If you do,
       // ... that creature's power", Disciple of Freyalise).
       if (c.of.ref === "sacrificed") return Math.max(0, (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1))?.[c.kind] ?? 0);
+      // A dies trigger's subject (the card the creature became in the graveyard): as the creature last existed on the
+      // battlefield, also once the card has left the graveyard again before the trigger resolves, not as the card is now
+      // (CR 603.10a, 608.2h, 113.7a).
+      const subjLk = c.of.ref === "subject" && ctx.subject && c.kind !== "manaValue" ? s.lastKnown?.[ctx.subject.id] : undefined;
+      if (subjLk && subjLk.zc === ctx.subject!.zc - 1) return subjLk[c.kind as "power" | "toughness"];
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) {
         // Gone: as it last existed on the battlefield (CR 608.2h).

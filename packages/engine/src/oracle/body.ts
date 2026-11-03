@@ -5527,6 +5527,49 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences[si + 1] = "Exile the top card of your library";
       continue;
     }
+    // Retribution, Barrin's Spite, Incriminate, Trial of Agony, Cannibalize: "Choose two target creatures controlled by the
+    // same opponent (player). That player chooses and sacrifices one of those creatures. Put a -1/-1 counter on the
+    // other.": both targets have one controller as they're chosen and as it resolves (CR 115.1, 608.2b); one of them is
+    // picked as it resolves (CR 608.2d), by their controller or by you (Cannibalize), among those still legal (rulings: with
+    // one left, that one), and the other gets the rest.
+    const split = si === 0 && ctx.spell ? /^Choose two target creatures controlled by the same (player|opponent)$/.exec(s) : null;
+    const splitRest = split ? sentences.slice(1).join(". ").replace(/\.$/, "") : "";
+    const splitKind = split
+      ? splitRest === "That player chooses and sacrifices one of those creatures. Put a -1/-1 counter on the other" ? "minus"
+        : splitRest === "Their controller chooses and sacrifices one of them. Return the other to its owner's hand" ? "bounce"
+        : splitRest === "That player sacrifices one of them of their choice" ? "sacrifice"
+        : splitRest === "Exile one of those creatures and put two +1/+1 counters on the other" ? "exile"
+        : splitRest === "That player chooses one of those creatures. ~ deals 5 damage to that creature, and the other can't block this turn" ? "damage"
+        : undefined
+      : undefined;
+    if (split && splitKind && !effects.length && !ctx.targets.length) {
+      const both = parseObject(split[1] === "opponent" ? "two target creatures an opponent controls" : "two target creatures", ctx);
+      if (both?.ref !== "target" || both.index !== 0 || ctx.targets.length !== 2) return null;
+      ctx.targets[1] = { ...ctx.targets[1]!, sameControllerAs: [0], text: `${ctx.targets[1]!.text} with the same controller` };
+      const t = (index: number): ObjRef => ({ ref: "target", index });
+      const option = (i: number): Effect[] => {
+        const [chosen, other] = [t(i), t(1 - i)];
+        if (splitKind === "minus") return [{ type: "sacrifice", what: chosen, byController: true }, { type: "counters", what: other, counter: "-1/-1", n: 1 }];
+        if (splitKind === "bounce") return [{ type: "sacrifice", what: chosen, byController: true }, { type: "bounce", what: other }];
+        if (splitKind === "sacrifice") return [{ type: "sacrifice", what: chosen, byController: true }];
+        if (splitKind === "exile") return [{ type: "exile", what: chosen }, { type: "counters", what: other, counter: "+1/+1", n: 2 }];
+        return [{ type: "damage", amount: 5, to: chosen }, { type: "continuous", what: other, mods: [{ kind: "cantBlock" }], duration: "endOfTurn" }];
+      };
+      const label = splitKind === "minus" ? "Sacrifice {0}; put a -1/-1 counter on {1}" : splitKind === "bounce" ? "Sacrifice {0}; return {1} to its owner's hand" : splitKind === "sacrifice" ? "Sacrifice {0}" : splitKind === "exile" ? "Exile {0}; put two +1/+1 counters on {1}" : "5 damage to {0}; {1} can't block this turn";
+      effects.push({ type: "splitTargets", chooser: splitKind === "exile" ? "you" : "controller", options: [option(0), option(1)], label });
+      si = sentences.length;
+      continue;
+    }
+    // Insubordination (as triggers.ts reads it): "~ deals 2 damage to that player unless enchanted creature attacked this
+    // turn": only checked as it resolves, the creature it's enchanting then (not an intervening "if", CR 603.4).
+    const unlessAttacked = /^(.+?) unless enchanted creature attacked this turn$/.exec(s);
+    if (unlessAttacked) {
+      const cond = parseStaticCondition("enchanted creature didn't attack this turn", { affects: { kind: "self" }, mods: [], text: "" });
+      const inner = cond ? parseBody(`${unlessAttacked[1]!}.`, opts) : null;
+      if (!cond || !inner || inner.targets.length || inner.modal) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond }, effects: inner.effects });
+      continue;
+    }
     // Take Out the Trash: "If you control a Raccoon, you may discard a card. If you do, draw a card.": the condition checked
     // as it resolves, then the choice and what depends on it, as written alone.
     const ifCtlMay = /^If (you control an? [A-Z][a-z]+), you may (.+)$/.exec(s);

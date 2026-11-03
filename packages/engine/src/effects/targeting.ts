@@ -6,7 +6,7 @@ import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughne
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
-import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
+import { CREATURE_TYPES, hexproofFrom, LAND_TYPE_LIST, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
@@ -358,14 +358,14 @@ export function choiceOptions(what: ChoiceKind | EntersOption, except?: string):
   if (what === "landOrNonland") return ["land", "nonland"];
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
-  const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
+  const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : what === "landType" ? [...LAND_TYPE_LIST] : [...CREATURE_TYPES].sort();
   return all.filter((x) => x.toLowerCase() !== except?.toLowerCase());
 }
 
 /** Record a choice by name: a creature type, or a color ("Blue" is U). */
 export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice: string): Chosen {
   if (what === "creatureType") return { ...chosen, type: choice };
-  if (what === "basicLandType") return { ...chosen, landType: choice };
+  if (what === "basicLandType" || what === "landType") return { ...chosen, landType: choice };
   if (what === "keyword") return { ...chosen, keyword: choice };
   if (what === "cardType") return { ...chosen, cardType: choice };
   if (what === "cardName") return { ...chosen, name: choice };

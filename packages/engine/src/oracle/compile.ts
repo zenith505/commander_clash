@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -2048,6 +2048,12 @@ export function compile(d: CardDef): CompiledCard {
     const leash = /^You can't choose an untapped (permanent|creature) as ~'s target as you cast it\.$/.exec(line);
     if (leash && d.subtypes.includes("Aura") && new RegExp(`^Enchant ${leash[1]}$`, "m").test(d.oracleText ?? "")) {
       out.castTargetTapped = true;
+      continue;
+    }
+    // Traveler's Cloak: "As this Aura enters, choose a land type." for "Enchanted creature has landwalk of the chosen type.":
+    // any land type, basic or not (CR 205.3i, rulings), kept as Chosen.landType.
+    if (line === "As ~ enters, choose a land type." && lines.includes("Enchanted creature has landwalk of the chosen type.") && !out.entersChoose?.length) {
+      out.entersChoose = [{ what: "landType" }];
       continue;
     }
     // Convincing Mirage, Phantasmal Terrain: the same choice on an Aura, for "Enchanted land is the chosen type."
@@ -6116,6 +6122,8 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
+    // "Landwalk of the chosen type": a land type chosen as it entered or resolved (any type, or a basic one for Giant Slug).
+    if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_LANDWALK) || (o.keywords as string[]).includes(CHOSEN_SNOW_LANDWALK))) needs.add("landType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     // "Each of the chosen abilities" (Greymond): only with "as ~ enters, choose two abilities from among ...".
@@ -6161,6 +6169,8 @@ function checkCastingLinks(out: CompiledCard) {
   // the choice of a "When ~ enters, choose a land card name" trigger is only kept while that trigger resolves.
   if ((out.nameBans || out.protectionFromChosenName || JSON.stringify(out.statics).includes('"chosen":"name"')) && !out.entersChoose?.some((c) => c.what === "cardName")) bad = true;
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
+  // A basic land type is a land type too (CR 205.3i): Giant Slug's choice gives its landwalk.
+  if (choices.has("basicLandType")) choices.add("landType");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
   if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;

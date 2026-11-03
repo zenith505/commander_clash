@@ -1564,6 +1564,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attackYouNextTurn": {
+      for (const pid of players(s, e.who, ctx)) {
+        (s.attackPlayerNextTurn ??= []).push({ player: pid, attack: ctx.controller, since: s.turn });
+        log(s, `During ${player(s, pid).name}'s next turn, creatures they control attack ${player(s, ctx.controller).name} if able.`);
+      }
+      return;
+    }
     case "attackBanThisTurn": {
       const you = player(s, ctx.controller).name;
       for (const pid of players(s, e.who, ctx)) {

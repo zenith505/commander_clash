@@ -1,6 +1,6 @@
 # Roadmap
 
-29,454 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,458 of
 9,979 (94%).
 
@@ -1801,7 +1801,7 @@ line blocks.
    browser test); "choose a card in your hand. That player guesses whether the card's mana value is greater than 4. If
    the player guessed wrong, you may cast the card without paying its mana cost" (Master of Predicaments, with two browser
    tests); "Reveal the top five cards of your library. Put one of them into your hand. Then choose an opponent. They put one
-   on the bottom of your library. Then you put one into your hand ..." (Memories Returning, with a browser test). +9 (29,447 of 31,936).
+   on the bottom of your library. Then you put one into your hand ..." (Memories Returning, with a browser test). +9 (29,447 of 31,936); 29,461 with B91).
    Round 258 (skipped cards from the top of the list): "Roll a d10. Put target artifact, creature, or planeswalker into
    its owner's library just beneath the top X cards of that library, where X is the result" (Underdark Rift); "for each
    opponent, choose a nonland permanent that player controls. Destroy one of them chosen at random" (Chaos Defiler: you
@@ -1815,7 +1815,7 @@ line blocks.
    "Return a creature card from your graveyard to the battlefield, then return another creature card from your graveyard
    to your hand" (Blood for Bones); "Flip a coin until you lose a flip or choose to stop flipping. If you lose a flip, ~
    has no effect. If you win one or more flips, ..." (Fiery Gambit: asked after each flip won, with a browser test). +7
-   (29,454 of 31,936).
+   (29,468 of 31,936 with B91).
    Out after round 258 (looked at, not done): Green Sun's Twilight ("Choose a creature card and/or a land card from among
    them": at least one if there is one, and with X 5 or more both onto the battlefield or both into your hand; the dig
    has no "at least one" pick yet); Canoptek Wraith ("you may pay {3} and sacrifice it. If you do, choose a land you
@@ -4884,6 +4884,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   an artifact, then copy it if you control an enchantment" (Banish into Fable); "You may cast spells with mana value less
   than or equal to the number of creatures you control from your hand without paying their mana costs" (Omnipresence).
   +10 (29,368 of 31,936 with B86 to B89 and rounds 248 and 249; 29,417 with rounds 250 to 254).
+- Round B91 (one-line templates from the bottom of the list): "choose a land type", any land type, basic or not (CR
+  205.3i), for "landwalk of the chosen type" (Traveler's Cloak as it enters, with a browser test; Illusionary Presence at
+  your upkeep) and "snow landwalk of the chosen type" (Barbarian Guides, a snow land of that type, CR 702.14c); "a spell
+  with {H} in its mana cost", any Phyrexian mana symbol (Rage Extractor, CR 107.4f); "unless that creature attacked this
+  turn" at the end step of the enchanted creature's controller (Insubordination, checked as it resolves); "During target
+  player's next turn, creatures that player controls attack you if able" (Taunt, CR 508.1d); "return the exiled cards to
+  their owner's graveyard" (Gravegouger); "Choose two target creatures controlled by the same opponent (player)", one of
+  them picked as it resolves among those still legal, by their controller or by you (Retribution, Barrin's Spite,
+  Incriminate, Trial of Agony, Cannibalize, with a browser test); "Whenever you activate an ability of an Elemental"
+  (Ceaseless Searblades); "Whenever one or more creatures you control that entered this turn attack a player" (Whirlwind,
+  Killer Cyclone). +14 (29,422 of 31,936 with B86 to B90 and rounds 248 to 253; 29,441 with rounds 254 and 255; 29,452 with round 256).
+- Out after round B91 (looked at, not done): Goblin Test Pilot (a target chosen at random as an activated ability is
+  activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
+  activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),
+  Suppress (a hand exiled face down until the end step of that player's next turn), Yare ("target creature defending
+  player controls" when several players are attacked), Matopi Golem (a trigger when a regeneration shield is used), Rock
+  Hydra and Lichenthrope (replacements for each 1 damage, and Rock Hydra's counters removed even if the damage can't be
+  prevented), Quenchable Fire ("unless that player pays {U} before that step": a payment any time before the upkeep).
 - Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
   names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (targeting any card in exile), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to

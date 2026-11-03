@@ -1,7 +1,7 @@
 # Roadmap
 
-29,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,485 of
+29,563 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -45,8 +45,7 @@ line blocks.
    checked and paid); Balor ("whenever ~ attacks or dies", "choose one or more. Each mode must target a different
    player", "discards three cards at random"); New Blood (changing a creature type in a card's text, CR 612); Guff
    Rewrites History (one target for each player, then each of them exiles until a nonland card and may cast it);
-   Deeproot Pilgrimage ("one or more nontoken Merfolk you control become tapped": taps at the same time aren't one
-   event yet); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
+   Deeproot Pilgrimage (done in round 265); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Tasha, the Witch Queen (page counters, "a spell you don't own"); Mirrormind Crown and Moonlit
    Meditation ("the first time you would create one or more tokens each turn, you may instead create copies": the same
    choice at token creation as Jinnie Fay); Sokrates, Athenian Teacher (a granted prevention whose draws count the
@@ -91,7 +90,7 @@ line blocks.
    battlefield), Great Unclean One (a token for each opponent with less life than you). Out after round 164: Agility
    Bobblehead (up to X targets, X counted as it's activated; "can't be blocked except by creatures with haste"),
    Nahiri's Resolve (exile any number of your artifacts and creatures, then return those cards at your next upkeep),
-   Omo, Queen of Vesuva (everything counters: every land type, every creature type), Shelob, Child of Ungoliant
+   Omo, Queen of Vesuva (done in round 265), Shelob, Child of Ungoliant
    (creatures dealt damage this turn by a Spider you controlled; a copy that's a Food artifact and loses its other
    card types), Professor Hojo (a cost reduction for the first activated ability that targets a creature you control;
    "become the target of an activated ability"), Squee, Dubious Monarch (an alternative cost from the graveyard that
@@ -717,12 +716,12 @@ line blocks.
    (Sengir). No new prompts.
    Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
    untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
-   Assassin Lord (attacked this turn by an Assassin you controlled), Kros, Defense Contractor (no record of who put
+   Assassin Lord (done in round 265), Kros, Defense Contractor (no record of who put
    counters on a creature), Glorious Purpose (the sixth
    plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
    counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
-   hand), Obeka, Splitter of Seconds (extra upkeep steps after this phase).
+   hand), Obeka, Splitter of Seconds (done in round 265).
    Round 203 went on from the top: storied and the enduring story (CR 702.195: Balin, Bifur, Bombur, Dáin, Fíli, Kíli,
    Óin, Ori, Thorin), "artifacts and creatures you control" as one group (Thorin), time travel (CR 701.56a, a prompt
    for each permanent with a time counter and each suspended card, then all the changes at once: Wibbly-wobbly,
@@ -1368,7 +1367,7 @@ line blocks.
    Shadow ("activate loyalty abilities of ~ twice this turn", a one-turn grant); Saheeli's Lattice, Altar of the
    Wretched, Paleontologist's Pick-Axe and Sunbird Standard ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
-   direction); Ramses, Assassin Lord (attacked this turn by an Assassin you controlled).
+   direction); Ramses, Assassin Lord (done in round 265).
    Round 232 (unexamined cards from ranks 6,400 to 13,000, now done): a search's exile linked to a dies ability (Hoarding
    Dragon: each Dragon its own hoard, CR 607.2a); "Choose a card name. Whenever a creature with the chosen name deals
    combat damage to a player this turn" (The Clone Saga: the name bound into the delayed trigger, anyone's creature); "for
@@ -1907,6 +1906,24 @@ line blocks.
    time counter on ~": another player's "may" about a card in exile), Nihilith and Curse of the Cabal (other "if ~ is
    suspended" triggers: a card put into a graveyard, each player's upkeep); Greater Gargadon (an activated ability of a
    card in exile: none can be activated there yet, for the engine, bots or the UI).
+   Round 265 made permanents tapped at the same time one event (game.ts batchTaps: the attackers declared together, CR
+   508.1f; one cost's taps, CR 601.2h, 602.2b; one instruction's, CR 608.2c; a mana ability's its own, CR 605.3a), for
+   "Whenever one or more nontoken Merfolk you control become tapped" (Deeproot Pilgrimage, once for creatures tapped
+   together, rulings) and "Whenever one or more creatures you control become tapped" (Rewrite History). Then from the
+   top: "Choose target creature. Whenever that creature is dealt damage this turn, it deals that much damage to each other
+   creature and each player" (Arcbond: a delayed trigger about that creature, lethal damage too, the creature the source
+   as it last existed, rulings); "you get that many additional upkeep steps after this phase" (Obeka, Splitter of Seconds:
+   added beginning phases with only an upkeep step, GameState.upkeepPhase, untap and draw skipped, rulings); "Whenever ~
+   becomes untapped during your untap step, you get an additional upkeep step after this step" (The Ninth Doctor: after
+   the upkeep its trigger resolves in, rulings); everything counters (Omo, Queen of Vesuva: every land type with the
+   basic types' mana abilities, CR 205.3i, 305.6; nonland creatures every creature type); "Whenever a player loses the
+   game, if they were attacked this turn by an Assassin you controlled, you win the game" (Ramses, Assassin Lord:
+   Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7 (29,553 of 31,936; 29,563 with B95).
+   Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
+   would deal combat damage to a player, instead that player mills that many cards": a replacement, not a prevention,
+   so it applies to damage that can't be prevented and the player orders it with the damage shields, CR 616.1; the
+   damage rules only prevent or redirect yet); The Ninth Doctor's trigger resolving outside an upkeep (an upkeep skipped
+   by Eon Hub) adds nothing.
    Out after round 263 (looked at, not done): Protean Hydra (done in round 264).
    Out after round 262 (looked at, not done): Dragon's Fire ("reveal a Dragon card from your hand or choose a Dragon you
    control" as an additional cost, the damage that card's or creature's power: a new cast-time choice for the UI and bots,
@@ -2059,7 +2076,7 @@ line blocks.
    Foremost, Goliath Hatchery (other lines, not started).
    Out after round 236 (looked at, not done): Ochre Jelly (a token copy, at the next end step, that enters with half
    the dead creature's +1/+1 counters).
-   Out after round 235 (looked at, not done): Deeproot Pilgrimage (a batched "one or more ... become tapped" trigger); Zurzoth, Chaos Rider ("you and those
+   Out after round 235 (looked at, not done): Deeproot Pilgrimage (done in round 265); Zurzoth, Chaos Rider ("you and those
    players" after attacking several players); Clockspinning (choose a counter kind on a permanent or suspended card);
    Radiant Lotus (sacrifice one or more artifacts, another player adds the
    mana).
@@ -2108,7 +2125,7 @@ line blocks.
    Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Erdwal Illuminator, Sigarda, Host of
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
-   Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
+   Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond (done in round 265), Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
    Smaller gaps from round 174: Howlpack Piper's and Tlincalli Hunter's tests use their front face alone (and Retrieve
    Prey on its own); bots activate "remove all counters" abilities in their second main phase only (Sage of Hours with
@@ -2379,7 +2396,7 @@ line blocks.
    round 96: Ugin's Nexus (its "would be put into a graveyard" line), Stranglehold ("can't search libraries"),
    Gerrard's Hourglass Pendant, Gond Gate ("Gates you control"), Neoform ("with an additional +1/+1 counter"), Vivien
    on the Hunt's +1, Elite Arcanist, the
-   Plans whose other lines are out (Claim the Kingdom, Political Triumph, Robot Domination, Rewrite History). Who puts
+   Plans whose other lines are out (Claim the Kingdom, Political Triumph, Robot Domination; Rewrite History done in round 265). Who puts
    counters (Vorinclex, Innkeeper's Talent) is the effect's controller; for costs and "enters with" counters it's the
    permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked
    for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Cinder
@@ -2471,7 +2488,7 @@ line blocks.
    Left from the round after mutate ("up to N" divided targets, merged cards leaving together, "becomes untapped"):
    - "Becomes untapped" still out on other lines: Arbiter of the Ideal (manifestation counters), Daring Thief and
      Disciple of Deceit, King Macar, Fishing Pole, Ghostly Pilferer; "become untapped" for two (Tui and La); "during
-     your untap step" (The Ninth Doctor).
+     your untap step" (The Ninth Doctor, done in round 265).
    Left from the round after backgrounds (the last five Backgrounds, kinship with last-known types, Leaf-Crowned Elder,
    Adeline's planeswalker choice, tempting offers, airbend and "its owner may cast it" exiles, Nalfeshnee):
    - Granted myriad's tokens still attack the player only, not a planeswalker.
@@ -4011,8 +4028,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B44: Mana Cache (a mana ability any player may activate), Torrent Elemental (an ability activated
   from exile needs the UI and the bot), Keldon Twilight ("that player sacrifices a creature they controlled since the
   beginning of the turn"), Leshrac's Sigil ("you may pay {B}{B}. If you do, look at that player's hand and choose a
-  card from it": the look sits inside the "if you do"), Rewrite History ("whenever one or more creatures you control
-  become tapped"), Spiny Starfish (counting regenerations), Magmablood Archaic (colors spent on the triggering spell),
+  card from it": the look sits inside the "if you do"), Rewrite History (done in round 265), Spiny Starfish (counting regenerations), Magmablood Archaic (colors spent on the triggering spell),
   Wanderwine Farewell (Kindred), Archery Training and Heartseeker (a granted ability that names the source),
   Stormwild Capridor (prevented damage turned into counters), Awesome Presence (a block cost for each blocker).
 - Round B45 (harder skipped cards, least played first): creatures that dealt damage this turn, as that object

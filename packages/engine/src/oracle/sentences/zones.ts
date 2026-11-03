@@ -1326,7 +1326,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
   // library": the X it was cast with.
   // Quarry Colossus: "..., where X is the number of Plains you control": X as the text defines it, counted as it resolves.
-  if ((m = /^[Pp]ut (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && (ctx.spell || ctx.whereX)) {
+  // Underdark Rift: "Roll a d10. Put target artifact, creature, or planeswalker into its owner's library just beneath the
+  // top X cards of that library, where X is the result": the roll's result (CR 706.2).
+  if ((m = /^[Pp]ut (target [a-z ]+?|target [a-z]+, [a-z]+, or [a-z]+) into its owner's library just beneath the top X cards of that library$/.exec(s)) && (ctx.spell || ctx.whereX)) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
   }
@@ -1512,6 +1514,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Skyship Weatherlight: a card exiled with it chosen at random as it resolves, into its owner's hand (rulings: the
     // errata's owner).
     if (/^Put a card exiled with ~ chosen at random into its owner's hand$/.test(s)) return [{ type: "moveLinked", dest: "hand", one: true, random: true }];
+    // Omenpath Journey: "choose a card at random exiled with ~ and put it onto the battlefield tapped": under this ability's
+    // controller's control (CR 110.2a).
+    if (/^[Cc]hoose a card at random exiled with ~ and put it onto the battlefield tapped$/.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, random: true, tapped: true }];
     // Bag of Devouring: "Return up to X cards from among cards exiled with ~ to their owners' hands, where X is the result":
     // chosen as it resolves, from the cards its sacrifice trigger exiled (CR 607.2a).
     if (/^Return up to X cards from among cards exiled with ~ to their owners' hands$/.test(s)) return [{ type: "moveLinked", dest: "hand", upTo: { count: { kind: "x" } } }];

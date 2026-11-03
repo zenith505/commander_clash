@@ -149,6 +149,37 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
     log(s, `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${up} came up heads${edgar}.`);
     return;
   }
+  // Fiery Gambit: "Flip a coin until you lose a flip or choose to stop flipping": one flip at a time, asked after each one
+  // won whether to flip again (rulings); with Krark's Thumb, a won coin kept if there is one. Edgar rigs the first of the
+  // run only. A run of 100 wins is cut short, as paper Magic would (CR 732).
+  if (e.untilLose && e.mayStop) {
+    const run = (sc.flipRun ??= { wins: 0 });
+    if (run.asked) {
+      run.asked = undefined;
+      const again = sc.may !== false;
+      sc.may = undefined;
+      if (!again) {
+        sc.flipRun = undefined;
+        s.resolving!.flipped = { won: true, wins: run.wins };
+        log(s, `${player(s, who).name} stops flipping coins for ${src}: ${run.wins} won.`);
+        return;
+      }
+    }
+    const won1 = (heads && run.wins === 0) || flip().some((w) => w);
+    fireEvent(s, { type: "coinFlipped", player: who, won: won1 });
+    if (!won1 || run.wins + 1 >= 100) {
+      sc.flipRun = undefined;
+      const wins1 = run.wins + (won1 ? 1 : 0);
+      s.resolving!.flipped = { won: won1, wins: wins1 };
+      log(s, `${player(s, who).name} flips coins for ${src} and ${won1 ? "wins" : "loses"} flip ${wins1 + (won1 ? 0 : 1)}${won1 ? "" : `: ${wins1} won before it`}${edgar}.`);
+      return;
+    }
+    run.wins++;
+    run.asked = true;
+    log(s, `${player(s, who).name} wins coin flip ${run.wins} for ${src}${run.wins === 1 ? edgar : ""}.`);
+    s.pending = { kind: "chooseMay", player: who, source: src, prompt: `flip another coin (${run.wins} won so far; if you lose a flip, ${src} has no effect)`, flipAgain: { wins: run.wins, enough: e.mayStop.enough } };
+    return "paused";
+  }
   let wins = 0;
   let won = false;
   // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).

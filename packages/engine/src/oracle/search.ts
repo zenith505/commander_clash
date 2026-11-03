@@ -104,8 +104,8 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const unlikeSpec = unlike ? parseSearchFilter(`${unlike[1]} card`) : undefined;
   if (unlike && (!unlikeSpec || n !== 1 || eachX || share || total)) return null;
   const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : unlike ? m[3]!.slice(0, unlike.index).replace(/ with mana value less than or equal to that Aura$/, " with mana value less than or equal to that permanent's mana value") : m[3]!;
-  // "That each have different names" (Tiamat) says the same.
-  const different = / (?:with|that each have) different names$/.exec(phrase);
+  // "That each have different names" (Tiamat), "that have different names" (Omenpath Journey) say the same.
+  const different = / (?:with|that each have|that have) different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
   const filter00 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
   if (filter00 === null || (eachX && (!filter00 || filter00.bound)) || (unlike && !filter00)) return null;

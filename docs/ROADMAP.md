@@ -1,6 +1,6 @@
 # Roadmap
 
-29,642 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,661 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,534 of
 9,979 (95%).
 
@@ -1979,7 +1979,7 @@ line blocks.
    sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each opponent sacrifices that many
    creatures of their choice" (Ravenous Rotbelly: with a browser test); "Remove a counter from an artifact, creature,
    land, or planeswalker you control" as a cost, any kind (Soul Diviner). Bots take a harmful counter off first and never
-   a planeswalker's last loyalty counter. +8 (29,595 of 31,936; 29,625 with B96 to B98).
+   a planeswalker's last loyalty counter. +8 (29,595 of 31,936; 29,644 with B96 to B100).
    Round 270 went back over earlier skips from the top. "Put a +1/+1 counter on it if the exiled card's mana value is 4
    or greater" (Summoner's Sending: the one card targeted, X as 0, rulings); "Sacrifice an artifact with mana value X:
    Return target artifact card with mana value less than X" (Scrap Welder: X announced, an equal mana value not legal,
@@ -1993,7 +1993,7 @@ line blocks.
    end of turn" (Katsumasa, the Animator); "If you sacrificed an Angel this way, create a number of Blood tokens equal to
    its toughness instead" (its toughness as it last existed, rulings) and "Return each creature card from your graveyard
    to the battlefield with a finality counter on it. Those creatures are Vampires in addition to their other types"
-   (Shilgengar, Sire of Famine). +9 (29,634 of 31,936 with B96 to B98).
+   (Shilgengar, Sire of Famine). +9 (29,653 of 31,936 with B96 to B100).
    Round 271 went back over earlier skips from the top. "Creatures entering or dying don't cause abilities to trigger"
    (Hushbringer, rulings: a dying creature's own and other permanents' dies, "put into a graveyard from the battlefield"
    and leaves-the-battlefield abilities, one-or-more batches and delayed triggers too; leaves-the-battlefield abilities
@@ -2007,8 +2007,8 @@ line blocks.
    down. It's a 2/2 Cyberman artifact creature" (Cyber Conversion: the same object with its counters and effects, a new
    timestamp, CR 613.7f; a face-down one or a double-faced one doesn't change, 708.2b and 712.16, nor a merged permanent
    with a double-faced card among its components, our reading of 730.2f; a morph ability turns it face up, rulings),
-   "Turn ~ face down" (Wall of Deceit) and "If you lose the flip, turn ~ face down" (Skittish Valesk). +8 (29,642 of
-   31,936 with B96 to B98).
+   "Turn ~ face down" (Wall of Deceit) and "If you lose the flip, turn ~ face down" (Skittish Valesk). +8 (29,661 of
+   31,936 with B96 to B100).
    Out after round 271 (looked at, not done): Rootcoil Creeper (its mana is supported, but "target card with flashback you
    own from exile" needs a target in exile); Mischievous Quanar ("When ~ is turned face up, copy target instant or sorcery
    spell"); Obscuring Aether ("Face-down creature spells you cast cost {1} less": the cost filters see the card, not the
@@ -5249,6 +5249,44 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the end of your next turn with a Villain of greater mana value), Carrionette (from the graveyard, itself and the target
   exiled unless that creature's controller pays {2}; paid, neither is). +10 (29,593 of 31,936 with B96, B97 and rounds 263
   to 265).
+- Round B99 (templates from the bottom of the list): fortify (CR 702.67, 301.6: Darksteel Garrison attaches only to a land
+  you control, as a sorcery; "fortified land has indestructible", "whenever fortified land becomes tapped"; it becomes
+  unattached when the land stops being a land, CR 704.5n), aura swap (CR 702.65: Arcanum Wings is exchanged with an Aura
+  card from your hand that could enchant the same creature, at once; nothing happens if either half can't be done, or if
+  you don't own it; bots only use it with such an Aura in hand), Jace, Reality Sculptor ("Empower Jace X" makes or grows a
+  Jace token, not Jace himself, CR 701.71a; "Activate only if there are twenty-five or more loyalty counters among Jaces you
+  control" on a loyalty ability; "Exile all but the bottom card of each opponent's library"), Goddric, Cloaked Reveler (a
+  Dragon with base power and toughness 4/4, flying and a quoted ability while celebrating), Dance of Many ("the token" of its
+  other abilities is the one its enters ability made: exiled when Dance leaves, and Dance sacrificed when it leaves), Atalya,
+  Samite Master ("Spend only white mana on X" in each mode), Suncleanser (no counters on that creature, or for that player,
+  for as long as Suncleanser remains, CR 611.2b), Wan Shi Tong, All-Knowing and Dutiful Knowledge Seeker ("whenever one or
+  more cards are put into a library from anywhere", once for each event, not from a library), Kaust, Eyes of the Glade (a
+  creature turned face up this turn, CR 708.8; "target face-down attacking creature you control"). +10 (29,627 of 31,936
+  with B96 to B98 and rounds 263 to 268).
+- Round B100 (templates from the bottom of the list): Hustle // Bustle ("Target creature attacks or blocks this turn if able",
+  both requirements, CR 508.1d, 509.1c; "You may turn a creature you control face up", a face-down one), Flesh // Blood ("where
+  X is the power of the card you exiled", as it last existed in the graveyard, rulings; fused, Blood's "Target creature you
+  control deals damage" now names its source by target like the rest of the right half, so the fused spell reads as both
+  halves), Dual Nature ("exile all tokens with the same name as that creature", anyone's, the name as it last existed, CR
+  603.10a), Biolume Egg ("When you sacrifice ~, return it to the battlefield transformed under its owner's control at the
+  beginning of the next end step"), Audacious Swap (the owner shuffles it in and exiles the top card: a land enters under their
+  control, anything else is theirs to cast for free as it resolves, CR 608.2g), Sift Through Sands (a spell with each name cast
+  by you this turn), Reins of the Vinesteed (back from the graveyard attached to a creature sharing a creature type with the dead
+  one as it last existed, not targeted, CR 303.4f; none, and it stays), Stick, Fearless Mentor ("Whenever a source you control
+  deals damage to you", "it" the exiled card), Wake to Slaughter (an opponent you choose picks which target goes to your hand,
+  the other returns with haste and is exiled at the next end step; with one target, it goes to your hand, rulings; with a
+  browser test). +9 (29,636 of 31,936 with B96 to B99 and rounds 263 to 268).
+- Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
+  ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
+  Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
+  card linked to the permanent), Torrent of Lava (an ability creatures have while it's on the stack), Speedball (new targets
+  for a spell that targets it), Tetravus (tokens created with it exiled to put counters back).
+- Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
+  resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
+  Mischievous Quanar (turning itself face down), Revealing Wind and Lumbering Laundry (looking at face-down creatures),
+  Delif's Cone (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
+  Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
+  seven lands).
 - Out after round B98 (looked at, not done): Teferi, Timeless Voyager ("Until the end of your next turn, they can't phase
   in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
   fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board

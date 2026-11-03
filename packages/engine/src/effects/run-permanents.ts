@@ -2118,7 +2118,11 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   if (me.zone !== "battlefield") return false;
   const meChars = characteristics(s, me);
   const aura = meChars.subtypes.includes("Aura");
-  if (!aura && !meChars.subtypes.includes("Equipment")) return false;
+  // A Fortification is to lands what an Equipment is to creatures (CR 301.6): only to a land, and not while it's a
+  // creature itself.
+  const fortification = !aura && !meChars.subtypes.includes("Equipment") && meChars.subtypes.includes("Fortification");
+  if (!aura && !meChars.subtypes.includes("Equipment") && !fortification) return false;
+  if (fortification) return typeof host !== "number" && me.attachedTo !== host.id && host.zone === "battlefield" && !objIsType(s, me, "Creature") && objIsType(s, host, "Land") && objectMatches(s, { kind: "object", text: "" }, host, controllerOf(s, me), false, meChars);
   const enchant = enchantOf(s, me);
   // "Enchant creature you control" is about the Aura's controller.
   const who = controllerOf(s, me);

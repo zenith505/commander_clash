@@ -1121,6 +1121,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b8cc7a78-a627-4e56-b1fc-0b2bd844ef68",
+  "name": "Arcanum Wings",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has flying.\nAura swap {2}{U} ({2}{U}: Exchange this Aura with an Aura card in your hand.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Aura Swap",
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff5caed4-0276-476d-8fae-edae2536df7f",
   "name": "Archangel of Tithes",
   "manaCost": "{1}{W}{W}{W}",
@@ -5320,6 +5351,32 @@
   "set": "sld",
   "releasedAt": "2020-06-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "48bf020e-45b9-4c27-82e0-80d942656a67",
+  "name": "Darksteel Garrison",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Fortification",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Fortification"
+  ],
+  "oracleText": "Fortified land has indestructible.\nWhenever fortified land becomes tapped, target creature gets +1/+1 until end of turn.\nFortify {3} ({3}: Attach to target land you control. Fortify only as a sorcery. This card enters unattached and stays on the battlefield if the land leaves.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Fortify"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24884,6 +24941,36 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "78eb5399-8c8b-4310-b585-e4ccd9d7c9cc",
+  "name": "Wake to Slaughter",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose up to two target creature cards in your graveyard. An opponent chooses one of them. Return that card to your hand. Return the other to the battlefield under your control. It gains haste. Exile it at the beginning of the next end step.\nFlashback {4}{B}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

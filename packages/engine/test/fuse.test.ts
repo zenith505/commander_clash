@@ -91,8 +91,20 @@ describe("fuse (CR 702.102)", () => {
   });
 
   it("a fuse card whose halves can't be read as one spell stays unsupported", () => {
-    // Flesh's "where X is the power of the card you exiled" isn't supported, so the card isn't either.
-    expect(isFullySupported(fleshBlood)).toBe(false);
+    // Breaking // Entering: Entering's "Put a creature card from a graveyard onto the battlefield" isn't supported, so the
+    // card isn't either.
+    const breakingEntering = scry(
+      "split",
+      [
+        { name: "Breaking", mana_cost: "{U}{B}", type_line: "Sorcery", oracle_text: `Target player mills eight cards.\n${FUSE}` },
+        { name: "Entering", mana_cost: "{4}{B}{R}", type_line: "Sorcery", oracle_text: `Put a creature card from a graveyard onto the battlefield under your control. It gains haste until end of turn.\n${FUSE}` },
+      ],
+      { keywords: ["Fuse"] },
+    );
+    expect(isFullySupported(breakingEntering)).toBe(false);
+    // Flesh's "where X is the power of the card you exiled" is since Lane B round B100, and Blood's "Target creature you
+    // control deals damage" names its source by target, shifted like any other in the fused spell (laneb-round100.test.ts).
+    expect(isFullySupported(fleshBlood)).toBe(true);
     // Take's "Draw that many cards" is since Lane B round B67 (laneb-round67.test.ts).
     expect(isFullySupported(giveTake)).toBe(true);
   });

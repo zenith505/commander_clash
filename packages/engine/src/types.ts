@@ -2436,6 +2436,8 @@ export interface Resolving {
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
+    /** Whirlwind Denial: the spells and abilities still to ask about, in order, and those not paid for. */
+    denial?: { queue: string[]; unpaid: string[] };
     /** Sword-Point Diplomacy's "for each of those cards": the revealed cards still to do, the one being done (ResolvingInfo.revealed), the step of its instructions, and the card its controller chose to do next. */
     eachRevealed?: { left: ObjectId[]; current?: ObjectId; step: number; next?: ObjectId };
     /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */

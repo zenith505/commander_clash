@@ -12901,6 +12901,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Eventide's Shadow: "Remove any number of counters from among permanents on the battlefield. You draw cards and lose
+    // life equal to the number of counters removed this way.": any kinds, any player's permanents (rulings), chosen one
+    // at a time as it resolves (CR 608.2d), removed together; then that many cards and life.
+    if (/^Remove any number of counters from among permanents on the battlefield$/.test(s) && /^You draw cards and lose life equal to the number of counters removed this way\.?$/.test(sentences[si + 1] ?? "")) {
+      const n = { count: { kind: "countersRemovedThisWay" as const } };
+      effects.push({ type: "gatherCounters", from: { kind: "object", types: [], text: "permanents" } }, { type: "draw", who: { ref: "you" }, n }, { type: "loseLife", who: { ref: "you" }, n });
+      si++;
+      continue;
+    }
     // Mathas, Fiend Seeker: "Put a bounty counter on target creature an opponent controls. For as long as that creature has
     // a bounty counter on it, it has "When this creature dies, each opponent draws a card and gains 2 life."": the ability
     // granted to what the counter was just put on, for as long as it has one (CR 611.2b), even after the source leaves, and

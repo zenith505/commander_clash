@@ -3,7 +3,7 @@ import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType,
 import { nameLandBan } from "../names";
 import { hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { putCounters, withPutter } from "../counters";
+import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -1532,6 +1532,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (left > 0) o.counters.time = left;
       else delete o.counters.time;
       log(s, `${defOf(s, o).name} loses a time counter${left ? ` (${left} left)` : ""}.`);
+      countersRemoved(s, o, "time", 1);
       fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;

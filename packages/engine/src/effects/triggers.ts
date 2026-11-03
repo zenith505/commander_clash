@@ -246,6 +246,8 @@ export type TriggerSourceEvent =
   | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
+  /** `n` counters of a kind were removed from it at the same time, for any reason (see countersRemoved in counters.ts). */
+  | { type: "countersRemoved"; id: ObjectId; counter: string; n: number }
   | { type: "echoPaid"; id: ObjectId }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
@@ -1663,6 +1665,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         fromExile = false;
       }
     }
+  } else if (ev.type === "countersRemoved") {
+    // Protean Hydra, Chandra, Fire Artisan: counters removed from a permanent, for any reason (see countersRemoved).
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") {
+      const ctrl = controllerOf(s, o);
+      const kind = (t: TriggeredAbility) => t.countersKind === ev.counter;
+      add(o, ctrl, (e, t) => e === "selfCountersRemoved" && kind(t) && !t.countersEach, undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.n });
+      for (let i = 0; i < ev.n; i++) add(o, ctrl, (e, t) => e === "selfCountersRemoved" && kind(t) && !!t.countersEach, undefined, undefined, undefined, undefined, undefined, undefined, { amount: 1 });
+    }
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     // Riftmarked Knight: "When the last time counter is removed from ~ while it's exiled" (CR 113.6).
@@ -2102,6 +2113,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
+    // Deep-Sea Kraken, Pardic Dragon: abilities of suspended cards that work in exile (CR 113.6).
+    fromExiled(castWatch);
     fromFloating(castWatch);
     fromEmblems(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.

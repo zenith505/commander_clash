@@ -1947,6 +1947,11 @@ export type StaticCondition =
   | { kind: "selfInGraveyard"; creatureAbove?: true; /** Nether Spirit: "if ~ is the only creature card in your graveyard". */ onlyCreature?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
   | { kind: "selfInExile" }
+  /**
+   * "If this card is suspended" (Deep-Sea Kraken, Pardic Dragon): the same card, face up in its owner's exile, with suspend
+   * and a time counter on it (CR 702.62b, rulings), an intervening if (CR 603.4).
+   */
+  | { kind: "selfSuspended" }
   /** Firemane Angel's "if ~ is in your graveyard or on the battlefield", one ability for each zone: still there, the same object (CR 400.7, 603.4). */
   | { kind: "selfStill"; zone: "graveyard" | "battlefield" }
   /** Codespell Cleric: "if it was the second spell you cast this turn": ~ entered this turn as that spell, cast (not a copy), the `n`th of its controller's this turn. */
@@ -3063,7 +3068,12 @@ export type Effect =
    * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
    * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
    */
-  | { type: "gatherCounters"; onto: ObjRef; from: TargetSpec }
+  /**
+   * Slippery Bogbonder: "move any number of counters from among creatures you control onto that creature", one counter at
+   * a time. Without `onto`, removed instead (Eventide's Shadow: "Remove any number of counters from among permanents on the
+   * battlefield"), counted for "removed this way".
+   */
+  | { type: "gatherCounters"; onto?: ObjRef; from: TargetSpec }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
@@ -3690,6 +3700,12 @@ export type Effect =
   | { type: "dismissStack" }
   /** Glen Elendra's Answer: "Counter all spells your opponents control and all abilities your opponents control": each one already on the stack, from the top down (rulings; mana abilities never are, CR 605.3a). */
   | { type: "counterOpponentsStack" }
+  /**
+   * Whirlwind Denial: "For each spell and ability your opponents control, counter it unless its controller pays {4}":
+   * the opponent whose turn it is (or the next in turn order) chooses and pays for theirs, then each other opponent in
+   * turn order; then all those not paid for are countered at the same time (rulings).
+   */
+  | { type: "counterOpponentsStackUnless"; unless: UnlessPays }
   /** "Target spell can't be countered" (Vexing Shusher): that spell, a copy too, while it's on the stack (CR 101.2). */
   | { type: "spellUncounterable"; index: number }
   /**
@@ -4979,6 +4995,12 @@ export type TriggerEvent =
   | "selfTimeCounterRemovedExiled"
   /** "When the last time counter is removed from ~ while it's exiled" (Riftmarked Knight; works in exile, CR 113.6). */
   | "selfLastTimeCounterRemovedExiled"
+  /**
+   * "Whenever a +1/+1 counter is removed from ~" (Protean Hydra: once for each, countersEach) / "whenever one or more
+   * loyalty counters are removed from ~" (Chandra, Fire Artisan: once for each event, "that much" the eventAmount), for
+   * any reason (see countersRemoved in counters.ts); countersKind is the kind.
+   */
+  | "selfCountersRemoved"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   | "selfEchoPaid" // "When ~'s echo cost is paid" (Shah of Naar Isle, CR 702.30a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
@@ -5268,7 +5290,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -6480,9 +6502,12 @@ export interface CompiledCard {
   /**
    * "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove that many +1/+1
    * counters from ~" (Ugin's Conjurant, CR 615.5): all of it prevented, as many counters as it has removed (rulings);
-   * damage that can't be prevented still removes them (615.12).
+   * damage that can't be prevented still removes them (615.12). "always": Protean Hydra's, with no "while it has" (all
+   * damage prevented even with none on it, rulings).
    */
-  counterShield?: true;
+  counterShield?: true | "always";
+  /** Bloatfly Swarm's counterShield: then each player gets a rad counter for each +1/+1 counter removed this way. */
+  counterShieldRad?: true;
   /**
    * Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).

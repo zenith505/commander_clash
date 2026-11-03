@@ -328,7 +328,6 @@ describe("Mindleech Mass: you may look at that player's hand and cast a spell fr
     const { s: s0, ap, opp } = setup([]);
     const mass = putOnBattlefield(s0, ap, C.mass);
     const giant = into(s0, opp, C.ogre, "hand");
-    for (const p of s0.turnOrder) s0.players[p]!.manaPool = {};
     let s = trigger(s0, ap, mass, 0, opp);
     expect(s.pending?.player).toBe(ap);
     const p = s.pending!;

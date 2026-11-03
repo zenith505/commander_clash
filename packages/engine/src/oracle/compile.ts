@@ -270,9 +270,10 @@ function fusedSupported(d: CardDef): boolean {
   const [left, right] = d.faces!.map((_, i) => compileCard(faceDef(d, i)).spell);
   const whole = compileCard(fused).spell;
   if (!whole || !left || !right || left.modal || right.modal || whole.modal) return false;
-  // The right half's targets come after the left half's (an effect names its target by `index`).
+  // The right half's targets come after the left half's (an effect names its target by `index`, a damage source by
+  // `target`: Blood's "Target creature you control deals damage", Flesh // Blood).
   const shift = (x: unknown): unknown =>
-    Array.isArray(x) ? x.map(shift) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === "index" && typeof v === "number" ? v + left.targets.length : shift(v)])) : x;
+    Array.isArray(x) ? x.map(shift) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, (k === "index" || k === "target") && typeof v === "number" ? v + left.targets.length : shift(v)])) : x;
   const strip = (b: AbilityBody) => JSON.stringify({ targets: b.targets.map((t) => ({ ...t, text: "" })), effects: b.effects });
   return strip(whole) === strip({ ...whole, targets: [...left.targets, ...right.targets], effects: [...left.effects, ...(shift(right.effects) as Effect[])] });
 }

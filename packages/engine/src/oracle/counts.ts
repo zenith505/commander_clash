@@ -965,6 +965,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[1] === "~" ? "~'s" : m[1] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
+  // Flesh // Blood: "where X is the power of the card you exiled": the one card targeted, as it last existed in the
+  // graveyard (rulings), as Lobelia's "the exiled card's power".
+  if ((m = /^the (power|toughness) of the card you exiled$/.exec(p)) && ctx) {
+    const of = whoseObject("the exiled card's", ctx);
+    return of?.ref === "target" ? count({ kind: m[1] as "power" | "toughness", of }) : null;
+  }
   // Death's Presence: "where X is the power of the creature that died": the trigger's subject as it last existed on the
   // battlefield (rulings, CR 603.10a).
   if ((m = /^the (power|toughness) of the creature that died$/.exec(p)) && ctx?.subjectIt) return count({ kind: m[1] as "power" | "toughness", of: { ref: "subject" } });

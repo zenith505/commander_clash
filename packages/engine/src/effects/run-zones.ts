@@ -81,14 +81,14 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * it could enchant it (null: it's gone, so nothing); `onlyToPlayer`: "attached to target player" (Bitterheart Witch), the
  * same for a player (null: the target is illegal).
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean, onlyToPlayer?: PlayerId | null): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean, onlyToPlayer?: PlayerId | null, fits?: (host: GameObject) => boolean): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
   for (const { o, under, face } of cards) {
     // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
     const d = asFace(s, o, face, () => defOf(s, o));
     if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (onlyToPlayer === undefined || ("attachToPlayer" in h && h.attachToPlayer === onlyToPlayer)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))));
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (onlyToPlayer === undefined || ("attachToPlayer" in h && h.attachToPlayer === onlyToPlayer)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))) && (!fits || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && fits(obj(s, h.attachTo)))));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
@@ -982,8 +982,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Hidetsugu and Kairi: "exile the top card of your library ... you may cast it": the card just exiled, still there.
         if ((o.zone !== "graveyard" && !(o.zone === "exile" && e.what.ref === "exiledTop")) || done.includes(o.id)) continue;
         sc.castingTarget = o.id;
-        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
-        if (freeCastable(s, ctx.controller, o.id)) return "paused";
+        const caster = e.byOwner ? o.owner : ctx.controller;
+        s.pending = { kind: "castFree", player: caster, objectId: o.id, source: src };
+        if (freeCastable(s, caster, o.id)) return "paused";
         s.pending = null;
         sc.castingTarget = undefined;
         done.push(o.id);
@@ -2472,7 +2473,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
+      // Reins of the Vinesteed: "attached to a creature that shares a creature type with that creature", the trigger's
+      // subject as it last existed (rulings), chosen as this resolves; not targeted (CR 303.4f).
+      let kin: ((h: GameObject) => boolean) | undefined;
+      if (e.attachSharesTypeWithSubject) {
+        const subj = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+        const here = subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === ctx.subject!.zc;
+        const lk = !here && ctx.subject ? s.lastKnown?.[ctx.subject.id] : undefined;
+        const types = here ? creatureTypesOf(s, subj!) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) && lk.creatureTypes ? (lk.creatureTypes === "all" ? ("all" as const) : new Set(lk.creatureTypes)) : undefined;
+        kin = (h) => !!types && objIsType(s, h, "Creature") && shareCreatureType(types, creatureTypesOf(s, h));
+      }
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];

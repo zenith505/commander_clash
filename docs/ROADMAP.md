@@ -1,6 +1,6 @@
 # Roadmap
 
-29,619 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,628 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,506 of
 9,979 (95%).
 
@@ -5190,6 +5190,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   more cards are put into a library from anywhere", once for each event, not from a library), Kaust, Eyes of the Glade (a
   creature turned face up this turn, CR 708.8; "target face-down attacking creature you control"). +10 (29,619 of 31,936
   with B96 to B98 and rounds 263 to 267).
+- Round B100 (templates from the bottom of the list): Hustle // Bustle ("Target creature attacks or blocks this turn if able",
+  both requirements, CR 508.1d, 509.1c; "You may turn a creature you control face up", a face-down one), Flesh // Blood ("where
+  X is the power of the card you exiled", as it last existed in the graveyard, rulings; fused, Blood's "Target creature you
+  control deals damage" now names its source by target like the rest of the right half, so the fused spell reads as both
+  halves), Dual Nature ("exile all tokens with the same name as that creature", anyone's, the name as it last existed, CR
+  603.10a), Biolume Egg ("When you sacrifice ~, return it to the battlefield transformed under its owner's control at the
+  beginning of the next end step"), Audacious Swap (the owner shuffles it in and exiles the top card: a land enters under their
+  control, anything else is theirs to cast for free as it resolves, CR 608.2g), Sift Through Sands (a spell with each name cast
+  by you this turn), Reins of the Vinesteed (back from the graveyard attached to a creature sharing a creature type with the dead
+  one as it last existed, not targeted, CR 303.4f; none, and it stays), Stick, Fearless Mentor ("Whenever a source you control
+  deals damage to you", "it" the exiled card), Wake to Slaughter (an opponent you choose picks which target goes to your hand,
+  the other returns with haste and is exiled at the next end step; with one target, it goes to your hand, rulings; with a
+  browser test). +9 (29,628 of 31,936 with B96 to B99 and rounds 263 to 267).
+- Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
+  ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
+  Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
+  card linked to the permanent), Torrent of Lava (an ability creatures have while it's on the stack), Speedball (new targets
+  for a spell that targets it), Tetravus (tokens created with it exiled to put counters back).
 - Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
   resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
   Mischievous Quanar (turning itself face down), Revealing Wind and Lumbering Laundry (looking at face-down creatures),

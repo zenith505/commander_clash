@@ -1,8 +1,8 @@
 # Roadmap
 
-29,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,479 of
-9,979 (94%).
+29,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,485 of
+9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -1880,9 +1880,34 @@ line blocks.
    player" (Owlbear Cub: TriggeredAbility.attacksPlayerLands, dig attackingEvent); "you may cast a permanent spell with
    equal or lesser mana value from your hand without paying its mana cost" in a cast trigger (Kellan, the Kid: the
    triggering spell's mana value with its X, rulings). +5 (29,524 of 31,936 with B93; 29,539 with B94).
-   Out after round 263 (looked at, not done): Protean Hydra ("Whenever a +1/+1 counter is removed from ~", for any reason,
-   once per counter, rulings: counters are removed in dozens of places with no one event for it yet; its "prevent that
-   damage and remove that many +1/+1 counters" even with none on it is close to Ugin's Conjurant's counterShield).
+   Round 264 added the event round 263 lacked: counters removed from a permanent, for any reason, as one event per kind
+   (counters.ts countersRemoved, fired by every removal: effects, costs, loyalty costs, damage to planeswalkers and
+   battles, the damage shields, stun and shield counters, +1/+1 and -1/-1 counters cancelling out, CR 704.5q, counters
+   moved off it, CR 122.5; leaving the battlefield removes none, CR 122.2; damage dealt at the same time removes them in
+   one event, batchCountersRemoved). With it: "Whenever a +1/+1 counter is removed from ~" (Protean Hydra, once for each
+   counter, rulings; its "If damage would be dealt to ~, prevent that damage and remove that many +1/+1 counters from it"
+   is counterShield "always", all of it prevented even with none on it) and "Whenever one or more loyalty counters are
+   removed from ~, she deals that much damage to target opponent or planeswalker" (Chandra, Fire Artisan: combat damage
+   from several creatures at once triggers her once, rulings). Then from the top: "Whenever an opponent casts a spell, if
+   ~ is suspended, remove a time counter from it" (Deep-Sea Kraken: StaticCondition selfSuspended, CR 702.62b, cast
+   triggers of cards in exile, CR 113.6); "..., then give each player a rad counter for each +1/+1 counter removed this
+   way" (Bloatfly Swarm: counterShieldRad, unpreventable damage too, rulings); "Whenever a creature you control dies or is
+   put into the command zone, if it had one or more +1/+1 counters on it, you may put that many +1/+1 counters on target
+   creature" (Reyhan, Last of the Abzan: a commander put into the command zone instead of its library, CR 903.9b; one
+   that died and then went there, CR 903.9a, triggers it once); "For each spell and ability your opponents control,
+   counter it unless its controller pays {4}" (Whirlwind Denial: each opponent asked in turn order from the active player,
+   then all not paid for countered at once, rulings; bots cast it only when the caster can't pay); "Remove any number of
+   counters from among permanents on the battlefield. You draw cards and lose life equal to the number of counters removed
+   this way" (Eventide's Shadow: gatherCounters without `onto`, one counter at a time, with a browser test). +7 (29,546 of
+   31,936).
+   Out after round 264 (looked at, not done): Regenerations Restored (its trigger now parses, but "Then if ~ has no time
+   counters on it, exile it. When you do, take an extra turn" needs a reflexive trigger after a mandatory exile, and its
+   order against vanishing's own trigger on the last counter matters); Magma Pummeler ("When one or more counters are
+   removed from ~ this way": a reflexive trigger from inside the damage shield); Pardic Dragon ("that player may put a
+   time counter on ~": another player's "may" about a card in exile), Nihilith and Curse of the Cabal (other "if ~ is
+   suspended" triggers: a card put into a graveyard, each player's upkeep); Greater Gargadon (an activated ability of a
+   card in exile: none can be activated there yet, for the engine, bots or the UI).
+   Out after round 263 (looked at, not done): Protean Hydra (done in round 264).
    Out after round 262 (looked at, not done): Dragon's Fire ("reveal a Dragon card from your hand or choose a Dragon you
    control" as an additional cost, the damage that card's or creature's power: a new cast-time choice for the UI and bots,
    and the chosen Dragon's last known power); Soul Immolation (blight X as an additional cost, X capped by the greatest
@@ -5052,7 +5077,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player exiles their top card, the greatest mana value takes an extra turn, tied players repeat, CR 500.7); Storage
   Matrix (each player chooses artifact, creature, or land in their untap step while it's untapped, CR 502.3, with a
   browser test; it limits the active player's own untaps, which are the only ones the untap step makes). +10 (29,544 of
-  31,936 with B94 and rounds 261 and 262; 29,549 with round 263).
+  31,936 with B94 and rounds 261 and 262; 29,556 with rounds 263 and 264).
 - Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
   Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
   of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's

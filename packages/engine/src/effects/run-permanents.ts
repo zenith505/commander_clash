@@ -3,7 +3,7 @@ import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomO
 import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
+import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -585,6 +585,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       else delete o.counters.time;
       invalidateCharacteristics(s);
       log(s, `${player(s, you).name} removes ${n} time counter${n === 1 ? "" : "s"} from ${defOf(s, o).name} (${src}).`);
+      countersRemoved(s, o, "time", n);
       if (o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
       if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
       return;
@@ -642,6 +643,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           if (left > 0) o.counters.time = left;
           else delete o.counters.time;
           changed.push(`-1 on ${name}`);
+          countersRemoved(s, o, "time", 1);
           if (o.zone === "exile") removedExiled.push(o.id);
           if (!left) last.push(o.id);
         }
@@ -913,6 +915,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           removed += k;
           invalidateCharacteristics(s);
           log(s, `${characteristics(s, o).name} loses ${k} ${e.counter} counter${k > 1 ? "s" : ""}.`);
+          countersRemoved(s, o, e.counter, k);
           if (had === k) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
         }
         r.countersRemoved = (r.countersRemoved ?? 0) + removed;
@@ -937,6 +940,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           if (m <= 0) continue;
           self.counters[e.counter] = has - m;
           invalidateCharacteristics(s);
+          countersRemoved(s, self, e.counter, m);
           const put = putCounters(s, o, e.counter, m);
           log(s, `${defOf(s, self).name} moves ${m} ${e.counter} counter${m > 1 ? "s" : ""} onto ${defOf(s, o).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
           continue;
@@ -1006,6 +1010,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // A counter that can't be removed doesn't move: none is put on the other one either (rulings on Fear of Sleep Paralysis).
       if (!removableCounters(s, from, counter)) return;
       from.counters[counter]! -= 1;
+      countersRemoved(s, from, counter, 1);
       const put = putCounters(s, to, counter, 1);
       invalidateCharacteristics(s);
       log(s, `${characteristics(s, from).name} moves a ${counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
@@ -1089,6 +1094,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
+        countersRemoved(s, o, e.counter, n);
+        // Deep-Sea Kraken removing a time counter from itself in exile: "whenever a time counter is removed from ~ while
+        // it's exiled" sees it too (CR 113.6).
+        if (e.counter === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n });
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;
@@ -1130,6 +1139,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           if (m <= 0) continue;
           const had = o.counters[k] ?? 0;
           o.counters[k] = had - m;
+          countersRemoved(s, o, k, m);
           const put = putCounters(s, to, k, m);
           invalidateCharacteristics(s);
           log(s, `${characteristics(s, o).name} moves ${m} ${k} counter${m > 1 ? "s" : ""} onto ${characteristics(s, to).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
@@ -1145,6 +1155,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         o.counters[k] = had - m;
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${m} ${k} counter${m > 1 ? "s" : ""}.`);
+        countersRemoved(s, o, k, m);
         if (had === m) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
       }
       return;
@@ -1152,13 +1163,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "gatherCounters": {
       // Slippery Bogbonder: one counter at a time from any creature it may come from (not the one they go onto, rulings),
       // then all moved at once (CR 122.5); none if the target is gone.
-      const to = objects(s, e.onto, ctx)[0];
+      // Eventide's Shadow (no `onto`): removed from any of them instead, all at once.
+      const to = e.onto ? objects(s, e.onto, ctx)[0] : undefined;
+      const removing = !e.onto;
       const sc = (s.resolving!.scratch ??= {});
       const picked = (sc.gathered ??= {});
-      const sources = () => (to?.zone === "battlefield" ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== to.id && objectMatches(s, e.from, o, ctx.controller, false)) : []);
+      const sources = () => (removing ? s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, e.from, o, ctx.controller, false)) : to?.zone === "battlefield" ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== to.id && objectMatches(s, e.from, o, ctx.controller, false)) : []);
       const left = (id: ObjectId, k: string) => (obj(s, id).counters[k] ?? 0) - (picked[`${id}:${k}`] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
-      while (to && !sc.countersDone) {
+      while ((to || removing) && !sc.countersDone) {
         if (sc.counterKind !== undefined) {
           if (sc.counterKind === "done") sc.countersDone = true;
           else {
@@ -1175,11 +1188,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           const k = opt.slice(opt.indexOf(":") + 1);
           return `A ${k} counter from ${characteristics(s, obj(s, id)).name} (${left(id, k)} left)`;
         };
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", onto: to.id, options: [...options, "done"], labels: [...options.map(label), count() ? "That's all" : "None"], prompt: `choose a counter to move onto ${characteristics(s, to).name} (${count()} so far)` };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", ...(to ? { onto: to.id } : {}), options: [...options, "done"], labels: [...options.map(label), count() ? "That's all" : "None"], prompt: to ? `choose a counter to move onto ${characteristics(s, to).name} (${count()} so far)` : `choose a counter to remove (${count()} so far)` };
         return "paused";
       }
       sc.gathered = undefined;
       sc.countersDone = undefined;
+      if (removing) {
+        let total = 0;
+        for (const [key, m] of Object.entries(picked)) {
+          const id = key.slice(0, key.indexOf(":"));
+          const k = key.slice(key.indexOf(":") + 1);
+          const o = obj(s, id);
+          const n = Math.min(m, removableCounters(s, o, k));
+          if (n <= 0 || o.zone !== "battlefield") continue;
+          const had = o.counters[k] ?? 0;
+          o.counters[k] = had - n;
+          total += n;
+          invalidateCharacteristics(s);
+          log(s, `${characteristics(s, o).name} loses ${n} ${k} counter${n > 1 ? "s" : ""}.`);
+          countersRemoved(s, o, k, n);
+          if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+        }
+        if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + total;
+        return;
+      }
       if (!to || to.zone !== "battlefield") return;
       for (const [key, m] of Object.entries(picked)) {
         const id = key.slice(0, key.indexOf(":"));
@@ -1188,6 +1220,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (m <= 0 || o.zone !== "battlefield") continue;
         const had = o.counters[k] ?? 0;
         o.counters[k] = had - m;
+        countersRemoved(s, o, k, m);
         const put = putCounters(s, to, k, m);
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} moves ${m} ${k} counter${m > 1 ? "s" : ""} onto ${characteristics(s, to).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
@@ -1207,6 +1240,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           o.counters.defense = had - n;
           invalidateCharacteristics(s);
           log(s, `${name} loses ${n} defense counter${n > 1 ? "s" : ""}.`);
+          countersRemoved(s, o, "defense", n);
           if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
         } else {
           const put = putCounters(s, o, "defense", e.n);
@@ -1224,6 +1258,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + total;
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}).`);
+        for (const [k, n] of kinds) countersRemoved(s, o, k, n);
         for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
       }
       return;
@@ -1235,6 +1270,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const kinds = Object.entries(from.counters).filter(([k, n]) => n > 0 && !countersStay(s, from, k));
       for (const [kind, n] of kinds) {
         from.counters[kind] = 0;
+        countersRemoved(s, from, kind, n);
         // Put onto the other one, so replacement effects and "whenever counters are put" apply (Nexus Mentality rulings).
         putCounters(s, to, kind, n);
       }
@@ -1255,6 +1291,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (s.resolving) s.resolving.did = true;
         o.counters[e.counter] = had - 1;
         log(s, `${name} loses a ${e.counter} counter (${had - 1} left).`);
+        countersRemoved(s, o, e.counter, 1);
         if (had === 1) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       } else if (e.orSacrifice && controllerOf(s, o) === ctx.controller) {
         log(s, `${player(s, ctx.controller).name} sacrifices ${name}: it has no ${e.counter} counters left.`);
@@ -1849,6 +1886,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (left > 0) o.counters[e.counter] = left;
       else delete o.counters[e.counter];
       log(s, `${player(s, ctx.controller).name} removes a ${e.counter} counter from ${defOf(s, o).name} in exile.`);
+      countersRemoved(s, o, e.counter, 1);
       return;
     }
     case "attachLastKnown": {

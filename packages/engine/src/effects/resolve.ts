@@ -1317,6 +1317,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterEach":
     case "dismissStack":
     case "counterOpponentsStack":
+    case "counterOpponentsStackUnless":
     case "changeTarget":
     case "newTargets":
     case "controlSpell":

@@ -875,6 +875,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
     // Slippery Bogbonder: onto an opponent's creature, our harmful counters (-1/-1, stun); onto ours, none.
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":")) && pend.onto === undefined) {
+      // Eventide's Shadow: removing them costs us a card's worth of life each (and gives a card), so a few at most, while
+      // our life stays well up: helpful ones off opponents' permanents, harmful ones off ours.
+      const so = Object.values(s.resolving?.scratch?.gathered ?? {}).reduce((a, b) => a + b, 0);
+      const room = Math.min(4, player(s, pid).life - 10);
+      const worth = pend.options.find((o) => {
+        if (!o.includes(":")) return false;
+        const x = s.objects[o.slice(0, o.indexOf(":"))];
+        return !!x && harmfulCounter(o.slice(o.indexOf(":") + 1)) === (controllerOf(s, x) === pid);
+      });
+      return [{ type: "chooseOption", player: pid, choice: worth && so < room ? worth : "done" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":"))) {
       const onto = pend.onto !== undefined ? s.objects[pend.onto] : undefined;
       const bad = onto && controllerOf(s, onto) !== pid ? pend.options.find((o) => o.includes(":") && harmfulCounter(o.slice(o.indexOf(":") + 1))) : undefined;
@@ -1150,7 +1162,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
       if (endsTurnOnly(body)) return theirs;
-      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell.
+      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell. Whirlwind
+      // Denial: unless they can pay its {4} for it.
+      const denial = body.effects.find((e) => e.type === "counterOpponentsStackUnless");
+      if (denial?.type === "counterOpponentsStackUnless") return !canPayUnless(s, top.controller, denial.unless, pid, sourceId, x);
       if (countersTheirStack(body)) return true;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
@@ -1326,7 +1341,7 @@ function endsTurnOnly(body: AbilityBody): boolean {
 
 /** "Counter all spells your opponents control and all abilities your opponents control" (Glen Elendra's Answer). */
 function countersTheirStack(body: AbilityBody): boolean {
-  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack");
+  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack" || e.type === "counterOpponentsStackUnless");
 }
 
 /**
@@ -2349,7 +2364,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack")) return null;
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack" || e.type === "counterOpponentsStackUnless")) return null;
   // Aggressive Mining: "You can't play lands" only once we have enough of them.
   if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.

@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
+import { countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -2146,6 +2146,7 @@ export function untapPermanent(s: GameState, o: GameObject) {
     if (countersStay(s, o, "stun")) return;
     o.counters.stun! -= 1;
     log(s, `A stun counter is removed from ${defOf(s, o).name} instead of untapping it.`);
+    countersRemoved(s, o, "stun", 1);
     return;
   }
   o.tapped = false;
@@ -2210,6 +2211,7 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
   if ((o.counters.shield ?? 0) <= 0) return false;
   o.counters.shield! -= 1;
   log(s, `A shield counter is removed from ${defOf(s, o).name} instead of ${what}.`);
+  countersRemoved(s, o, "shield", 1);
   return true;
 }
 
@@ -3656,7 +3658,9 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
       // rulings: only one that would untap, not one kept tapped).
       const winds = o.tapped ? s.battlefield.map((b) => abilitiesOf(s, obj(s, b)).untapRemovesCounters).find((k) => k && (o.counters[k] ?? 0) > 0) : undefined;
       if (winds) {
+        const had = o.counters[winds] ?? 0;
         o.counters[winds] = 0;
+        countersRemoved(s, o, winds, had);
         invalidateCharacteristics(s);
         log(s, `${nameOf(s, o.id)} doesn't untap: its ${winds} counters are removed instead.`);
         fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: winds });
@@ -4729,6 +4733,7 @@ function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; 
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
   invalidateCharacteristics(s);
+  countersRemoved(s, o, rc.counter, rc.n);
   if (left === 0) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: rc.counter });
 }
 
@@ -8211,9 +8216,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     loseEnergy(s, p.id, x);
     log(s, `${p.name} pays ${x} energy.`);
   }
-  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
-  if (ab.removeCounters) removeCountersCost(s, o, countersRemoved !== undefined ? { counter: ab.removeCounters.counter, n: countersRemoved } : ab.removeCounters);
-  if (countersRemoved !== undefined) log(s, `${p.name} removes ${countersRemoved} ${ab.removeCounters!.counter} counter${countersRemoved === 1 ? "" : "s"} from ${d.name}.`);
+  const removedCount = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
+  if (ab.removeCounters) removeCountersCost(s, o, removedCount !== undefined ? { counter: ab.removeCounters.counter, n: removedCount } : ab.removeCounters);
+  if (removedCount !== undefined) log(s, `${p.name} removes ${removedCount} ${ab.removeCounters!.counter} counter${removedCount === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
   if (ab.putCounters) {
     const put = putCounters(s, o, ab.putCounters.counter, ab.putCounters.n);
@@ -8231,6 +8236,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
     // They're still put on, so "whenever you put one or more loyalty counters on a planeswalker" triggers (CR 122.6).
     if (change > 0) fireEvent(s, { type: "countersPut", id: o.id, counter: "loyalty", amount: change, by: p.id });
+    // Chandra, Fire Artisan: a minus loyalty cost removes them (rulings).
+    if (change < 0) countersRemoved(s, o, "loyalty", -change);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
   if (ab.equip && !s.turnLog?.equipped?.includes(p.id)) ((s.turnLog ??= {}).equipped ??= []).push(p.id);
@@ -8298,7 +8305,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),
-    ...(countersRemoved !== undefined ? { countersRemoved } : {}),
+    ...(removedCount !== undefined ? { countersRemoved: removedCount } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
@@ -11218,6 +11225,9 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         o.counters["+1/+1"]! -= n;
         o.counters["-1/-1"]! -= n;
         changed = true;
+        // Both kinds are removed (CR 704.5q): Protean Hydra's "whenever a +1/+1 counter is removed" triggers (rulings).
+        countersRemoved(s, o, "+1/+1", n);
+        countersRemoved(s, o, "-1/-1", n);
       }
     }
     // Legend rule (704.5j): the rest of each group go to the graveyard, all but the one its controller chose (asked at the

@@ -2,7 +2,7 @@ import type { Amount, AmountExpr, Modification, Effect, PlayerRef, TargetSpec } 
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital, isGroup } from "./words";
-import { Ctx, parseBody } from "./body";
+import { Ctx, parseBody, parseUnlessPays } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseKeywordList, parseObject, parsePlayer } from "./targets";
@@ -233,6 +233,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // Summary Dismissal: "Exile all other spells and counter all abilities" (see Effect "dismissStack").
   if (ctx.spell && /^Exile all other spells and counter all abilities$/.test(s)) return [{ type: "dismissStack" }];
   if (ctx.spell && /^Counter all spells your opponents control and all abilities your opponents control$/.test(s)) return [{ type: "counterOpponentsStack" }];
+  // Whirlwind Denial (see Effect "counterOpponentsStackUnless").
+  const denial = ctx.spell ? /^For each spell and ability your opponents control, counter it unless its controller pays (\{\d+\})$/.exec(s) : null;
+  if (denial) {
+    const unless = parseUnlessPays(denial[1]!, ctx);
+    return unless && !unless.generic && !unless.life && !unless.lifeAmount ? [{ type: "counterOpponentsStackUnless", unless }] : null;
+  }
   // An ability an Equipment gives that names it: "Blazing Torch deals 2 damage to any target" (Blazing Torch, Ninja's
   // Kunai): the Equipment is the source, as it last existed if the cost sacrificed it (CR 608.2h; the creature isn't).
   const sourceDeals = /^\u27easource\u27eb (deals \d+ damage to (?:any target|target [a-z ]+))$/.exec(s);

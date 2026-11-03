@@ -6,7 +6,7 @@ import { PREDEFINED_TOKENS } from "./oracle/tokens";
 import { CREATURE_TYPES } from "./keywords";
 import { abilitiesOf } from "./cards";
 import { controllerOf, characteristics, invalidateCharacteristics, keywordOfCounter } from "./layers";
-import type { GameObject, GameState, PlayerId } from "./types";
+import type { GameObject, GameState, ObjectId, PlayerId } from "./types";
 import { opponents } from "./game";
 import { fireEvent } from "./effects";
 
@@ -261,6 +261,48 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
     fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m, by });
   }
   return m;
+}
+
+/** While set, counter removals happening at the same time, gathered into one event each (see batchCountersRemoved). */
+let removedBatch: { id: ObjectId; counter: string; n: number }[] | null = null;
+
+/**
+ * `n` counters of kind `counter` were just removed from `o` (CR 122): "whenever a +1/+1 counter is removed from ~", for any
+ * reason (Protean Hydra's rulings: an effect, a cost, damage it prevents, +1/+1 and -1/-1 counters cancelling out, CR
+ * 704.5q, or a counter moved off it, CR 122.5), and "whenever one or more loyalty counters are removed from ~" (Chandra,
+ * Fire Artisan: damage, a loyalty cost or an effect). An object leaving the battlefield doesn't lose its counters this way
+ * (CR 122.2, Chandra's rulings).
+ */
+export function countersRemoved(s: GameState, o: GameObject, counter: string, n: number): void {
+  if (n <= 0) return;
+  if (removedBatch) {
+    const x = removedBatch.find((r) => r.id === o.id && r.counter === counter);
+    if (x) x.n += n;
+    else removedBatch.push({ id: o.id, counter, n });
+    return;
+  }
+  fireEvent(s, { type: "countersRemoved", id: o.id, counter, n });
+}
+
+/**
+ * Counters removed during `fn` are removed at the same time: damage dealt at once removes them in one event, so several
+ * creatures dealing combat damage to Chandra, Fire Artisan at the same time trigger her once (rulings, CR 120.3c, 510.2).
+ */
+export function batchCountersRemoved<T>(s: GameState, fn: () => T): T {
+  const outer = removedBatch;
+  const mine: { id: ObjectId; counter: string; n: number }[] = [];
+  removedBatch = mine;
+  let out: T;
+  try {
+    out = fn();
+  } finally {
+    removedBatch = outer;
+  }
+  for (const r of mine) {
+    const o = s.objects[r.id];
+    if (o) countersRemoved(s, o, r.counter, r.n);
+  }
+  return out;
 }
 
 /**

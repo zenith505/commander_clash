@@ -667,6 +667,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   switch (cond.kind) {
     case "selfInExile": // Senu's intervening if (CR 603.4): the same object, face up in its owner's exile
       return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
+    case "selfSuspended": // CR 702.62b: in exile, with suspend (printed or gained there) and a time counter on it
+      return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc) && (src.counters.time ?? 0) > 0 && (!!compileCard(defOf(s, src)).suspend || src.gainedSuspend === (src.zoneChanges ?? 0));
     case "selfStill":
       return src.zone === cond.zone && (cond.zone === "battlefield" || src.owner === you) && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
     case "selfCastNth": {

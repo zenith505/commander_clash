@@ -1,0 +1,516 @@
+// Round 264: counters removed from a permanent, for any reason, as one event (CR 122; see countersRemoved in
+// counters.ts): Protean Hydra ("Whenever a +1/+1 counter is removed from ~", once for each counter, and its damage
+// prevention that removes that many +1/+1 counters even with fewer or none) and Chandra, Fire Artisan ("Whenever one or
+// more loyalty counters are removed from Chandra", once for each event, combat damage dealt at the same time being one).
+
+import { describe, expect, it } from "vitest";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { botActions, destroyPermanent, invalidateCharacteristics } from "../src";
+import { putCounters } from "../src/counters";
+import { abilitiesOf, applyAction, characteristics, dealDamageBatch, isFullySupported, objectSource, planActivate, moveObject, planCast, planSuspend, runStateBasedActions, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+
+const run = (s: GameState, plan: Action[] | null) => {
+  if (!plan) throw new Error("no plan");
+  for (const a of plan) s = applyAction(s, a);
+  return s;
+};
+/** Everyone passes until the stack is empty; stops at any question but blockers (none declared). */
+const settle = (s: GameState) => {
+  for (let i = 0; i < 300 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const p = s.pending;
+    if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+    else if (p) return s;
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+const opps = (s: GameState, ap: PlayerId) => [1, 2, 3].map((k) => s.turnOrder[(s.turnOrder.indexOf(ap) + k) % s.turnOrder.length]!);
+const indexOf = (s: GameState, id: ObjectId, text: RegExp) => {
+  const i = abilitiesOf(s, s.objects[id]!).activated.findIndex((a) => text.test(a.text));
+  if (i < 0) throw new Error(`no ability ${text}`);
+  return i;
+};
+/** Damage from these sources dealt at the same time (one batch, like combat damage). */
+const hitAll = (s: GameState, to: ObjectId, hits: [ObjectId, number][], combat = false) =>
+  dealDamageBatch(s, hits.map(([from, n]) => ({ src: objectSource(s, s.objects[from]!), to: { object: to }, n, ...(combat ? { combat: true as const } : {}) })));
+const plus = (s: GameState, id: ObjectId) => s.objects[id]!.counters["+1/+1"] ?? 0;
+
+const hydra = (): CardDef => ({"oracleId":"6e32b958-70d3-4f3d-b10e-d6c8cb27dd93","name":"Protean Hydra","manaCost":"{X}{G}","cmc":1,"typeLine":"Creature — Hydra","supertypes":[],"types":["Creature"],"subtypes":["Hydra"],"oracleText":"This creature enters with X +1/+1 counters on it.\nIf damage would be dealt to this creature, prevent that damage and remove that many +1/+1 counters from it.\nWhenever a +1/+1 counter is removed from this creature, put two +1/+1 counters on it at the beginning of the next end step.","power":"0","toughness":"0","colors":["G"],"colorIdentity":["G"],"keywords":[],"commanderLegal":"legal","set":"m10","releasedAt":"2009-07-17","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
+const chandra = (): CardDef => ({"oracleId":"2867d539-6a63-4fae-aae2-a7fdd4dd9f28","name":"Chandra, Fire Artisan","manaCost":"{2}{R}{R}","cmc":4,"typeLine":"Legendary Planeswalker — Chandra","supertypes":["Legendary"],"types":["Planeswalker"],"subtypes":["Chandra"],"oracleText":"Whenever one or more loyalty counters are removed from Chandra, she deals that much damage to target opponent or planeswalker.\n+1: Exile the top card of your library. You may play it this turn.\n−7: Exile the top seven cards of your library. You may play them this turn.","loyalty":"4","colors":["R"],"colorIdentity":["R"],"keywords":[],"commanderLegal":"legal","set":"sld","releasedAt":"2020-02-18","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const hexmage = (): CardDef => ({"oracleId":"fcb2a95b-cef0-4b29-8b2b-538f380aff2b","name":"Vampire Hexmage","manaCost":"{B}{B}","cmc":2,"typeLine":"Creature — Vampire Shaman","supertypes":[],"types":["Creature"],"subtypes":["Vampire","Shaman"],"oracleText":"First strike\nSacrifice this creature: Remove all counters from target permanent.","power":"2","toughness":"1","colors":["B"],"colorIdentity":["B"],"keywords":["First strike"],"commanderLegal":"legal","set":"zen","releasedAt":"2009-10-02","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+
+const kraken = (): CardDef => ({"oracleId":"54de4a7f-86f4-4029-80f7-bc25d6509cc8","name":"Deep-Sea Kraken","manaCost":"{7}{U}{U}{U}","cmc":10,"typeLine":"Creature — Kraken","supertypes":[],"types":["Creature"],"subtypes":["Kraken"],"oracleText":"This creature can't be blocked.\nSuspend 9—{2}{U} (Rather than cast this card from your hand, you may pay {2}{U} and exile it with nine time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost. It has haste.)\nWhenever an opponent casts a spell, if this card is suspended, remove a time counter from it.","power":"6","toughness":"6","colors":["U"],"colorIdentity":["U"],"keywords":["Suspend"],"commanderLegal":"legal","set":"tsp","releasedAt":"2006-10-06","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+const bloatfly = (): CardDef => ({"oracleId":"fc50e254-71bc-46b3-93e6-c6eb820a3473","name":"Bloatfly Swarm","manaCost":"{3}{B}","cmc":4,"typeLine":"Creature — Insect Mutant","supertypes":[],"types":["Creature"],"subtypes":["Insect","Mutant"],"oracleText":"Flying\nThis creature enters with five +1/+1 counters on it.\nIf damage would be dealt to this creature while it has a +1/+1 counter on it, prevent that damage, remove that many +1/+1 counters from it, then give each player a rad counter for each +1/+1 counter removed this way.","power":"0","toughness":"0","colors":["B"],"colorIdentity":["B"],"keywords":["Flying"],"commanderLegal":"legal","set":"pip","releasedAt":"2024-03-08","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+const into = (s: GameState, pid: PlayerId, def: CardDef, z: "graveyard" | "hand" | "library" | "exile") => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = z;
+  if (z === "library") s.players[pid]!.library.unshift(id);
+  else s.players[pid]![z].push(id);
+  invalidateCharacteristics(s);
+  return id;
+};
+
+const reyhan = (): CardDef => ({"oracleId":"3e7df01c-75af-440d-97fd-1b1b794281b9","name":"Reyhan, Last of the Abzan","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Human Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warrior"],"oracleText":"Reyhan enters with three +1/+1 counters on it.\nWhenever a creature you control dies or is put into the command zone, if it had one or more +1/+1 counters on it, you may put that many +1/+1 counters on target creature.\nPartner (You can have two commanders if both have partner.)","power":"0","toughness":"0","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Partner"],"commanderLegal":"legal","set":"c16","releasedAt":"2016-11-11","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+const denial = (): CardDef => ({"oracleId":"ba9e129d-a3cf-431c-93af-f2e4902d40a0","name":"Whirlwind Denial","manaCost":"{2}{U}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"For each spell and ability your opponents control, counter it unless its controller pays {4}.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"thb","releasedAt":"2020-01-24","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
+
+const shadow = (): CardDef => ({"oracleId":"92ac8aa4-e23c-4ed9-8317-c249a17ce3d2","name":"Eventide's Shadow","manaCost":"{4}{B}","cmc":5,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Remove any number of counters from among permanents on the battlefield. You draw cards and lose life equal to the number of counters removed this way.","colors":["B"],"colorIdentity":["B"],"keywords":[],"commanderLegal":"legal","set":"ecc","releasedAt":"2026-01-23","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+/** A Protean Hydra with `n` +1/+1 counters, and an opponent's creature to deal damage with. */
+const withHydra = (n: number) => {
+  const { s, ap } = setup([]);
+  const h = putOnBattlefield(s, ap, hydra());
+  s.objects[h]!.counters["+1/+1"] = n;
+  const opp = opps(s, ap)[0]!;
+  const src = putOnBattlefield(s, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+  const src2 = putOnBattlefield(s, opp, card("Test Lout", "Creature — Giant", "{2}", { power: "2", toughness: "2" }));
+  return { s, ap, h, src, src2, opp };
+};
+
+describe("Protean Hydra", () => {
+  it("is fully supported", () => {
+    expect(isFullySupported(hydra())).toBe(true);
+    expect(isFullySupported(chandra())).toBe(true);
+  });
+
+  it("prevents damage and removes that many +1/+1 counters; each one removed puts two back at the next end step", () => {
+    const { s: s0, h, src } = withHydra(4);
+    const out = hitAll(s0, h, [[src, 3]]);
+    expect(out.reduce((a, e) => a + e.dealt, 0)).toBe(0);
+    expect(s0.objects[h]!.damage ?? 0).toBe(0);
+    expect(plus(s0, h)).toBe(1);
+    // Three counters removed at once: three triggers (rulings), each making a delayed trigger.
+    expect(s0.triggerQueue.length).toBe(3);
+    let s = settle(s0);
+    expect(s.delayed?.filter((d) => d.when === "nextEndStep").length).toBe(3);
+    expect(plus(s, h)).toBe(1);
+    s = settle(passUntil(s, "end"));
+    expect(plus(s, h)).toBe(7);
+    expect(characteristics(s, s.objects[h]!).power).toBe(7);
+  });
+
+  it("damage greater than its counters is all prevented and removes them all; it then dies with 0 toughness", () => {
+    const { s: s0, h, src } = withHydra(2);
+    const out = hitAll(s0, h, [[src, 5]]);
+    expect(out.reduce((a, e) => a + e.dealt, 0)).toBe(0);
+    expect(plus(s0, h)).toBe(0);
+    expect(s0.triggerQueue.length).toBe(2);
+    runStateBasedActions(s0);
+    expect(s0.objects[h]!.zone).toBe("graveyard");
+    // The delayed triggers are made but do nothing: "it" is a new object in the graveyard (CR 400.7).
+    let s = settle(s0);
+    s = settle(passUntil(s, "end"));
+    expect(s.objects[h]!.zone).toBe("graveyard");
+    expect(plus(s, h)).toBe(0);
+  });
+
+  it("damage is prevented even with no +1/+1 counters on it (rulings), and nothing triggers", () => {
+    const { s: s0, ap, h, src } = withHydra(0);
+    const anthem = putOnBattlefield(s0, ap, card("Test Anthem", "Enchantment", "{2}", { oracleText: "Creatures you control get +2/+2." }));
+    expect(characteristics(s0, s0.objects[h]!).toughness).toBe(2);
+    expect(anthem).toBeTruthy();
+    const out = hitAll(s0, h, [[src, 5]]);
+    expect(out.reduce((a, e) => a + e.dealt, 0)).toBe(0);
+    expect(s0.objects[h]!.damage ?? 0).toBe(0);
+    expect(s0.triggerQueue.length).toBe(0);
+    runStateBasedActions(s0);
+    expect(s0.objects[h]!.zone).toBe("battlefield");
+  });
+
+  it("combat damage from two creatures at once removes the counters for both and triggers once for each counter", () => {
+    const { s: s0, h, src, src2 } = withHydra(6);
+    hitAll(s0, h, [[src, 3], [src2, 2]], true);
+    expect(plus(s0, h)).toBe(1);
+    expect(s0.triggerQueue.length).toBe(5);
+  });
+
+  it("a -1/-1 counter cancelling a +1/+1 counter (CR 704.5q) triggers it", () => {
+    const { s: s0, ap, h } = withHydra(3);
+    putCounters(s0, s0.objects[h]!, "-1/-1", 1);
+    expect(s0.triggerQueue.length).toBe(0);
+    runStateBasedActions(s0);
+    expect(plus(s0, h)).toBe(2);
+    expect(s0.objects[h]!.counters["-1/-1"] ?? 0).toBe(0);
+    // State-based actions put the trigger on the stack (CR 704.3, 603.3b).
+    expect(s0.triggerQueue.length + s0.stack.length).toBe(1);
+    let s = settle(s0);
+    s = settle(passUntil(s, "end", ap));
+    expect(plus(s, h)).toBe(4);
+  });
+
+  it("counters removed by an effect (Vampire Hexmage) trigger it once for each", () => {
+    expect(isFullySupported(hexmage())).toBe(true);
+    const { s: s0, ap, h } = withHydra(3);
+    const hex = putOnBattlefield(s0, ap, hexmage());
+    let s = run(s0, planActivate(s0, ap, hex, indexOf(s0, hex, /Remove all counters/), [{ kind: "object", id: h }]));
+    s = settle(s);
+    expect(plus(s, h)).toBe(0);
+    // It has 0 toughness now and died before the triggers resolved (state-based actions first, CR 704.3).
+    expect(s.objects[h]!.zone).toBe("graveyard");
+    expect(s.delayed?.filter((d) => d.when === "nextEndStep").length).toBe(3);
+  });
+
+  it("counters removed during the end step put counters on it at the next turn's end step (rulings)", () => {
+    const { s: s0, ap, h, src } = withHydra(3);
+    let s = passUntil(s0, "end", ap);
+    const turn = s.turn;
+    hitAll(s, h, [[src, 1]]);
+    s = settle(s);
+    expect(plus(s, h)).toBe(2);
+    s = settle(passUntil(s, "cleanup"));
+    expect(plus(s, h)).toBe(2);
+    s = settle(passUntil(s, "end"));
+    expect(s.turn).toBe(turn + 1);
+    expect(plus(s, h)).toBe(4);
+  });
+});
+
+describe("Chandra, Fire Artisan", () => {
+  const withChandra = (loyalty: number) => {
+    const { s, ap } = setup([]);
+    const c = putOnBattlefield(s, ap, chandra());
+    s.objects[c]!.counters.loyalty = loyalty;
+    const opp = opps(s, ap)[0]!;
+    const src = putOnBattlefield(s, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    const src2 = putOnBattlefield(s, opp, card("Test Lout", "Creature — Giant", "{2}", { power: "2", toughness: "2" }));
+    return { s, ap, c, src, src2, opp };
+  };
+
+  it("damage dealt to her removes loyalty counters: she deals that much damage to target opponent", () => {
+    const { s: s0, ap, c, src, opp } = withChandra(4);
+    hitAll(s0, c, [[src, 3]]);
+    expect(s0.objects[c]!.counters.loyalty).toBe(1);
+    let s = settle(s0);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+
+  it("combat damage from several creatures at once is one event: she triggers once, for all of it (rulings)", () => {
+    const { s: s0, c, src, src2 } = withChandra(9);
+    hitAll(s0, c, [[src, 5], [src2, 2]], true);
+    expect(s0.objects[c]!.counters.loyalty).toBe(2);
+    expect(s0.triggerQueue.length).toBe(1);
+  });
+
+  it("damage two sources deal one after the other is two events", () => {
+    const { s: s0, c, src, src2 } = withChandra(9);
+    hitAll(s0, c, [[src, 5]]);
+    hitAll(s0, c, [[src2, 2]]);
+    expect(s0.triggerQueue.length).toBe(2);
+  });
+
+  it("with all her loyalty removed she still deals the damage, as many as were removed (rulings)", () => {
+    const { s: s0, ap, c, src, opp } = withChandra(4);
+    hitAll(s0, c, [[src, 5]]);
+    runStateBasedActions(s0);
+    expect(s0.objects[c]!.zone).toBe("graveyard");
+    let s = settle(s0);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 4);
+  });
+
+  it("her −7 loyalty cost removes seven counters: she deals 7 damage; her +1 doesn't trigger", () => {
+    const { s: s0, ap, c, opp } = withChandra(8);
+    let s = run(s0, planActivate(s0, ap, c, indexOf(s0, c, /^−7/)));
+    expect(s.objects[c]!.counters.loyalty).toBe(1);
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 7);
+
+    const { s: t0, ap: ap2, c: c2 } = withChandra(4);
+    const t = run(t0, planActivate(t0, ap2, c2, indexOf(t0, c2, /^\+1/)));
+    expect(t.objects[c2]!.counters.loyalty).toBe(5);
+    // Only the +1 ability itself is on the stack.
+    expect(t.triggerQueue.length).toBe(0);
+    expect(t.stack.length).toBe(1);
+  });
+
+  it("leaving the battlefield doesn't remove her counters, so nothing triggers (rulings, CR 122.2)", () => {
+    const { s, c } = withChandra(4);
+    moveObject(s, c, "hand");
+    runStateBasedActions(s);
+    expect(s.objects[c]!.zone).toBe("hand");
+    expect(s.triggerQueue.length).toBe(0);
+  });
+});
+
+describe("Deep-Sea Kraken", () => {
+  /** Kraken suspended by its owner (the active player) with `n` time counters, and an instant in an opponent's hand. */
+  const suspended = (n: number) => {
+    const { s, ap, ids } = setup([kraken(), card("Test Study", "Sorcery", "{U}", { oracleText: "Draw a card." })]);
+    let t = run(s, planSuspend(s, ap, ids[0]!));
+    const k = ids[0]!;
+    expect(t.objects[k]!.zone).toBe("exile");
+    expect(t.objects[k]!.counters.time).toBe(9);
+    t.objects[k]!.counters.time = n;
+    const opp = opps(t, ap)[0]!;
+    const shocks = [0, 1].map(() => into(t, opp, card("Test Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }), "hand"));
+    t.players[opp]!.manaPool.U = 2;
+    return { s: t, ap, k, opp, shocks, study: ids[1]! };
+  };
+  /** The active player casts their sorcery, then the opponent responds with an instant. */
+  const oppCasts = (s: GameState, ap: PlayerId, opp: PlayerId, study: ObjectId, shock: ObjectId) => {
+    let t = run(s, planCast(s, ap, study, []));
+    t = act(t, { type: "passPriority", player: ap });
+    expect(waitingOn(t)).toBe(opp);
+    return run(t, planCast(t, opp, shock, []));
+  };
+
+  it("is fully supported", () => {
+    expect(isFullySupported(kraken())).toBe(true);
+  });
+
+  it("an opponent casting a spell removes a time counter from it while it's suspended", () => {
+    const { s: s0, ap, k, opp, shocks, study } = suspended(3);
+    let s = oppCasts(s0, ap, opp, study, shocks[0]!);
+    // The trigger works in exile, controlled by its owner (CR 113.6, 113.8).
+    const trig = s.stack.at(-1)!;
+    expect(trig.description).toMatch(/remove a time counter/);
+    expect(trig.controller).toBe(ap);
+    s = settle(s);
+    expect(s.objects[k]!.counters.time).toBe(2);
+    expect(s.objects[k]!.zone).toBe("exile");
+  });
+
+  it("its owner's own spells don't remove one", () => {
+    const { s: s0, ap, k, study } = suspended(3);
+    const s = settle(run(s0, planCast(s0, ap, study, [])));
+    expect(s.objects[k]!.counters.time).toBe(3);
+  });
+
+  it("removing the last time counter lets its owner cast it without paying its mana cost (CR 702.62a)", () => {
+    const { s: s0, ap, k, opp, shocks, study } = suspended(1);
+    let s = oppCasts(s0, ap, opp, study, shocks[0]!);
+    s = settle(s);
+    expect(s.objects[k]!.counters.time ?? 0).toBe(0);
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: k, how: "suspend" });
+    s = settle(run(s, planCast(s, ap, k, [])));
+    expect(s.objects[k]!.zone).toBe("battlefield");
+  });
+
+  it("a card in exile without time counters isn't suspended: nothing triggers", () => {
+    const { s: s0, ap, k, opp, shocks, study } = suspended(1);
+    s0.objects[k]!.counters = {};
+    const s = settle(oppCasts(s0, ap, opp, study, shocks[0]!));
+    expect(s.objects[k]!.counters.time ?? 0).toBe(0);
+    expect(s.pending?.kind).not.toBe("castFree");
+  });
+});
+
+describe("Bloatfly Swarm", () => {
+  it("prevents damage, removes that many +1/+1 counters, then gives each player a rad counter for each", () => {
+    expect(isFullySupported(bloatfly())).toBe(true);
+    const { s, ap } = setup([]);
+    const b = putOnBattlefield(s, ap, bloatfly());
+    s.objects[b]!.counters["+1/+1"] = 5;
+    const opp = opps(s, ap)[0]!;
+    const src = putOnBattlefield(s, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    const out = hitAll(s, b, [[src, 2]]);
+    expect(out.reduce((a, e) => a + e.dealt, 0)).toBe(0);
+    expect(plus(s, b)).toBe(3);
+    for (const p of s.turnOrder) expect(s.players[p]!.rad ?? 0).toBe(2);
+    // More damage than counters: all of it prevented, only the counters it had count.
+    hitAll(s, b, [[src, 5]]);
+    expect(plus(s, b)).toBe(0);
+    for (const p of s.turnOrder) expect(s.players[p]!.rad ?? 0).toBe(5);
+    // With no counters left the damage isn't prevented.
+    runStateBasedActions(s);
+    expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Reyhan, Last of the Abzan", () => {
+  /** Reyhan with three counters, another creature of yours, and a creature to get the counters. */
+  const withReyhan = () => {
+    const { s, ap } = setup([]);
+    const r = putOnBattlefield(s, ap, reyhan());
+    s.objects[r]!.counters["+1/+1"] = 3;
+    const b = putOnBattlefield(s, ap, bear());
+    const to = putOnBattlefield(s, ap, card("Test Squire", "Creature — Human", "{1}", { power: "1", toughness: "1" }));
+    return { s, ap, r, b, to };
+  };
+  /** Answers its target and its "you may". */
+  const answer = (s: GameState, ap: PlayerId, to: ObjectId) => {
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: to }] }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    return settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+  };
+
+  it("a creature of yours with +1/+1 counters dying: that many on target creature, as it last existed", () => {
+    expect(isFullySupported(reyhan())).toBe(true);
+    const { s: s0, ap, b, to } = withReyhan();
+    s0.objects[b]!.counters["+1/+1"] = 2;
+    destroyPermanent(s0, s0.objects[b]!, "test");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(2);
+  });
+
+  it("Reyhan itself dying counts; -1/-1 counters that killed it don't lower the number (rulings)", () => {
+    const { s: s0, ap, r, to } = withReyhan();
+    putCounters(s0, s0.objects[r]!, "-1/-1", 6);
+    runStateBasedActions(s0);
+    expect(s0.objects[r]!.zone).toBe("graveyard");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(3);
+  });
+
+  it("a creature without +1/+1 counters dying doesn't trigger it", () => {
+    const { s: s0, b } = withReyhan();
+    destroyPermanent(s0, s0.objects[b]!, "test");
+    const s = settle(s0);
+    expect(s.pending).toBeFalsy();
+    expect(s.stack.length).toBe(0);
+  });
+
+  it("a commander with counters put into the command zone instead of its library triggers it (CR 903.9b)", () => {
+    const { s: s0, ap, to } = withReyhan();
+    const c = putOnBattlefield(s0, ap, card("Test Captain", "Legendary Creature — Human", "{2}", { power: "2", toughness: "2" }), { commander: true });
+    s0.objects[c]!.counters["+1/+1"] = 4;
+    moveObject(s0, c, "library");
+    expect(s0.objects[c]!.zone).toBe("command");
+    const s = answer(s0, ap, to);
+    expect(plus(s, to)).toBe(4);
+  });
+
+  it("a commander that dies and then goes to the command zone triggers it only once (CR 903.9a)", () => {
+    const { s: s0, ap, to } = withReyhan();
+    const c = putOnBattlefield(s0, ap, card("Test Captain", "Legendary Creature — Human", "{2}", { power: "2", toughness: "2" }), { commander: true });
+    s0.objects[c]!.counters["+1/+1"] = 1;
+    destroyPermanent(s0, s0.objects[c]!, "test");
+    let s = settle(s0);
+    // Its owner may move it to the command zone as a state-based action.
+    if (s.pending?.kind === "chooseMay" && s.pending.player === ap && s.objects[c]!.zone === "graveyard") s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: to }] }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(plus(s, to)).toBe(1);
+    expect(s.pending).toBeFalsy();
+    expect(s.stack.length).toBe(0);
+  });
+});
+
+describe("Whirlwind Denial", () => {
+  /**
+   * The active player casts a sorcery; the next two opponents each respond with an instant; then the active player
+   * casts Whirlwind Denial. The opponents have `pool` colorless mana each to pay with.
+   */
+  const stackUp = (pool: number) => {
+    const { s: s0, ap, ids } = setup([card("Test Study", "Sorcery", "{U}", { oracleText: "Draw a card." }), denial()]);
+    const [o1, o2] = opps(s0, ap) as [PlayerId, PlayerId];
+    const i1 = into(s0, o1, card("Test Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }), "hand");
+    const i2 = into(s0, o2, card("Test Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }), "hand");
+    for (const p of [o1, o2]) s0.players[p]!.manaPool = { ...s0.players[p]!.manaPool, U: 1, C: pool };
+    const to = (s: GameState, p: PlayerId) => {
+      for (let i = 0; i < 10 && waitingOn(s) !== p; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(waitingOn(s)).toBe(p);
+      return s;
+    };
+    let s = run(s0, planCast(s0, ap, ids[0]!, []));
+    s = to(act(s, { type: "passPriority", player: ap }), o1);
+    s = run(s, planCast(s, o1, i1, []));
+    s = to(act(s, { type: "passPriority", player: o1 }), o2);
+    s = run(s, planCast(s, o2, i2, []));
+    s = to(act(s, { type: "passPriority", player: o2 }), ap);
+    s = run(s, planCast(s, ap, ids[1]!, []));
+    s = to(s, ap);
+    // Everyone passes: Whirlwind Denial resolves.
+    for (let i = 0; i < 4 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, o1, o2, i1, i2, study: ids[0]! };
+  };
+
+  it("is fully supported", () => {
+    expect(isFullySupported(denial())).toBe(true);
+  });
+
+  it("asks the opponents in turn order from the next one; those not paid for are countered, the caster's own spell stays", () => {
+    const { s: s0, ap, o1, o2, i1, i2, study } = stackUp(4);
+    expect(s0.pending).toMatchObject({ kind: "payUnless", player: o1, cost: "{4}" });
+    let s = act(s0, { type: "payUnless", player: o1, pay: true });
+    expect(s.players[o1]!.manaPool.C ?? 0).toBe(0);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: o2, cost: "{4}" });
+    // Nothing is countered until every opponent has chosen (rulings).
+    expect(s.objects[i1]!.zone).toBe("stack");
+    s = act(s, { type: "payUnless", player: o2, pay: false });
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[i2]!.zone).toBe("graveyard");
+    expect(s.objects[i1]!.zone).toBe("stack");
+    expect(s.objects[study]!.zone).toBe("stack");
+    expect(ap).toBeTruthy();
+  });
+
+  it("an opponent who can't pay has theirs countered", () => {
+    const { s: s0, o1, o2, i1, i2 } = stackUp(0);
+    expect(s0.pending).toMatchObject({ kind: "payUnless", player: o1 });
+    // A bot without the mana declines.
+    const a1 = botActions(s0, o1);
+    expect(a1[a1.length - 1]).toMatchObject({ type: "payUnless", player: o1, pay: false });
+    let s = act(s0, { type: "payUnless", player: o1, pay: false });
+    s = act(s, { type: "payUnless", player: o2, pay: false });
+    expect(s.objects[i1]!.zone).toBe("graveyard");
+    expect(s.objects[i2]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Eventide's Shadow", () => {
+  it("removes any number of counters of any kinds from any player's permanents, one at a time; then that many cards and life", () => {
+    expect(isFullySupported(shadow())).toBe(true);
+    const { s: s0, ap, ids } = setup([shadow()]);
+    const opp = opps(s0, ap)[0]!;
+    const theirs = putOnBattlefield(s0, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    s0.objects[theirs]!.counters["+1/+1"] = 2;
+    const h = putOnBattlefield(s0, ap, hydra());
+    s0.objects[h]!.counters["+1/+1"] = 3;
+    const mine = putOnBattlefield(s0, ap, bear());
+    s0.objects[mine]!.counters.stun = 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "removeCounter" });
+    const opts = (s.pending as { options: string[] }).options;
+    expect(opts).toEqual(expect.arrayContaining([`${theirs}:+1/+1`, `${h}:+1/+1`, `${mine}:stun`, "done"]));
+    s = act(s, { type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    s = act(s, { type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    // None left there: no more options from it.
+    expect((s.pending as { options: string[] }).options).not.toContain(`${theirs}:+1/+1`);
+    s = act(s, { type: "chooseOption", player: ap, choice: `${mine}:stun` });
+    s = act(s, { type: "chooseOption", player: ap, choice: `${h}:+1/+1` });
+    const hand = s.players[ap]!.hand.length;
+    const life = s.players[ap]!.life;
+    s = act(s, { type: "chooseOption", player: ap, choice: "done" });
+    expect(s.objects[theirs]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[mine]!.counters.stun ?? 0).toBe(0);
+    expect(plus(s, h)).toBe(2);
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+    expect(s.players[ap]!.life).toBe(life - 4);
+    // Protean Hydra's counter was removed too: it triggers.
+    s = settle(s);
+    expect(s.delayed?.filter((d) => d.when === "nextEndStep").length).toBe(1);
+  });
+
+  it("removing none draws nothing; a bot takes helpful counters off opponents' permanents, a few at most", () => {
+    const { s: s0, ap, ids } = setup([shadow()]);
+    const opp = opps(s0, ap)[0]!;
+    const theirs = putOnBattlefield(s0, opp, card("Test Brute", "Creature — Giant", "{3}", { power: "5", toughness: "5" }));
+    s0.objects[theirs]!.counters["+1/+1"] = 9;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])));
+    const a = botActions(s, ap);
+    expect(a[a.length - 1]).toEqual({ type: "chooseOption", player: ap, choice: `${theirs}:+1/+1` });
+    for (let i = 0; i < 20 && s.pending?.kind === "chooseOption"; i++) s = run(s, botActions(s, ap));
+    expect(s.objects[theirs]!.counters["+1/+1"]).toBe(5);
+
+    const { s: t0, ap: ap2, ids: ids2 } = setup([shadow()]);
+    let t = settle(run(t0, planCast(t0, ap2, ids2[0]!, [])));
+    const hand = t.players[ap2]!.hand.length;
+    const life = t.players[ap2]!.life;
+    if (t.pending) t = act(t, { type: "chooseOption", player: ap2, choice: "done" });
+    expect(t.players[ap2]!.hand.length).toBe(hand);
+    expect(t.players[ap2]!.life).toBe(life);
+  });
+});

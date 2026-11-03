@@ -1332,7 +1332,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = (m[2] ?? m[3])!;
     // "It" in an ability that says nothing else it could be is its source (Balduvian Hydra).
     const self = /^it$/i.test(who) && !ctx.spell && !ctx.targets.length && !ctx.subject && !ctx.subjectIt;
-    const to = /^(?:any target|target (?:player|opponent) or planeswalker)$/i.test(who) ? parseDamageRecipient(who, ctx) : /^you$/i.test(who) ? ({ ref: "you" } as const) : self ? ({ ref: "self" } as const) : parseObject(who, ctx);
+    const to = /^(?:any target|target (?:player|opponent) or planeswalker|target player, planeswalker, or [A-Z][a-z]+ creature)$/.test(who) ? parseDamageRecipient(who, ctx) : /^you$/i.test(who) ? ({ ref: "you" } as const) : self ? ({ ref: "self" } as const) : parseObject(who, ctx);
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];

@@ -3941,6 +3941,11 @@ export function compile(d: CardDef): CompiledCard {
       out.countsAsNamed = countsAs[1]!;
       continue;
     }
+    const untapInstead = new RegExp(`^If a permanent with an? ${COUNTER} counter on it would untap during its controller's untap step, remove all \\1 counters from it instead\\.$`).exec(line);
+    if (untapInstead) {
+      out.untapRemovesCounters = counterKind(untapInstead[1]!);
+      continue;
+    }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
       continue;
@@ -3951,7 +3956,7 @@ export function compile(d: CardDef): CompiledCard {
       out.skipUpkeepIfHellbent = true;
       continue;
     }
-    if (line === "Players skip their untap steps.") {
+    if (line === "Players skip their untap steps." || line === "Each player skips their untap step.") {
       out.skipUntapSteps = true;
       continue;
     }

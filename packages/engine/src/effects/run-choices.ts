@@ -604,7 +604,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (sc.asked) return;
         sc.asked = true;
         r.chosen = { ...r.chosen, cardType: undefined };
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "cardType", options: e.options ?? [] };
+        // Teferi's Realm: "that player chooses" (the upkeep's player).
+        const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+        if (chooser === undefined) return;
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardType", options: e.options ?? [] };
         return "paused";
       }
       if (e.choice === "cardName") {

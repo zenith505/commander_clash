@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
+import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -2325,6 +2325,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
+  // Juxtapose (see Effect "juxtapose"): no permanent is targeted (rulings).
+  if (opts.spell && text.trim() === "You and target player exchange control of the creature you each control with the greatest mana value. Then exchange control of artifacts the same way. If two or more permanents a player controls are tied for greatest, their controller chooses one of them.")
+    return { targets: [{ kind: "player", text: "target player" }], effects: [{ type: "juxtapose", who: { ref: "target", index: 0 }, types: ["Creature", "Artifact"] }], text };
+  // Twist Allegiance: the same, with the creatures untapped once each player controls the other's.
+  if (opts.spell && /^You and target opponent each gain control of all creatures the other controls until end of turn\. Untap those creatures\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
+    return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 }, untapAfter: true }], text };
   // Bring to Light: "Search your library for a creature, instant, or sorcery card with mana value less than or equal to
   // ..., exile that card, then shuffle. You may cast that card without paying its mana cost.": cast as this resolves or
   // not at all, and it stays exiled if it isn't cast (rulings, CR 608.2g).
@@ -2453,6 +2459,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Hide in Plain Sight: two of the five cloaked, not optional (as many as there are, CR 701.58a), the rest on the bottom.
   if (/^Look at the top five cards of your library, cloak two of them, and put the rest on the bottom of your library in a random order\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "dig", n: 5, count: 2, upTo: false, required: true, into: "cloak", rest: "bottom", random: true, reveal: false }], text };
+  // Remove Enchantments: first the enchantments and Auras you own among them go to your hand, then the rest of those still
+  // there are destroyed ("all other").
+  if (text.trim() === "Return to your hand all enchantments you both own and control, all Auras you own attached to permanents you control, and all Auras you own attached to attacking creatures your opponents control. Then destroy all other enchantments you control, all other Auras attached to permanents you control, and all other Auras attached to attacking creatures your opponents control.") {
+    const aura = (owned: boolean, host: TargetSpec): TargetSpec => ({ kind: "object", types: ["Enchantment"], subtypes: ["Aura"], notTypes: [], notColors: [], ...(owned ? { owner: "you" as const } : {}), attachedTo: host, text: `Aura${owned ? " you own" : ""} attached to ${host.text}` });
+    const yours: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "a permanent you control" };
+    const attacking: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "opponent", combat: "attacking", text: "an attacking creature an opponent controls" };
+    const group = (owned: boolean): TargetSpec => ({ kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: ["Enchantment"], notTypes: [], notColors: [], controller: "you", ...(owned ? { owner: "you" as const } : {}), text: owned ? "enchantment you both own and control" : "enchantment you control" }, aura(owned, yours), aura(owned, attacking)], text: owned ? "enchantments and Auras you own" : "other enchantments and Auras" });
+    return { targets: [], effects: [{ type: "bounce", what: { ref: "each", filter: group(true) } }, { type: "destroy", what: { ref: "each", filter: group(false) } }], text };
+  }
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };
@@ -11572,6 +11587,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Silvan Reveler: "draw a card, then discard a card. If you discard a land card this way, put it from your graveyard
       // onto the battlefield tapped": the one card discarded, while it's still that card in the graveyard (CR 400.7).
       const putIt = then === "put it from your graveyard onto the battlefield tapped" && prev.n === 1 && prev.who.ref === "you" && !prev.upTo;
+      // Aether Rift: "If you discard a creature card this way, return it from your graveyard to the battlefield unless any
+      // player pays 5 life": the card discarded, unless a player in turn order pays (rulings: each is given the option).
+      const rift = /^return it from your graveyard to the battlefield unless any player (pays \d+ life)$/.exec(then);
+      const riftOptions = rift && filter && prev.n === 1 && prev.who.ref === "you" && prev.random ? parsePunisherOptions(rift[1]!, ctx) : null;
+      if (riftOptions) {
+        effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter: filter! }, effects: [{ type: "punisher", who: { ref: "eachPlayer" }, options: riftOptions, effects: [{ type: "putOntoBattlefield", what: { ref: "discarded" } }], mode: "ifNone", thenText: "the discarded card returns to the battlefield" }] });
+        continue;
+      }
       const inner = putIt ? [{ type: "putOntoBattlefield" as const, what: { ref: "discarded" as const }, tapped: true as const }] : filter && (itsPower ? replaceX(parseOne(then.replace(/^~ deals damage equal to that card's power/, "~ deals X damage"), ctx), { count: { kind: "power", of: { ref: "discarded" } } }) : parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx));
       if (!filter || !inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
@@ -14271,6 +14294,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!yes || !no || sub.targets.length) return null;
       effects.push({ type: "delayed", when: "playersNextEndStep", whose: { ref: "chosenPlayer" }, effects: [{ type: "if", cond: { kind: "eventPlayerAttackedYou", not: true }, effects: yes, otherwise: no }], text: `${theirEnd[1]!} if they didn't attack you that turn. Otherwise, ${theirElse[1]!}` });
       si = sentences.length;
+      continue;
+    }
+    // Teferi's Realm: "that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken permanents of that
+    // type phase out." (a non-Aura enchantment: an enchantment that isn't an Aura, any other type being itself).
+    const realm = /^(that player|you) chooses? artifact, creature, land, or non-Aura enchantment$/i.exec(s);
+    if (realm && /^All nontoken permanents of that type phase out\.?$/.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(realm[1]!.toLowerCase(), ctx);
+      if (!who) return null;
+      effects.push({ type: "choose", choice: "cardType", who, options: ["Artifact", "Creature", "Land", NON_AURA_ENCHANTMENT] }, { type: "phaseOut", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], chosen: "cardType", token: false, text: "all nontoken permanents of the chosen type" } } });
+      si++;
       continue;
     }
     // "Choose artifact or enchantment. Destroy all permanents of the chosen type" (Season of Gathering): a card type,

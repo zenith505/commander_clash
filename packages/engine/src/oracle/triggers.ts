@@ -2646,6 +2646,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     .replace(/^(Whenever one or more \+1\/\+1 counters are put on ~), put an additional \+1\/\+1 counter on it\./, "$1, put a +1/+1 counter on ~.")
     // Greener Pastures: "if that player controls more lands than each other player, the player creates ...": that player.
     .replace(/^(At the beginning of each player's upkeep, if that player controls more lands than each other player), the player creates /, "$1, that player creates ")
+    // Kudzu, Steam Vines: "that land's controller" is the destroyed land's, as it last existed (rulings: any land, not
+    // targeted; with none to move to, the Aura is left attached to nothing and state-based actions bin it).
+    .replace(/^(When enchanted land becomes tapped, destroy it)\. That land's controller may attach ~ to a land of their choice\.$/, "$1. Its controller may attach ~ to a land of their choice.")
+    .replace(/^(When enchanted land becomes tapped, destroy it) and ~ deals (\w+) damage to that land's controller\. That player attaches ~ to a land of their choice\.$/, "$1. ~ deals $2 damage to its controller. Its controller attaches ~ to a land of their choice.")
     // Psychic Venom: "Whenever enchanted land becomes tapped, ~ deals 2 damage to that land's controller": the tapped land's
     // controller, as Pooling Venom's "its controller" (rulings: tapped for any reason).
     .replace(/^(Whenever enchanted land becomes tapped, ~ deals \w+ damage to) that land's controller\.$/, "$1 its controller.")

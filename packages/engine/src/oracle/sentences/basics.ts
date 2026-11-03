@@ -19,6 +19,13 @@ import { emblemAbilityOk } from "../grants";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // Plagiarize: "Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a
+  // card." (CR 614.1a; the body reads it as "If ..., ... until end of turn"): every draw of theirs this turn, the first in
+  // their draw step too.
+  if ((m = /^(?:Until end of turn, )?[Ii]f (target player|target opponent) would draw a card, instead that player skips that draw and you draw a card(?: until end of turn)?$/.exec(s)) && (/^Until end of turn, /.test(s) || / until end of turn$/.test(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && [{ type: "stealDrawsThisTurn", who }];
+  }
   // Rad counters (CR 728): "target player gets two rad counters", "each player gets X", "that player gets twice that many"
   // (twice X), "each opponent gets a number of rad counters equal to its power", "you get half X rad counters, rounded up".
   if ((m = /^(.+?) gets? half X rad counters, rounded (up|down)$/.exec(s))) {

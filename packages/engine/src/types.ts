@@ -1060,7 +1060,7 @@ export interface DelayedTrigger {
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
   /**
-   * `lostControl` only: what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
+   * `lostControl` (and `leaves`: War Barge's target): what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
    * control of ~", Krovikan Vampire): it triggers even if the watched object left the battlefield (Khârn rulings).
    */
   about?: { id: ObjectId; zc: number };
@@ -1363,7 +1363,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** The payment is this permanent's cumulative upkeep (CR 702.24a): mana "only to pay cumulative upkeep costs" pays it (mayPayUse). */ upkeepOf?: ObjectId; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -2407,7 +2407,7 @@ export interface Resolving {
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
   /** "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents a pick put counters on. */
-  countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
+  countersPutThisWay?: { id: ObjectId; zc: number; kind?: string; /** How many were put (distributed counters, Shambling Swarm). */ n?: number }[];
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */

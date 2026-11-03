@@ -2,6 +2,7 @@ import { linkedCards, playerProtectedFrom, playerProtection } from "./effects/ta
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
+import { mayPayUse } from "./spend";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
@@ -260,7 +261,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;
-      const taps = mana ? planMana(s, pid, parseManaCost(mana)) : [];
+      const taps = mana ? planMana(s, pid, parseManaCost(mana), 0, undefined, [], mayPayUse(s, pend)) : [];
       const ok = !!taps && (!mana || manaValue(parseManaCost(mana)) <= Math.max(4, lands(s, pid) - 2)) && player(s, pid).life > life + 5 && (player(s, pid).energy ?? 0) >= energy;
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
@@ -1574,6 +1575,9 @@ function chooseFlickers(s: GameState, pid: PlayerId, options: ObjectId[]): Objec
 function joinForcesAmount(s: GameState, pid: PlayerId, max: number): number {
   const r = s.resolving!;
   const fx = allEffects(r.body.effects);
+  // Errant Minion: enough to prevent the damage, no more.
+  const minion = fx.find((e) => e.type === "damage" && e.preventOf);
+  if (minion?.type === "damage") return Math.min(max, typeof minion.amount === "number" ? minion.amount : max);
   if (JSON.stringify(fx).includes('"whose"')) return max;
   const paid = r.scratch?.join?.paid ?? 0;
   const me = player(s, pid);

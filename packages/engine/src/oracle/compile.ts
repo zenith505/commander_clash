@@ -588,6 +588,12 @@ export function compile(d: CardDef): CompiledCard {
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
       .replace(/^Whenever you cast (an? [a-z]+ spell)(?: or| and whenever) (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
+      // Orcish Mine: "At the beginning of your upkeep and whenever enchanted land becomes tapped, remove an ore counter from
+      // ~": the same, an ability for each event (CR 603.1).
+      .replace(/^At the beginning of your upkeep and whenever enchanted land becomes tapped, ([^\n]+)$/m, "At the beginning of your upkeep, $1\nWhenever enchanted land becomes tapped, $1")
+      // Its "destroy enchanted land and ~ deals 2 damage to that land's controller": two instructions, the player the land's
+      // controller as it last existed (CR 608.2h, see "hostController").
+      .replace(/^(When the last ore counter is removed from ~), destroy enchanted land and ~ deals 2 damage to that land's controller\.$/m, "$1, destroy enchanted land. ~ deals 2 damage to enchanted land's controller.")
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
@@ -1277,6 +1283,16 @@ export function compile(d: CardDef): CompiledCard {
       const per = parseCount(`the number of ${byCounters[3]} counters on ~`, null);
       if (!g || g.filter.kind !== "object" || g.filter.controller !== "you" || !per || typeof per !== "object") out.unsupported.push(raw);
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byCounters[2]!), n: 1, per, text: line });
+      continue;
+    }
+    // Blue, Loyal Raptor: "For each kind of counter on ~, each other Dinosaur you control enters with a counter of that kind
+    // on it." The same replacement (CR 614.1c), with the kinds of counters on it as each would enter; not Dinosaurs entering
+    // with it (rulings).
+    const eachKind = /^For each kind of counter on ~, each other ([A-Z][a-z]+) you control enters with a counter of that kind on it\.$/.exec(line);
+    if (eachKind) {
+      const g = CREATURE_TYPES.has(eachKind[1]!) ? parseGroup(`each ${eachKind[1]} you control`) : null;
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: "+1/+1", n: 1, eachKindOnSource: true, text: line });
       continue;
     }
     const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s (toughness|power)(?: and as an? ([A-Z][a-z]+) in addition to its other types)?\\.$`).exec(line);

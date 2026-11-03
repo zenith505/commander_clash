@@ -6646,6 +6646,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "65c32889-3d70-449f-af76-05385c78c5a9",
+  "name": "Evercoat Ursine",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental Bear",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Bear"
+  ],
+  "oracleText": "Trample\nHideaway 3, hideaway 3 (When this creature enters, look at the top three cards of your library, exile one face down, then put the rest on the bottom in a random order. Then do it again.)\nWhenever this creature deals combat damage to a player, if there are cards exiled with it, you may play one of them without paying its mana cost.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample",
+   "Hideaway"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a75445d3-1303-4bb5-89ad-26ea93fecd48",
   "name": "Evolving Wilds",
   "manaCost": "",

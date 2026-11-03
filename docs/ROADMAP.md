@@ -1,6 +1,6 @@
 # Roadmap
 
-29,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,627 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,514 of
 9,979 (95%).
 
@@ -5198,6 +5198,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the end of your next turn with a Villain of greater mana value), Carrionette (from the graveyard, itself and the target
   exiled unless that creature's controller pays {2}; paid, neither is). +10 (29,593 of 31,936 with B96, B97 and rounds 263
   to 265).
+- Round B99 (templates from the bottom of the list): fortify (CR 702.67, 301.6: Darksteel Garrison attaches only to a land
+  you control, as a sorcery; "fortified land has indestructible", "whenever fortified land becomes tapped"; it becomes
+  unattached when the land stops being a land, CR 704.5n), aura swap (CR 702.65: Arcanum Wings is exchanged with an Aura
+  card from your hand that could enchant the same creature, at once; nothing happens if either half can't be done, or if
+  you don't own it; bots only use it with such an Aura in hand), Jace, Reality Sculptor ("Empower Jace X" makes or grows a
+  Jace token, not Jace himself, CR 701.71a; "Activate only if there are twenty-five or more loyalty counters among Jaces you
+  control" on a loyalty ability; "Exile all but the bottom card of each opponent's library"), Goddric, Cloaked Reveler (a
+  Dragon with base power and toughness 4/4, flying and a quoted ability while celebrating), Dance of Many ("the token" of its
+  other abilities is the one its enters ability made: exiled when Dance leaves, and Dance sacrificed when it leaves), Atalya,
+  Samite Master ("Spend only white mana on X" in each mode), Suncleanser (no counters on that creature, or for that player,
+  for as long as Suncleanser remains, CR 611.2b), Wan Shi Tong, All-Knowing and Dutiful Knowledge Seeker ("whenever one or
+  more cards are put into a library from anywhere", once for each event, not from a library), Kaust, Eyes of the Glade (a
+  creature turned face up this turn, CR 708.8; "target face-down attacking creature you control"). +10 (29,627 of 31,936
+  with B96 to B98 and rounds 263 to 268).
+- Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
+  resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
+  Mischievous Quanar (turning itself face down), Revealing Wind and Lumbering Laundry (looking at face-down creatures),
+  Delif's Cone (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
+  Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
+  seven lands).
 - Out after round B98 (looked at, not done): Teferi, Timeless Voyager ("Until the end of your next turn, they can't phase
   in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
   fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board

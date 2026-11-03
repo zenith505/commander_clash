@@ -1,6 +1,6 @@
 # Roadmap
 
-29,607 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,514 of
 9,979 (95%).
 
@@ -1966,7 +1966,7 @@ line blocks.
    "put a +1/+1 counter on target creature you control other than that creature" (Pawpatch Recruit); "Each player may
    discard a card. Each player who discarded a card this way draws a card. If a creature card was discarded this way, ...
    Then if a noncreature card was discarded this way, ..." (Mog, Moogle Warrior: each in turn order, CR 101.4; one with an
-   empty hand isn't asked, 101.3). +8 (29,587 of 31,936; 29,607 with B96 and B97).
+   empty hand isn't asked, 101.3). +8 (29,587 of 31,936; 29,607 with B96 and B97; 29,617 with B98).
    Out after round 268 (looked at, not done): Eruth, Tormented Prophet ("If you would draw a card, exile the top two cards
    of your library instead": a draw replacement that has to join the choice among the other draw replacements, CR 616.1,
    and the draws a resolution counts); Quintorius Kand's −6 ("You may play those cards this turn" about the cards its own
@@ -5183,13 +5183,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it's greater than every other player's, never below 1), Skophos Maze-Warden (another creature targeted by an ability of
   your Labyrinth of Skophos), Brilliance Unleashed (a noncreature artifact card returns as a 3/3 Robot artifact creature
   with flying, keeping its other types and abilities, CR 205.1b). +10 (29,583 of 31,936 with B96 and rounds 263 to 265).
+- Round B98 (templates from the bottom of the list): first the gap B97 left (reviewer follow-up 11): a card put onto the
+  battlefield with "it's a ..." has that as it enters, not just after (CR 614.12; rulings on Chainer, Dementia Master), on
+  every path that says so (Brilliance Unleashed, Rise from the Grave, Storm of Souls, Drana, Grimoire of the Dead and the
+  rest): a returned artifact land is a creature as it enters, so "creatures your opponents control enter tapped", "enters
+  with an additional +1/+1 counter", Containment Priest and creature enters triggers see it. Then Karlov Watchdog
+  (opponents' permanents can't be turned face up during your turn), Overlaid Terrain ("As ~ enters, sacrifice all lands you
+  control"), Henry Wu, InGen Geneticist ("If the exploited creature had power 3 or greater", as it last existed), Iron Fist,
+  Living Weapon (a tap ability he gives himself, "his power"), Brine Comber // Brinebound Gift ("or becomes the target of an
+  Aura spell", the Aura's own and the enchanted creature's), Jade Seedstones // Jadeheart Attendant ("the mana value of the
+  exiled card used to craft it", CR 702.167c, all of them if several), Bound // Determined (up to X cards for the colors of
+  the creature sacrificed this way; "Other spells you control can't be countered this turn" from when it resolves), Niko
+  Defies Destiny (mana only to foretell cards, the special action, or cast spells that have foretell), Evil's Thrall (until
+  the end of your next turn with a Villain of greater mana value), Carrionette (from the graveyard, itself and the target
+  exiled unless that creature's controller pays {2}; paid, neither is). +10 (29,593 of 31,936 with B96, B97 and rounds 263
+  to 265).
+- Out after round B98 (looked at, not done): Teferi, Timeless Voyager ("Until the end of your next turn, they can't phase
+  in"), Time Reaper (targeting a face-up card in exile), Strax, Sontaran Nurse (a player chosen at random, then a reflexive
+  fight), Sevinne, the Chronoclasm (copy the first instant or sorcery cast from a graveyard each turn), Soulcipher Board
+  (omen counters off for each creature card put into your graveyard), Biolume Egg ("When you sacrifice ~, return it ...
+  transformed"), Wumpus Aberration, Roving Actuator, Kianne, Dean of Substance, Chong and Lily, Nomads, Soul Ransom ("Only
+  your opponents may activate this ability"), Grinning Totem, Failure // Comply (Comply's chosen name), Musician, Soul
+  Sculptor ("until a player casts a creature spell"), Heat Wave (a block cost per creature), Bane Alley Broker, Essence of
+  the Wild, Dreams of the Dead, Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
 - Out after round B97 (looked at, not done): Wall of Caltrops, Nature's Blessing, Master of the Hunt and the "bands with
   other legendary creatures" lands (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (an exchange that removes it from
   combat), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (piles), Swindler's Scheme (counter and cast the revealed
-  card), Legion Angel (outside the game, as the Wishes). Brilliance Unleashed's robot becomes one after it enters, as other
-  "return ... It's a ..." cards here do (no ruling says it enters as a creature).
+  card), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
+  entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
   unless they put a card from their hand on top of their library": a punisher option with a card from hand), Vortex

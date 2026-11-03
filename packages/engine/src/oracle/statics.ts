@@ -352,6 +352,8 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   else if ((m = /^During your end step, (.+)$/.exec(text))) [cond, statement] = ["it's your end step", m[1]];
   // Razorkin Needlehead: "~ has first strike during your turn".
   else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
+  // Karlov Watchdog: "Permanents your opponents control can't be turned face up during your turn" (CR 702.37e, 701.40b).
+  else if ((m = /^(Permanents your opponents control can't be turned face up) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Medomai the Ageless: "~ can't attack during extra turns" (CR 500.7).
   else if ((m = /^(~ can't attack) during extra turns$/.exec(text))) [statement, cond] = [m[1], "it's an extra turn"];
   // Lurker: "~ can't be the target of spells unless it attacked or blocked this turn".

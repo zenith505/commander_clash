@@ -193,7 +193,7 @@ function withOtherOpponents(body: AbilityBody): AbilityBody {
 }
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
-const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true; spell?: true }][] = [
+const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true; spell?: true; aura?: true }][] = [
   [/^attacks or blocks, (.+)$/, "selfAttacksOrBlocks", {}],
   [/^attacks, (.+)$/, "selfAttacks", { defending: true }],
   [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
@@ -216,6 +216,8 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
   // Spectral Prison: "When enchanted creature becomes the target of a spell, sacrifice ~": of a spell only.
   [/^becomes the target of a spell, (.+)$/, "selfBecomesTarget", { spell: true }],
+  // Brinebound Gift: "Whenever ... enchanted creature becomes the target of an Aura spell": a spell with that subtype.
+  [/^becomes the target of an Aura spell, (.+)$/, "selfBecomesTarget", { spell: true, aura: true }],
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
   [/^becomes untapped, (.+)$/, "selfBecomesUntapped", {}],
   [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
@@ -350,7 +352,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       body = moved;
     }
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.spell ? { targeted: { spell: true as const } } : {}), ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.spell ? { targeted: { spell: true as const, ...(o.aura ? { spellSubtypes: ["Aura"] } : {}) } } : {}), ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -2615,6 +2617,16 @@ function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!m) return null;
   const filter = m[1] === "creature" ? undefined : parseTargetPhrase(m[1]!);
   if (filter === null || (filter && filter.kind !== "object")) return "fail";
+  // Henry Wu, InGen Geneticist: "draw a card. If the exploited creature had power 3 or greater, create a Treasure token.":
+  // the exploited creature is the subject, its power as it last existed on the battlefield (CR 603.10a, 608.2h).
+  const hadPower = /^(.+?)\. If the exploited creature had power (\d+) or greater, (create an? [^.]+)\.$/.exec(m[2]!);
+  if (hadPower) {
+    const first = parseBody(`${hadPower[1]}.`);
+    const then = parseBody(`${capital(hadPower[3]!)}.`);
+    if (!first || !then || first.targets.length || then.targets.length) return "fail";
+    const body = { targets: [], effects: [...first.effects, { type: "if" as const, cond: { kind: "amountsCompare" as const, a: { count: { kind: "power" as const, of: { ref: "subject" as const } } }, atLeast: Number(hadPower[2]) }, effects: then.effects }], text: m[2]! };
+    return { event: "creatureYouControlExploits", body, ...(filter ? { subjectFilter: { ...filter, text: m[1]! } } : {}) };
+  }
   if (/\bexploited\b/.test(m[2]!)) return "fail"; // "the exploited creature" isn't modeled
   const body = parseBody(m[2]!);
   if (!body) return "fail";

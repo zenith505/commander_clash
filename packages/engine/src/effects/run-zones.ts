@@ -1701,8 +1701,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         : e.what
           ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard")
           : [];
-      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(e.escape ? { escape: e.escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
-      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${e.escape.mana}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
+      // Confession Dial: an escape cost made of the card's own mana cost; a card with none has no such cost and can't be cast
+      // this way (as with flashback, rulings on Snapcaster Mage).
+      const escapeOf = (o: GameObject) => (e.escape ? { mana: e.escape.mana ?? defOf(s, o).manaCost ?? "", exile: e.escape.exile } : undefined);
+      for (const o of cards) {
+        const escape = escapeOf(o);
+        if (escape && !escape.mana) continue;
+        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}) });
+      }
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : "flashback"} until end of turn.`);
       return;
     }
     case "cipher":

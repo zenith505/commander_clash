@@ -1323,6 +1323,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Pumpkin Bombs: "... to target opponent. They gain control of ~": that target player, for the rest of the game.
   if (/^(?:They gain|That player gains) control of ~$/.test(s) && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many && !ctx.targets[ctx.lastPlayerTarget]!.optional)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "target", index: ctx.lastPlayerTarget } }];
+  // Karona, False God: "At the beginning of each player's upkeep, that player untaps ~ and gains control of it": untapped,
+  // then theirs for the rest of the game (layer 2, the newest control effect winning, CR 613.7).
+  if (/^[Tt]hat player untaps ~ and gains control of it$/.test(s) && ctx.eventPlayer && !ctx.spell && !ctx.targets.length)
+    return [
+      { type: "untap", what: { ref: "self" } },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } },
+    ];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Fractured Loyalty: "that spell or ability's controller gains control of that creature": the trigger's creature (its
   // subject) for the rest of the game (layer 2), given to the trigger's player.

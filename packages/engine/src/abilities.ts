@@ -388,6 +388,8 @@ export type Count =
   /** "The number of abilities from among flying, first strike, ... found among creatures you control" (Odric, Blood-Cursed): each listed keyword once if any creature you control has it, a "hexproof from" counting as hexproof (rulings). */
   | { kind: "keywordsAmong"; keywords: string[] }
   /** Domain: "basic land type among lands you control". */
+  /** Rose Tyler: "each suspended card you own and each other permanent you control with a time counter on it": suspended cards (CR 702.62b) plus those permanents, not the source. */
+  | { kind: "timeCountedObjects" }
   | { kind: "basicLandTypes"; /** Allied Strategies: "among lands they control", that player's. */ whose?: PlayerRef }
   /** "The number of different color pairs among permanents you control that are exactly two colors" (Niv-Mizzet, Guildpact). */
   | { kind: "colorPairs" }
@@ -2468,7 +2470,7 @@ export type Effect =
    * its mana cost." (Snapcaster Mage), "each instant and sorcery card in your graveyard ..." (Past in Flames): only the
    * cards there as it resolves (rulings). A card with no mana cost can't be cast this way (rulings).
    */
-  | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec; /** The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four other cards from your graveyard."": escape with this cost instead of flashback (CR 702.138a). */ escape?: { mana: string; exile: number }; /** Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end of turn": that permission instead of flashback. */ cast?: true }
+  | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec; /** The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four other cards from your graveyard."": escape with this cost instead of flashback (CR 702.138a). */ escape?: { /** Left out: the card's own mana cost (Confession Dial: "The escape cost is equal to its mana cost plus ..."). */ mana?: string; exile: number }; /** Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end of turn": that permission instead of flashback. */ cast?: true }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true }
   /**

@@ -1445,6 +1445,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     if (notSource && m?.[1] !== "~ or another") return "fail";
     body = { ...body, targets: [{ ...rest, ...(notSource ? { notSubject: true as const } : {}), bound: { key, at: "most", amount: { count: { kind: key, of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser ${lesserKey}` }] };
   }
+  // Illicit Masquerade: "Whenever a creature you control with an impostor counter on it dies, exile it. Return up to one
+  // other target creature card from your graveyard to the battlefield": "other" than the card that died, the trigger's
+  // subject (TargetSpec.notSubject, fixed as the trigger is put on the stack), not the source.
+  if (!attached && !lesser && m?.[1]?.toLowerCase() === "a" && /^exile it\. Return up to one other target creature card from your graveyard to the battlefield\.?$/.test(bodyText)) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "card" || !t.notSource) return "fail";
+    const { notSource: _n, ...rest } = t;
+    body = { ...body, targets: [{ ...rest, notSubject: true as const, text: `${t.text} other than that creature` }] };
+  }
   if (attached) {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
     // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).

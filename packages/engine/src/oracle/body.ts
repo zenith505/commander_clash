@@ -6984,6 +6984,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Perception Bobblehead: "Look at the top X cards of your library, where X is the number of Bobbleheads you control. You
+    // may cast a spell with mana value 3 or less from among them without paying its mana cost. Put the rest on the bottom
+    // of your library in a random order." X counted as it resolves (rulings), the spell cast then (CR 608.2g). Kiora,
+    // Sovereign of the Deep in a cast trigger: "where X is that spell's mana value ... mana value less than X": that
+    // spell's as it last existed, one less, nothing below 0 (CR 107.1b doesn't apply to a comparison).
+    const lookX = /^[Ll]ook at the top X cards of your library, where X is (.+)$/.exec(s);
+    const lookXCast = lookX && /^You may cast a spell with mana value (X or less|less than X|\d+ or less) from among them without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (lookX && lookXCast && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      const x = parseCount(lookX[1]!, ctx);
+      if (!x || typeof x !== "object") return null;
+      const fixed = /^(\d+) or less$/.exec(lookXCast[1]!);
+      const maxMv: Amount = fixed ? Number(fixed[1]) : lookXCast[1] === "X or less" ? x : { ...x, plus: (x.plus ?? 0) - 1, signed: true };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: x, reveal: true, look: true, maxMv, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
+      continue;
+    }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
     if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(sunbird[1]!, ctx);

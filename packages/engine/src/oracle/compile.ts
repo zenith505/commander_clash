@@ -3748,6 +3748,10 @@ export function compile(d: CardDef): CompiledCard {
       out.noZeroLifeLossAttached = true;
       continue;
     }
+    if (line === "As long as you have 0 or less life, all damage is dealt to you as though its source had infect.") {
+      out.damageAsInfectAtZero = true;
+      continue;
+    }
     const zeroLife = /^You (have no maximum hand size and )?don't lose the game for having 0 or less life\.$/.exec(line);
     if (zeroLife) {
       if (zeroLife[1]) out.noMaxHandSize = out.noMaxHandSize || true;

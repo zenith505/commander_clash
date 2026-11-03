@@ -267,7 +267,9 @@ export function dealDamage(
     noteDealt(s, src, opts.combat, { object: o });
   } else {
     const p = player(s, to.player);
-    if (has(src, "Infect")) {
+    // Phyrexian Unlife: dealt as though its source had infect while the player was at 0 or less life as the damage was
+    // dealt; damage dealt at the same time all as the player was before any of it (rulings: 3 life and dealt 5 is -2).
+    if (has(src, "Infect") || (infectAtZero ? infectAtZero.has(p.id) : damageAsInfect(s, p.id))) {
       const k = withPutter(src.controller, () => putPlayerCounters(s, p.id, "poison", n));
       log(s, `${src.name} deals ${n} damage to ${p.name} (${k} poison counter${k === 1 ? "" : "s"}).`);
     } else {
@@ -1281,6 +1283,13 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
 
 /** The damage each player is being dealt by the damage dealtPlanned is dealing now, all at the same time. */
 let playerBatch: Map<PlayerId, number> | null = null;
+/** The players damage is dealt to as though its source had infect (Phyrexian Unlife), as they were before this batch. */
+let infectAtZero: Set<PlayerId> | null = null;
+/** Is `pid` at 0 or less life and controlling a permanent saying all damage is dealt to them as though it had infect? */
+function damageAsInfect(s: GameState, pid: PlayerId): boolean {
+  const p = player(s, pid);
+  return p.life <= 0 && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).damageAsInfectAtZero);
+}
 /** The "deals damage to a creature" events of the damage dealPlanned is dealing now, fired once it's all dealt. */
 let creatureBatch: Extract<Parameters<typeof fireEvent>[1], { type: "damagedCreature" }>[] | null = null;
 
@@ -1363,6 +1372,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   }
   const outer = playerBatch;
   playerBatch = new Map();
+  const outerInfect = infectAtZero;
+  infectAtZero = new Set(s.players.filter((p) => !p.lost && damageAsInfect(s, p.id)).map((p) => p.id));
   const outerCreatures = creatureBatch;
   creatureBatch = [];
   // Poison counters from several sources at once are put as one event (rulings on All Will Be One).
@@ -1417,6 +1428,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller, ...(src.id ? { srcId: src.id } : {}), ...(combat ? { combat: true as const } : {}), ...(src.id && src.types.includes("Creature") ? { creature: true as const } : {}), ...(src.spell ? { spell: true as const } : {}) });
   const toPlayers = playerBatch;
   playerBatch = outer;
+  infectAtZero = outerInfect;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.

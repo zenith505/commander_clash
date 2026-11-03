@@ -184,6 +184,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[2]!);
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[2]} with different names` }, n: num(c[1]!), differentNames: true });
+    } else if ((c = /^Sacrifice an? (creature|artifact) you control with mana value X other than ~$/.exec(part))) {
+      // Sidisi, Regent of the Mire: X announced as it's activated, then a creature with that mana value, not this one
+      // (CR 107.3a, 602.2b); one with {X} in its mana cost has X as 0 there (CR 202.3e).
+      const filter = pickFilter(c[1]!);
+      if (!filter) return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} with mana value X other than ~` }, n: 1, other: true, mvX: true });
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|X|${NUM}) (other )?(.+)$`).exec(part))) {
       // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
       const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;
@@ -631,7 +637,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf || removeCounters?.x))) return "fail";
   if (exileFromHand && (anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length || (mana === "mana" ? costs !== "Exile ~ from your hand" : !JSON.stringify(body.effects).includes('"type":"mayCastExiledSelf"')))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
-  if (usesX(body) && !symbols.includes("X") && !energyX && !removeCounters?.x && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
+  if (usesX(body) && !symbols.includes("X") && !energyX && !removeCounters?.x && !extra.some((c) => ("x" in c && c.x) || ((c.kind === "discard" || c.kind === "sacrifice") && c.mvX))) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.

@@ -389,10 +389,22 @@ function parseExcessTrigger(line: string): TriggeredAbility | "fail" | null {
   } else if (/^if /.test(text)) return "fail";
   const where = /^(.+), where X is that excess damage\.$/.exec(text);
   if (where) text = `${where[1]}.`;
+  // Toralf, God of Fury: "~ deals damage equal to the excess to any target other than that permanent": X the excess
+  // (CR 120.10), the target any but the permanent dealt it (TargetSpec.notSubject, fixed as the trigger is put on the
+  // stack); the excess counts no matter what it was before (rulings).
+  const toralf = /^~ deals damage equal to the excess to any target other than that permanent\.$/.test(text);
+  if (toralf) {
+    if (oneOrMore || /\bX\b/.test(text)) return "fail";
+    text = "~ deals X damage to any target.";
+  }
   if (oneOrMore && /\b(it|that|those)\b/.test(text)) return "fail";
   let body = parseBody(text, { subjectIt: true });
   if (!body) return "fail";
-  if (where) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: m[4]!.replace(/^if [^]+? this turn, /, "") };
+  if (toralf) {
+    if (body.targets.length !== 1) return "fail";
+    body = { ...body, targets: [{ ...body.targets[0]!, notSubject: true as const, text: "any target other than that permanent" }] };
+  }
+  if (where || toralf) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: m[4]!.replace(/^if [^]+? this turn, /, "") };
   return { event: "permanentDealtExcess", body, excess: { filter: { ...filter, text: m[2]! }, ...(m[3] ? { noncombat: true as const } : {}), ...(oneOrMore ? { oneOrMore: true as const } : {}) }, ...(ifCond ? { ifCond } : {}) };
 }
 
@@ -1873,6 +1885,18 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // Whirlwind, Killer Cyclone: "one or more creatures you control that entered this turn attack a player": attackers that
   // entered this turn, read as "creatures that entered this turn".
   line = line.replace(/^Whenever one or more creatures you control that entered this turn attack a player, /, "Whenever one or more creatures that entered this turn you control attack a player, ");
+  // Zurzoth, Chaos Rider: "Whenever one or more Devils you control attack one or more players, you and those players each
+  // draw a card, then discard a card at random": once for the declaration, only those attacking a player counting (not a
+  // planeswalker, rulings; CR 508.3e), "those players" the players they attack.
+  // Each draws, then each discards at random (no choice to make, CR 701.9b).
+  const groupAttacksPlayers = /^Whenever one or more ([A-Z][a-z]+) you control attack one or more players, (you and those players each draw a card, then discard a card at random)\.$/.exec(line);
+  if (groupAttacksPlayers) {
+    const st = singularWord(groupAttacksPlayers[1]!);
+    if (!CREATURE_TYPES.has(st)) return "fail";
+    const who = { ref: "youAndEventPlayers" as const };
+    const body: AbilityBody = { targets: [], effects: [{ type: "draw", who, n: 1 }, { type: "discard", who, n: 1, random: true }], text: `${groupAttacksPlayers[2]!}.` };
+    return { event: "creaturesYouControlAttack", body, group: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [st], text: groupAttacksPlayers[1]! }, attacksPlayers: true };
+  }
   const groupAttacksAPlayer = /^Whenever one or more (.+?) you control attack a player, /.exec(line);
   if (groupAttacksAPlayer) {
     perPlayer = true;
@@ -3890,7 +3914,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (/\bX\b/.test(text)) return "fail";
       text = text.replace(/\bthat (?:much|many)\b/g, "X");
     }
-    let body = parseBody(self ? text.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ") : text, self ? { selfIt: true } : { subjectIt: true });
+    // Auntie Ool, Cursewretch: "draw a card if you control that creature. If you don't control it, its controller loses 1
+    // life": whose it is as the ability resolves, or as it last existed (CR 608.2h).
+    const yoursOrNot = !self && !thatMuch ? /^(.+) if you control it\. If you don't control it, (.+)$/.exec(text) : null;
+    let body: AbilityBody | null;
+    if (yoursOrNot) {
+      const yes = parseBody(`${yoursOrNot[1]}.`, { subjectIt: true });
+      const no = parseBody(yoursOrNot[2]!, { subjectIt: true });
+      if (!yes || !no || yes.targets.length || no.targets.length) return "fail";
+      body = { targets: [], effects: [{ type: "if", cond: { kind: "subjectYours" }, effects: yes.effects, otherwise: no.effects }], text: put[3]! };
+    } else body = parseBody(self ? text.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ") : text, self ? { selfIt: true } : { subjectIt: true });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
     const kind = put[1] ? { countersKind: put[1].trim() } : {};

@@ -76,6 +76,8 @@ export interface UnlessPays {
   discardRandom?: number;
   /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
   poison?: number;
+  /** "Ward—Blight 2" (Auntie Ool, Cursewretch): this many -1/-1 counters on one creature they control as the payment (CR 701.68a); not with none (701.68b). */
+  blight?: number;
 }
 
 /**
@@ -684,7 +686,7 @@ export interface TargetSpec {
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
    * any value.
    */
-  xRange?: { key: "power" | "toughness" | "manaValue"; at: "exact" | "most" | "least" };
+  xRange?: { key: "power" | "toughness" | "manaValue"; at: "exact" | "most" | "least"; /** "With mana value X plus 1" (Sidisi, Regent of the Mire): X and this much more. */ plus?: number };
   /**
    * "With mana value less than or equal to the number of Plains you control", "with power less than or equal to ~'s
    * power": a range of `key` up to (or from) an amount. For a target it's worked out as the target is chosen and again as
@@ -853,6 +855,12 @@ export interface TargetSpec {
    * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
    */
   dealtCombatDamageToYou?: true;
+  /**
+   * "Target nonland permanent controlled by a player who was dealt combat damage by three or more Pirates this turn"
+   * (Admiral Beckett Brass): its controller was dealt combat damage this turn by at least `min` different creatures of
+   * this creature type, anyone's, each a Pirate as it dealt it (turnLog.combatDamagedByTypes, rulings).
+   */
+  controllerCombatDamagedBy?: { subtype: string; min: number };
   /** "Target creature that dealt damage to you this turn" (Spear of Heliod): any damage, by this object as a creature then (turnLog.damagedBy). */
   dealtDamageToYou?: true;
   /** "Enchanted creature deals damage ... to any other target" (Pain for All): not the permanent the source is attached to. */
@@ -1362,6 +1370,8 @@ export type PlayerRef =
   | { ref: "votedWithYou" }
   /** "Each of those opponents" (Breeches, Brazen Plunderer): the players a "one or more ... deal damage to your opponents" event was about (TriggerEventInfo.players). */
   | { ref: "eventPlayers" }
+  /** "You and those players" (Zurzoth, Chaos Rider): you and the event's players, in turn order from the active player (CR 101.4). */
+  | { ref: "youAndEventPlayers" }
   /** "That attacking player" (Breena): the player who attacked, for "playerAttacksYourOpponent" (TriggerEventInfo.attacker). */
   | { ref: "attackingPlayer" }
   /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
@@ -4323,7 +4333,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": "choose an opponent at random that ~ didn't attack during your last combat" (Territorial Hellkite): not the player this source attacked in its controller's combat before the one going on (GameObject.attackedInCombat, Player.combatsBegun); none chosen if there's no other. */ notAttackedLastCombat?: true; /** With "opponent" and `random`: "choose a player at random" (Wildfire Devils): any player still in the game, you too. */ anyPlayer?: true; /** With "opponent": kept on the source permanent (GameObject.chosen.player) for its "the last chosen player" (Triarch Stalker; set by compile.ts). */ keepOnSource?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents" | /** Loxodon Peacekeeper: "a player with the lowest life total", any player, you too. */ "least"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number }; /** With "number": "Discard any number of cards at random" (Rites of Initiation): from 0 to the cards in its controller's hand as it resolves, into Chosen.number. */ upToHand?: true };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -4536,6 +4546,10 @@ export type SpellCondition =
   | { kind: "cycledSelfNamed"; n: number }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
   | { kind: "subjectWasAttacking" }
+  /** "If you can't choose an opponent this way" (Territorial Hellkite): this resolution chose no player. */
+  | { kind: "noPlayerChosen" }
+  /** Auntie Ool, Cursewretch: "if you control that creature": the trigger's subject is the ability's controller's, as it is now or last existed on the battlefield (CR 608.2h). */
+  | { kind: "subjectYours" }
   /** Silumgar Scavenger: "if it exploited that creature": the creature a dies trigger is about was sacrificed for this source's exploit, this object (CR 702.110a, 400.7). */
   | { kind: "subjectExploitedBySelf" }
   /** Pulse of the Forge: "if that player or that planeswalker's controller has more life than you", as it resolves. */
@@ -5299,6 +5313,12 @@ export interface TriggeredAbility {
   /** With `perPlayer`: "Whenever you attack a player or planeswalker with ..." (Rigo, Streetwise Mentor): once for each planeswalker attacked too. */
   perWalker?: true;
   /**
+   * For "creaturesYouControlAttack": "Whenever one or more Devils you control attack one or more players" (Zurzoth, Chaos
+   * Rider): once for the declaration, counting only those attacking a player, not a planeswalker or battle (CR 508.3e,
+   * rulings); the event's players are the players they attack ("those players").
+   */
+  attacksPlayers?: true;
+  /**
    * With `anyoneAttacks`: "Whenever one or more creatures attack one of your opponents (or a planeswalker they control)"
    * (Frontier Warmonger): once for each of its controller's opponents attacked; the event's player is that opponent, its
    * group the creatures attacking them (and, `orPlaneswalkers`, their planeswalkers).
@@ -6053,7 +6073,7 @@ export type AdditionalCost =
    */
   | { kind: "forage" }
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true }
   | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }

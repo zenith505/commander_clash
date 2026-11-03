@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -564,7 +564,22 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = e.mostLife === "least" ? Math.min(...living.map((x) => player(s, x).life)) : Math.max(...living.map((x) => player(s, x).life));
         // Wildfire Devils: "choose a player at random": any of them, you too (rulings).
-        const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : e.anyPlayer ? living : opponents(s, ctx.controller);
+        let opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : e.anyPlayer ? living : opponents(s, ctx.controller);
+        // Territorial Hellkite: not the player it attacked during its controller's last combat; any of them if it didn't
+        // attack then, or wasn't theirs then (rulings). None left: none chosen.
+        if (e.notAttackedLastCombat) {
+          const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          const begun = player(s, ctx.controller).combatsBegun ?? [];
+          const now = begun.at(-1);
+          const ongoing = !!now && s.activePlayer === ctx.controller && inCombatPhase(s) && now.turn === s.turn && now.combat === (s.combatsThisTurn ?? 0);
+          const last = ongoing ? begun.at(-2) : now;
+          const hit = me?.attackedInCombat && last && me.attackedInCombat.turn === last.turn && me.attackedInCombat.combat === last.combat ? me.attackedInCombat.player : undefined;
+          opps = opps.filter((x) => x !== hit);
+          if (!opps.length) {
+            log(s, `No opponent can be chosen for ${src}.`);
+            return keep();
+          }
+        }
         // "At random": no one chooses (CR 608.2d doesn't apply).
         if (e.random && opps.length > 1) {
           const pick = opps[Math.floor(nextRandom(s) * opps.length)]!;
@@ -808,6 +823,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 if (o?.zone !== "battlefield" && ctx.lki?.subtypes && typeOnly && f.subtypes?.length) return f.subtypes.some((t) => ctx.lki!.subtypes!.includes(t) || (!!ctx.lki!.allCreatureTypes && CREATURE_TYPES.has(t)));
                 return objects(s, { ref: "subject" }, ctx).some((x) => objectMatches(s, f, x, ctx.controller, false));
               })(e.cond.filter)
+            : e.cond.kind === "noPlayerChosen"
+            ? s.resolving?.chosen?.player === undefined
+            : e.cond.kind === "subjectYours"
+            ? players(s, { ref: "subjectController" }, ctx).includes(ctx.controller)
             : e.cond.kind === "subjectCardIs"
             ? objects(s, { ref: "subjectCard" }, ctx).some((o) => printedMatches(e.cond.kind === "subjectCardIs" ? e.cond.filter : ({} as TargetSpec), defOf(s, o)))
             : e.cond.kind === "targetCardWas"

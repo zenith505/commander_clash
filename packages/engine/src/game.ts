@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
+import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -838,6 +838,7 @@ export function moveObject(
   o.combatHitTurn = undefined;
   o.blockedTurn = undefined;
   o.declaredInCombat = undefined;
+  o.attackedInCombat = undefined;
   o.attackedTurns = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
@@ -3875,6 +3876,8 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
+      // Territorial Hellkite: "your last combat" is the one before this one.
+      player(s, ap).combatsBegun = [...(player(s, ap).combatsBegun ?? []), { turn: s.turn, combat: s.combatsThisTurn }].slice(-2);
       // "Attacks this combat if able" holds in one combat only.
       invalidateCharacteristics(s);
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -7131,12 +7134,12 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
     const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
-    return xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
+    return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
-const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
+const mvXCost = (c: AdditionalCost) => (c.kind === "discard" || c.kind === "sacrifice") && !!c.mvX && !!c.filter;
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
 export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
@@ -7883,7 +7886,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
   // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
-  if (x === undefined && ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+  // Sidisi, Regent of the Mire: "Sacrifice a creature you control with mana value X" the same way.
+  if (x === undefined && ab.costs?.some((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX)) {
     for (let n = 0; n <= 20; n++) {
       if (abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs)) continue;
       // Without targets chosen, the check above lets any X target; here the target must have mana value n too.
@@ -9882,6 +9886,22 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       continueResolution(s);
       return;
     }
+    if (pend.blight) {
+      // "Ward—Blight 2": then which creature gets the -1/-1 counters, all on one (CR 701.68a, rulings), put on it as the
+      // counter effect carries on (see paidUnless). With none they can't choose to blight (701.68b).
+      const options = blightOptions(s, p.id, pend.blight);
+      if (!options.length) throw new RulesError(`you control no creature to blight ${pend.blight}`);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
+      if (options.length > 1) {
+        const n = pend.blight;
+        s.pending = { kind: "pickPermanents", player: p.id, source: pend.source, action: "counters", counter: "-1/-1", what: "creature", options, count: 1, prompt: `blight ${n}: click a creature of yours to put ${n === 1 ? "a -1/-1 counter" : `${n} -1/-1 counters`} on.` };
+        return;
+      }
+      r.scratch.chosen![p.id] = options;
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
     if (pend.sacrifice) {
       // Then which permanents to sacrifice, sacrificed as the counter effect carries on (see paidUnless).
       const options = sacrificeOptions;
@@ -10422,6 +10442,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
       const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
       const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
       o.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      o.attackedInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0, ...(a.planeswalker === undefined ? { player: a.defender } : {}) };
       o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
       if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
       log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);

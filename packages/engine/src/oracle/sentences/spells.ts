@@ -391,6 +391,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     return [roll];
   }
+  // Iron Mastiff: "roll a d20 for each player being attacked and ignore all but the highest roll": one die per player a
+  // creature is attacking as it resolves (not a planeswalker or battle, CR 506.2), the highest the result (CR 706.1);
+  // none for none.
+  if ((m = /^[Rr]oll a d(\d+) for each (player|opponent) being attacked and ignore all but the highest roll$/.exec(s))) {
+    const per = parseCount(`${m[2]}s being attacked`, ctx, true);
+    return per ? [{ type: "roll", sides: Number(m[1]), n: per, keepHighest: true }] : null;
+  }
   // "Each player rolls a d20" (Chaos Dragon): every player rolls one die; see Modification "cantAttackPlayers".
   if ((m = /^[Ee]ach player rolls a d(\d+)$/.exec(s))) return [{ type: "roll", sides: Number(m[1]), eachPlayer: true }];
   // Scry and surveil (CR 701.22, 701.25)

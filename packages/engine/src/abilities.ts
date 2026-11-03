@@ -54,7 +54,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount } | { /** "Any player may pay half their life, rounded up" (Temporal Extortion): half their own life total as it's paid (CR 107.1a, 119.4). */ halfLife: "up" | "down" };
 
 export interface UnlessPays {
   cost: string;
@@ -249,8 +249,9 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
-  /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). */
-  | { kind: "linkedExiled" }
+  /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). `ever`:
+   * "cards have been exiled with ~" (Colfenor's Urn): every card it exiled over the game, wherever it is now (rulings). */
+  | { kind: "linkedExiled"; ever?: true }
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
   | { kind: "linkedExiledPT"; stat: "power" | "toughness" }
@@ -1684,7 +1685,7 @@ export type Modification =
   | { kind: "ownAttackTax"; n: number; perPlusOne?: true; /** "{1} for each card in your hand" (Cowed by Wisdom): counted as it applies, "your" being the source's controller. */ amount?: Amount }
   /** "~ can't attack or block unless you pay {2}" (Qal Sisma Behemoth), "Enchanted creature can't attack or block unless its controller pays {3}" (Oppressive Rays): what blocking with this creature costs (CR 509.1d-e), as for ownAttackTax. */
   | { kind: "ownBlockTax"; n: number; perPlusOne?: true; amount?: Amount }
-  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true }
+  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless ...": only attacks on its controller's planeswalkers, not on the player. */ onlyPlaneswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)

@@ -410,6 +410,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // blocking it": a delayed trigger about the target (CR 603.7), its blockers counted as it resolves (rulings).
   if ((m = /^When that creature becomes blocked this turn, it gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "becomesBlocked", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }], text: `it gets ${m[1]}/${m[2]} until end of turn for each creature blocking it`, thisTurn: true }];
+  // Golden Guardian: "{2}: ~ fights another target creature you control. When ~ dies this turn, return it to the battlefield
+  // transformed under your control": a delayed trigger about ~ as it is when the ability resolves (CR 603.7c, 400.7), for
+  // the rest of the turn, whatever kills it (rulings: none if it left before then); back face up (CR 712.14a).
+  if (/^When ~ dies this turn, return it to the battlefield transformed under your control$/.test(s) && ctx.activated && !ctx.spell)
+    return [{ type: "delayed", when: "dies", of: { ref: "self" }, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, transformed: true }], text: "return it to the battlefield transformed under your control", thisTurn: true }];
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)

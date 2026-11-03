@@ -1,7 +1,7 @@
 # Roadmap
 
-29,494 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,459 of
+29,503 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,468 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1816,6 +1816,25 @@ line blocks.
    to your hand" (Blood for Bones); "Flip a coin until you lose a flip or choose to stop flipping. If you lose a flip, ~
    has no effect. If you win one or more flips, ..." (Fiery Gambit: asked after each flip won, with a browser test). +7
    (29,468 of 31,936 with B91).
+   Round 259 (skipped cards from the top of the list): "As long as another player controls enchanted creature, it can't
+   attack or block. Otherwise, ~ has umbra armor" (Dog Umbra: checked continuously); "if three or more cards have been
+   exiled with ~, sacrifice it. If you do, return those cards to the battlefield under their owner's control" (Colfenor's
+   Urn: every card it ever exiled counts, only those still in exile return, with a browser test); "Earthbend 3. Then each
+   creature you control with power less than or equal to that land's power gains ..." (Earthshape); "any player may pay
+   half their life, rounded up. If a player does, counter ~" (Temporal Extortion: a punisher option, bots keep their
+   life, with two browser tests); "Creatures can't attack planeswalkers you control unless their controller pays {1} for
+   each creature they control that's attacking a planeswalker you control" (Onakke Oathkeeper); "roll a d20 for each
+   player being attacked and ignore all but the highest roll" (Iron Mastiff); "If ~ was cast from exile, for each
+   opponent, choose an artifact or land that player controls. Destroy the chosen permanents" (Ultimate Magic: Meteor,
+   with a browser test); "Return target creature card and all other cards with the same name as that card from your
+   graveyard to the battlefield tapped" (Rat King, Verminister); "When ~ dies this turn, return it to the battlefield
+   transformed under your control" (Golden Guardian; bots don't use it yet). +9 (29,477 of 31,936; 29,491 with B92).
+   Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
+   and "that creature's controller may have ~ deal 1 damage to it"); Sorceress's Schemes (a target that is either a card
+   in your graveyard or an exiled card with flashback: exile targets aren't supported); Reyhan, Last of the Abzan ("or is
+   put into the command zone", with "if it had one or more +1/+1 counters on it"); Red Sun's Twilight (token copies of
+   the artifacts destroyed this way, as they last existed); Hellish Rebuke (a trigger granted to every opponent's
+   permanent about the player who cast it); Whirlwind Denial (one payment prompt per spell and ability) still out.
    Out after round 258 (looked at, not done): Green Sun's Twilight ("Choose a creature card and/or a land card from among
    them": at least one if there is one, and with X 5 or more both onto the battlefield or both into your hand; the dig
    has no "at least one" pick yet); Canoptek Wraith ("you may pay {3} and sacrifice it. If you do, choose a land you
@@ -4929,7 +4948,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   pays 5 life" (Aether Rift); "that player chooses artifact, creature, land, or non-Aura enchantment. All nontoken
   permanents of that type phase out" (Teferi's Realm, with a browser test); Juxtapose (the greatest mana value creatures,
   then artifacts, exchanged; a tie chosen by its controller, with a browser test). +12 (29,494 of 31,936 with B92 and
-  rounds 257 and 258).
+  rounds 257 and 258; 29,503 with round 259).
 - Out after round B93 (looked at, not done): Bewitching Leechcraft ("If ~ would untap during your untap step, remove a
   +1/+1 counter from it instead": with Freyalise's Winds too, its controller would order the two replacements, CR 616.1),
   Drafna's Restoration (targets in the graveyard of an earlier target player), Rite of Ruin (an order for three card

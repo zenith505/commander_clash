@@ -846,7 +846,7 @@ export function planSuspend(s: GameState, pid: PlayerId, id: ObjectId, x?: numbe
 export function planForetell(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
   const problem = foretellProblem(s, pid, id);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const taps = problem ? planMana(s, pid, parseManaCost("{2}")) : [];
+  const taps = problem ? planMana(s, pid, parseManaCost("{2}"), 0, undefined, [], { ability: obj(s, id), foretell: true }) : [];
   return taps ? [...taps, { type: "foretell", player: pid, objectId: id }] : null;
 }
 

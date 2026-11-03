@@ -324,6 +324,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const linked = src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []) : [];
       return c.ever ? linked.length : linked.filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     }
+    case "linkedExiledMv": {
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!src) return 0;
+      return (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []).reduce((n, l) => {
+        const o = s.objects[l.id];
+        return !o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== l.zc || o.faceDown || o.isToken ? n : n + defMv(defOf(s, o));
+      }, 0);
+    }
     case "linkedExiledPT": {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!src) return 0;
@@ -431,6 +439,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "sacrificedThisWayTotalPower":
       return (s.resolving?.sacrificedThisWay ?? []).reduce((n, l) => n + (l.power ?? 0), 0);
+    case "sacrificedThisWayColors":
+      return new Set((s.resolving?.sacrificedThisWay ?? []).flatMap((l) => l.colors ?? [])).size;
     case "destroyedThisWayTotalPower": {
       const who = refPlayers(s, c.survivorsOf, ctx);
       const left = s.battlefield.map((id) => characteristics(s, s.objects[id]!)).filter((ch) => ch.types.includes("Creature") && who.includes(ch.controller));
@@ -1233,6 +1243,8 @@ function describeCount(c: Count): string {
       return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
+    case "sacrificedThisWayColors":
+      return "#colors of the sacrificed creature";
     case "sacrificedThisWayTotalPower":
     case "costSacrificedTotalPower":
       return "the total power sacrificed";
@@ -1288,6 +1300,8 @@ function describeCount(c: Count): string {
       return "#cards exiled with it";
     case "linkedExiledPT":
       return `the exiled creature card's ${c.stat}`;
+    case "linkedExiledMv":
+      return "the mana value of the card used to craft it";
     case "movedLinkedThisWay":
       return "#cards put into graveyards";
     case "movedThisWayGreatestPower":

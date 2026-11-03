@@ -1589,6 +1589,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Monoist Circuit-Feeder: "until end of turn, target creature you control gets +X/+0 and target creature an opponent
   // controls gets -0/-X, where X is ...": both until end of turn, X counted as it resolves (rulings).
   text = text.replace(/(^|, )until end of turn, (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+) and (target creature [a-z ]+?) gets ([+-][\dX]+\/[+-][\dX]+)(?=, where X is |\.)/, "$1$2 gets $3 until end of turn and $4 gets $5 until end of turn");
+  // Bound: "Sacrifice a creature. Return up to X cards from your graveyard to your hand, where X is the number of colors
+  // that creature was.": the creature sacrificed this way, as it last existed (rulings: none for a colorless one).
+  text = text.replace(/^(Sacrifice a creature\. [^.]+, where X is) the number of colors that creature was\./, "$1 the number of colors of the creature sacrificed this way.");
   // Profane Procession: "Then if there are three or more cards exiled with ~, transform it": "it" is ~.
   text = text.replace(/(\. Then if there are \w+ or more cards exiled with ~, transform) it\.$/, "$1 ~.");
   // Heretic's Punishment: "Choose any target, then mill three cards. ~ deals damage to that permanent or player equal to
@@ -13851,6 +13854,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner) return null;
       const n = num(subjPT[3]!);
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
+    // Evil's Thrall: "Gain control of target creature until end of turn. If you control a Villain with greater mana value than
+    // that creature, gain control of that creature until the end of your next turn instead.": both checked as it resolves.
+    const villain = ctx.spell ? /^If you control an? ([A-Z][a-z]+) with greater mana value than that creature, gain control of that creature until the end of your next turn instead$/.exec(s) : null;
+    const thrallPrev = effects[effects.length - 1];
+    if (villain && CREATURE_TYPES.has(villain[1]!) && effects.length === 1 && thrallPrev?.type === "continuous" && thrallPrev.duration === "endOfTurn" && thrallPrev.what.ref === "target" && thrallPrev.what.index === 0 && thrallPrev.mods.length === 1 && thrallPrev.mods[0]!.kind === "control") {
+      const greatest = parseCount(`the greatest mana value among ${villain[1]}s you control`, ctx);
+      if (!greatest || typeof greatest !== "object") return null;
+      effects[0] = { type: "if", cond: { kind: "amountsCompare", a: greatest, atLeast: { count: { kind: "manaValue", of: { ref: "target", index: 0 } }, plus: 1 } }, effects: [{ ...thrallPrev, duration: "endOfYourNextTurn" }], otherwise: [thrallPrev] };
       continue;
     }
     // Anax, Hardened in the Forge: "create a 1/1 red Satyr creature token ... If the creature had power 4 or greater, create

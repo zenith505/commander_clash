@@ -1696,7 +1696,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       // "Tapped and attacking" (Winota, CR 508.4): during combat, attacking a player or planeswalker its controller chooses
       // as it enters (rulings: not necessarily the one the trigger's creature attacks); never declared as an attacker.
       // Outside combat it's only tapped (CR 506.3d).
-      const attackOptions = e.attacking && found.some((id) => isType(defOf(s, obj(s, id)), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      // Owlbear Cub: "tapped and attacking that player", the player its attack trigger is about, if still in the game.
+      const attackOptions = e.attacking && found.some((id) => isType(defOf(s, obj(s, id)), "Creature")) ? attackChoices(s, p.id, ctx.sourceId).filter((a) => !e.attackingEvent || (a.player === ctx.event?.player && !a.planeswalker)) : [];
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, obj(s, found.find((id) => isType(defOf(s, obj(s, id)), "Creature"))!)).name} attacks` };
         return "paused";

@@ -926,6 +926,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const amount = { count: { kind: "manaValue" as const, of: { ref: "target" as const, index: ctx.lastObjectTarget } } };
     return [{ type: "castFromHand", filter: { ...filter, bound: { key: "manaValue", at: "most", amount }, text: `${m[1]} with equal or lesser mana value` } }];
   }
+  // Kellan, the Kid, in a cast trigger: "you may cast a permanent spell with equal or lesser mana value from your hand
+  // without paying its mana cost": no more than the triggering spell's mana value, with the X chosen for it (rulings), as
+  // it last existed if it has left the stack, counted as this resolves (TargetSpec.bound).
+  if ((m = /^(?:You may c|C)ast an? ((?:.+? )?spell) with equal or lesser mana value from your hand without paying its mana cost$/.exec(s)) && (/^You/.test(s) || ctx.mayNow) && ctx.castSpell && ctx.lastObjectTarget === undefined) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || filter.manaValue || filter.bound) return null;
+    const amount = { count: { kind: "manaValue" as const, of: { ref: "castSpell" as const } } };
+    return [{ type: "castFromHand", filter: { ...filter, bound: { key: "manaValue", at: "most", amount }, text: `${m[1]} with equal or lesser mana value` } }];
+  }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
   // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...",
   // "... with mana value less than or equal to the other result ..." (Arcane Endeavor: counted as it resolves).

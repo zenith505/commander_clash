@@ -845,6 +845,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // "That spell's power" (Eshki, Temur's Roar): as it is on the stack, or as it last existed there (CR 608.2h).
         return c.kind === "manaValue" ? spellManaValue(s, item) : (spellPT(s, item, c.kind) ?? 0);
       }
+      // Command the Dreadhorde: "the total mana value of those cards", the target cards still legal (CR 608.2b), each card
+      // in its graveyard with X as 0 (CR 107.3, rulings).
+      if (c.kind === "manaValue" && c.total) return refObjects(s, c.of, ctx).reduce((n, o) => n + defMv(defOf(s, o)), 0);
       // Not sacrificed for a cost: what the ability sacrificed as it resolved ("You may sacrifice another creature. If you do,
       // ... that creature's power", Disciple of Freyalise).
       if (c.of.ref === "sacrificed") return Math.max(0, (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1))?.[c.kind] ?? 0);

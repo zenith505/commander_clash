@@ -3055,6 +3055,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // That creature's owner puts it on their choice of the top or bottom of their library." One instruction for each
   // opponent's creature.
   text = text.replace(/^for each opponent, choose up to one target creature they control with a rejection counter on it\. That creature's owner puts it on their choice of the top or bottom of their library\.$/, "for each opponent, the owner of up to one target creature with a rejection counter on it that player controls puts it on their choice of the top or bottom of their library.");
+  // Blood for Bones: "Return a creature card from your graveyard to the battlefield, then return another creature card
+  // from your graveyard to your hand": two instructions, neither card targeted (rulings).
+  text = text.replace(/^Return a creature card from your graveyard to the battlefield, then return another creature card from your graveyard to your hand\.$/, "Return a creature card from your graveyard to the battlefield. Return another creature card from your graveyard to your hand.");
   // Skyship Weatherlight: "Choose a card at random that was exiled with ~. Put that card into its owner's hand." One
   // instruction.
   text = text.replace(/^Choose a card at random that was exiled with ~\. Put that card into its owner's hand\.$/, "Put a card exiled with ~ chosen at random into its owner's hand.");
@@ -7321,6 +7324,69 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(eachDestroy[1]!);
       if (!filter || filter.kind !== "object") return null;
       effects.push({ type: "pick", who: { ref: "eachPlayer" }, filter, n: 1, action: "choose", upTo: true, youChoose: true, prompt: `click up to one ${filter.text} of {player}. ~ destroys it.` }, { type: "destroy", what: { ref: "created" } });
+      continue;
+    }
+    // Fiery Gambit: "Flip a coin until you lose a flip or choose to stop flipping. If you lose a flip, ~ has no effect. If
+    // you win one or more flips, .... If you win two or more flips, ...": asked after each win whether to go on; a lost
+    // flip leaves nothing done, else each "N or more" part done in order (rulings).
+    if (s === "Flip a coin until you lose a flip or choose to stop flipping" && /^If you lose a flip, ~ has no effect\.?$/.test(sentences[si + 1] ?? "")) {
+      const parts: Effect[] = [];
+      let k = si + 2;
+      let most = 0;
+      for (let m: RegExpExecArray | null; (m = new RegExp(`^If you win ${NUM} or more flips, (.+?)\\.?$`).exec(sentences[k] ?? "")); k++) {
+        const n = num(m[1]!);
+        const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+        // "Draw nine cards and untap all lands you control": two instructions, in order.
+        const two = /^(draw [a-z]+ cards?) and (untap all lands you control)$/.exec(m[2]!);
+        const fx = two ? [parseSentence(cap(two[1]!), ctx), parseSentence(cap(two[2]!), ctx)].reduce<Effect[] | null>((a, b) => (a && b ? [...a, ...b] : null), []) : parseSentence(cap(m[2]!), ctx);
+        if (!fx?.length || n <= most) return null;
+        most = n;
+        parts.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "flipsWon" } }, min: n }, effects: fx });
+      }
+      if (!parts.length || k !== sentences.length) return null;
+      effects.push({ type: "flipCoin", untilLose: true, mayStop: { enough: most } }, { type: "if", cond: { kind: "wonFlip" }, effects: parts });
+      si = k - 1;
+      continue;
+    }
+    // Blood for Bones: "Return another creature card from your graveyard to your hand" after one returned to the
+    // battlefield: not the card chosen for it (rulings: chosen as it resolves, not targeted).
+    const anotherBack = /^Return another ([a-z ]+? card) from your graveyard to your hand$/.exec(s);
+    const toField = effects.at(-1);
+    if (anotherBack && toField?.type === "chooseFromGraveyard" && toField.dest === "battlefield" && toField.n === 1 && !toField.who && !toField.upTo) {
+      const back = parseSentence(`Return a ${anotherBack[1]} from your graveyard to your hand`, ctx);
+      if (back?.length !== 1 || back[0]!.type !== "chooseFromGraveyard" || back[0]!.dest !== undefined || JSON.stringify(back[0]!.filter) !== JSON.stringify(toField.filter)) return null;
+      effects.push({ ...back[0]!, another: true });
+      continue;
+    }
+    // Command the Dreadhorde: "Choose any number of target creature and/or planeswalker cards in graveyards. ~ deals damage
+    // to you equal to the total mana value of those cards. Put them onto the battlefield under your control." The damage
+    // first, then the cards, even if the damage leaves you at 0 life (rulings); only the targets still legal count.
+    const dreadhorde = /^Choose any number of target ([a-z/ ]+?) cards in graveyards$/.exec(s);
+    if (dreadhorde && ctx.spell && /^~ deals damage to you equal to the total mana value of those cards\.?$/.test(sentences[si + 1] ?? "") && /^Put them onto the battlefield under your control\.?$/.test(sentences[si + 2] ?? "")) {
+      const put = parseSentence(`Put any number of target ${dreadhorde[1]} cards from graveyards onto the battlefield under your control`, ctx);
+      if (put?.length !== 1 || put[0]!.type !== "putOntoBattlefield" || put[0]!.what.ref !== "target") return null;
+      effects.push({ type: "damage", amount: { count: { kind: "manaValue", of: put[0]!.what, total: true } }, to: { ref: "you" } }, put[0]!);
+      si += 2;
+      continue;
+    }
+    // Chaos Defiler: "For each opponent, choose a nonland permanent that player controls. Destroy one of them chosen at
+    // random." You choose for each opponent as it resolves, none targeted; then one of those still on the battlefield,
+    // at random, is destroyed, one without indestructible if any is (rulings).
+    const eachRandom = /^[Ff]or each opponent, choose an? ([a-z ]+?) that player controls$/.exec(s);
+    if (eachRandom && /^Destroy one of them chosen at random\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter = pickFilter(eachRandom[1]!);
+      if (!filter || filter.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "eachOpponent" }, filter, n: 1, action: "choose", youChoose: true, prompt: `click ${/^[aeiou]/.test(filter.text) ? "an" : "a"} ${filter.text} of {player}. ~ destroys one of the chosen permanents at random.` }, { type: "destroyRandomTarget", what: { ref: "created" }, destroyable: true });
+      si++;
+      continue;
+    }
+    // Winnowing: "For each player, you choose a creature that player controls. Then each player sacrifices all other
+    // creatures they control that don't share a creature type with the chosen creature they control." Not targeted;
+    // then all at once (CR 101.4). A changeling shares every creature type (CR 702.73a); a creature with none shares none.
+    if (s === "For each player, you choose a creature that player controls" && /^Then each player sacrifices all other creatures they control that don't share a creature type with the chosen creature they control\.?$/.test(sentences[si + 1] ?? "")) {
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, youChoose: true, sparesTypeOfKept: true });
+      si++;
       continue;
     }
     // "For each player, choose a creature that player controls. Each player sacrifices all creatures they control not

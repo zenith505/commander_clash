@@ -115,6 +115,7 @@ import {
   landsAllowed,
   landUntappedOffer,
   creatureTypesOf,
+  shareCreatureType,
   mustAttackPlayers,
   conspireInstances,
   walkersFreeToAttack,
@@ -289,6 +290,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     // Krark's Thumb: keep the won flip.
     if (pend.kind === "chooseMay" && pend.thumb) return [{ type: "chooseMay", player: pid, yes: true }];
+    // Fiery Gambit: flip again until more wins do nothing more (each flip risks the whole spell).
+    if (pend.kind === "chooseMay" && pend.flipAgain) return [{ type: "chooseMay", player: pid, yes: pend.flipAgain.wins < pend.flipAgain.enough }];
     // Rona, Tolarian Obliterator: a land exiled from a hand at random, ours to put onto the battlefield.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
     // Primal Surge: every permanent is worth having, and saying no ends it.
@@ -1759,6 +1762,24 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
   if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
+  // Command the Dreadhorde: the cards' total mana value is dealt to us first: the costliest cards that still leave us
+  // more than 6 life, none if that's nothing worth it.
+  const selfMv = many >= 0 ? body.effects.find((e) => e.type === "damage" && JSON.stringify(e.to) === '{"ref":"you"}' && typeof e.amount === "object" && e.amount.count?.kind === "manaValue" && !!e.amount.count.total) : undefined;
+  if (selfMv) {
+    const slots = body.targets.length - printed.targets.length + 1;
+    const cards = legalTargets(s, body.targets[many]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" ? [t.id] : [])).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))));
+    let budget = player(s, pid).life - 7;
+    const picked: string[] = [];
+    for (const id of cards) {
+      const cost = defMv(defOf(s, obj(s, id)));
+      if (cost > budget || picked.length >= slots) continue;
+      picked.push(id);
+      budget -= cost;
+    }
+    if (!forced && picked.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) < 4) return null;
+    if (body.targets.length !== printed.targets.length + slots - 1 || printed.targets.length !== 1) return null;
+    return Array.from({ length: slots }, (_, k): TargetChoice => (picked[k] ? { kind: "object", id: picked[k]! } : { kind: "none" }));
+  }
   // Goblin Welder: our own cheapest artifact for a costlier artifact card in our graveyard.
   const weld = body.effects.find((e) => e.type === "weld");
   if (weld?.type === "weld") {
@@ -3298,7 +3319,8 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
   // else our least useful one.
   // Eye of Doom: a doom counter (the Eye destroys them later) likewise.
-  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && after.counter === "doom")) {
+  // Chaos Defiler: one of the chosen is destroyed at random: each opponent's most useful.
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "destroyRandomTarget" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}') || (after?.type === "counters" && after.what.ref === "created" && after.counter === "doom")) {
     const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
     return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
   }
@@ -3316,6 +3338,14 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   }
   // "Choose ..., then sacrifice the rest": keep our best permanents, and choosing for another player (Mythos of Snapdax),
   // leave them their least useful ones.
+  // Winnowing: the creature kept spares those sharing a creature type with it: ours, the one saving the most worth; another
+  // player's, the one saving the least.
+  const keeping = action === "keep" && count === 1 && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+  if (keeping?.type === "keepRest" && keeping.sparesTypeOfKept) {
+    const saved = (id: ObjectId) => options.filter((o2) => o2 === id || shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, o2)))).reduce((n, o2) => n + worth(s, pid, obj(s, o2)), 0);
+    const mine = options.every((id) => controllerOf(s, obj(s, id)) === pid);
+    return [...options].sort((a, b) => (mine ? 1 : -1) * (saved(b) - saved(a))).slice(0, 1);
+  }
   if (action === "keep") {
     // Mount Doom: every player's are among them; ours, best first.
     if (options.some((id) => controllerOf(s, obj(s, id)) !== pid) && options.some((id) => controllerOf(s, obj(s, id)) === pid))

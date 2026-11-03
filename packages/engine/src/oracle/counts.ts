@@ -804,6 +804,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Devotion (CR 700.5): "your devotion to black", "your devotion to black and red".
   if ((m = /^your devotion to (white|blue|black|red|green)(?: and (white|blue|black|red|green))?$/i.exec(p)))
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
+  // Rose Tyler: "for each suspended card you own and each other permanent you control with a time counter on it".
+  if (/^suspended card you own and each other permanent you control with a time counter on it$/.test(p)) return count({ kind: "timeCountedObjects" });
   // Domain.
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Niv-Mizzet, Guildpact: "the number of different color pairs among permanents you control that are exactly two colors".

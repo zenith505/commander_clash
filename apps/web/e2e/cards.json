@@ -15576,6 +15576,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c637fedc-b7b9-4da8-bab4-0488e7c1fac1",
+  "name": "Noggin Whack",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Kindred Sorcery — Rogue",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Rogue"
+  ],
+  "oracleText": "Prowl {1}{B} (You may cast this for its prowl cost if you dealt combat damage to a player this turn with a Rogue.)\nTarget player reveals three cards from their hand. You choose two of them. That player discards those cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Prowl"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9a1fbe72-4a17-42be-8e23-d7d30a5e59c1",
   "name": "Norn's Annex",
   "manaCost": "{3}{W/P}{W/P}",

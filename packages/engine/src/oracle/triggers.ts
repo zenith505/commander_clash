@@ -685,7 +685,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     return body ? { event: "selfCrewsVehicle", body: { ...body, text: crews[1]! } } : "fail";
   }
   // Catacomb Dragon: "a nonartifact, non-Dragon creature" is one that's neither (the comma joins two "non-" words).
-  const blockLine = line.replace(/^(Whenever ~ becomes blocked by an? non[-a-z]+), (non-?[A-Za-z]+ creature, )/, "$1 $2");
+  // Alaborn Zealot: "When ~ blocks a creature, destroy both creatures.": that creature and ~ (each blocked creature
+  // triggers it once, CR 509.1h).
+  const blockLine = line.replace(/^(Whenever ~ becomes blocked by an? non[-a-z]+), (non-?[A-Za-z]+ creature, )/, "$1 $2").replace(/^When ~ blocks a creature, destroy both creatures\.$/, "Whenever ~ blocks a creature, destroy that creature. Destroy ~.");
   for (const [re, event] of BLOCK_TRIGGERS) {
     const m = re.exec(blockLine);
     if (!m) continue;
@@ -1442,6 +1444,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     const { notSource, ...rest } = t;
     if (notSource && m?.[1] !== "~ or another") return "fail";
     body = { ...body, targets: [{ ...rest, ...(notSource ? { notSubject: true as const } : {}), bound: { key, at: "most", amount: { count: { kind: key, of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser ${lesserKey}` }] };
+  }
+  // Illicit Masquerade: "Whenever a creature you control with an impostor counter on it dies, exile it. Return up to one
+  // other target creature card from your graveyard to the battlefield": "other" than the card that died, the trigger's
+  // subject (TargetSpec.notSubject, fixed as the trigger is put on the stack), not the source.
+  if (!attached && !lesser && m?.[1]?.toLowerCase() === "a" && /^exile it\. Return up to one other target creature card from your graveyard to the battlefield\.?$/.test(bodyText)) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "card" || !t.notSource) return "fail";
+    const { notSource: _n, ...rest } = t;
+    body = { ...body, targets: [{ ...rest, notSubject: true as const, text: `${t.text} other than that creature` }] };
   }
   if (attached) {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
@@ -2733,6 +2744,9 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  // Liability: "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1
+  // life.": a card goes to its owner's graveyard (CR 400.3), so that player is its owner.
+  if (raw === "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1 life.") raw = "Whenever a nontoken permanent is put into a graveyard from the battlefield, its owner loses 1 life.";
   // Wiitigo: "At the beginning of your upkeep, put a +1/+1 counter on ~ if it has blocked or been blocked since your last
   // upkeep. Otherwise, remove a +1/+1 counter from it." Shape of the Wiitigo: the same about enchanted creature, "if it
   // attacked or blocked": checked as it resolves (not an intervening if, CR 603.4); none to remove, nothing happens.
@@ -3246,6 +3260,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // artifact": that one is the enchanted one.
   const hostWord = hostUpkeep?.[3];
   const hostRest = hostUpkeep && hostWord !== "creature" && hostWord !== "permanent" ? hostUpkeep[4]!.replace(new RegExp(`\\bthat ${hostWord}\\b`, "g"), `${hostUpkeep[2]} ${hostWord}`) : hostUpkeep?.[4];
+  // Aggression: "At the beginning of the end step of enchanted creature's controller, destroy that creature if it didn't
+  // attack this turn.": the creature it enchanted as the ability triggered, even if the Aura moves after that (rulings),
+  // checked as it resolves (CR 608.2c): the trigger's subject (effects/triggers.ts).
+  if (hostUpkeep?.[2] === "enchanted" && hostUpkeep[3] === "creature" && /^destroy that creature if it didn't attack this turn\.$/.test(hostUpkeep[4]!)) {
+    const didnt: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "didntAttackThisTurn", text: "creature that didn't attack this turn" };
+    const step = hostUpkeep[1] === "upkeep" ? "eachUpkeep" : hostUpkeep[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
+    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, destroy enchanted creature.`);
+    if (!t || t === "fail" || t.event !== step) return "fail";
+    return { ...t, hostControllersUpkeep: true, hostSubject: true, body: { targets: [], effects: [{ type: "if", cond: { kind: "subjectIs", filter: didnt }, effects: [{ type: "destroy", what: { ref: "subject" } }] }], text: "destroy that creature if it didn't attack this turn." } };
+  }
   if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostRest!.replace(/\bthat (?:player|damage)\b/g, ""))))) {
     const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostRest!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";

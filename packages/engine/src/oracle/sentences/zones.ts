@@ -486,6 +486,24 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter?.kind !== "card") return null;
     return [{ type: "grantFlashback", each: { ...filter, owner: "you", text: `${m[1]!.toLowerCase()} card in your graveyard` }, cast: true }];
   }
+  // Confession Dial: "Target legendary creature card in your graveyard gains escape until end of turn. The escape cost is
+  // equal to its mana cost plus exile three other cards from your graveyard" (parseBody joins the two sentences): escape
+  // (CR 702.138a) with the card's own mana cost, until end of turn (the cleanup step, CR 514.2).
+  if ((m = /^(target .+? card in your graveyard(?: that's .+?)?) gains escape with its mana cost and exile (two|three|four|five) other cards until end of turn$/i.exec(s))) {
+    const i = ctx.targets.length;
+    // Desdemona, Freedom's Edge: "target creature card in your graveyard that's an artifact or that has mana value 3 or
+    // less": a creature card that's either.
+    const either = /^(target [a-z]+ card in your graveyard) that's an artifact or that has mana value (\d+) or less$/.exec(m[1]!);
+    const what = parseCardTarget(either ? either[1]! : m[1]!, ctx, "you");
+    if (either && ctx.targets[i]?.kind === "card" && !ctx.targets[i]!.anyOf) {
+      const t = ctx.targets[i]!;
+      ctx.targets[i] = { ...t, anyOf: [{ kind: "card", types: ["Artifact"], notTypes: [], notColors: [], text: "artifact" }, { kind: "card", types: [], notTypes: [], notColors: [], manaValue: { max: Number(either[2]) }, text: `mana value ${either[2]} or less` }], text: m[1]!.replace(/^target /, "") };
+    }
+    const spec = ctx.targets[i];
+    // A land card can't be cast (CR 305.9).
+    if (what?.ref !== "target" || spec?.kind !== "card" || ctx.targets.length !== i + 1 || spec.types?.includes("Land") || !(spec.types?.length || spec.anyOf?.length)) return null;
+    return [{ type: "grantFlashback", what, escape: { exile: num(m[2]!) } }];
+  }
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
   if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {
@@ -1577,7 +1595,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
-    if (/^Put a creature card exiled with ~ onto the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
+    // Chaos Shrine's Black Crystal: "... with a finality counter on it": it enters with it (CR 122.6).
+    if ((m = /^Put a creature card exiled with ~ onto the battlefield under your control( with a finality counter on it)?$/i.exec(s))) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, ...(m[1] ? { counters: { finality: 1 } } : {}) }];
     // Clone Shell: the controller looks at the top four, exiles one of them face down (one must be exiled, rulings) and puts
     // the rest on the bottom in the order they choose.
     if (/^Exile one of the top four cards of your library face down and put the rest on the bottom of your library in any order$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 4, pickOne: true, bottomAnyOrder: true }];
@@ -1883,9 +1902,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "libraryTop" }];
   }
   // (Sea Drake's "return two target lands you control" targets: sentences/permanents.ts.)
-  if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
-    const filter = pickFilter(m[2]!);
-    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  // Kazandu Stomper: "return up to two lands you control to their owner's hand": none to that many, chosen as it resolves.
+  if ((m = new RegExp(`^Return (up to )?${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s)) && !/\btarget\b/.test(m[3]!)) {
+    const filter = pickFilter(m[3]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[2]!), action: "bounce", ...(m[1] ? { upTo: true as const } : {}) }];
   }
   // Killing Wave: "For each creature, its controller sacrifices it unless they pay X life": each player chooses which of
   // theirs to keep, paying X life for each, the active player first and each knowing the choices before theirs; then

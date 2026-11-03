@@ -1,6 +1,6 @@
 # Roadmap
 
-29,553 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,563 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
@@ -1918,7 +1918,7 @@ line blocks.
    the upkeep its trigger resolves in, rulings); everything counters (Omo, Queen of Vesuva: every land type with the
    basic types' mana abilities, CR 205.3i, 305.6; nonland creatures every creature type); "Whenever a player loses the
    game, if they were attacked this turn by an Assassin you controlled, you win the game" (Ramses, Assassin Lord:
-   Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7 (29,553 of 31,936).
+   Player.attackedWith.to, players only, the attacker's types as it was declared, rulings). +7 (29,553 of 31,936; 29,563 with B95).
    Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control
    would deal combat damage to a player, instead that player mills that many cards": a replacement, not a prevention,
    so it applies to damage that can't be prevented and the player orders it with the damage shields, CR 616.1; the
@@ -5079,6 +5079,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   paid, and never if the card leaves exile another way, rulings; with a browser test). Also: "{N}, Exile ~ from your
   hand" with any other effect used to compile with the exile cost dropped; it now only compiles for these. +15 (29,509 of
   31,936 with B93 and rounds 257 and 258; 29,527 with rounds 259 and 260; 29,534 with rounds 261 and 262).
+- Round B95 (templates from the bottom of the list): "Whenever a spell or ability causes a player to shuffle their
+  library" (Psychogenic Probe) and "causes its controller to shuffle their library" (Widespread Panic): the shuffle is
+  the resolving spell or ability's controller's, or a static replacement's controller's (Darksteel Colossus), never a
+  game rule's; "Choose target opponent. Until that player's next turn, they gain protection from everything and their
+  life total can't change. All nonland permanents they control phase out" (Teferi's Reproach); "Whenever an opponent
+  puts one or more counters on a creature they control, they put the same number and kind of counters on this creature"
+  (Bold Plagiarist, once per kind put); "You can cast spells only during your turn and you can cast no more than two
+  spells each turn" and free spells with mana value up to the number of lands you control (Fires of Invention); "if
+  there are five basic land types among lands you control" (Nael, Avizoa Aeronaut); Aethermage's Touch (the creature
+  gains "At the beginning of your end step, return this creature to its owner's hand"); "Roll a d8. Reveal cards ...
+  until you reveal a creature card with mana value equal to the result" (Bag of Tricks); Timesifter (each upkeep every
+  player exiles their top card, the greatest mana value takes an extra turn, tied players repeat, CR 500.7); Storage
+  Matrix (each player chooses artifact, creature, or land in their untap step while it's untapped, CR 502.3, with a
+  browser test; it limits the active player's own untaps, which are the only ones the untap step makes). +10 (29,544 of
+  31,936 with B94 and rounds 261 and 262; 29,556 with rounds 263 and 264).
+- Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
+  Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
+  of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's
+  permanent cards entering at once, Auras needing hosts among them), Spirit-Sister's Call (a sacrifice sharing a card
+  type with a card put into your graveyard, then a granted leave-the-battlefield replacement), Back from the Brink (a
+  token copy of the card exiled to pay the cost), Dream Halls (an alternative cost for every player's spells: discard a
+  card sharing a color), Hall of Gemstone (lands tapped for mana make the chosen color instead, a mana replacement).
 - Out after round B94 (looked at, not done): Forgotten Lore and Shrouded Lore (an opponent chooses a card in your
   graveyard, repeated while you pay, none chosen twice), Graceful Takedown ("any number of target enchanted creatures you
   control and up to one other target creature" each dealing damage), Nahiri's Sacrifice (an additional sacrifice with

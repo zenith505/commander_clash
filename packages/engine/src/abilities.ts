@@ -2902,7 +2902,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "Put the same number of each kind of counter on that creature" as ~ has (Denry Klin, Editor in Chief): each kind `copyFrom` has as it resolves, that many; `counter` and `n` are ignored. */ copyFrom?: ObjRef; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** Bold Plagiarist: "the same ... kind of counters": the kind the trigger's event put (TriggerEventInfo.counter); `counter` is ignored. */ eventCounter?: true; /** "Put the same number of each kind of counter on that creature" as ~ has (Denry Klin, Editor in Chief): each kind `copyFrom` has as it resolves, that many; `counter` and `n` are ignored. */ copyFrom?: ObjRef; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -4136,6 +4136,12 @@ export type Effect =
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
+  /**
+   * Timesifter: "each player exiles the top card of their library. The player who exiled the card with the greatest mana
+   * value takes an extra turn after this one. If two or more players' cards are tied for greatest, the tied players repeat
+   * this process until the tie is broken." A player who can't exile a card is out of it (rulings).
+   */
+  | { type: "timesifter" }
   | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true; /** "During that turn, power-up abilities can't be activated" (Kang the Conqueror). */ noPowerUp?: true }
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
@@ -4256,6 +4262,11 @@ export type Effect =
       keywords: string[];
       /** "Until your next turn" rather than until end of turn (Noble Heritage). */
       untilYourNextTurn?: true;
+      /**
+       * Teferi's Reproach: "Until that player's next turn, they gain protection from everything and their life total can't
+       * change": this player gains them (with `untilYourNextTurn`, until their own next turn), not the controller.
+       */
+      who?: PlayerRef;
       /** "Until your next turn, your life total can't change" (Teferi's Protection): see Player.lifeCantChange. */
       lifeCantChange?: true;
       /** "Until end of turn, your life total can't change" (Flare of Fortitude): see Player.lifeCantChangeTurn. */
@@ -4962,6 +4973,13 @@ export type TriggerEvent =
    */
   | "opponentShufflesLibrary"
   /**
+   * "Whenever a spell or ability causes a player to shuffle their library" (Psychogenic Probe), an empty one too (rulings);
+   * not the game's own shuffles. `effectShufflesOwnLibrary`: "... causes its controller to shuffle their library"
+   * (Widespread Panic), a spell or ability that player controls. "That player" is the one who shuffled.
+   */
+  | "effectShufflesLibrary"
+  | "effectShufflesOwnLibrary"
+  /**
    * "Whenever an opponent attacks you with two or more creatures" (Everett K. Ross), "Whenever an opponent attacks with
    * creatures, if two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara, Tomik): see
    * TriggeredAbility.attacksYou. Once per declaration; "that opponent" is the event player.
@@ -5145,6 +5163,12 @@ export interface TriggeredAbility {
   countersKind?: string;
   /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
   countersByYou?: true;
+  /**
+   * For "permanentCountersPut": "Whenever an opponent puts one or more counters on a creature they control" (Bold
+   * Plagiarist): counters an opponent of this ability's controller puts (CR 122.6) on a creature that player controls;
+   * that player is the event's player. Once for each kind put on it at a time.
+   */
+  countersByOpponentOnTheirs?: true;
   /** For "permanentCountersPut": "on a permanent or player" (All Will Be One), counters put on a player too. */
   countersOrPlayer?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
@@ -6605,6 +6629,8 @@ export interface CompiledCard {
   opponentsSorceryTiming?: true;
   /** "Players can cast spells only during their own turns" (Dosan the Falling Leaf). */
   castOnlyOwnTurn?: true;
+  /** Fires of Invention: "You can cast spells only during your turn": its controller only, even when told to cast one (rulings). */
+  castOnlyYourTurn?: true;
   /** "Players can ... activate abilities only during their own turns" (City of Solitude): every activated ability, mana
    * abilities and abilities of cards in other zones included (rulings). */
   activateOnlyOwnTurn?: true;
@@ -6692,7 +6718,7 @@ export interface CompiledCard {
    * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
-  castLimits?: { who: "each" | "you" | "enchanted"; filter?: TargetSpec; text: string }[];
+  castLimits?: { who: "each" | "you" | "enchanted"; filter?: TargetSpec; text: string; /** Fires of Invention: "no more than two spells each turn": this many (one unless set), every spell cast this turn counting (rulings). */ n?: number }[];
   /**
    * What the name chosen as it entered does (Chosen.name, CR 201.4): "Spells with the chosen name can't be cast", "Your
    * opponents can't cast spells with the chosen name", "Activated abilities of sources with the chosen name can't be
@@ -7250,6 +7276,11 @@ export interface CompiledCard {
   untapRemovesCounters?: string;
   /** "Skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10): its controller's upkeep doesn't happen while their hand is empty. */
   skipUpkeepIfHellbent?: true;
+  /**
+   * Storage Matrix: "As long as ~ is untapped, each player chooses artifact, creature, or land during their untap step.
+   * That player can untap only permanents of the chosen type this step." Each untapped one asks once (Player.untapTypes).
+   */
+  untapTypeChoice?: true;
   /** "Players skip their untap steps." (Stasis, CR 614.10): no player's untap step happens. */
   skipUntapSteps?: boolean;
   /** Eon Hub: "Players skip their upkeep steps": every player's, the whole step (CR 614.10). */

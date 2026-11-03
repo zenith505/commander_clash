@@ -6,12 +6,12 @@ import { defMv } from "../faces";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindChosen, objectMatches, printedMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches, printedMatches } from "./targeting";
 import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
-import { ResolveCtx, amountNow, apnap, players } from "./resolve";
+import { ResolveCtx, amountCtx, amountNow, apnap, players } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -117,7 +117,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (who === undefined) return;
       const p = player(s, who);
-      const filter = bindChosen(e.filter, ctx.chosen);
+      // Bag of Tricks: "a creature card with mana value equal to the result", the roll's (TargetSpec.bound).
+      const filter = bindBound(s, bindChosen(e.filter, ctx.chosen), amountCtx(s, ctx));
       // "Shares a card type with that permanent": its types as it last existed if it's gone (CR 608.2h).
       const shared = e.sharesTypeWith === undefined ? undefined : targetTypes(s, ctx, e.sharesTypeWith);
       if (shared && !shared.length) return;

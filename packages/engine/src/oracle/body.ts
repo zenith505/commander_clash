@@ -2045,6 +2045,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Balance of Power: "If target opponent has more cards in hand than you, draw cards equal to the difference.": with
   // fewer or as many, the difference is nothing to draw (handMoreThanYou).
   text = text.replace(/^If target opponent has more cards in hand than you, draw cards equal to the difference\.$/, "Draw X cards, where X is the number of cards in target opponent's hand minus the number of cards in your hand.");
+  // Aethermage's Touch: "Then put the rest of the cards revealed this way on the bottom of your library in any order." after
+  // the grant to the card put onto the battlefield is the dig's "rest".
+  text = text.replace(/(You may put a creature card from among them onto the battlefield\. It gains "At the beginning of your end step, return ~ to its owner's hand\.") Then put the rest of the cards revealed this way on the bottom of your library in any order\./, "$1 Put the rest on the bottom of your library in any order.");
+  // Teferi's Reproach: "Choose target opponent. Until that player's next turn, they gain protection from everything and
+  // their life total can't change. All nonland permanents they control phase out." (sentences/permanents.ts).
+  text = text.replace(/^Choose target opponent\. Until that player's next turn, they gain protection from everything and their life total can't change\. All nonland permanents they control phase out\./, "Until target opponent's next turn, that player gains protection from everything and their life total can't change. All nonland permanents that player controls phase out.");
   // Waking the Trolls: "Choose target opponent. If they control fewer lands than you, create a number of ... tokens ... equal
   // to the difference.": as many as you have more, none if they have as many or more (Superior Numbers' "in excess of").
   text = text.replace(/^Choose target opponent\. If they control fewer lands than you, create a number of ([^.]+? tokens(?: with [a-z]+)?) equal to the difference\.$/, "Create X $1, where X is the number of lands you control in excess of the number of lands target opponent controls.");
@@ -10005,6 +10011,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       afterDig = [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: [capital(digGains[1]!)] }], duration: "endOfTurn" }];
       continue;
     }
+    // Aethermage's Touch: 'It gains "At the beginning of your end step, return this creature to its owner's hand."': the one
+    // card put onto the battlefield, the permanent it became, for as long as it's that object (rulings, CR 400.7, 611.2a).
+    if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^It gains "At the beginning of your end step, return ~ to its owner's hand\."$/.test(s)) {
+      afterDig = [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addAbility", text: "At the beginning of your end step, return ~ to its owner's hand." }], duration: "game" }];
+      continue;
+    }
     // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
     if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
       afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
@@ -14206,6 +14218,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Mirko Vosk, Mind Drinker: "that player reveals cards from the top of their library until they reveal four land cards,
     // then puts those cards into their graveyard": the same, about the player dealt the damage.
+    // Timesifter: the three sentences are one process (Effect timesifter).
+    if (/^[Ee]ach player exiles the top card of their library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "The player who exiled the card with the greatest mana value takes an extra turn after this one" && sentences[si + 2]?.replace(/\.$/, "") === "If two or more players' cards are tied for greatest, the tied players repeat this process until the tie is broken") {
+      effects.push({ type: "timesifter" });
+      si += 2;
+      continue;
+    }
     const mirko = ctx.eventPlayer && /^[Tt]hat player reveals cards from the top of their library until they reveal (two|three|four|five) land cards$/.exec(s);
     if (mirko && /^(?:That player p|P)uts those cards into their graveyard\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "revealUntilLandToGraveyard", who: { ref: "eventPlayer" }, n: num(mirko[1]!) });
@@ -14467,8 +14485,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // and put all other cards revealed this way into your graveyard": the whole process, if you choose.
     // Sacred Guide: "Put that card into your hand and exile all other cards revealed this way" (as Demonic Consultation).
     const untilPut = /^Put that card (into your hand|onto the battlefield( tapped(?: and attacking)?)?) and (the rest on the bottom of your library in a random order|(?:put )?all other cards revealed this way into your graveyard|the rest into your graveyard|exile all other cards revealed this way)$/.exec((mayUntil ? sentences[si + 1]?.replace(/^If you do, put /, "Put ") : sentences[si + 1])?.replace(/\.$/, "") ?? "");
-    if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
-      const filter = parseSearchFilter(until[1]!);
+    // Bag of Tricks: "Roll a d8. Reveal cards ... until you reveal a creature card with mana value equal to the result.":
+    // that roll's result, as the reveal begins (TargetSpec.bound).
+    const rollMv = !until && !mayUntil && effects.at(-1)?.type === "roll" ? /^Reveal cards from the top of your library until you reveal a (creature card) with mana value equal to the result$/.exec(s) : null;
+    const untilOrRoll = until ?? rollMv;
+    if (untilOrRoll && untilPut && !/\b(?:named|chosen|that name)\b/.test(untilOrRoll[1]!)) {
+      const parsed = parseSearchFilter(untilOrRoll[1]!);
+      const filter: TargetSpec | null | undefined = parsed && rollMv ? { ...parsed, bound: { key: "manaValue", at: "exact", amount: { count: { kind: "rollResult" } } } } : parsed;
       if (!filter || filter.kind !== "card") return null;
       const onto = untilPut[1] !== "into your hand";
       // A planeswalker card enters with its loyalty (CR 306.5b): no choice either (The Prismatic Bridge).
@@ -14479,7 +14502,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (onto && !safe && !tribal && !saga) return null;
       if (sharesM && (onto || filter.types?.length !== 1 || filter.types[0] !== "Creature")) return null;
       const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : /^exile/.test(untilPut[3]!) ? "exile" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}), ...(untilPut[2] === " tapped and attacking" ? { attacking: true as const } : {}), ...(sharesM ? { sharesCreatureTypeWithSubject: true as const } : {}) };
-      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!}${sharesM ? " that shares a creature type with it" : ""} is revealed` } : reveal);
+      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(untilOrRoll[1]!) ? "an" : "a"} ${untilOrRoll[1]!}${sharesM ? " that shares a creature type with it" : ""} is revealed` } : reveal);
       si++;
       continue;
     }

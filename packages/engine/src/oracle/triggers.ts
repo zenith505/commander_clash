@@ -3774,6 +3774,23 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(nth[3]!, { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: nth[2]!, countersReach: reach, body } : "fail";
   }
+  // Protean Hydra: "Whenever a +1/+1 counter is removed from ~", for any reason, once for each counter (rulings).
+  // Chandra, Fire Artisan: "Whenever one or more loyalty counters are removed from ~", once for each event (combat damage
+  // from several creatures at once is one), "that much" how many (rulings). See countersRemoved in counters.ts.
+  const removed = /^Whenever (an? |one or more )(\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) counters? (?:is|are) removed from ~, (.+)$/.exec(line);
+  if (removed && (removed[1] === "one or more " ? / counters are /.test(line) : / counter is /.test(line))) {
+    const each = removed[1] !== "one or more ";
+    let text = removed[3]!.replace(/^(?:it|she|he) (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ");
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) {
+      if (each || /\bX\b/.test(text)) return "fail";
+      text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    }
+    let body = parseBody(text, { selfIt: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, removed[3]!) };
+    return { event: "selfCountersRemoved", countersKind: removed[2]!, ...(each ? { countersEach: true as const } : {}), body };
+  }
   // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter put on it (rulings).
   const each = /^Whenever an? ((?:\+1\/\+1|-1\/-1|[a-z]+) )counter is put on ~, (.+)$/.exec(line);
   if (each) {

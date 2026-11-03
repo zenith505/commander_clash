@@ -4968,6 +4968,12 @@ export type TriggerEvent =
   | "selfTimeCounterRemovedExiled"
   /** "When the last time counter is removed from ~ while it's exiled" (Riftmarked Knight; works in exile, CR 113.6). */
   | "selfLastTimeCounterRemovedExiled"
+  /**
+   * "Whenever a +1/+1 counter is removed from ~" (Protean Hydra: once for each, countersEach) / "whenever one or more
+   * loyalty counters are removed from ~" (Chandra, Fire Artisan: once for each event, "that much" the eventAmount), for
+   * any reason (see countersRemoved in counters.ts); countersKind is the kind.
+   */
+  | "selfCountersRemoved"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   | "selfEchoPaid" // "When ~'s echo cost is paid" (Shah of Naar Isle, CR 702.30a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
@@ -6469,9 +6475,10 @@ export interface CompiledCard {
   /**
    * "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove that many +1/+1
    * counters from ~" (Ugin's Conjurant, CR 615.5): all of it prevented, as many counters as it has removed (rulings);
-   * damage that can't be prevented still removes them (615.12).
+   * damage that can't be prevented still removes them (615.12). "always": Protean Hydra's, with no "while it has" (all
+   * damage prevented even with none on it, rulings).
    */
-  counterShield?: true;
+  counterShield?: true | "always";
   /**
    * Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).

@@ -11,7 +11,7 @@ import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
-import { batchPlayerCounters, putPlayerCounters, putCounters, tokenBatch, withPutter } from "./counters";
+import { batchCountersRemoved, batchPlayerCounters, countersRemoved, putPlayerCounters, putCounters, tokenBatch, withPutter } from "./counters";
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, inRange, objectMatches, playerProtectedFrom } from "./effects/targeting";
@@ -156,6 +156,7 @@ export function dealDamage(
           if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
           invalidateCharacteristics(s);
           log(s, `A +1/+1 counter is removed from ${targetName}.`);
+          countersRemoved(s, o, "+1/+1", 1);
         }
         o.phantomEvent = event;
       }
@@ -182,13 +183,14 @@ export function dealDamage(
     const o = to.object;
     const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
     const has = o.counters["+1/+1"] ?? 0;
-    if (has > 0 || (event && o.phantomEvent === event)) {
+    if (abilitiesOf(s, o).counterShield === "always" || has > 0 || (event && o.phantomEvent === event)) {
       if (has) {
         const off = Math.min(n, has);
         o.counters["+1/+1"] = has - off;
         if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
         invalidateCharacteristics(s);
         log(s, `${off} +1/+1 counter${off === 1 ? " is" : "s are"} removed from ${targetName}.`);
+        countersRemoved(s, o, "+1/+1", off);
       }
       o.phantomEvent = event;
       if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
@@ -215,6 +217,7 @@ export function dealDamage(
     if (walker) {
       const removed = Math.min(n, o.counters.loyalty ?? 0);
       if (removed) o.counters.loyalty = (o.counters.loyalty ?? 0) - removed;
+      countersRemoved(s, o, "loyalty", removed);
       invalidateCharacteristics(s);
       log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} loyalty removed).`);
     }
@@ -224,6 +227,7 @@ export function dealDamage(
       const had = o.counters.defense ?? 0;
       const removed = Math.min(n, had);
       if (removed) o.counters.defense = had - removed;
+      countersRemoved(s, o, "defense", removed);
       invalidateCharacteristics(s);
       log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} defense removed).`);
       if (removed && removed === had) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
@@ -1064,7 +1068,7 @@ export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: numbe
   if (combat && s.preventCombatDamage && prev) return 0;
   const phantom = "object" in to && s.objects[to.object] ? abilitiesOf(s, obj(s, to.object)).phantom : undefined;
   if ("object" in to && prev && phantom && (phantom !== "whileCounter" || (obj(s, to.object).counters["+1/+1"] ?? 0) > 0)) return 0;
-  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0) return 0;
+  if ("object" in to && prev && s.objects[to.object] && (abilitiesOf(s, obj(s, to.object)).counterShield === "always" || (abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0))) return 0;
   const k = recKey(to);
   return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);
 }
@@ -1377,7 +1381,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   const outerCreatures = creatureBatch;
   creatureBatch = [];
   // Poison counters from several sources at once are put as one event (rulings on All Will Be One).
-  const out = batchPlayerCounters(s, () =>
+  // Counters removed by damage dealt at the same time are removed at once (Chandra, Fire Artisan's rulings).
+  const out = batchCountersRemoved(s, () => batchPlayerCounters(s, () =>
     simultaneousLifeLoss(s, () => plan.final.map((e) => {
       const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
       const o = "object" in e.to ? obj(s, e.to.object) : undefined;
@@ -1385,7 +1390,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
       const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
       return { ...e, dealt };
     })),
-  );
+  ));
   for (const [key, n] of witherCounters) {
     const [id, by] = key.split("|") as [ObjectId, PlayerId];
     const o = obj(s, id);

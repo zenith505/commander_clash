@@ -4092,6 +4092,12 @@ export function compile(d: CardDef): CompiledCard {
       out.counterShield = true;
       continue;
     }
+    // Protean Hydra: "If damage would be dealt to ~, prevent that damage and remove that many +1/+1 counters from it":
+    // all of it prevented, even with fewer counters or none (rulings).
+    if (/^If damage would be dealt to ~, prevent that damage and remove that many \+1\/\+1 counters from (?:~|it)\.$/.test(line)) {
+      out.counterShield = "always";
+      continue;
+    }
     // Polukranos, Unchained: "~ enters with six +1/+1 counters on it. It escapes with twelve +1/+1 counters on it
     // instead." One replacement effect with two amounts (CR 614.1c, 702.138c).
     const escInstead = new RegExp(`^~ enters with ${NUM} \\+1/\\+1 counters on it\\. It escapes with ${NUM} \\+1/\\+1 counters on it instead\\.$`).exec(line);

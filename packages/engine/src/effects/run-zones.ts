@@ -1213,6 +1213,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
+      if (!sc.castAmong && e.fromYard?.chooser) {
+        // Wildfire Devils: the chosen player picks the card from their own graveyard (rulings) and exiles it; then a copy
+        // of only that card. None there: nothing happens.
+        const whose = players(s, e.fromYard.chooser, ctx)[0];
+        const pool = whose === undefined ? [] : player(s, whose).graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        const picked = sc.found?.filter((id) => pool.includes(id)) ?? (pool.length === 1 ? pool : undefined);
+        if (whose !== undefined && pool.length && !picked?.length) {
+          s.pending = { kind: "searchLibrary", player: whose, source: src, what: `${/^[aeiou]/i.test(e.fromYard.filter!.text) ? "an" : "a"} ${e.fromYard.filter!.text}`, cards: pool, min: 1, max: 1, fromGraveyard: "exile", copiedBy: you.id };
+          return "paused";
+        }
+        const gone: ObjectId[] = [];
+        if (whose !== undefined && picked?.length) {
+          moveObject(s, picked[0]!, "exile");
+          log(s, `${player(s, whose).name} exiles ${defOf(s, obj(s, picked[0]!)).name} from their graveyard.`);
+          if (obj(s, picked[0]!).zone === "exile") gone.push(picked[0]!);
+        } else if (whose !== undefined) log(s, `${player(s, whose).name} has no ${e.fromYard.filter!.text} in their graveyard.`);
+        sc.found = undefined;
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard?.random) {
         // Wondrous Crucible: one card at random; a copy of that card only.
         const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
@@ -1289,6 +1308,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const st = sc.castAmong;
       if (st.done) return;
+      // Spell mastery (Talent of the Telepath): checked once, as it starts resolving (rulings).
+      if (e.maxIfYard && st.max === undefined) st.max = you.graveyard.filter((id) => printedMatches(e.maxIfYard!.has, defOf(s, obj(s, id)))).length >= e.maxIfYard.min ? e.maxIfYard.max : (e.max ?? Number.MAX_SAFE_INTEGER);
+      const maxCast = st.max ?? e.max;
       const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
       // Still where they were put: in exile, or revealed in the library (`reveal`).
       const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && (e.handAndYard ? (e.andExile ? ["hand", "graveyard", "exile"] : ["hand", "graveyard"]).includes(s.objects[id]?.zone ?? "") : s.objects[id]?.zone === (e.yourYard ? "graveyard" : e.fromHand ? "hand" : e.reveal ? "library" : "exile")) && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
@@ -1332,8 +1354,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
         const others = left.filter((id) => !toHand.includes(id));
         if (e.rest.dest === "graveyard") {
+          // Each card to its owner's graveyard (CR 404.2): the target opponent's own, for Talent of the Telepath.
           for (const id of others) moveObject(s, id, "graveyard");
-          if (others.length) log(s, `${you.name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
+          if (others.length) log(s, `${player(s, obj(s, others[0]!).owner).name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
           return;
         }
         const byOwner = new Map<PlayerId, ObjectId[]>();
@@ -1449,7 +1472,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .map((x) => x.id)
         .filter((id) => !copiedOne.length || copiedOne.includes(id))
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
-      if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
+      if (!options.length || (maxCast !== undefined && (st.cast ?? 0) >= maxCast)) return finish();
       if (e.look && options.length === 1) {
         // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
         st.pick = options[0];
@@ -2076,6 +2099,84 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
+    case "alternatePicks": {
+      // Memories Returning: revealed (CR 701.20a) and kept on top until picked; each step from those still there.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      if (!sc.alternate) {
+        const ids = you.library.slice(0, e.n);
+        log(s, `${you.name} reveals ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        sc.alternate = { ids, step: 0 };
+      }
+      const st = sc.alternate;
+      for (;;) {
+        const left = st.ids.filter((id) => you.library.includes(id));
+        if (!left.length || st.step >= e.steps.length) return;
+        const step = e.steps[st.step]!;
+        // "Then choose an opponent": before the first step that's theirs.
+        if (step === "bottom" && st.opp === undefined) {
+          const opps = opponents(s, you.id);
+          if (!opps.length) return;
+          if (opps.length === 1) {
+            st.opp = opps[0];
+            log(s, `${you.name} chooses ${player(s, st.opp!).name}.`);
+          } else if (s.resolving!.chosen?.player !== undefined && opps.includes(s.resolving!.chosen.player)) st.opp = s.resolving!.chosen.player;
+          else {
+            s.pending = { kind: "chooseOption", player: you.id, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: `choose an opponent to put cards on the bottom of your library` };
+            return "paused";
+          }
+        }
+        const last = st.step === e.steps.length - 1 && step === "hand" && left.length === 1;
+        const picker = step === "hand" ? you.id : st.opp!;
+        const pick = left.length === 1 ? left[0]! : st.pick !== undefined && left.includes(st.pick) ? st.pick : undefined;
+        st.pick = undefined;
+        if (pick === undefined) {
+          s.pending = { kind: "chooseOption", player: picker, source: src, what: "alternatePick", options: left, labels: left.map((id) => defOf(s, obj(s, id)).name), prompt: step === "hand" ? `put one of the revealed cards into your hand` : `put one of the cards ${you.name} revealed on the bottom of their library` };
+          return "paused";
+        }
+        if (step === "hand") {
+          moveObject(s, pick, "hand");
+          log(s, `${you.name} puts ${defOf(s, obj(s, pick)).name} into their hand${last ? " (the last one)" : ""}.`);
+        } else {
+          you.library.splice(you.library.indexOf(pick), 1);
+          you.library.push(pick);
+          log(s, `${player(s, picker).name} puts ${defOf(s, obj(s, pick)).name} on the bottom of ${you.name}'s library.`);
+        }
+        // No longer among those revealed and still to be picked.
+        st.ids = st.ids.filter((id) => id !== pick);
+        st.step++;
+      }
+    }
+    case "predicament": {
+      // Master of Predicaments (rulings): the card chosen without revealing it; the guess made blind; nothing revealed
+      // unless it's cast.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      const guesser = players(s, e.who, ctx).find((pid) => !player(s, pid).lost);
+      if (guesser === undefined) return;
+      const st = (sc.predicament ??= {});
+      if (st.card === undefined) {
+        if (!you.hand.length) return log(s, `${you.name} has no card in hand to choose.`);
+        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "predicamentCard", options: [...you.hand], labels: you.hand.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a card in your hand: ${player(s, guesser).name} guesses whether its mana value is greater than ${e.over}; if they guess wrong, you may cast it without paying its mana cost` };
+        return "paused";
+      }
+      if (st.guess === undefined) {
+        s.pending = { kind: "chooseOption", player: guesser, source: src, what: "predicamentGuess", options: ["over", "notOver"], labels: [`Greater than ${e.over}`, `${e.over} or less`], prompt: `${you.name} chose a card in their hand. Guess whether its mana value is greater than ${e.over}: if you guess wrong, they may cast it without paying its mana cost` };
+        return "paused";
+      }
+      if (st.offered) return;
+      st.offered = true;
+      const o = s.objects[st.card.id];
+      if (!o || o.zone !== "hand" || (o.zoneChanges ?? 0) !== st.card.zc) return;
+      // A split card's mana value is that of both halves together (CR 709.4, rulings).
+      const right = (defMv(defOf(s, o)) > e.over) === (st.guess === "over");
+      if (right) return log(s, `${player(s, guesser).name} guessed right.`);
+      log(s, `${player(s, guesser).name} guessed wrong.`);
+      s.pending = { kind: "castFree", player: you.id, objectId: o.id, source: src };
+      if (!isType(defOf(s, o), "Land") && freeCastable(s, you.id, o.id)) return "paused";
+      s.pending = null;
+      return;
+    }
     case "castNow": {
       const sc = (s.resolving!.scratch ??= {});
       if (sc.castNow === undefined) {
@@ -2137,6 +2238,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+          // Wheel of Potential: only the cards its controller owns, with seven or more energy paid.
+          else if (e.mayPlayIfNoted !== undefined && (s.resolving?.notedAmount ?? 0) >= e.mayPlayIfNoted && o.owner === ctx.controller && o.zone === "exile") o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "nextTurn", turn: s.turn };
           // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }

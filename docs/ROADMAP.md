@@ -1,7 +1,7 @@
 # Roadmap
 
-29,466 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,449 of
+29,475 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,452 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1784,6 +1784,32 @@ line blocks.
    Frolicker); "Counters remain on ~ as it moves to any zone other than a player's hand or library" (Skullbriar, the
    Walking Grave and Me, the Immortal: only with the ability in the zone it leaves, rulings). +11 (29,428 of 31,936 with
    B84 to B89; 29,438 with B90).
+   Round 257 (the top of the list): "Target opponent reveals the top five cards of their library. You may cast an instant
+   or sorcery spell from among them without paying its mana cost. Then that player puts the rest into their graveyard"
+   with mastery's "cast up to two" (Talent of the Telepath: the count of instants and sorceries in your graveyard as it
+   resolves); "For each nonland permanent, choose a player at random. Then each player gains control of each permanent
+   for which they were chosen. Untap those permanents" (Scrambleverse); "any number of creature and/or Vehicle cards with
+   different powers" (Rip, Spawn Hunter, with a browser test); "Each player may exile their hand and draw a number of
+   cards equal to the amount of {E} paid this way. If seven or more {E} was paid this way, you may play cards you own
+   exiled this way until the end of your next turn" (Wheel of Potential);
+   "Choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy that card. You may
+   cast the copy without paying its mana cost" (Wildfire Devils: the chosen player picks, with a browser test); "For each
+   permanent destroyed this way, its controller reveals cards ... until an artifact or creature card is revealed and
+   exiles that card. Those players put the exiled cards onto the battlefield, then shuffle" (Indomitable Creativity: the
+   hits enter at the same time, APNAP reveals, CR 101.4); "Reveal the cards in your library. An opponent chooses from
+   among them a creature card, a land card, and a noncreature, nonland card" (Guided Passage: that opponent picks, with a
+   browser test); "choose a card in your hand. That player guesses whether the card's mana value is greater than 4. If
+   the player guessed wrong, you may cast the card without paying its mana cost" (Master of Predicaments, with two browser
+   tests); "Reveal the top five cards of your library. Put one of them into your hand. Then choose an opponent. They put one
+   on the bottom of your library. Then you put one into your hand ..." (Memories Returning, with a browser test). +9 (29,447 of 31,936); 29,461 with B91).
+   Out after round 257 (looked at, not done): Vaevictis Asmadi, the Dire and Guff Rewrites History (one target for each
+   player: no per-player target spec yet); Thieves' Auction (players draft exiled cards one by one until all are chosen);
+   Deceiver of Form (your other creatures become copies of the revealed card until end of turn); Monk Class (level 3 grants
+   an exiled card a cast-from-exile ability tied to another spell this turn); Sen Triplets (you play from an opponent's
+   hand, which is revealed, while they can't cast or activate); Breath of Fury (the Aura moves after its creature is
+   sacrificed, then an extra combat); Gollum, Scheming Guide (an opponent guesses land or nonland about your top card, then
+   Gollum is removed from combat); Elrond of the White Council (secret council votes, then you gain control of the creatures
+   chosen); Reverse the Sands (redistribute life totals).
    Out after round 256 (looked at, not done): Scrap Welder ("Sacrifice an artifact with mana value X" as a cost, X set by
    the artifact sacrificed and the target's mana value less than it: no sacrifice cost with a mana value X yet, in the
    engine, the bot or the app); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
@@ -4867,7 +4893,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control" (Sheltered Valley); "a creature you control with power greater than its base power deals combat damage to a
   player" (Ms. Marvel, Elastic Ally, CR 208.4b); "Whenever a creature becomes blocked by (blocks) a creature with lesser
   power" (No Quarter, once for each pair as blockers are declared, CR 509.3c-d). +14 (29,466 of 31,936 with B91 and
-  rounds 254 to 256).
+  rounds 254 to 256; 29,475 with round 257).
 - Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
   your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'

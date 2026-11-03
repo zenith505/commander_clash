@@ -724,6 +724,9 @@ export function compile(d: CardDef): CompiledCard {
     // Zimone, All-Questioning: "if ... you control a prime number of lands, create Primo, ..., then put that many +1/+1
     // counters on it": that many is the number of lands, counted as it resolves.
     line = line.replace(/^(At the beginning of your end step, if [^,]+ and you control a prime number of lands, create [^.]+ token, then put) that many (\+1\/\+1 counters on it)\.$/, "$1 X $2, where X is the number of lands you control.");
+    // Rip, Spawn Hunter: "At the beginning of your second main phase, if ~ is tapped, reveal the top X cards of your library,
+    // where X is its power": no other object for "its" to be, so ~'s power (as it last existed if it has left, rulings).
+    line = line.replace(/^((?:Survival — )?At the beginning of your second main phase, if ~ is tapped, reveal the top X cards of your library, where X is) its power\./, "$1 ~'s power.");
     // Ascendant Acolyte: "~ enters with a +1/+1 counter on it for each +1/+1 counter among other creatures you control":
     // counted as it enters, when it isn't on the battlefield yet (CR 614.1c), so the same as "among creatures you control".
     line = line.replace(/^(~ enters with a \+1\/\+1 counter on it for each \+1\/\+1 counter among) other (creatures you control\.)$/, "$1 $2");

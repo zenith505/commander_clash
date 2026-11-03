@@ -1117,6 +1117,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileHand":
     case "mayCastFromGraveyard":
     case "castNow":
+    case "predicament":
+    case "alternatePicks":
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":
@@ -1235,6 +1237,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exchangePower":
     case "groupRules":
     case "ownersGainControl":
+    case "scrambleControl":
     case "swapCreatures":
     case "exchangeControl":
     case "playerGains":
@@ -1349,6 +1352,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
     case "revealUntil":
+    case "revealUntilPerDestroyed":
     case "banName":
       return runNamesEffect(s, e, ctx, src);
     case "venture":

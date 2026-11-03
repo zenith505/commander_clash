@@ -1521,6 +1521,25 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       return;
     }
+    case "scrambleControl": {
+      // One random pick per permanent, any living player (rulings); then each player's own effect for those they got
+      // (CR 613.1b), all at the same time; then each of them untaps, whoever got it (rulings).
+      const who = livingPlayers(s);
+      const picked = s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      const byPlayer = new Map<PlayerId, ObjectId[]>();
+      for (const id of picked) {
+        const to = who[Math.floor(nextRandom(s) * who.length)]!;
+        byPlayer.set(to, [...(byPlayer.get(to) ?? []), id]);
+      }
+      for (const [to, affected] of byPlayer) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
+        log(s, `${player(s, to).name} is chosen at random for ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      }
+      invalidateCharacteristics(s);
+      for (const id of picked) if (obj(s, id).zone === "battlefield" && obj(s, id).tapped) untapPermanent(s, obj(s, id));
+      if (!picked.length) log(s, `${src}: there's no nonland permanent.`);
+      return;
+    }
     case "groupRules": {
       s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: e.duration, ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}), affected: [], group: e.affects, mods: e.mods });
       invalidateCharacteristics(s);

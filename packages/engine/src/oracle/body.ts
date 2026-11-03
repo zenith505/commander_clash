@@ -6373,7 +6373,79 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
-    const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
+    // Memories Returning: "Reveal the top five cards of your library. Put one of them into your hand. Then choose an
+    // opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the bottom
+    // of your library. Put the other into your hand."
+    const memories = new RegExp(`^Reveal the top ${NUM} cards of your library$`).exec(s);
+    const memoriesRest = ["Put one of them into your hand", "Then choose an opponent", "They put one on the bottom of your library", "Then you put one into your hand", "Then they put one on the bottom of your library", "Put the other into your hand"];
+    if (memories && num(memories[1]!) === 5 && !ctx.chosenOpponent && memoriesRest.every((x, i) => sentences[si + 1 + i]?.replace(/\.$/, "") === x)) {
+      effects.push({ type: "alternatePicks", n: 5, steps: ["hand", "bottom", "hand", "bottom", "hand"] });
+      si += memoriesRest.length;
+      continue;
+    }
+    // Master of Predicaments, after "Whenever ~ deals combat damage to a player": "choose a card in your hand. That player
+    // guesses whether the card's mana value is greater than 4. If the player guessed wrong, you may cast the card without
+    // paying its mana cost." (rulings: a land can't be cast; a split card's mana value is both halves').
+    const guessMv = ctx.eventPlayer && /^[Cc]hoose a card in your hand$/.test(s) ? new RegExp(`^That player guesses whether the card's mana value is greater than ${NUM}\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (guessMv && /^If the player guessed wrong, you may cast the card without paying its mana cost\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "predicament", who: { ref: "eventPlayer" }, over: num(guessMv[1]!) });
+      si += 2;
+      continue;
+    }
+    // Guided Passage: "Reveal the cards in your library. An opponent chooses from among them a creature card, a land card,
+    // and a noncreature, nonland card. You put the chosen cards into your hand. Then shuffle.": an opponent you choose
+    // picks one of each kind you have (none of a kind you have none of, rulings), seeing the whole library (rulings).
+    if (/^Reveal the cards in your library$/.test(s) && /^An opponent chooses from among them a creature card, a land card, and a noncreature, nonland card\.?$/.test(sentences[si + 1] ?? "") && /^You put the chosen cards into your hand\.?$/.test(sentences[si + 2] ?? "") && /^(?:Then )?[Ss]huffle\.?$/.test(sentences[si + 3] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer) return null;
+      const kinds = ["creature card", "land card", "noncreature, nonland card"].map((w) => parseSearchFilter(w));
+      if (kinds.some((f) => !f || f.kind !== "card")) return null;
+      const anyOf = kinds as TargetSpec[];
+      effects.push(
+        { type: "choose", choice: "opponent" },
+        { type: "dig", n: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, reveal: true, count: 3, upTo: false, required: true, oneOfEach: anyOf, filter: { kind: "card", anyOf, text: "creature card, land card, and noncreature, nonland card" }, into: "hand", rest: "shuffle", chooser: { ref: "chosenPlayer" } },
+      );
+      ctx.chosenOpponent = true;
+      si += 3;
+      continue;
+    }
+    // Indomitable Creativity, after "Destroy X target artifacts and/or creatures": "For each permanent destroyed this way, its
+    // controller reveals cards from the top of their library until an artifact or creature card is revealed and exiles that
+    // card. Those players put the exiled cards onto the battlefield, then shuffle." Each destroyed permanent's controller
+    // as it last existed, once for each (one put elsewhere than a graveyard counts; one not destroyed doesn't), all the
+    // exiled cards onto the battlefield at once; a player with none destroyed doesn't reveal or shuffle (rulings).
+    const perDestroyed = /^For each permanent destroyed this way, its controller reveals cards from the top of their library until an? (.+? card) is revealed and exiles that card$/.exec(s);
+    if (perDestroyed && /^Those players put the exiled cards onto the battlefield, then shuffle\.?$/.test(sentences[si + 1] ?? "") && effects[effects.length - 1]?.type === "destroy") {
+      const filter = parseSearchFilter(perDestroyed[1]!);
+      if (!filter || filter.kind !== "card") return null;
+      effects.push({ type: "revealUntilPerDestroyed", filter });
+      si++;
+      continue;
+    }
+    // Scrambleverse: "For each nonland permanent, choose a player at random. Then each player gains control of each
+    // permanent for which they were chosen. Untap those permanents.": any player, its controller too, chosen at random
+    // for each one; all the control changes at once, indefinitely, and every one of them untaps (rulings).
+    if (/^For each nonland permanent, choose a player at random$/.test(s) && /^Then each player gains control of each permanent for which they were chosen\.?$/.test(sentences[si + 1] ?? "") && /^Untap those permanents\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "scrambleControl", filter: { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonland permanent" } });
+      si += 2;
+      continue;
+    }
+    // Talent of the Telepath: "Target opponent reveals the top seven cards of their library. You may cast an instant or
+    // sorcery spell from among them without paying its mana cost. Then that player puts the rest into their graveyard."
+    // and its spell mastery, "If there are two or more instant and/or sorcery cards in your graveyard, you may cast up to
+    // two instant and/or sorcery spells from among the revealed cards instead of one": cast from the library as it
+    // resolves, ignoring timing (CR 608.2g, rulings); the graveyard checked as it resolves, the spell itself still on the
+    // stack (rulings); the cards not cast go to their owner's graveyard (rulings).
+    const talent = new RegExp(`^(Target opponent|Target player) reveals the top ${NUM} cards of their library$`).exec(s);
+    if (talent && sentences[si + 1]?.replace(/\.$/, "") === "You may cast an instant or sorcery spell from among them without paying its mana cost" && /^Then that player puts the rest into their graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+      const who = parsePlayer(talent[1]!, ctx);
+      if (who?.ref !== "target") return null;
+      const mastery = new RegExp(`^If there are ${NUM} or more instant and/or sorcery cards in your graveyard, you may cast up to two instant and/or sorcery spells from among the revealed cards instead of one\\.?$`).exec(sentences[si + 3] ?? "");
+      const spells: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who, n: num(talent[2]!), reveal: true, filter: spells, max: 1, rest: { dest: "graveyard" }, ...(mastery ? { maxIfYard: { has: spells, min: num(mastery[1]!), max: 2 } } : {}) });
+      si += mastery ? 3 : 2;
+      continue;
+    }
+    const castAmongHead =new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
     // "You may cast an instant or sorcery spell with mana value X or less from among them ..." (Muse Vortex), "... up to
     // two sorcery spells ..." (Collected Conjuring): only so many, of those types.
     // "You may play lands and cast spells from among cards exiled this way without paying their mana costs" (Gix): lands
@@ -9942,6 +10014,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true }, text: `pay any amount of {E}. ${energyUse}` });
       si++;
+      continue;
+    }
+    // Wheel of Potential: "You get {E}{E}{E}, then you may pay any amount of {E}. Each player may exile their hand and draw
+    // a number of cards equal to the amount of {E} paid this way. If seven or more {E} was paid this way, you may play cards
+    // you own exiled this way until the end of your next turn.": X energy (0 is paying, rulings); then each player decides
+    // in turn order, those who chose exile their hands and draw X (rulings); the cards you exiled from your hand, yours
+    // (CR 400.3), may be played until the end of your next turn if X was seven or more.
+    if (anyEnergy && /^Each player may exile their hand and draw a number of cards equal to the amount of \{E\} paid this way\.?$/.test(sentences[si + 1] ?? "") && /^If seven or more \{E\} was paid this way, you may play cards you own exiled this way until the end of your next turn\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+      // The amount paid is noted for the instructions after the payment.
+      const paid: Amount = { count: { kind: "notedAmount" } };
+      effects.push(
+        { type: "may", effects: [{ type: "noteAmount", n: { count: { kind: "x" } } }], pay: {}, payX: { energy: true }, text: "pay any amount of {E}" },
+        { type: "eachMay", who: { ref: "eachPlayer" }, text: "exile your hand and draw a number of cards equal to the {E} paid", wheel: paid, effects: [{ type: "exileHand", who: { ref: "choseThisWay" }, mayPlayIfNoted: 7 }, { type: "draw", who: { ref: "choseThisWay" }, n: paid }] },
+      );
+      si += 2;
       continue;
     }
     // Localized Destruction: "You may pay one or more {E}. If you do, each creature you control with power equal to the
@@ -14072,6 +14159,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
     // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
+    // Wildfire Devils: "choose a player at random. That player exiles an instant or sorcery card from their graveyard. Copy
+    // that card. You may cast the copy without paying its mana cost.": any player, you too; the chosen player picks the
+    // card (rulings); the copy is made in exile and cast from there as this resolves, or it ceases to exist (CR 707.12,
+    // rulings). With no such card in that player's graveyard, nothing happens; no other player is chosen (rulings).
+    const devils = /^[Cc]hoose a player at random$/.test(s) ? /^That player exiles an? (.+? card) from their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (devils && /^Copy that card\.?$/.test(sentences[si + 2] ?? "") && /^You may cast the copy without paying its mana cost\.?$/.test(sentences[si + 3] ?? "")) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
+      const filter = parseSearchFilter(devils[1]!);
+      if (!filter || filter.kind !== "card" || !filter.types?.length || filter.types.some((t) => t !== "Instant" && t !== "Sorcery")) return null;
+      effects.push({ type: "choose", choice: "opponent", random: true, anyPlayer: true }, { type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, chooser: { ref: "chosenPlayer" } } });
+      si += 3;
+      continue;
+    }
     if (/^[Cc]hoose an opponent at random$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
       effects.push({ type: "choose", choice: "opponent", random: true });

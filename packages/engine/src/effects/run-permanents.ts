@@ -1491,6 +1491,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // The affected set is locked in now (CR 611.2c).
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).
       // Rootwater Matriarch: an unenchanted creature isn't affected at all (rulings).
+      // Stiltzkin, Moogle Merchant: "If they do" asks whether the player gained control of it (set below).
+      if (e.setsDid && s.resolving) s.resolving.did = false;
       const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId) && (!e.whileEnchanted || isEnchanted(s, id)));
       if (s.resolving) s.resolving.affected = affected.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
       if (s.resolving && e.mods.some((m) => m.kind === "goad")) s.resolving.goadedThisWay = affected.length;
@@ -1561,6 +1563,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : untilCast ? ` until ${src} is cast from exile` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+      }
+      if (e.setsDid && giveTo !== undefined && s.resolving) {
+        invalidateCharacteristics(s);
+        s.resolving.did = affected.some((id) => obj(s, id).zone === "battlefield" && controllerOf(s, obj(s, id)) === giveTo);
       }
       return;
     }

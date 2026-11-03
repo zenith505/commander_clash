@@ -1224,6 +1224,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
   // (rulings), the same as "Choose an opponent. That player gains control of ~."
   if (opts.selfIt || !/\bit\b/.test(text)) text = text.replace(/^[Aa]n opponent gains control of (?:~|it)\.$/, "Choose an opponent. That player gains control of ~.");
+  // Discerning Financier: "Choose another player. That player gains control of target Treasure you control.": with no teams,
+  // every other player is an opponent (CR 102.3), so the same as "Choose an opponent."
+  text = text.replace(/^Choose another player\. (?=That player gains control of target [^.]+ you control\.)/, "Choose an opponent. ");
   // Liliana's Triumph: "Each opponent sacrifices a creature of their choice. If you control a Liliana planeswalker, each
   // opponent also discards a card.": "also" says only that it's in addition to the sacrifice.
   text = text.replace(/(\. If you control an? [A-Z][a-z]+ planeswalker, each opponent) also (discards a card\.)$/, "$1 $2");
@@ -13616,6 +13619,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^After this phase, there is an additional combat phase$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Each of those creatures attacks that combat if able" && sentences[si + 2]?.replace(/\.$/, "") === "They can't attack you or planeswalkers you control that combat" && effects.some((e) => e.type === "removeFromCombat" && e.remember)) {
       effects.push({ type: "addPhases", phases: ["combat"], thoseAttack: true });
       si += 2;
+      continue;
+    }
+    // Stiltzkin, Moogle Merchant: "Target opponent gains control of another target permanent you control. If they do, you
+    // draw a card": only if that player controls it now (not with either target illegal, CR 608.2b).
+    const theyGain = /^If they do, (.+)$/.exec(s);
+    const gave = effects[effects.length - 1];
+    if (theyGain && gave?.type === "continuous" && gave.giveTo?.ref === "target" && gave.what.ref === "target" && !gave.what.n && gave.mods.length === 1 && gave.mods[0]!.kind === "control" && !gave.setsDid) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(theyGain[1]!), ctx);
+      if (!inner?.length || ctx.targets.length !== before) return null;
+      gave.setsDid = true;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);

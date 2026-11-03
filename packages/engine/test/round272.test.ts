@@ -2,11 +2,13 @@
 // only face up (a face-down card has no characteristics, CR 406.3, rulings on Runic Repetition): Rootcoil Creeper ("target
 // card with flashback you own from exile"), Runic Repetition ("target exiled card with flashback you own"), Sorceress's
 // Schemes (a card from your graveyard or an exiled one, one target), Pull from Eternity and Riftsweeper ("target face-up
-// exiled card"), Blade of the Swarm ("target exiled card with warp").
+// exiled card"), Blade of the Swarm ("target exiled card with warp"); and giving a permanent away: Stiltzkin, Moogle
+// Merchant ("If they do, you draw a card") and Discerning Financier ("Choose another player. That player gains control of
+// target Treasure you control").
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, harmfulTargets, invalidateCharacteristics, isFullySupported, legalTargets, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { act, bear, card, putOnBattlefield, setup } from "./helpers";
+import { botActions, canChooseTarget, compileCard, controllerOf, harmfulTargets, invalidateCharacteristics, isFullySupported, legalTargets, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const C = {
   rootcoil: {"oracleId":"101f06f8-7980-41d1-98fa-3cb959380737","name":"Rootcoil Creeper","manaCost":"{G}{U}","cmc":2,"typeLine":"Creature — Plant Horror","supertypes":[],"types":["Creature"],"subtypes":["Plant","Horror"],"oracleText":"{T}: Add one mana of any color.\n{T}: Add two mana of any one color. Spend this mana only to cast spells from your graveyard.\n{G}{U}, {T}, Exile this creature: Return target card with flashback you own from exile to your hand.","power":"2","toughness":"2","colors":["G","U"],"colorIdentity":["G","U"],"keywords":[],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/8/d/8d36f995-a8f2-4a61-8e79-867a70b2a499.jpg?1783924335","artUrl":"https://cards.scryfall.io/art_crop/front/8/d/8d36f995-a8f2-4a61-8e79-867a70b2a499.jpg?1783924335","commanderLegal":"legal","set":"dbl","releasedAt":"2022-01-28","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
@@ -20,6 +22,8 @@ const C = {
   sawIt: {"oracleId":"90edaf33-d0ab-47e0-8f6a-6fba38286e6e","name":"Saw It Coming","manaCost":"{1}{U}{U}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Counter target spell.\nForetell {1}{U} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)","colors":["U"],"colorIdentity":["U"],"keywords":["Foretell"],"imageUrl":"https://cards.scryfall.io/normal/front/8/7/877a1bb9-5eae-453a-bec0-a9de20ea6815.jpg?1783928256","artUrl":"https://cards.scryfall.io/art_crop/front/8/7/877a1bb9-5eae-453a-bec0-a9de20ea6815.jpg?1783928256","commanderLegal":"legal","set":"khm","releasedAt":"2021-02-05","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
   bolt: {"oracleId":"4457ed35-7c10-48c8-9776-456485fdf070","name":"Lightning Bolt","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Lightning Bolt deals 3 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","artUrl":"https://cards.scryfall.io/art_crop/front/7/6/7673784e-db4b-43a1-8d55-1bb9fc1e284f.jpg?1783903008","commanderLegal":"legal","set":"msc","releasedAt":"2026-06-26","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
   stalker: {"oracleId":"da9ec010-8b42-4927-b602-4e96bced4e99","name":"All-Fates Stalker","manaCost":"{3}{W}","cmc":4,"typeLine":"Creature — Drix Assassin","supertypes":[],"types":["Creature"],"subtypes":["Drix","Assassin"],"oracleText":"When this creature enters, exile up to one target non-Assassin creature until this creature leaves the battlefield.\nWarp {1}{W} (You may cast this card from your hand for its warp cost. Exile this creature at the beginning of the next end step, then you may cast it from exile on a later turn.)","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Warp"],"imageUrl":"https://cards.scryfall.io/normal/front/8/2/82ae4f7b-8122-4af6-8079-888eabf1a11e.jpg?1783906001","artUrl":"https://cards.scryfall.io/art_crop/front/8/2/82ae4f7b-8122-4af6-8079-888eabf1a11e.jpg?1783906001","commanderLegal":"legal","set":"eoe","releasedAt":"2025-08-01","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
+  stiltzkin: {"oracleId":"958c2a27-9fb1-42b4-a0ef-296584763a98","name":"Stiltzkin, Moogle Merchant","manaCost":"{W}","cmc":1,"typeLine":"Legendary Creature — Moogle","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Moogle"],"oracleText":"Lifelink\n{2}, {T}: Target opponent gains control of another target permanent you control. If they do, you draw a card.","power":"1","toughness":"2","colors":["W"],"colorIdentity":["W"],"keywords":["Lifelink"],"imageUrl":"https://cards.scryfall.io/normal/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","artUrl":"https://cards.scryfall.io/art_crop/front/0/6/06a972a4-0c1b-4f12-a5a5-fdea47c4cd35.jpg?1783906644","commanderLegal":"legal","set":"fin","releasedAt":"2025-06-13","rarity":"rare","layout":"normal","gameChanger":false} as CardDef,
+  financier: {"oracleId":"734a5186-caa6-4811-b6d7-91b7b32fc403","name":"Discerning Financier","manaCost":"{2}{W}","cmc":3,"typeLine":"Creature — Human Noble","supertypes":[],"types":["Creature"],"subtypes":["Human","Noble"],"oracleText":"At the beginning of your upkeep, if an opponent controls more lands than you, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{2}{W}: Choose another player. That player gains control of target Treasure you control. You draw a card.","power":"2","toughness":"3","colors":["W"],"colorIdentity":["W"],"keywords":["Treasure"],"producedMana":["B","G","R","U","W"],"imageUrl":"https://cards.scryfall.io/normal/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","artUrl":"https://cards.scryfall.io/art_crop/front/5/8/584774b5-640f-45e0-810b-f5faf119645b.jpg?1783915133","commanderLegal":"legal","set":"woe","releasedAt":"2023-09-08","rarity":"uncommon","layout":"normal","gameChanger":false} as CardDef,
 };
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -57,7 +61,7 @@ const choices = (s: GameState, def: CardDef, pid: PlayerId, which: "spell" | num
 
 describe("round 272 cards", () => {
   it("all compile fully", () => {
-    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade]) expect(isFullySupported(def), def.name).toBe(true);
+    for (const def of [C.rootcoil, C.schemes, C.runic, C.pull, C.rift, C.blade, C.stiltzkin, C.financier]) expect(isFullySupported(def), def.name).toBe(true);
   });
 });
 
@@ -209,5 +213,66 @@ describe("Blade of the Swarm: put target exiled card with warp on the bottom of 
     into(s0, opp, C.bolt, "exile");
     const s = settle(castNow(s0, ap, ids[0]!));
     expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(2);
+  });
+});
+
+describe("Stiltzkin, Moogle Merchant: target opponent gains control of another target permanent you control; if they do, draw", () => {
+  it("gives the permanent away for the rest of the game and draws a card", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const stiltzkin = putOnBattlefield(s0, ap, C.stiltzkin);
+    const bears = putOnBattlefield(s0, ap, bear());
+    const hand = s0.players[ap]!.hand.length;
+    const s = settle(run(s0, planActivate(s0, ap, stiltzkin, 0, [{ kind: "player", id: opp }, tgt(bears)])));
+    expect(controllerOf(s, s.objects[bears]!)).toBe(opp);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  it("can't give itself away (another target)", () => {
+    const { s, ap } = setup([]);
+    const stiltzkin = putOnBattlefield(s, ap, C.stiltzkin);
+    const bears = putOnBattlefield(s, ap, bear());
+    const specs = compileCard(C.stiltzkin).activated[0]!.body.targets;
+    const them: TargetChoice = { kind: "player", id: s.turnOrder.find((p) => p !== ap)! };
+    expect(canChooseTarget(s, specs, [them], 1, tgt(bears), ap, undefined, stiltzkin)).toBe(true);
+    expect(canChooseTarget(s, specs, [them], 1, tgt(stiltzkin), ap, undefined, stiltzkin)).toBe(false);
+  });
+
+  it("no card if the permanent left the battlefield first (they didn't gain control of it)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const stiltzkin = putOnBattlefield(s0, ap, C.stiltzkin);
+    const bears = putOnBattlefield(s0, ap, bear());
+    const hand = s0.players[ap]!.hand.length;
+    let s = run(s0, planActivate(s0, ap, stiltzkin, 0, [{ kind: "player", id: opp }, tgt(bears)]));
+    s.battlefield.splice(s.battlefield.indexOf(bears), 1);
+    s.objects[bears]!.zone = "graveyard";
+    s.objects[bears]!.zoneChanges = (s.objects[bears]!.zoneChanges ?? 0) + 1;
+    s.players[ap]!.graveyard.push(bears);
+    invalidateCharacteristics(s);
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+
+  it("bots don't give their permanents away with it", () => {
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, C.stiltzkin);
+    putOnBattlefield(s, ap, bear());
+    expect(botActions(s, ap).some((a) => a.type === "activate")).toBe(false);
+  });
+});
+
+describe("Discerning Financier: choose another player; that player gains control of target Treasure you control", () => {
+  it("the chosen opponent gets the Treasure and you draw a card", () => {
+    const { s: s0, ap } = setup([]);
+    const financier = putOnBattlefield(s0, ap, C.financier);
+    const treasure = putOnBattlefield(s0, ap, card("Treasure", "Artifact — Treasure"));
+    const hand = s0.players[ap]!.hand.length;
+    let s = run(s0, planActivate(s0, ap, financier, 0, [tgt(treasure)]));
+    for (let i = 0; i < 50 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.player).toBe(ap);
+    s = settle(s);
+    const to = controllerOf(s, s.objects[treasure]!);
+    expect(to).not.toBe(ap);
+    expect(s.turnOrder).toContain(to);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
   });
 });

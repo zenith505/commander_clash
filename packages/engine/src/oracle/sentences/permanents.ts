@@ -34,6 +34,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Turn target face-down creature face up" (CR 708.8), "you may turn a face-down creature you control face up" (Ugin's
   // Mastery): chosen as it resolves (CR 608.2d), with no cost paid.
   let fu: RegExpExecArray | null;
+  // Cyber Conversion: "Turn target creature face down. It's a 2/2 Cyberman artifact creature." (joined by parseBody).
+  if ((fu = /^[Tt]urn (target creature) face down as a 2\/2 Cyberman artifact creature$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "turnFaceDown", what, as: "cyberman" }] : null;
+  }
+  // Wall of Deceit, Mischievous Quanar, Obscuring Aether: "Turn ~ face down" (an activated ability of its own): a 2/2 with
+  // no text (CR 708.2a).
+  if (/^[Tt]urn ~ face down$/.test(s)) return [{ type: "turnFaceDown", what: { ref: "self" }, as: "morph" }];
   if ((fu = /^[Tt]urn (target face-down .+?) face up$/.exec(s))) {
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;

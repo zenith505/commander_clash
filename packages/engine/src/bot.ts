@@ -4277,6 +4277,10 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "phaseOut":
         v += e.what.ref === "target" ? 3 : 0;
         break;
+      // Cyber Conversion: an opponent's creature becomes a vanilla 2/2 (CR 708.2).
+      case "turnFaceDown":
+        v += e.what.ref === "target" ? 6 : 0;
+        break;
       case "putOntoBattlefield":
         v += 8;
         break;

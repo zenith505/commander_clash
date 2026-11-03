@@ -4003,6 +4003,8 @@ function LibrarySearch({
                 ? `${pending.source}: exile ${pending.what} from your hand`
                 : pending.fromHand && pending.manifest
                 ? `${pending.source}: ${pending.cloak ? "cloak" : "manifest"} ${pending.what} from your hand (each a face-down 2/2 creature${pending.cloak ? " with ward {2}" : ""})`
+                : pending.fromHand && pending.swap
+                ? `${pending.source}: you may exchange it with ${pending.what} from your hand (aura swap)`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile" && pending.copiedBy !== undefined

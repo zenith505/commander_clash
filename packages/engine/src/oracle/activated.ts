@@ -1,11 +1,11 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type AmountExpr, type Effect, type TargetSpec } from "../abilities";
-import { NUM, num, X, sacrificeSelf, counterKind, singular } from "./words";
+import { NUM, NUMBER_WORDS, num, X, sacrificeSelf, counterKind, singular } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { blightCost, parseAdditionalCost } from "./keyword-abilities";
 import { parseTargetPhrase, pickFilter } from "./targets";
-import { parseOnlyClauses, parseStaticCondition } from "./statics";
+import { parseActivateCondition, parseOnlyClauses, parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import type { ManaType } from "../types";
 
@@ -441,6 +441,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
       found = true;
     }
+    // Atalya, Samite Master: "Choose one — • ... Spend only white mana on X. • ... Spend only white mana on X.": every mode
+    // says it, so it holds whichever is chosen, read as for one ability (below).
+    const modesOnX = /^Choose one — /.test(effectText) && !spendOnly ? effectText.split(" • ").slice(1).map((mode) => / Spend only (white|blue|black|red|green) mana on X\.$/.exec(mode)?.[1]) : [];
+    if (modesOnX.length > 1 && modesOnX.every((c) => c && c === modesOnX[0])) effectText = `${effectText.replaceAll(` Spend only ${modesOnX[0]} mana on X. •`, " •").replace(new RegExp(` Spend only ${modesOnX[0]} mana on X\\.$`), "")} Spend only ${modesOnX[0]} mana on X.`;
     // "Spend only black mana on X." (Crypt Rats, Crimson Hellkite): with {X} the whole mana cost, all of it (CR 107.3).
     const onlyOnX = / Spend only (white|blue|black|red|green) mana on X\.$/.exec(effectText);
     if (onlyOnX && !spendOnly) {
@@ -731,11 +735,17 @@ export function manaAbilityKind(body: AbilityBody): "mana" | "stack" | "fail" {
 export function parseLoyalty(sign: string, amount: string, effectText: string, raw: string): ActivatedAbility | "fail" {
   const minus = sign === "−" || sign === "-";
   if (amount === "X" && !minus) return "fail";
+  // Jace, Reality Sculptor: "Activate only if there are twenty-five or more loyalty counters among Jaces you control"
+  // (CR 602.5b), checked as it's activated, on top of the loyalty ability's own timing (CR 606.3).
+  const onlyIf = / Activate only if ([^.]+)\.$/.exec(effectText);
+  const activateIf = onlyIf ? parseActivateCondition(onlyIf[1]!.replace(/\b(twenty|thirty|forty|fifty)-(one|two|three|four|five|six|seven|eight|nine)\b/g, (_, t: string, u: string) => String(NUMBER_WORDS[t]! + NUMBER_WORDS[u]!))) : undefined;
+  if (activateIf === null) return "fail";
+  if (onlyIf) effectText = effectText.slice(0, onlyIf.index);
   const body = parseBody(effectText, { activated: true });
   if (!body) return "fail";
   if (usesX(body) && amount !== "X") return "fail";
   const n = Number(amount);
-  return { manaCost: "", tap: false, sacrificeSelf: false, sorcerySpeed: true, body, text: raw, ...(amount === "X" ? { loyaltyX: true } : { loyalty: minus ? -n : n }) };
+  return { manaCost: "", tap: false, sacrificeSelf: false, sorcerySpeed: true, body, text: raw, ...(amount === "X" ? { loyaltyX: true } : { loyalty: minus ? -n : n }), ...(activateIf ? { activateIf } : {}) };
 }
 
 /** How much energy "Pay {E}{E}" or "Pay eight {E}" asks for (CR 107.14), or 0. */

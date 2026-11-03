@@ -965,6 +965,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[1] === "~" ? "~'s" : m[1] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
+  // Flesh // Blood: "where X is the power of the card you exiled": the one card targeted, as it last existed in the
+  // graveyard (rulings), as Lobelia's "the exiled card's power".
+  if ((m = /^the (power|toughness) of the card you exiled$/.exec(p)) && ctx) {
+    const of = whoseObject("the exiled card's", ctx);
+    return of?.ref === "target" ? count({ kind: m[1] as "power" | "toughness", of }) : null;
+  }
   // Death's Presence: "where X is the power of the creature that died": the trigger's subject as it last existed on the
   // battlefield (rulings, CR 603.10a).
   if ((m = /^the (power|toughness) of the creature that died$/.exec(p)) && ctx?.subjectIt) return count({ kind: m[1] as "power" | "toughness", of: { ref: "subject" } });
@@ -985,10 +991,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
   // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
   // Deepwood Denizen: "for each +1/+1 counter on creatures you control", the same.
-  // Bioessence Hydra: "for each loyalty counter on planeswalkers you control", the same.
+  // Bioessence Hydra: "for each loyalty counter on planeswalkers you control", the same. Jace, Reality Sculptor: "loyalty
+  // counters among Jaces you control", Jace planeswalkers, tokens or not.
   // Gleam of Authority: "for each +1/+1 counter on other creatures you control" (an Aura's: other than the enchanted
   // creature, statics.ts ofAffected); Ascendant Acolyte: "among other creatures you control".
-  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|planeswalkers|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
+  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|planeswalkers|artifacts and creatures|Sagas|Jaces) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }

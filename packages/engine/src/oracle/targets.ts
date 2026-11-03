@@ -1573,6 +1573,12 @@ export function parseTargetPhrase(
     extra.enteredUnderYou = true;
     p = p.slice(0, enteredYours.index);
   }
+  // Kaust, Eyes of the Glade: "a creature you control that was turned face up this turn" (CR 708.8), as this object.
+  const turnedUp = / that was turned face up this turn$/.exec(p);
+  if (turnedUp) {
+    extra.turnedFaceUpThisTurn = true;
+    p = p.slice(0, turnedUp.index);
+  }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
   if (entered) {
@@ -1977,7 +1983,8 @@ export function parseTargetPhrase(
   }
   // "A face-down creature you control" (Ugin's Mastery, CR 708.2); "face-up nontoken creatures you control" (Whisperwood
   // Elemental): not face down.
-  if ((m = /^face-(down|up) (?=permanent|creature|nontoken creature)/.exec(p))) {
+  // Kaust, Eyes of the Glade: "face-down attacking creature you control".
+  if ((m = /^face-(down|up) (?=permanent|creature|nontoken creature|attacking creature)/.exec(p))) {
     extra.faceDown = m[1] === "down";
     p = p.slice(m[0].length);
   }

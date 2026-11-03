@@ -10322,6 +10322,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cd54438d-7f9d-4d80-b15b-0f0bf4becc15",
+  "name": "Inferno of the Star Mounts",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "This spell can't be countered.\nFlying, haste\n{R}: Inferno of the Star Mounts gets +1/+0 until end of turn. When its power becomes 20 this way, it deals 20 damage to any target.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "760e8561-4ec6-4594-ba5d-f79cb9f25fd0",
   "name": "Inscription of Ruin",
   "manaCost": "{2}{B}",
@@ -12871,6 +12906,39 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c65c4d01-29da-47e6-993c-a265cf1f198c",
+  "name": "Long River Lurker",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Frog Scout",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Frog",
+   "Scout"
+  ],
+  "oracleText": "Ward {1}\nOther Frogs you control have ward {1}.\nWhen this creature enters, target creature you control can't be blocked this turn. Whenever that creature deals combat damage this turn, you may exile it. If you do, return it to the battlefield under its owner's control.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

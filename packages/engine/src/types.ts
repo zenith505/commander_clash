@@ -2228,6 +2228,8 @@ export interface Resolving {
   attachedThisWay?: ObjectId[];
   /** The permanents its last continuous effect changed, for "untap those creatures" after it (ObjRef "affected"). */
   affected?: { id: ObjectId; zc: number }[];
+  /** Inferno of the Star Mounts: ~'s power just before a continuous effect with `notePower` applied (undefined if it wasn't on the battlefield). */
+  powerBefore?: number;
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
   /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */

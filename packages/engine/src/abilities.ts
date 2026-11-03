@@ -3254,7 +3254,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -3326,7 +3326,7 @@ export type Effect =
    * toughness of those creatures, and ...": chosen as it resolves (not targeted, CR 608.2d), then one of them copied.
    */
   | { type: "copyChosenPerOpponent"; filter: TargetSpec; except: CopyExcept }
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true; /** An embalm ability's: the tokens are "embalmed" (CR 702.128b). */ embalmed?: true; /** With `each`: "its controller creates a token that's a copy of that creature" (Parallel Evolution), each copy for the copied permanent's controller, not `who`. */ eachController?: true }
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true; /** An embalm ability's: the tokens are "embalmed" (CR 702.128b). */ embalmed?: true; /** With `each`: "its controller creates a token that's a copy of that creature" (Parallel Evolution), each copy for the copied permanent's controller, not `who`. */ eachController?: true; /** Ochre Jelly: "a copy of it at the beginning of the next end step. The token enters with half that many +1/+1 counters on it, rounded down": copy ~ as it last existed on the battlefield (CR 608.2h), with half the counters of that kind it had then; filled in as the delayed trigger is made (`copyKey`, `except`). */ lkiCopy?: { halfCounters: CounterKind }; /** The copiable values to copy, a key into GameState.cards (see `lkiCopy`). */ copyKey?: string }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
@@ -4432,6 +4432,8 @@ export type SpellCondition =
    * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
    */
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
+  /** Inferno of the Star Mounts: "When its power becomes 20 this way": the continuous effect before (with `notePower`) changed ~'s power from something else to exactly `n` (rulings: not 21 or more, not another way). */
+  | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
@@ -5257,6 +5259,8 @@ export interface TriggeredAbility {
   ifNoCounter?: string;
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
   ifHadCounter?: string;
+  /** With `ifHadCounter`: "if it had two or more +1/+1 counters on it" (Ochre Jelly): at least this many of that kind. */
+  ifHadCounterMin?: number;
   /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
   ifDamagedThisTurn?: number;
   /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
@@ -6864,6 +6868,8 @@ export interface CompiledCard {
    * skips the state-based action of CR 704.5a while it's on the battlefield; they can still lose any other way.
    */
   noZeroLifeLoss?: true;
+  /** With `noZeroLifeLoss`: "As long as ~ is attached to a creature" (Pact Weapon): only while it is. */
+  noZeroLifeLossAttached?: true;
   cantWin?: "you" | "opponents";
   /**
    * The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1." A replacement effect

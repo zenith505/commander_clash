@@ -1398,6 +1398,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       // Dulcet Sirens: with its target opponent illegal, the creature isn't made to attack anyone (rulings).
       if (e.mods.some((m) => m.kind === "mustAttackPlayer" && typeof m.player === "object" && !ctx.legal[m.player.target])) return;
+      // Inferno of the Star Mounts: its power as this begins, for "when its power becomes 20 this way" after it.
+      if (e.notePower && s.resolving) {
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        s.resolving.powerBefore = me?.zone === "battlefield" ? power(s, me) : undefined;
+      }
       // The affected set is locked in now (CR 611.2c).
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).
       // Rootwater Matriarch: an unenchanted creature isn't affected at all (rulings).

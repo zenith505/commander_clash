@@ -132,6 +132,18 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Mechtitan Core: the permanents its cost exiled.
       const costExiled = s.resolving?.item.costExiled ?? [];
       const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x.type === "returnExiled" && x.fromCost ? { ...x, cards: costExiled } : x.type === "exileRemembered" ? { ...x, cards: (s.resolving?.created ?? []).map((c) => ({ id: c, zc: s.objects[c]?.zoneChanges ?? 0 })) } : x));
+      // Ochre Jelly: a copy of ~ as it last existed on the battlefield, with half the counters of that kind it had then,
+      // rounded down (CR 608.2h): both known now, from the dies trigger's last known information.
+      for (const [i, x] of effects.entries())
+        if (x.type === "createTokenCopy" && x.lkiCopy) {
+          const { lkiCopy, ...rest } = x;
+          // ~ as it last existed on the battlefield, the zone change before the one that put it in the graveyard.
+          const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+          const copyKey = lk && ctx.sourceZc !== undefined && lk.zc === ctx.sourceZc - 1 ? lk.copyKey : undefined;
+          if (!copyKey || !ctx.lki) return;
+          const n = Math.floor((ctx.lki.counters?.[lkiCopy.halfCounters] ?? 0) / 2);
+          effects[i] = { ...rest, copyKey, ...(n > 0 ? { except: { ...rest.except, enterCounters: [...(rest.except?.enterCounters ?? []), { counter: lkiCopy.halfCounters, n }] } } : {}) };
+        }
       // Venomous Breath: "destroy all creatures that blocked or were blocked by it this turn": the target as it is now.
       for (const [i, x] of effects.entries())
         if ("what" in x && x.what && typeof x.what === "object" && "ref" in x.what && x.what.ref === "blockHistory" && !x.what.at) {
@@ -253,6 +265,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      // Ochre Jelly's token: it ceased to exist in the graveyard (CR 704.5d, 111.7), but what the delayed trigger copies
+      // is already known (createTokenCopy.copyKey), so it's made about the object that was.
+      else if (id && effects.some((x) => x.type === "createTokenCopy" && x.copyKey)) {
+        const key = effects.find((x) => x.type === "createTokenCopy" && x.copyKey)!;
+        (s.delayed ??= []).push({ when: e.when as DelayedTrigger["when"], controller: ctx.controller, sourceCardId: (key as { copyKey: string }).copyKey, subject: { id, zc: ctx.sourceZc ?? 0 }, body, turn: s.turn, step: s.step });
+      }
       // "At this turn's next end of combat" (Venomous Breath): never on a later turn.
       if (o && e.thisTurn && e.when === "endOfCombat") s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
       // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.

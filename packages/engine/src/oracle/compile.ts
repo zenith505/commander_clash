@@ -3730,6 +3730,13 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "You don't lose the game for having 0 or less life" (CR 704.5a); Marina Vendrell's Grimoire says both at once.
+    // Pact Weapon: "As long as ~ is attached to a creature, you don't lose ...": whoever controls the Equipment, whoever
+    // controls the creature (rulings).
+    if (line === "As long as ~ is attached to a creature, you don't lose the game for having 0 or less life.") {
+      out.noZeroLifeLoss = true;
+      out.noZeroLifeLossAttached = true;
+      continue;
+    }
     const zeroLife = /^You (have no maximum hand size and )?don't lose the game for having 0 or less life\.$/.exec(line);
     if (zeroLife) {
       if (zeroLife[1]) out.noMaxHandSize = out.noMaxHandSize || true;

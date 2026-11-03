@@ -688,6 +688,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.digTook
             : e.cond.kind === "searchFound"
             ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
+            : e.cond.kind === "shuffledInThisWay"
+            ? !!s.resolving!.shuffledIn?.length
             : e.cond.kind === "bouncedThisWay"
             ? ((c) => !!s.resolving!.bouncedThisWay?.some((b) => (!c.subtype || b.subtypes.includes(c.subtype)) && (!c.another || b.id !== ctx.sourceId) && (!c.returned || !!(b as { returned?: true }).returned)))(e.cond as Extract<SpellCondition, { kind: "bouncedThisWay" }>)
             : e.cond.kind === "excessDealt"
@@ -863,6 +865,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((option) => { const chose = Object.entries(s.resolving!.chose ?? {}).filter(([p]) => !player(s, Number(p)).lost); return chose.length > 0 && chose.every(([, w]) => w === option); })(e.cond.option)
             : e.cond.kind === "amountNow"
             ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
+            : e.cond.kind === "powerBecame"
+            ? ((me, n) => s.resolving!.powerBefore !== undefined && s.resolving!.powerBefore !== n && me?.zone === "battlefield" && power(s, me) === n)(objects(s, { ref: "self" }, ctx)[0], e.cond.n)
             : e.cond.kind === "amountsCompare"
             ? amountNow(s, e.cond.a, ctx) >= amountNow(s, e.cond.atLeast, ctx)
             : e.cond.kind === "xAtLeast"

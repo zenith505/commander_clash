@@ -5115,11 +5115,11 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && pending.what === "copy" && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "copy" || pending.what === "copyOther") && pending.player === HUMAN)
     return (
       <div className="controls copy-pick">
         <span>
-          <strong>{pending.source}:</strong> enter as a copy of
+          <strong>{pending.source}:</strong> {pending.prompt ?? "enter as a copy of"}
         </span>
         {pending.options.map((o, i) => (
           <button

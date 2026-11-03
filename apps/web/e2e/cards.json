@@ -10348,6 +10348,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cd54438d-7f9d-4d80-b15b-0f0bf4becc15",
+  "name": "Inferno of the Star Mounts",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "This spell can't be countered.\nFlying, haste\n{R}: Inferno of the Star Mounts gets +1/+0 until end of turn. When its power becomes 20 this way, it deals 20 damage to any target.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "760e8561-4ec6-4594-ba5d-f79cb9f25fd0",
   "name": "Inscription of Ruin",
   "manaCost": "{2}{B}",
@@ -11215,6 +11250,39 @@
   "commanderLegal": "legal",
   "set": "sok",
   "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "17fd42f6-f388-4ffc-8fec-ca9ada2506ee",
+  "name": "Kaito, Dancing Shadow",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Kaito",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kaito"
+  ],
+  "oracleText": "Whenever one or more creatures you control deal combat damage to a player, you may return one of them to its owner's hand. If you do, you may activate loyalty abilities of Kaito twice this turn rather than only once.\n+1: Up to one target creature can't attack or block until your next turn.\n0: Draw a card.\n−2: Create a 2/2 colorless Drone artifact creature token with deathtouch and \"When this token leaves the battlefield, each opponent loses 2 life and you gain 2 life.\"",
+  "loyalty": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -12920,6 +12988,39 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c65c4d01-29da-47e6-993c-a265cf1f198c",
+  "name": "Long River Lurker",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Frog Scout",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Frog",
+   "Scout"
+  ],
+  "oracleText": "Ward {1}\nOther Frogs you control have ward {1}.\nWhen this creature enters, target creature you control can't be blocked this turn. Whenever that creature deals combat damage this turn, you may exile it. If you do, return it to the battlefield under its owner's control.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22004,6 +22105,42 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839"
    }
   ]
+ },
+ {
+  "oracleId": "55123455-d435-46d4-b0cd-0c1614343be2",
+  "name": "The Mimeoplasm",
+  "manaCost": "{2}{B}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Ooze",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ooze"
+  ],
+  "oracleText": "As The Mimeoplasm enters, you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card.",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "b981af39-4ee6-4fbc-9a89-618dcad9dfbf",

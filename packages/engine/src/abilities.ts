@@ -1343,6 +1343,7 @@ export type PlayerRef =
   | { ref: "attackedThisTurnBySelf" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
   | { ref: "subjectOwner" } // "its owner": whose the object the trigger was about is (CR 108.3)
+  | { ref: "sourceOwner" } // "~'s owner" (Mirror-Mad Phantasm): whose the ability's source is (CR 108.3)
   /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */
   | { ref: "target"; index: number; n?: number }
   | { ref: "eachOpponent" }
@@ -3262,7 +3263,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true }
+  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -3334,7 +3335,7 @@ export type Effect =
    * toughness of those creatures, and ...": chosen as it resolves (not targeted, CR 608.2d), then one of them copied.
    */
   | { type: "copyChosenPerOpponent"; filter: TargetSpec; except: CopyExcept }
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true; /** An embalm ability's: the tokens are "embalmed" (CR 702.128b). */ embalmed?: true; /** With `each`: "its controller creates a token that's a copy of that creature" (Parallel Evolution), each copy for the copied permanent's controller, not `who`. */ eachController?: true }
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true; /** An embalm ability's: the tokens are "embalmed" (CR 702.128b). */ embalmed?: true; /** With `each`: "its controller creates a token that's a copy of that creature" (Parallel Evolution), each copy for the copied permanent's controller, not `who`. */ eachController?: true; /** Ochre Jelly: "a copy of it at the beginning of the next end step. The token enters with half that many +1/+1 counters on it, rounded down": copy ~ as it last existed on the battlefield (CR 608.2h), with half the counters of that kind it had then; filled in as the delayed trigger is made (`copyKey`, `except`). */ lkiCopy?: { halfCounters: CounterKind }; /** The copiable values to copy, a key into GameState.cards (see `lkiCopy`). */ copyKey?: string }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
@@ -4032,7 +4033,7 @@ export type Effect =
    * a replacement effect for the rest of the turn (CR 106.12b, 614.1a; GameState.landManaRules).
    */
   | { type: "landManaUntilEndOfTurn"; mana: ManaType; nonbasic?: true; yours?: true }
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[]; /** About the ability's source, the object it is now (Kaito, Dancing Shadow's "loyaltyTwice"). */ self?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
   /**
@@ -4304,7 +4305,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -4376,6 +4377,8 @@ export type SpellCondition =
    * `cards`: "When ~ dies, exile it. When you do, ..." (Glissa's Retriever): they exiled a card from a graveyard instead. */
   | { kind: "exiledThisWay"; cards?: true }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
+  /** "~'s owner shuffles it into their library. If that player does, ..." (Mirror-Mad Phantasm): its shuffleIntoLibrary of the source put it into a library (a token too: it went there before ceasing to exist, rulings). */
+  | { kind: "shuffledInThisWay" }
   | { kind: "bouncedThisWay"; subtype?: string; another?: true; /** Mistbreath Elder: "Return another creature you control to its owner's hand. If you do, ...": one went to its owner's hand (not a commander sent to the command zone instead). */ returned?: true }
   /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
   | { kind: "returnedYoursAtLeast"; n: number }
@@ -4457,6 +4460,8 @@ export type SpellCondition =
    * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
    */
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
+  /** Inferno of the Star Mounts: "When its power becomes 20 this way": the continuous effect before (with `notePower`) changed ~'s power from something else to exactly `n` (rulings: not 21 or more, not another way). */
+  | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
@@ -5282,6 +5287,8 @@ export interface TriggeredAbility {
   ifNoCounter?: string;
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
   ifHadCounter?: string;
+  /** With `ifHadCounter`: "if it had two or more +1/+1 counters on it" (Ochre Jelly): at least this many of that kind. */
+  ifHadCounterMin?: number;
   /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
   ifDamagedThisTurn?: number;
   /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
@@ -6391,7 +6398,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
@@ -6891,6 +6898,8 @@ export interface CompiledCard {
    * skips the state-based action of CR 704.5a while it's on the battlefield; they can still lose any other way.
    */
   noZeroLifeLoss?: true;
+  /** With `noZeroLifeLoss`: "As long as ~ is attached to a creature" (Pact Weapon): only while it is. */
+  noZeroLifeLossAttached?: true;
   cantWin?: "you" | "opponents";
   /**
    * The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1." A replacement effect

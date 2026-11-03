@@ -2572,6 +2572,35 @@ export function compile(d: CardDef): CompiledCard {
       out.extraLandsEach = (out.extraLandsEach ?? 0) + 1;
       continue;
     }
+    // Mirror-Mad Phantasm: "{1}{U}: ~'s owner shuffles it into their library. If that player does, they reveal cards from the
+    // top of that library until a card named ~ is revealed. ...": the owner (rulings: you activate it only while you control
+    // it, even if you don't own it), and the card named Mirror-Mad Phantasm whoever has the ability (rulings on Necrotic
+    // Ooze); none revealed (a token or a copy shuffled in), the whole library into the graveyard (rulings).
+    if (line === "{1}{U}: ~'s owner shuffles it into their library. If that player does, they reveal cards from the top of that library until a card named ~ is revealed. The player puts that card onto the battlefield and all other cards revealed this way into their graveyard.") {
+      out.activated.push({
+        manaCost: "{1}{U}",
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        body: {
+          targets: [],
+          effects: [
+            { type: "shuffleIntoLibrary", what: { ref: "self" } },
+            { type: "if", cond: { kind: "shuffledInThisWay" }, effects: [{ type: "revealUntil", filter: { kind: "card", named: d.name, text: `card named ${d.name}` }, found: "battlefield", rest: "graveyard", who: { ref: "sourceOwner" } }] },
+          ],
+          text: line.slice(line.indexOf(": ") + 2),
+        },
+        text: line,
+      });
+      continue;
+    }
+    // The Mimeoplasm: "As ~ enters, you may exile two creature cards from graveyards. If you do, it enters as a copy of one
+    // of those cards with a number of additional +1/+1 counters on it equal to the power of the other card." Two cards
+    // from any graveyards, the same one too; its controller chooses which one it copies; not just one (rulings).
+    if (line === "As ~ enters, you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card.") {
+      out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: "creature card in a graveyard" }, exileTwo: true };
+      continue;
+    }
     // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
@@ -3709,6 +3738,13 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "You don't lose the game for having 0 or less life" (CR 704.5a); Marina Vendrell's Grimoire says both at once.
+    // Pact Weapon: "As long as ~ is attached to a creature, you don't lose ...": whoever controls the Equipment, whoever
+    // controls the creature (rulings).
+    if (line === "As long as ~ is attached to a creature, you don't lose the game for having 0 or less life.") {
+      out.noZeroLifeLoss = true;
+      out.noZeroLifeLossAttached = true;
+      continue;
+    }
     const zeroLife = /^You (have no maximum hand size and )?don't lose the game for having 0 or less life\.$/.exec(line);
     if (zeroLife) {
       if (zeroLife[1]) out.noMaxHandSize = out.noMaxHandSize || true;

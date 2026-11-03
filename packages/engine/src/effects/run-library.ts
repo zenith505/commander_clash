@@ -1073,7 +1073,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const o of objects(s, e.what, ctx)) {
           owners.add(o.owner);
           log(s, `${src} shuffles ${defOf(s, o).name} into its owner's library.`);
+          const token = o.isToken;
           moveObject(s, o.id, "library");
+          // "If that player does" (Mirror-Mad Phantasm): it went there, a token too (rulings), not a commander put into the command zone instead.
+          if (s.resolving && (token || s.objects[o.id]?.zone === "library")) (s.resolving.shuffledIn ??= []).push(o.id);
         }
       }
       for (const pid of apnap(s, [...owners])) {

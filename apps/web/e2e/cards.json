@@ -1121,6 +1121,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b8cc7a78-a627-4e56-b1fc-0b2bd844ef68",
+  "name": "Arcanum Wings",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has flying.\nAura swap {2}{U} ({2}{U}: Exchange this Aura with an Aura card in your hand.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Aura Swap",
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff5caed4-0276-476d-8fae-edae2536df7f",
   "name": "Archangel of Tithes",
   "manaCost": "{1}{W}{W}{W}",
@@ -5324,6 +5355,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "48bf020e-45b9-4c27-82e0-80d942656a67",
+  "name": "Darksteel Garrison",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Fortification",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Fortification"
+  ],
+  "oracleText": "Fortified land has indestructible.\nWhenever fortified land becomes tapped, target creature gets +1/+1 until end of turn.\nFortify {3} ({3}: Attach to target land you control. Fortify only as a sorcery. This card enters unattached and stays on the battlefield if the land leaves.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Fortify"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1c2dbe2-fbe0-4058-bdf1-91d1b1832786",
   "name": "Dauthi Voidwalker",
   "manaCost": "{B}{B}",
@@ -6375,6 +6432,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b3b9a87d-cb95-435c-90b6-037406cab32e",
+  "name": "Elite Vanguard",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "40c88392-2aa7-4e12-86a4-8d680219e670",
   "name": "Elspeth Conquers Death",
   "manaCost": "{3}{W}{W}",
@@ -6804,6 +6892,38 @@
   "commanderLegal": "legal",
   "set": "sok",
   "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5def9f38-0a0b-4e8d-9f9d-29dcb46520b4",
+  "name": "Esper Sentinel",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Artifact Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is this creature's power.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -8079,6 +8199,36 @@
   "releasedAt": "2008-05-02",
   "rarity": "uncommon",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cacda1c2-2fe8-40a3-89f3-38a835f10af3",
+  "name": "Fugitive of the Judoon",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 1/1 white Human creature token with ward {2} and a 4/4 white Alien Rhino creature token.\nII — Investigate.\nIII — You may exile a Human you control and an artifact you control. If you do, search your library for a Doctor card, put it onto the battlefield, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {
@@ -25064,6 +25214,36 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "78eb5399-8c8b-4310-b585-e4ccd9d7c9cc",
+  "name": "Wake to Slaughter",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose up to two target creature cards in your graveyard. An opponent chooses one of them. Return that card to your hand. Return the other to the battlefield under your control. It gains haste. Exile it at the beginning of the next end step.\nFlashback {4}{B}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

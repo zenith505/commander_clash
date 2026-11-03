@@ -93,6 +93,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
+  // Sudden Insight: "for each different mana value among nonland cards in your graveyard".
+  if (each && /^different mana value among nonland cards in your graveyard$/i.test(p)) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" } } };
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   // Treva, the Renewer: "you gain 1 life for each permanent of the chosen color", the color chosen as it resolves.
   if ((m = each ? /^(permanent|creature) of the chosen color$/.exec(p) : /^the number of (permanent|creature)s of the chosen color$/.exec(p)))
@@ -965,6 +967,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[1] === "~" ? "~'s" : m[1] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
+  // Flesh // Blood: "where X is the power of the card you exiled": the one card targeted, as it last existed in the
+  // graveyard (rulings), as Lobelia's "the exiled card's power".
+  if ((m = /^the (power|toughness) of the card you exiled$/.exec(p)) && ctx) {
+    const of = whoseObject("the exiled card's", ctx);
+    return of?.ref === "target" ? count({ kind: m[1] as "power" | "toughness", of }) : null;
+  }
   // Death's Presence: "where X is the power of the creature that died": the trigger's subject as it last existed on the
   // battlefield (rulings, CR 603.10a).
   if ((m = /^the (power|toughness) of the creature that died$/.exec(p)) && ctx?.subjectIt) return count({ kind: m[1] as "power" | "toughness", of: { ref: "subject" } });
@@ -985,10 +993,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
   // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
   // Deepwood Denizen: "for each +1/+1 counter on creatures you control", the same.
-  // Bioessence Hydra: "for each loyalty counter on planeswalkers you control", the same.
+  // Bioessence Hydra: "for each loyalty counter on planeswalkers you control", the same. Jace, Reality Sculptor: "loyalty
+  // counters among Jaces you control", Jace planeswalkers, tokens or not.
   // Gleam of Authority: "for each +1/+1 counter on other creatures you control" (an Aura's: other than the enchanted
   // creature, statics.ts ofAffected); Ascendant Acolyte: "among other creatures you control".
-  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|planeswalkers|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
+  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|planeswalkers|artifacts and creatures|Sagas|Jaces) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }
@@ -1033,7 +1042,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${singularWord(m[1]!)} an opponent controls`, { chosen: true });
     return spec?.kind === "object" && !spec.owner ? count({ kind: "permanents", filter: { ...spec, owner: "you", text: p } }) : null;
   }
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|that opponent or that planeswalker's controller controls|the chosen player controls|those players control|those opponents control|enchanted creature's controller controls)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|that opponent or that planeswalker's controller controls|the chosen player controls|those players control|those opponents control|enchanted creature's controller controls|that creature's controller controls)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those|the chosen|enchanted creature's) /.test(who);
@@ -1127,6 +1136,9 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   if (x === "enchanted player's" || x === "enchanted opponent's") return { ref: "enchantedPlayer" };
   // Observed Stasis: "each tapped creature its controller controls", its being enchanted creature (CR 303.4).
   if (x === "enchanted creature's controller's" && !ctx.spell) return { ref: "hostController" };
+  // Weight of Spires: "the number of nonbasic lands that creature's controller controls", the creature it targets (as it
+  // last existed if it has left, CR 608.2h).
+  if (x === "that creature's controller's" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object") return { ref: "targetController", index: ctx.lastObjectTarget };
   if (x === "defending player's" && ctx.defending) return { ref: "eventPlayer" };
   // Goblin Lyre: "creatures that opponent or that planeswalker's controller controls": the opponent it targets, or the
   // targeted planeswalker's controller (as it last existed, CR 608.2h).

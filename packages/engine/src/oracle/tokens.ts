@@ -109,7 +109,9 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   }
   // The Girl in the Fireplace: 'with vanishing 3 and "Prevent all damage that would be dealt to this token."': vanishing
   // (CR 702.63a) written out as its ability too, before the quoted one.
-  const vanishing = kwText ? /^(?:(.+?),? and )?(vanishing \d+)$/.exec(kwText) : null;
+  // Fugitive of the Judoon: "a 1/1 white Human creature token with ward {2}": ward (CR 702.21a) written out the same way, its
+  // triggered ability as if printed.
+  const vanishing = kwText ? /^(?:(.+?),? and )?(vanishing \d+|ward \{\d+\})$/.exec(kwText) : null;
   if (vanishing && subtypes.length) {
     const kws = vanishing[1] ? parseKeywordList(vanishing[1]) : [];
     const text = [vanishing[2]!.charAt(0).toUpperCase() + vanishing[2]!.slice(1), ...(ability !== undefined ? [ability] : [])].join("\n");

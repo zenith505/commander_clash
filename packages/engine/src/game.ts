@@ -847,7 +847,7 @@ export function moveObject(
   o.exertedTurn = undefined;
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
-  if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
+  if (fromZone === "battlefield" && to === "graveyard" && (o.damagedBy?.length || o.wasDealtDamage) && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
@@ -1175,8 +1175,9 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
-  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere.
-  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile"))
+  // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere. Wan Shi Tong, All-Knowing: "into a library
+  // from anywhere", not from a library (rulings).
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile") || (to === "library" && fromZone !== "library"))
     (s.zoneBatch ??= []).push({
       id,
       zc: o.zoneChanges,
@@ -1254,6 +1255,9 @@ export function moveObject(
   if (fromZone === "battlefield" && to === "graveyard") {
     const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
     for (const t of last.types) if (!mine.includes(t)) mine.push(t);
+    // The Lady of Otaria: "a land you controlled", by the player who controlled it as it left.
+    const ctl = ((s.turnLog.controlledTypesToYard ??= {})[lastController] ??= []);
+    for (const t of last.types) if (!ctl.includes(t)) ctl.push(t);
     if (last.types.includes("Artifact")) s.turnLog.artifactsToYard = (s.turnLog.artifactsToYard ?? 0) + 1;
   }
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
@@ -2111,12 +2115,18 @@ function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; cont
 /** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
 function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
   const by = o.damagedBy ?? [];
+  // Etching of Kumano: who controlled each source as it dealt `o` damage this turn.
+  const dealt = s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? [];
   for (const id of s.battlefield) {
     const w = obj(s, id);
     const how = abilitiesOf(s, w).exileWhatItDamaged;
-    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo))) return true;
+    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo)) || (how === "yours" && dealt.some((d) => d.controller === controllerOf(s, w)))) return true;
   }
-  return (s.leftTogether ?? []).some((l) => l.hadAbilities && by.includes(l.id) && withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged === "self");
+  return (s.leftTogether ?? []).some((l) => {
+    if (!l.hadAbilities) return false;
+    const how = withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged;
+    return (how === "self" && by.includes(l.id)) || (how === "yours" && dealt.some((d) => d.controller === l.controller));
+  });
 }
 
 /**
@@ -11455,6 +11465,15 @@ function attachmentSBAs(s: GameState): boolean {
         log(s, `${c.name} becomes unattached.`);
         changed = true;
       }
+    } else if (c.subtypes.includes("Fortification") && o.attachedTo) {
+      // A Fortification: unattached from anything but a land, and when it becomes a creature itself (CR 301.6, 704.5n).
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Land") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host))) {
+        if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
+        o.attachedTo = undefined;
+        invalidateCharacteristics(s);
+        log(s, `${c.name} becomes unattached.`);
+        changed = true;
+      }
     } else if (o.attachedTo || o.attachedToPlayer !== undefined) {
       // A creature, or anything that's no longer an Aura or Equipment, can't stay attached (CR 704.5p).
       o.attachedTo = undefined;
@@ -12142,6 +12161,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
  */
 function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId) {
   o.faceDown = undefined;
+  o.turnedFaceUpTurn = s.turn;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);

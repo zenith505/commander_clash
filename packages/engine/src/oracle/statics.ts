@@ -432,8 +432,10 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
   // other creature types (CR 205.1b, the reminder text says so), with that base power and toughness (layers 4 and 7b).
   // Futurist Operative: "As long as ~ is tapped, it's a Human Citizen with base power and toughness 1/1 and can't be
   // blocked": those creature types instead of its others, applied in its own timestamp order (rulings).
-  const typedBase = /^(?:~ is|it's) an? ((?:[A-Z][a-z]+ )*[A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)( and can't be blocked)?$/.exec(statement);
-  const unblockable = typedBase?.[4] ? parseStaticMods("can't be blocked") : [];
+  // Goddric, Cloaked Reveler: "~ is a Dragon with base power and toughness 4/4, flying, and "{R}: ..."": the abilities
+  // listed after it are ones it has (layer 6) while the condition holds.
+  const typedBase = /^(?:~ is|it's) an? ((?:[A-Z][a-z]+ )*[A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)(?:( and can't be blocked)|, ([a-z ]+), and (".+"))?$/.exec(statement);
+  const unblockable = typedBase?.[4] ? parseStaticMods("can't be blocked") : typedBase?.[5] ? parseStaticMods(`has ${typedBase[5]} and ${typedBase[6]}`) : [];
   if (typedBase && typedBase[1]!.split(" ").every((w) => CREATURE_TYPES.has(w)) && unblockable) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setSubtypes", subtypes: typedBase[1]!.split(" ") }, { kind: "setPT", power: Number(typedBase[2]), toughness: Number(typedBase[3]) }, ...unblockable], text: line };
     const condition = parseStaticCondition(cond, self);
@@ -1412,6 +1414,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   // Kami of Transience: "if an enchantment was put into your graveyard from the battlefield this turn".
   if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
+  if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) you controlled was put into a graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!), controlled: true } }, min: 1 };
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Wolverine, Best There Is: "if ~ dealt damage to another creature this turn".
@@ -1854,7 +1857,8 @@ export function parseAffected(subject: string): Affects | null {
     const { controller: _, ...spec } = a.spec;
     return { ...a, spec, controller: "enchanted" };
   }
-  if (/^(Enchanted|Equipped) (creature|permanent|artifact|land|planeswalker)$/.test(x)) return { kind: "attached" };
+  // Darksteel Garrison: "Fortified land" (CR 301.6), the land a Fortification is attached to.
+  if (/^(Enchanted|Equipped) (creature|permanent|artifact|land|planeswalker)$|^Fortified land$/.test(x)) return { kind: "attached" };
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
   // "Creatures attacking your opponents", the same (rulings).

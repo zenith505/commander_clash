@@ -353,6 +353,8 @@ function diesMatches(
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (d.damagedByEquipped && (!attachedTo || !dying.o.damagedBy?.includes(attachedTo))) return false;
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
+  // Dance of Many: a token this object created, as the object it is now (CR 400.7).
+  if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
     if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;
@@ -371,8 +373,10 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
     if (en.orSelf) return true;
     if (en.other) return false;
   }
+  // Gladewalker Ritualist: "another creature you control named ~": the watcher's name now (CR 201.5).
+  const filter = en.filter.named === "~" ? { ...en.filter, named: o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name } : en.filter;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for the watcher.
-  return objectMatches(s, bindChosen(bindEnchanted(en.filter, o), o.chosen), entering, you, false);
+  return objectMatches(s, bindChosen(bindEnchanted(filter, o), o.chosen), entering, you, false);
 }
 
 /**
@@ -2961,6 +2965,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "exiledFromGraveyardsOrBattlefield") return m.to === "exile" && (m.from === "battlefield" || m.from === "graveyard");
   if (b.what === "exiled") return m.to === "exile" && m.from !== "exile";
+  if (b.what === "toLibrary") return m.to === "library" && m.from !== "library";
   // Hushbringer: a creature dying doesn't cause "put into a graveyard from anywhere" abilities to trigger either, but those
   // look at the game after the event (they aren't leaves-the-battlefield abilities, CR 603.10a), so a Hushbringer that left
   // at the same time, or is the card, doesn't stop them (rulings).

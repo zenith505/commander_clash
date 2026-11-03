@@ -814,7 +814,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.ifHadCounter && !((ev.counters[d.ifHadCounter] ?? 0) > 0)) continue;
       if (d.to?.includes(ev.to))
-        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
+        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
@@ -1701,6 +1701,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
+    // Orcish Mine: "When the last ore counter is removed from ~".
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e, t) => e === "selfLastCounterRemoved" && t.countersKind === ev.counter);
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.

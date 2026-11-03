@@ -1,6 +1,6 @@
 # Roadmap
 
-29,563 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,573 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,955 of 4,988 (99%), top 10,000: 9,491 of
 9,979 (95%).
 
@@ -5094,6 +5094,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Matrix (each player chooses artifact, creature, or land in their untap step while it's untapped, CR 502.3, with a
   browser test; it limits the active player's own untaps, which are the only ones the untap step makes). +10 (29,544 of
   31,936 with B94 and rounds 261 and 262; 29,556 with rounds 263 and 264).
+- Round B96 (templates from the bottom of the list): "Put a matrix counter on target creature and that creature gains
+  "Remove a matrix counter from this creature: Regenerate this creature." Activate only during your upkeep." (Life
+  Matrix, only the creature's controller can activate it, rulings); "When ~ leaves the battlefield this turn, destroy that
+  creature. A creature destroyed this way can't be regenerated." (War Barge: ~ watched, the delayed trigger about the
+  target, CR 603.7c); Orcish Mine ("At the beginning of your upkeep and whenever enchanted land becomes tapped", "When the
+  last ore counter is removed from ~", the land's controller as it last existed, CR 608.2h); Errant Minion and Power Leak
+  ("that player may pay any amount of mana. ~ deals 2 damage to that player. Prevent X of that damage": none prevented if
+  damage can't be, CR 615.12); "Reveal any number of creature cards with power 5 or greater from your hand. Add {G} for
+  each card revealed this way." (Sacellum Godspeaker, a mana ability); Shambling Swarm (distributed -1/-1 counters, as
+  many removed from each creature at the next end step, rulings: not necessarily the same counters); Mindbender Spores
+  (the blocked creature gains "doesn't untap ... if it has a fungus counter on it" and an upkeep counter removal); Dread
+  Wight (each creature in combat with it at end of combat: a paralyzation counter, tapped, no untapping for as long as it
+  has one, CR 611.2b, and "{4}: Remove a paralyzation counter"); Gaze of the Gorgon (regenerate, then destroy at end of
+  combat what blocked it or it blocked this turn, rulings). +10 (29,566 of 31,936 with B95 and rounds 261 to 264; 29,573 with round 265).
+- Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
+  creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
+  unless they put a card from their hand on top of their library": a punisher option with a card from hand), Vortex
+  Elemental (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
+  Spy (play with that hand revealed for as long as it remains), Bone Mask and Mourner's Shield (damage prevented by a
+  source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
+  next combat damage to an opponent), Shifty Doppelganger (return the exiled card at end step if the creature was
+  sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type).
+  Known gap: Sacellum Godspeaker and other in-hand power filters read printed power, so a characteristic-defining power
+  (*) in hand counts as 0 (CR 604.3 says it works there).
 - Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
   Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
   of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's

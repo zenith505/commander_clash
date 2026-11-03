@@ -2,10 +2,10 @@ import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { defMv } from "../faces";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tappedForMana } from "../manaabilities";
@@ -248,6 +248,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const excess = excessOver(lethalAmounts(s, from, o), ev.n);
           return excess ? [{ ...ev, n: ev.n - excess }, { src: from, to: { player: controllerOf(s, o) }, n: excess }] : [ev];
         });
+      // Errant Minion: "Prevent X of that damage": prevented as it would be dealt (CR 615.1a), unless damage can't be
+      // prevented (CR 615.12). Its controller applies it before any other prevention or replacement that could apply
+      // (CR 616.1): an amount off this damage only is never worse for them than another shield first.
+      const off = e.preventOf !== undefined ? Math.max(0, amountNow(s, e.preventOf, ctx)) : 0;
+      if (off > 0 && canPreventDamage(s) && !unpreventable(from, false)) {
+        events = events.map((ev) => ({ ...ev, n: Math.max(0, ev.n - off) })).filter((ev) => ev.n > 0);
+        log(s, `${src}: ${off} of that damage is prevented.`);
+      }
       const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });

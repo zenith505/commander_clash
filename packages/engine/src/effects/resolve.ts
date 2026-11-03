@@ -520,6 +520,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
     const host = attachedHost(s, ctx);
+    // Orcish Mine: "destroy enchanted land and ~ deals 2 damage to that land's controller": its controller as it last
+    // existed on the battlefield (CR 608.2h), kept for "hostController".
+    if (host?.here && s.resolving) s.resolving.hostControllerWas = controllerOf(s, s.objects[host.id]!);
     return host?.here ? [s.objects[host.id]!] : [];
   }
   if (ref.ref === "targetHost") {

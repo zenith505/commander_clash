@@ -1,7 +1,7 @@
 # Roadmap
 
-29,515 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,470 of
+29,519 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,474 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1857,6 +1857,25 @@ line blocks.
    library. If that player does, they reveal cards ... until a card named ~ is revealed ..." (Mirror-Mad Phantasm:
    PlayerRef sourceOwner, SpellCondition shuffledInThisWay, the card's printed name for a granted copy of the ability;
    bots never activate it). +3 (29,503 of 31,936; 29,515 with B93).
+   Round 262 (top of the list, from the "Out" lists): "When its power becomes 20 this way, it deals 20 damage to any
+   target" (Inferno of the Star Mounts: the pump notes ~'s power first, SpellCondition powerBecame, a reflexive trigger
+   whose target is chosen only then); "if it had two or more +1/+1 counters on it, create a token that's a copy of it at
+   the beginning of the next end step. The token enters with half that many +1/+1 counters on it, rounded down" (Ochre
+   Jelly: TriggeredAbility.ifHadCounterMin, createTokenCopy lkiCopy, the copy and the counters taken from last known
+   information as the delayed trigger is made); "As long as ~ is attached to a creature, you don't lose the game for
+   having 0 or less life" and "draw a card and reveal it. The creature gets +X/+X ... and you lose X life" (Pact Weapon:
+   noZeroLifeLossAttached, X 0 if the draw was replaced); "Whenever that creature deals combat damage this turn, you may
+   exile it. If you do, return it to the battlefield under its owner's control" (Long River Lurker: a floating trigger
+   about the target, the creature its subject). +4 (29,507 of 31,936; 29,519 with B93).
+   Rules gaps round 262 saw, for the next round: a delayed trigger made by a dies trigger of a token is dropped when the
+   token has ceased to exist (run-spells "delayed": `if (o) addDelayed`; Ochre Jelly's token is handled, a token's
+   "When ~ dies, at the beginning of the next end step, ..." in general isn't); a floating trigger whose source has ceased
+   to exist (a token Long River Lurker that left the battlefield) no longer triggers (triggers.ts fromFloating skips it),
+   though a delayed trigger doesn't need its source (CR 603.7).
+   Out after round 262 (looked at, not done): Dragon's Fire ("reveal a Dragon card from your hand or choose a Dragon you
+   control" as an additional cost, the damage that card's or creature's power: a new cast-time choice for the UI and bots,
+   and the chosen Dragon's last known power); Soul Immolation (blight X as an additional cost, X capped by the greatest
+   toughness among your creatures: putCounter costs have no X yet).
    Out after round 261 (looked at, not done): Doors of Durin (a "may reveal the top card" whose creature card enters tapped
    and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
    attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library

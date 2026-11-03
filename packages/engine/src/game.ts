@@ -11401,7 +11401,9 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
 export function zeroLifeOk(s: GameState, pid: PlayerId): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
-    return controllerOf(s, o) === pid && [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)].some((a) => a.noZeroLifeLoss);
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    const onCreature = host?.zone === "battlefield" && objIsType(s, host, "Creature");
+    return controllerOf(s, o) === pid && [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)].some((a) => a.noZeroLifeLoss && (!a.noZeroLifeLossAttached || onCreature));
   });
 }
 

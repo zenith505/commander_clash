@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
+import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -284,6 +284,16 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     const trigger = parseTrigger("Whenever ~ deals combat damage, you gain that much life.");
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamage" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "if", cond: { kind: "kicked" }, effects: [{ type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! }] };
+  }
+  // Long River Lurker: "target creature you control can't be blocked this turn. Whenever that creature deals combat damage
+  // this turn, you may exile it. If you do, return it to the battlefield under its owner's control.": a delayed trigger
+  // about that creature (CR 603.7b-c), each time it deals combat damage this turn, until it's a new object (CR 400.7); a
+  // token exiled this way doesn't return (rulings, CR 111.7).
+  const blinkAfter = ctx?.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && after.length === 1 && /^Whenever that creature deals combat damage this turn, you may exile it$/.test(s) && /^If you do, return it to the battlefield under its owner's control\.?$/.test(after[0]!);
+  if (blinkAfter) {
+    const text = "you may exile it. If you do, return it to the battlefield under its owner's control.";
+    const trigger: TriggeredAbility = { event: "selfDealsCombatDamage", body: { targets: [], effects: [{ type: "may", effects: [{ type: "flicker", what: { ref: "subject" }, under: "owner" }], text: "exile it. If you do, return it to the battlefield under its owner's control" }], text } };
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
   // Jaya, Fiery Negotiator: "Choose target creature an opponent controls. Whenever you attack this turn, ~ deals damage
   // equal to the number of attacking creatures to that creature.": a delayed trigger about that creature (CR 603.7b-c), as
@@ -11764,13 +11774,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Inferno of the Star Mounts: "~ gets +1/+0 until end of turn. When its power becomes 20 this way, it deals 20 damage
+    // to any target." A reflexive trigger (CR 603.12) only if that pump changed ~'s power to exactly 20 (rulings: not to
+    // 21 or more, and not some other way); its target is chosen only then.
+    const becomes = /^When its power becomes (\d+) this way, it deals (\d+) damage to any target$/.exec(s);
+    if (becomes) {
+      const prev = effects.at(-1);
+      const mod = prev?.type === "continuous" && prev.what.ref === "self" && prev.mods.length === 1 ? prev.mods[0] : undefined;
+      if (prev?.type !== "continuous" || mod?.kind !== "modifyPT" || typeof mod.power !== "number" || mod.power <= 0 || prev.duration !== "endOfTurn") return null;
+      const body = reflexiveBody(`~ deals ${becomes[2]} damage to any target`, ctx);
+      if (!body) return null;
+      prev.notePower = true;
+      effects.push({ type: "if", cond: { kind: "powerBecame", n: Number(becomes[1]) }, effects: [{ type: "reflexive", body }] });
+      continue;
+    }
     // Sindbad, Fa'adiyah Seer: "Draw a card and reveal it. If it isn't a land card, discard it.": the card drawn (none if the
     // draw was replaced), revealed, and discarded unless it's a land card.
-    if (/^Draw a card and reveal it$/.test(s)) {
+    if (/^[Dd]raw a card and reveal it$/.test(s)) {
       // Jace, Mirror Mage: "Remove a number of loyalty counters equal to that card's mana value from ~": none if the draw
       // was replaced (rulings), all he has if it's more (CR 704.5i then).
       if (/^Remove a number of loyalty counters equal to that card's mana value from ~\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) {
         effects.push({ type: "draw", who: { ref: "you" }, n: 1 }, { type: "revealDrawn", keep: { kind: "card", types: [], text: "card" } }, { type: "removeCounters", what: { ref: "self" }, counter: "loyalty", n: { count: { kind: "drawnRevealedMv" } } });
+        si++;
+        continue;
+      }
+      // Pact Weapon: "The creature gets +X/+X until end of turn and you lose X life, where X is that card's mana value": the
+      // equipped creature the trigger is about; X is 0 if the draw was replaced, even by other draws (rulings).
+      if (/^The creature gets \+X\/\+X until end of turn and you lose X life, where X is that card's mana value\.?$/.test(sentences[si + 1] ?? "") && (ctx.subjectIt || ctx.subject) && !ctx.spell) {
+        const x: Amount = { count: { kind: "drawnRevealedMv" } };
+        effects.push({ type: "draw", who: { ref: "you" }, n: 1 }, { type: "revealDrawn", keep: { kind: "card", types: [], text: "card" } }, { type: "continuous", what: { ref: "subject" }, mods: [{ kind: "modifyPT", power: x, toughness: x }], duration: "endOfTurn" }, { type: "loseLife", who: { ref: "you" }, n: x });
         si++;
         continue;
       }

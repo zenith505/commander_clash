@@ -813,7 +813,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) =>
-        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotSubtype && !!ev.chars?.subtypes.includes(t.ifNotSubtype)) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifDealtCombatDamage && !Object.values(s.turnLog?.combatDamagedBy ?? {}).some((ids) => ids.includes(`${ev.id}@${was}`))) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
+        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotSubtype && !!ev.chars?.subtypes.includes(t.ifNotSubtype)) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifDiesInCombat && !inCombatPhase(s)) && !(t.ifBlockedThisTurn && ev.snapshot?.becameBlockedTurn !== s.turn) && !(t.ifDealtCombatDamage && !Object.values(s.turnLog?.combatDamagedBy ?? {}).some((ids) => ids.includes(`${ev.id}@${was}`))) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) >= (t.ifHadCounterMin ?? 1))) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
         (e === "selfExiledCrafting" && ev.to === "exile" && !!ev.crafted) ||
         e === "selfLeaves" ||
@@ -1714,7 +1714,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
-      if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
+      // Long River Lurker: "whenever that creature deals combat damage this turn, you may exile it": the creature is its subject.
+      if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }), o);
       if (ev.toBlocker) add(o, controllerOf(s, o), (e) => e === "selfDealsCombatDamageToBlockers");
       // Essence Sliver: "Whenever a Sliver deals damage": anyone's, the dealer the subject.
       for (const id of s.battlefield) {

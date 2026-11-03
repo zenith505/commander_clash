@@ -220,7 +220,8 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // The copiable values of what it copies as it is now, or as it last existed (CR 707.2, 608.2h): a card in
       // a graveyard is copied as that card; "a copy of it" for a creature that has left is of it as it last was
       // (offspring and squad rulings).
-      let base = e.ofSource ? ctx.sourceDef : e.what.ref === "linkedCard" ? undefined : copiedValues(s, e.what, ctx);
+      // Ochre Jelly: the copiable values the delayed trigger remembered (createTokenCopy.lkiCopy).
+      let base = e.copyKey ? s.cards[e.copyKey] : e.ofSource ? ctx.sourceDef : e.what.ref === "linkedCard" ? undefined : copiedValues(s, e.what, ctx);
       if (e.what.ref === "linkedCard") {
         // "A copy of a card exiled with ~" (Mimic Vat): the cards exiled with it as this resolves; its controller picks one
         // if there are several (a melded pair, rulings). A nonpermanent card can't be a token, so none is made (rulings).

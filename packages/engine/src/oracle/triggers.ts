@@ -4477,6 +4477,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifHadCounter = hadKind[1]!;
         body0 = hadKind[2]!;
       }
+      // Ochre Jelly: "if it had two or more +1/+1 counters on it", at least that many of that kind.
+      let ifHadCounterMin: number | undefined;
+      const hadMany = /^if it had (two|three|four|five) or more (\+1\/\+1|-1\/-1|[a-z]+) counters on it, (.+)$/.exec(body0);
+      if (hadMany) {
+        if (event !== "selfDies" || ifHadCounter) return "fail" as const;
+        ifHadCounter = hadMany[2]!;
+        ifHadCounterMin = ["two", "three", "four", "five"].indexOf(hadMany[1]!) + 2;
+        body0 = hadMany[3]!;
+      }
       // The Zubera: "When ~ dies, if 4 or more damage was dealt to it this turn, ...": an intervening if (CR 603.4) on damage
       // that can't change once it's gone.
       let ifDamaged: number | undefined;
@@ -4634,6 +4643,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // graveyard now; if it has left there by then, it stays where it went (CR 400.7).
       const brood = event === "selfToGraveyard" && /^When ~ is put into your graveyard/.test(line) ? /^at the beginning of the next end step, you lose (\d+) life and return ~ to your hand\.$/.exec(text) : null;
       if (brood) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "loseLife", who: { ref: "you" }, n: Number(brood[1]) }, { type: "bounce", what: { ref: "subjectCard" } }], text: `you lose ${brood[1]} life and return ~ to your hand` }], text };
+      // Ochre Jelly: "create a token that's a copy of it at the beginning of the next end step. The token enters with half
+      // that many +1/+1 counters on it, rounded down": a delayed trigger copying ~ as it last existed on the battlefield
+      // (CR 608.2h, 707.2), with half the counters it had (rulings), even if the card has left the graveyard by then.
+      const split = event === "selfDies" && ifHadCounter && ifHadCounterMin ? new RegExp(`^create a token that's a copy of it at the beginning of the next end step\\. The token enters with half that many ${ifHadCounter.replace(/[+/]/g, "\\$&")} counters on it, rounded down\\.$`).exec(text) : null;
+      if (split) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, lkiCopy: { halfCounters: ifHadCounter as CounterKind } }], text: "create a token that's a copy of it with half that many counters on it" }], text };
       if (body && attackingPlayer) body = { ...(JSON.parse(JSON.stringify(body).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body), text: body.text.replace(/\bthat player\b/g, "attacking player") };
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
@@ -4665,7 +4679,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: ifNoCounters } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotSubtype ? { ifNotSubtype } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifDealtCombatDamage ? { ifDealtCombatDamage: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEscaped ? { ifEscaped: true as const } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: ifNoCounters } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifHadCounterMin ? { ifHadCounterMin } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotSubtype ? { ifNotSubtype } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifDealtCombatDamage ? { ifDealtCombatDamage: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEscaped ? { ifEscaped: true as const } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

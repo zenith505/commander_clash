@@ -1191,7 +1191,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
 // "Is exiled from the battlefield" (Soulherder) is leaving it for exile (CR 406.3).
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield|is returned to its owner's hand), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies or is put into the command zone|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield|is returned to its owner's hand), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -1324,7 +1324,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature with a coin counter on it dies or is put into exile" (Athreos, Shroud-Veiled): from the
   // battlefield to either one (CR 700.4, 603.6c).
   const diesOrExiled = !attached && m![3] === "dies or is put into exile";
-  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled || toHand);
+  // Reyhan, Last of the Abzan: "Whenever a creature you control dies or is put into the command zone": from the
+  // battlefield to a graveyard, or to the command zone instead of a hand or library (CR 903.9b). A commander that died and
+  // then went from the graveyard to the command zone (CR 903.9a) wasn't on the battlefield then, so only its dying counts.
+  const diesOrCommand = !attached && m![3] === "dies or is put into the command zone";
+  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled || diesOrCommand || toHand);
   // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
   // change, so it's part of the event, like "without dying".
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
@@ -1343,6 +1347,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // creature": the counters of every kind it had as it last existed (rulings, CR 603.10a).
   const thatNumber = !!hadCounter && !hadKindOf && /^you may put that number of \+1\/\+1 counters on target creature\.$/.test(bodyText);
   if (thatNumber) bodyText = "you may put X +1/+1 counters on target creature.";
+  // Reyhan: "if it had one or more +1/+1 counters on it, you may put that many +1/+1 counters on target creature": those
+  // it had as it last existed (rulings: before -1/-1 counters that killed it cancelled any, CR 704.3).
+  const thatMany = !!hadCounter && hadKindOf === "+1/+1" && /^you may put that many \+1\/\+1 counters on target creature\.$/.test(bodyText);
+  if (thatMany) bodyText = "you may put X +1/+1 counters on target creature.";
   // "If its toughness was less than 1" (Massacre Girl, Known Killer): as it last existed (CR 603.10a), so it can't change
   // and is part of what dies, like a keyword it had.
   const wasPT = attached ? null : new RegExp(`^if its (power|toughness) was (?:less than ${NUM}|${NUM} or less|greater than ${NUM}|${NUM} or greater), (.+)$`).exec(bodyText);
@@ -1382,6 +1390,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatNumber) {
     body = { ...replaceX(body, { count: { kind: "counters", counter: ANY_COUNTER, of: { ref: "subject" } } }), text: "you may put that number of +1/+1 counters on target creature." };
     for (const e of body.effects) if (e.type === "may") e.text = "put that number of +1/+1 counters on target creature";
+  }
+  if (thatMany) {
+    body = { ...replaceX(body, { count: { kind: "counters", counter: "+1/+1", of: { ref: "subject" } } }), text: "you may put that many +1/+1 counters on target creature." };
+    for (const e of body.effects) if (e.type === "may") e.text = "put that many +1/+1 counters on target creature";
   }
   if (lesser) {
     const [t, ...more] = body.targets;
@@ -1429,7 +1441,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(damaged ? (damaged[1] === "~" ? { damagedBySelf: true } : { damagedByEquipped: true as const }) : {}),
       ...(blockingSelf ? { blockingSelf: true as const } : {}),
       ...(leaves ? { leaves: true as const } : {}),
-      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
+      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : diesOrCommand ? { toZones: ["graveyard", "command"] as ("graveyard" | "command")[] } : toHand ? { toZones: ["hand"] as "hand"[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
       ...(notSacrificed ? { notSacrificed: true as const } : {}),
@@ -3262,6 +3274,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
     return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
   }
+  // Deep-Sea Kraken: "Whenever an opponent casts a spell, if ~ is suspended, remove a time counter from it"; Pardic Dragon:
+  // "..., that player may put a time counter on ~". An ability that works while the card is suspended in exile (CR 113.6,
+  // 702.62b), its owner controlling it (CR 113.8), with an intervening if (CR 603.4). "It" is the card: a spell can't have
+  // a time counter put on it or removed.
+  const suspendedIf = /^(Whenever (?:a player|an opponent|you) casts? a spell), if ~ is suspended, (.+)$/.exec(line);
+  if (suspendedIf) {
+    const t = parseTrigger(`${suspendedIf[1]}, ${suspendedIf[2]!.replace(/ time counter from it\.$/, " time counter from ~.")}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.zone || t.ifCond || t.cast.orCopy) return "fail";
+    // The card in exile ("selfCard"), not a permanent: only removing a time counter from it is modeled.
+    const fx = t.body.effects;
+    if (fx.length !== 1 || fx[0]!.type !== "removeCounters" || fx[0]!.what.ref !== "self" || fx[0]!.counter !== "time") return "fail";
+    return { ...t, zone: "exile", ifCond: { kind: "selfSuspended" }, body: { ...t.body, effects: [{ ...fx[0]!, what: { ref: "selfCard" } }] } };
+  }
   // Oloro, Ageless Ascetic: "At the beginning of your upkeep, if ~ is in the command zone, you gain 2 life." An ability
   // that works only in the command zone (CR 113.6), with an intervening if (CR 603.4).
   const inCommand = /^((?:When|Whenever|At)\b[^,]+), if ~ is in the command zone, (.+)$/.exec(line);
@@ -3784,6 +3809,23 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const reach = ["second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"].indexOf(nth[1]!) + 2;
     const body = parseBody(nth[3]!, { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: nth[2]!, countersReach: reach, body } : "fail";
+  }
+  // Protean Hydra: "Whenever a +1/+1 counter is removed from ~", for any reason, once for each counter (rulings).
+  // Chandra, Fire Artisan: "Whenever one or more loyalty counters are removed from ~", once for each event (combat damage
+  // from several creatures at once is one), "that much" how many (rulings). See countersRemoved in counters.ts.
+  const removed = /^Whenever (an? |one or more )(\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) counters? (?:is|are) removed from ~, (.+)$/.exec(line);
+  if (removed && (removed[1] === "one or more " ? / counters are /.test(line) : / counter is /.test(line))) {
+    const each = removed[1] !== "one or more ";
+    let text = removed[3]!.replace(/^(?:it|she|he) (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ");
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) {
+      if (each || /\bX\b/.test(text)) return "fail";
+      text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    }
+    let body = parseBody(text, { selfIt: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, removed[3]!) };
+    return { event: "selfCountersRemoved", countersKind: removed[2]!, ...(each ? { countersEach: true as const } : {}), body };
   }
   // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter put on it (rulings).
   const each = /^Whenever an? ((?:\+1\/\+1|-1\/-1|[a-z]+) )counter is put on ~, (.+)$/.exec(line);

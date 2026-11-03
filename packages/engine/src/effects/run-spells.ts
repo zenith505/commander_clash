@@ -890,6 +890,37 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "counterOpponentsStackUnless": {
+      // Whirlwind Denial: the opponents in turn order from the one whose turn it is (from the next one after you on your
+      // turn), each asked about each of theirs from the top of the stack down, paying as they choose; then those not paid
+      // for are countered, all at the same time (rulings). One that has left the stack meanwhile isn't asked about.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.denial) {
+        const order = s.turnOrder;
+        const start = order.indexOf(s.activePlayer);
+        const opps = order.map((_, k) => order[(start + k) % order.length]!).filter((p) => p !== ctx.controller && !player(s, p).lost);
+        const items = [...s.stack].reverse().filter((x) => x.id !== s.resolving?.item.id);
+        sc.denial = { queue: opps.flatMap((p) => items.filter((x) => x.controller === p).map((x) => x.id)), unpaid: [] };
+        sc.paid = undefined;
+      }
+      const st = sc.denial;
+      while (st.queue.length) {
+        const item = s.stack.find((x) => x.id === st.queue[0]);
+        if (!item) {
+          st.queue.shift();
+          continue;
+        }
+        const paid = paidUnless(s, ctx, item.controller, e.unless, src, item.description);
+        if (paid === "paused") return paid;
+        sc.paid = undefined;
+        st.queue.shift();
+        if (paid) log(s, `${player(s, item.controller).name} pays for ${item.description}.`);
+        else st.unpaid.push(item.id);
+      }
+      sc.denial = undefined;
+      for (const id of st.unpaid) if (s.stack.some((x) => x.id === id)) counterOnStack(s, ctx, id, src);
+      return;
+    }
     case "spellEntersWith": {
       // Only the spell that was cast (a copy isn't), while it's still that spell on the stack (CR 400.7).
       const item = s.stack.find((x) => x.id === ctx.cause);

@@ -1866,6 +1866,8 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     }
     // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
+    // Temporal Extortion: "any player may pay half their life, rounded up": half their own life (CR 107.1a).
+    else if ((m = /^pays? half their life, rounded (up|down)$/.exec(part))) out.push({ halfLife: m[1] as "up" | "down" });
     // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
     // existed (CR 608.2h).
     else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });

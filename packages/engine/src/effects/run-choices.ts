@@ -1145,6 +1145,7 @@ export function punisherLabel(o: PunisherOption): string {
   if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${o.sacrifice.sourceHost ? "the" : /^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if ("allow" in o) return o.allow;
+  if ("halfLife" in o) return `Pay half your life, rounded ${o.halfLife}`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }
@@ -1160,7 +1161,13 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
   // "Unless they discard a nonland card": only with one in hand.
-  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) ? [] : [i]));
+  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) ? [] : [i]));
+}
+
+/** Half a player's life total, rounded as the text says; 0 for a total of 0 or less (CR 107.1a-b). */
+export function halfOfLife(s: GameState, pid: PlayerId, round: "up" | "down"): number {
+  const life = Math.max(0, player(s, pid).life);
+  return round === "up" ? Math.ceil(life / 2) : Math.floor(life / 2);
 }
 
 /**
@@ -1208,7 +1215,12 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           }
         }
         const o = pu.picked[pid] === "none" ? undefined : e.options[Number(pu.picked[pid])];
-        if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
+        if (o && "halfLife" in o) {
+          // Temporal Extortion: half their life as it is now, paid as it's chosen (CR 119.4); 0 life can always be paid.
+          const n = halfOfLife(s, pid, o.halfLife);
+          if (n) payLife(s, pid, n);
+          log(s, `${p.name} pays ${n} life (half their life, rounded ${o.halfLife}).`);
+        } else if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
           // "Any player may pay 5 life" (Dash Hopes), "sacrifices a creature or pays 3 life" (Indulgent Tormentor):
           // chosen on the prompt above, so paid now, not asked again (CR 119.4).
           payLife(s, pid, o.pay.life);

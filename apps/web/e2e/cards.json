@@ -20559,6 +20559,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a986d83d-22f1-45c3-bc2d-f5b210c539fb",
+  "name": "Sorcerous Squall",
+  "manaCost": "{6}{U}{U}{U}",
+  "cmc": 9,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nTarget opponent mills nine cards, then you may cast an instant or sorcery spell from that player's graveyard without paying its mana cost. If that spell would be put into a graveyard, exile it instead.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Delve",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-11-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0f5b79ca-9f80-420b-a6c5-bb2a9a95c7e7",
   "name": "Soul Summons",
   "manaCost": "{1}{W}",

@@ -1294,7 +1294,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.castAmong && e.anyYard) {
         // Spectral Arcanist: a card from any graveyard, cast from there as this resolves (rulings, CR 608.2g); the mana value
         // limit counted now.
-        sc.castAmong = { ids: apnap(s, livingPlayers(s)).flatMap((pid) => player(s, pid).graveyard).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
+        // Sorcerous Squall: only that player's graveyard.
+        sc.castAmong = { ids: (e.yardOf ? players(s, e.yardOf, ctx) : apnap(s, livingPlayers(s))).flatMap((pid) => player(s, pid).graveyard).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
       }
       if (!sc.castAmong && e.yourYard) {
         // Chandra Ablaze: the cards in your graveyard, cast from there one after another as this resolves, ignoring timing
@@ -1521,7 +1522,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from a graveyard without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
       return "paused";
     }
     case "exileCastEachType": {
@@ -3553,7 +3554,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7). Casey & Raph: the player whose
       // library it is plays it.
-      const p = player(s, e.theyPlay && e.who ? (players(s, e.who, ctx)[0] ?? ctx.controller) : ctx.controller);
+      const p = player(s, e.player ? (players(s, e.player, ctx)[0] ?? ctx.controller) : e.theyPlay && e.who ? (players(s, e.who, ctx)[0] ?? ctx.controller) : ctx.controller);
       // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
       // "Exile the top card of each opponent's library" (Brainstealer Dragon, Stolen Strategy): the same, opponents only.
       // "Each of those opponents' libraries" (Breeches, Brazen Plunderer): the opponents dealt damage.

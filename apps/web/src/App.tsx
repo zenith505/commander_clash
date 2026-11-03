@@ -742,12 +742,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (x === undefined && abilityCostsHaveX(ab)) {
       // "Discard a card with mana value X" (Kozilek): only some X work, so the greatest that does, starting at the mana value
       // of the spell on top of the stack when that one does.
-      if (ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+      // "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): likewise.
+      const mvX = ab.costs?.find((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX);
+      if (mvX) {
         const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
         const top = s.stack[s.stack.length - 1];
-        const mv = top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
-        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
+        const mv = mvX.kind === "discard" && top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
+        const extra = mvX.kind === "discard" ? "discard a card with mana value X" : `sacrifice ${/^[aeiou]/i.test(mvX.filter.text) ? "an" : "a"} ${mvX.filter.text.replace(/~/g, cardOf(s, objectId).name)}`;
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
@@ -855,8 +858,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         c.kind === "sacrifice"
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId && !(c.selfIf && objectMatches(s, c.selfIf, s.objects[id]!, HUMAN, false))) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
-      const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
-      const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
+      const what = c.kind === "sacrifice" ? c.filter.text.replace(/~/g, cardOf(s, d.objectId).name) : (c.filter?.text ?? "card");
+      // "Sacrifice a creature with mana value 2 other than Sidisi": its text already says which.
+      const article = c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
       // Ormos, Archive Keeper: "Discard three cards with different names".
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;

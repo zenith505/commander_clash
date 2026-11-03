@@ -4271,7 +4271,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(`${anyUntilUpkeep[1]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (/^(artifacts|creatures|enchantments|planeswalkers|permanents)$/.test(w) ? w.slice(0, -1) : w)).join(" ")} you control`);
       if (filter?.kind !== "object") return null;
       si++;
-      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${anyUntilUpkeep[1]!} you control` }, n: 1, action: "flicker", anyNumber: true, prompt: `click any number of your ${anyUntilUpkeep[1]!} to exile, then exile them. They return at the beginning of your next upkeep.` }, { type: "flicker", what: { ref: "created" }, under: "owner", at: "yourNextUpkeep" });
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: `${anyUntilUpkeep[1]!} you control` }, n: 1, action: "flicker", anyNumber: true, prompt: `click any number of your ${anyUntilUpkeep[1]!} to exile. They return to the battlefield at the beginning of your next upkeep.` }, { type: "flicker", what: { ref: "created" }, under: "owner", at: "yourNextUpkeep" });
       continue;
     }
     // Another Round: "Exile any number of creatures you control, then return them to the battlefield under their owner's

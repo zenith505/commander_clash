@@ -14917,6 +14917,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12bd2051-297b-4bab-ac64-6eb26a42e3e2",
+  "name": "Nahiri's Resolve",
+  "manaCost": "{3}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Creatures you control get +1/+0 and have haste.\nAt the beginning of your end step, exile any number of nontoken artifacts and/or creatures you control. Return those cards to the battlefield under their owner's control at the beginning of your next upkeep.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
   "name": "Nautiloid Ship",
   "manaCost": "{4}",
@@ -19591,6 +19619,40 @@
   "set": "tor",
   "releasedAt": "2002-02-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "72074972-418d-4dce-83cf-ce8cf310fc42",
+  "name": "Sidisi, Regent of the Mire",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Zombie Snake Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Snake",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Sacrifice a creature you control with mana value X other than Sidisi: Return target creature card with mana value X plus 1 from your graveyard to the battlefield. Activate only as a sorcery.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

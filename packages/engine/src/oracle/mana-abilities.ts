@@ -235,6 +235,13 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   let what: string;
   const out: Partial<ManaTrigger> = { text: line };
   let adds: string;
+  // Winter's Night: "... That land doesn't untap during its controller's next untap step.": the land tapped for mana, as
+  // the triggered mana ability resolves (rulings: whoever controls it at that untap step).
+  const noUntap = /^(Whenever a player taps an? .+? for mana, that player adds .+?\.) That land doesn't untap during its controller's next untap step\.$/.exec(line);
+  if (noUntap) {
+    out.landSkipsUntap = true;
+    line = noUntap[1]!;
+  }
   if ((m = /^Whenever (?:(enchanted|fortified) |an? )(.+?) is tapped for mana( of the chosen color)?, its controller adds (?:an additional )?(.+)\.$/.exec(line))) {
     if (m[1]) out.attached = true;
     what = m[2]!;

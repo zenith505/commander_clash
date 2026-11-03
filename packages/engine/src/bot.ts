@@ -1,5 +1,5 @@
 import { linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
-import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
@@ -963,6 +963,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
+    // Juxtapose: the tied permanent we give away: our least useful one.
+    if (pend.kind === "chooseOption" && pend.what === "greatestTie") {
+      const least = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
+      return [{ type: "chooseOption", player: pid, choice: least ?? pend.options[0]! }];
+    }
     // Gilgamesh: which of the Equipment to attach: the one with the greatest mana value.
     if (pend.kind === "chooseOption" && pend.what === "attachWhich") {
       // Goldwardens' Gambit: not one already moved onto an earlier token this way.
@@ -1846,6 +1851,25 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const pick = ranked[0];
     if (forced) return pick ? [pick] : null;
     return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
+  }
+  // Juxtapose: the opponent whose greatest mana value creature and artifact are worth the most more than ours.
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "juxtapose") {
+    const types = body.effects[0]!.types;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const top = (who: PlayerId, type: string) => {
+      const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === who && objIsType(s, o, type));
+      const mv = Math.max(-1, ...mine.map((o) => characteristics(s, o).manaValue));
+      return mine.filter((o) => characteristics(s, o).manaValue === mv);
+    };
+    const gain = (them: PlayerId) => types.reduce((n, type) => {
+      const [ours, theirs] = [top(pid, type), top(them, type)];
+      if (!ours.length || !theirs.length) return n;
+      return n + Math.min(...theirs.map((o) => worth(s, pid, o))) - Math.max(...ours.map((o) => (o.isCommander ? 100 : worth(s, pid, o))));
+    }, 0);
+    const ranked = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player" && t.id !== pid).sort((a, b) => gain(b.id) - gain(a.id));
+    const pick = ranked[0];
+    if (forced) return pick ? [pick] : all[0] ? [all[0]] : null;
+    return pick && gain(pick.id) > 2 ? [pick] : null;
   }
   // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
   // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
@@ -4019,9 +4043,11 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
     const hurts = c ? choiceHurts(c) : true;
+    // Teferi's Realm: a non-Aura enchantment is an enchantment that isn't an Aura.
+    const isOf = (o: GameObject, ty: string) => (ty === NON_AURA_ENCHANTMENT ? characteristics(s, o).types.includes("Enchantment") && !characteristics(s, o).subtypes.includes("Aura") : characteristics(s, o).types.includes(ty));
     const score = (ty: string) => s.battlefield.reduce((n, id) => {
       const o = obj(s, id);
-      if (!characteristics(s, o).types.includes(ty)) return n;
+      if (!isOf(o, ty)) return n;
       return n + (controllerOf(s, o) === pid ? -1 : 1) * (hurts ? 1 : -1) * Math.max(1, worth(s, pid, o));
     }, 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;

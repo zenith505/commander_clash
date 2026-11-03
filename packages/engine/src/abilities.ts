@@ -11,6 +11,8 @@ import type { CopyExcept } from "./copies";
  */
 /** TargetSpec.counter for "with a counter on it": a counter of any kind. */
 export const ANY_COUNTER = "any";
+/** Teferi's Realm's "non-Aura enchantment" among card types to choose: an enchantment that isn't an Aura. */
+export const NON_AURA_ENCHANTMENT = "Non-Aura enchantment";
 
 export type Amount = number | AmountExpr;
 
@@ -1033,6 +1035,8 @@ export interface TargetSpec {
   targetsSource?: true;
   /** For "any" targets: "target creature token, player, or planeswalker" (Coalborn Entity): a creature only if it's a token. */
   creatureTokens?: true;
+  /** For "any" targets: "target player, planeswalker, or Sliver creature" (Cautery Sliver): a creature only if it has this creature type. */
+  creatureSubtype?: string;
   /** That very object (see `targetsSource`). */
   objectId?: string;
   /**
@@ -2857,6 +2861,11 @@ export type Effect =
    * untap", where doing neither is a choice too (one question).
    */
   | { type: "tapOrUntap"; what: ObjRef; may?: true }
+  /**
+   * Sands of Time: "that player simultaneously untaps each tapped artifact, creature, and land they control and taps each
+   * untapped artifact, creature, and land they control": both groups found first, then each flips at once.
+   */
+  | { type: "toggleTapped"; who: PlayerRef; filter: TargetSpec }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
   /** Provoke and "target creature blocks ~ this turn if able": for this combat, or the rest of the turn (CR 509.1c). */
   /** Provoke-like: `what` blocks the source (or `attacker`, "blocks target creature") this combat or turn if able. */
@@ -3243,7 +3252,7 @@ export type Effect =
    * each gain control of all creatures the other controls until end of turn. Those creatures gain haste until end of
    * turn." Both groups are the creatures each controls as it resolves, exchanged at once (CR 701.12b, 611.2c).
    */
-  | { type: "swapCreatures"; who: PlayerRef }
+  | { type: "swapCreatures"; who: PlayerRef; /** Twist Allegiance: "Untap those creatures" after the exchange, not before (Reins of Power). */ untapAfter?: true }
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
@@ -3303,7 +3312,7 @@ export type Effect =
    * it resolves, not targeted (CR 608.2d), among those it could be attached to (CR 701.3a-b, 301.5c). `equipmentOnly`:
    * nothing happens unless it's an Equipment; `may`: attaching it to none is a choice too.
    */
-  | { type: "attachToChosen"; source: ObjRef; filter: TargetSpec; may?: true; equipmentOnly?: true; /** "Attach one of them" (Gilgamesh): with more than one of `source`, which one is chosen first (with `may`, or none). */ pickOne?: true }
+  | { type: "attachToChosen"; source: ObjRef; filter: TargetSpec; may?: true; equipmentOnly?: true; /** Kudzu: "That land's controller may attach ~ to a land of their choice": who chooses (default: the ability's controller). */ chooser?: PlayerRef; /** "Attach one of them" (Gilgamesh): with more than one of `source`, which one is chosen first (with `may`, or none). */ pickOne?: true }
   /**
    * "Exile them, then meld them into [the combined back face]" (CR 701.42): ~ and a permanent of this card type named its
    * counterpart, if you both own and control them (and both are attacking, `attacking`: then it enters tapped and
@@ -3956,6 +3965,14 @@ export type Effect =
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
+  /**
+   * Juxtapose: "You and target player exchange control of the creature you each control with the greatest mana value. Then
+   * exchange control of artifacts the same way. If two or more permanents a player controls are tied for greatest, their
+   * controller chooses one of them." Each of `types` in turn; with either player having none, that exchange is skipped.
+   */
+  | { type: "juxtapose"; who: PlayerRef; types: string[] }
+  /** Time and Tide: "Simultaneously, all phased-out creatures phase in and all creatures with phasing phase out." (CR 702.26). */
+  | { type: "phaseSwap" }
   | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
@@ -5800,6 +5817,8 @@ export interface ManaTrigger {
    * their cost.
    */
   anyAbility?: true;
+  /** Winter's Night: "That land doesn't untap during its controller's next untap step." (the permanent tapped for mana). */
+  landSkipsUntap?: true;
   /**
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
@@ -7144,6 +7163,11 @@ export interface CompiledCard {
   countsAsNamed?: string;
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
+  /**
+   * Freyalise's Winds: "If a permanent with a wind counter on it would untap during its controller's untap step, remove all
+   * wind counters from it instead." (a replacement effect, CR 614.1a): any permanent's, the counters of this kind.
+   */
+  untapRemovesCounters?: string;
   /** "Skip your upkeep step if you have no cards in hand" (Gibbering Descent, CR 614.10): its controller's upkeep doesn't happen while their hand is empty. */
   skipUpkeepIfHellbent?: true;
   /** "Players skip their untap steps." (Stasis, CR 614.10): no player's untap step happens. */

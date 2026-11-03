@@ -3907,6 +3907,30 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(chosenLand[2]!, { subjectIt: true });
     return body ? { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: ["Land"], controller: chosenLand[1] === "you" ? "you" : "opponent", chosen: "landType", text: `land of the chosen type ${chosenLand[1]} control${chosenLand[1] === "you" ? "" : "s"}` }, body } : "fail";
   }
+  // Ramses, Assassin Lord: "Whenever a player loses the game, if they were attacked this turn by an Assassin you
+  // controlled, ...": an Assassin declared as an attacker attacking that player this turn, as it was declared; even if it's
+  // gone or changed since, not a planeswalker of theirs, not one put onto the battlefield attacking (rulings).
+  const attackedBy = /^Whenever a player loses the game, if they were attacked this turn by an? ([A-Z][a-z]+) you controlled, (.+)$/.exec(line);
+  if (attackedBy) {
+    if (!CREATURE_TYPES.has(attackedBy[1]!)) return "fail";
+    const t = parseTrigger(`Whenever a player loses the game, ${attackedBy[2]!}`);
+    return t && t !== "fail" && t.event === "anotherPlayerLosesGame" && !t.ifCond ? { ...t, ifCond: { kind: "attackedWith", n: 1, subtype: attackedBy[1]!, eventPlayer: true } } : "fail";
+  }
+  // The Ninth Doctor: "Whenever ~ becomes untapped during your untap step": only as its controller's untap step untaps it
+  // (CR 502.3); it goes on the stack in the next step, usually the upkeep (rulings).
+  const untapStep = /^Whenever ~ becomes untapped during your untap step, (.+)$/.exec(line);
+  if (untapStep) {
+    const body = parseBody(untapStep[1]!);
+    return body ? { event: "selfBecomesUntapped", inYourUntapStep: true, body } : "fail";
+  }
+  // Deeproot Pilgrimage: "Whenever one or more nontoken Merfolk you control become tapped", Rewrite History: "Whenever one
+  // or more creatures you control become tapped": once for the permanents that become tapped at the same time (rulings).
+  const tappedMany = /^Whenever one or more (.+?) become tapped, (.+)$/.exec(line);
+  if (tappedMany) {
+    const filter = parseTargetPhrase(tappedMany[1]!.replace(/^creatures /, "creature "));
+    const body = filter?.kind === "object" && parseBody(tappedMany[2]!);
+    return filter && body ? { event: "permanentsBecomeTapped", tappedFilter: filter, body } : "fail";
+  }
   const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {
     const filter = parseTargetPhrase(tapped[1]!);

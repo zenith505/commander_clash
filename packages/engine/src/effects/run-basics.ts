@@ -125,8 +125,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "addUpkeepStep":
-      if (s.step === "upkeep") s.extraUpkeeps = (s.extraUpkeeps ?? 0) + 1;
+      if (s.step === "upkeep" && (!e.you || ctx.controller === s.activePlayer)) s.extraUpkeeps = (s.extraUpkeeps ?? 0) + 1;
       return;
+    case "addUpkeepPhases": {
+      // Obeka: additional beginning phases after this phase, each only an upkeep step (rulings, CR 500.8); the most
+      // recently added first (addPhases).
+      const n = amountNow(s, e.n, ctx);
+      if (n > 0 && ctx.controller === s.activePlayer && addPhases(s, Array.from({ length: n }, () => "upkeep" as const))) log(s, `${player(s, ctx.controller).name} gets ${n === 1 ? "an additional upkeep step" : `${n} additional upkeep steps`} after this phase.`);
+      return;
+    }
     case "addEndStep":
       if (s.step === "end" && (s.turnLog?.endSteps ?? 0) === 1) s.extraEndSteps = (s.extraEndSteps ?? 0) + 1;
       return;

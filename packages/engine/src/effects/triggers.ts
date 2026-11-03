@@ -202,6 +202,11 @@ export type TriggerSourceEvent =
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true; /** The player an effect had tap it (see tapPermanent). */ by?: PlayerId; /** Tapped to pay a teamwork cost (Agent Maria Hill). */ teamwork?: true }
+  /**
+   * Permanents that became tapped at the same time (CR 701.26a; see batchTaps in game.ts), for "whenever one or more ...
+   * become tapped" (Deeproot Pilgrimage): one event for the attackers declared together, a cost's taps, an instruction's.
+   */
+  | { type: "tappedTogether"; ids: ObjectId[] }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
@@ -1257,12 +1262,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems(tapWatch);
     // Don't Move: "Until your next turn, whenever a creature becomes tapped, destroy it" (a delayed trigger, CR 603.7b).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.tappedByYou && ev.by !== ctrl) && objectMatches(s, t.tappedFilter, o, ctrl, false), triggers, undefined, o));
+  } else if (ev.type === "tappedTogether") {
+    // "Whenever one or more nontoken Merfolk you control become tapped" (Deeproot Pilgrimage): once for all the permanents
+    // that became tapped at the same time, if any of them is one (rulings).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      add(w, wc, (e, t) => e === "permanentsBecomeTapped" && !!t.tappedFilter && ev.ids.some((x) => s.objects[x]?.zone === "battlefield" && objectMatches(s, t.tappedFilter!, obj(s, x), wc, false)));
+    }
   } else if (ev.type === "untapped") {
     // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
     // you control becomes untapped" (the untapped permanent is the subject).
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfBecomesUntapped");
-    addHosted(o, (e) => e === "selfBecomesUntapped");
+    add(o, controllerOf(s, o), (e, t) => e === "selfBecomesUntapped" && (!t.inYourUntapStep || (s.step === "untap" && s.activePlayer === controllerOf(s, o))));
+    addHosted(o, (e, t) => e === "selfBecomesUntapped" && !t.inYourUntapStep);
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
@@ -1887,6 +1900,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const first = (s.turnLog?.timesDealtDamage?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? 0) <= 1;
       add(o, controllerOf(s, o), (e, t) => (e === "selfIsDealtDamage" && ev.amount >= (t.minDamage ?? 0) && (!t.firstDealtEachTurn || first)) || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
+      // Arcbond: "Whenever that creature is dealt damage this turn, ...": a delayed trigger about it (CR 603.7c), it the subject.
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfIsDealtDamage", triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }), o);
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {
         const w = obj(s, id);

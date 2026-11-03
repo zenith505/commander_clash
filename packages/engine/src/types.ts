@@ -877,7 +877,7 @@ export interface Player {
    */
   /** How many creatures this player declared as attackers in this turn's latest combat (Kytheon, Hero of Akros: "~ and at least two other creatures attacked this combat"). */
   attackedCombat?: { turn: number; combat: number; n: number };
-  attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all"> };
+  attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all">; /** The players each one was declared attacking, not their planeswalkers (Ramses, Assassin Lord). */ to?: Record<string, PlayerId[]> };
   /**
    * The total power of the creatures this player declared as attackers in the latest combat, as they were declared, and its
    * turn (pack tactics: a later change of power, or an attacker leaving, doesn't matter; AFR release notes).
@@ -1847,13 +1847,15 @@ export interface GameState {
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
-  addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
+  addedPhases?: ("combat" | "main" | "beginning" | /** A beginning phase with only its upkeep step (Obeka, Splitter of Seconds). */ "upkeep" | { combat: number })[];
   /** Phases waiting for this turn's second main phase, to come after it (World at War, CR 500.8). */
-  afterSecondMain?: ("combat" | "main" | "beginning" | { combat: number })[];
+  afterSecondMain?: ("combat" | "main" | "beginning" | "upkeep" | { combat: number })[];
   /** Additional end steps still to come directly after this end step (Y'shtola Rhul, CR 500.8): no cleanup in between. */
   extraEndSteps?: number;
   /** Additional upkeep steps still to come directly after this upkeep (Paradox Haze, CR 500.8). */
   extraUpkeeps?: number;
+  /** The added beginning phase going on now has only an upkeep step (Obeka, Splitter of Seconds; see addedPhases). */
+  upkeepPhase?: true;
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;

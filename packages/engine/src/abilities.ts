@@ -3686,6 +3686,12 @@ export type Effect =
   | { type: "dismissStack" }
   /** Glen Elendra's Answer: "Counter all spells your opponents control and all abilities your opponents control": each one already on the stack, from the top down (rulings; mana abilities never are, CR 605.3a). */
   | { type: "counterOpponentsStack" }
+  /**
+   * Whirlwind Denial: "For each spell and ability your opponents control, counter it unless its controller pays {4}":
+   * the opponent whose turn it is (or the next in turn order) chooses and pays for theirs, then each other opponent in
+   * turn order; then all those not paid for are countered at the same time (rulings).
+   */
+  | { type: "counterOpponentsStackUnless"; unless: UnlessPays }
   /** "Target spell can't be countered" (Vexing Shusher): that spell, a copy too, while it's on the stack (CR 101.2). */
   | { type: "spellUncounterable"; index: number }
   /**

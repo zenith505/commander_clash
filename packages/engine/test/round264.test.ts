@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { destroyPermanent, invalidateCharacteristics } from "../src";
+import { botActions, destroyPermanent, invalidateCharacteristics } from "../src";
 import { putCounters } from "../src/counters";
 import { abilitiesOf, applyAction, characteristics, dealDamageBatch, isFullySupported, objectSource, planActivate, moveObject, planCast, planSuspend, runStateBasedActions, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
@@ -52,6 +52,8 @@ const into = (s: GameState, pid: PlayerId, def: CardDef, z: "graveyard" | "hand"
 };
 
 const reyhan = (): CardDef => ({"oracleId":"3e7df01c-75af-440d-97fd-1b1b794281b9","name":"Reyhan, Last of the Abzan","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Human Warrior","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warrior"],"oracleText":"Reyhan enters with three +1/+1 counters on it.\nWhenever a creature you control dies or is put into the command zone, if it had one or more +1/+1 counters on it, you may put that many +1/+1 counters on target creature.\nPartner (You can have two commanders if both have partner.)","power":"0","toughness":"0","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Partner"],"commanderLegal":"legal","set":"c16","releasedAt":"2016-11-11","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
+
+const denial = (): CardDef => ({"oracleId":"ba9e129d-a3cf-431c-93af-f2e4902d40a0","name":"Whirlwind Denial","manaCost":"{2}{U}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"For each spell and ability your opponents control, counter it unless its controller pays {4}.","colors":["U"],"colorIdentity":["U"],"keywords":[],"commanderLegal":"legal","set":"thb","releasedAt":"2020-01-24","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
 
 /** A Protean Hydra with `n` +1/+1 counters, and an opponent's creature to deal damage with. */
 const withHydra = (n: number) => {
@@ -391,5 +393,67 @@ describe("Reyhan, Last of the Abzan", () => {
     expect(plus(s, to)).toBe(1);
     expect(s.pending).toBeFalsy();
     expect(s.stack.length).toBe(0);
+  });
+});
+
+describe("Whirlwind Denial", () => {
+  /**
+   * The active player casts a sorcery; the next two opponents each respond with an instant; then the active player
+   * casts Whirlwind Denial. The opponents have `pool` colorless mana each to pay with.
+   */
+  const stackUp = (pool: number) => {
+    const { s: s0, ap, ids } = setup([card("Test Study", "Sorcery", "{U}", { oracleText: "Draw a card." }), denial()]);
+    const [o1, o2] = opps(s0, ap) as [PlayerId, PlayerId];
+    const i1 = into(s0, o1, card("Test Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }), "hand");
+    const i2 = into(s0, o2, card("Test Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }), "hand");
+    for (const p of [o1, o2]) s0.players[p]!.manaPool = { ...s0.players[p]!.manaPool, U: 1, C: pool };
+    const to = (s: GameState, p: PlayerId) => {
+      for (let i = 0; i < 10 && waitingOn(s) !== p; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(waitingOn(s)).toBe(p);
+      return s;
+    };
+    let s = run(s0, planCast(s0, ap, ids[0]!, []));
+    s = to(act(s, { type: "passPriority", player: ap }), o1);
+    s = run(s, planCast(s, o1, i1, []));
+    s = to(act(s, { type: "passPriority", player: o1 }), o2);
+    s = run(s, planCast(s, o2, i2, []));
+    s = to(act(s, { type: "passPriority", player: o2 }), ap);
+    s = run(s, planCast(s, ap, ids[1]!, []));
+    s = to(s, ap);
+    // Everyone passes: Whirlwind Denial resolves.
+    for (let i = 0; i < 4 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, o1, o2, i1, i2, study: ids[0]! };
+  };
+
+  it("is fully supported", () => {
+    expect(isFullySupported(denial())).toBe(true);
+  });
+
+  it("asks the opponents in turn order from the next one; those not paid for are countered, the caster's own spell stays", () => {
+    const { s: s0, ap, o1, o2, i1, i2, study } = stackUp(4);
+    expect(s0.pending).toMatchObject({ kind: "payUnless", player: o1, cost: "{4}" });
+    let s = act(s0, { type: "payUnless", player: o1, pay: true });
+    expect(s.players[o1]!.manaPool.C ?? 0).toBe(0);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: o2, cost: "{4}" });
+    // Nothing is countered until every opponent has chosen (rulings).
+    expect(s.objects[i1]!.zone).toBe("stack");
+    s = act(s, { type: "payUnless", player: o2, pay: false });
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[i2]!.zone).toBe("graveyard");
+    expect(s.objects[i1]!.zone).toBe("stack");
+    expect(s.objects[study]!.zone).toBe("stack");
+    expect(ap).toBeTruthy();
+  });
+
+  it("an opponent who can't pay has theirs countered", () => {
+    const { s: s0, o1, o2, i1, i2 } = stackUp(0);
+    expect(s0.pending).toMatchObject({ kind: "payUnless", player: o1 });
+    // A bot without the mana declines.
+    const a1 = botActions(s0, o1);
+    expect(a1[a1.length - 1]).toMatchObject({ type: "payUnless", player: o1, pay: false });
+    let s = act(s0, { type: "payUnless", player: o1, pay: false });
+    s = act(s, { type: "payUnless", player: o2, pay: false });
+    expect(s.objects[i1]!.zone).toBe("graveyard");
+    expect(s.objects[i2]!.zone).toBe("graveyard");
   });
 });

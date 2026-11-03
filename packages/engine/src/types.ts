@@ -2432,6 +2432,8 @@ export interface Resolving {
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
   rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
+    /** Whirlwind Denial: the spells and abilities still to ask about, in order, and those not paid for. */
+    denial?: { queue: string[]; unpaid: string[] };
     /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */
     topOrdered?: true;
     /** "Each player chooses a creature type": the players asked so far. */

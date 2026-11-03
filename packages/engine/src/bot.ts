@@ -1141,7 +1141,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
       if (endsTurnOnly(body)) return theirs;
-      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell.
+      // Glen Elendra's Answer counters only what opponents control: always worth it against their spell. Whirlwind
+      // Denial: unless they can pay its {4} for it.
+      const denial = body.effects.find((e) => e.type === "counterOpponentsStackUnless");
+      if (denial?.type === "counterOpponentsStackUnless") return !canPayUnless(s, top.controller, denial.unless, pid, sourceId, x);
       if (countersTheirStack(body)) return true;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
@@ -1317,7 +1320,7 @@ function endsTurnOnly(body: AbilityBody): boolean {
 
 /** "Counter all spells your opponents control and all abilities your opponents control" (Glen Elendra's Answer). */
 function countersTheirStack(body: AbilityBody): boolean {
-  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack");
+  return !body.targets.length && body.effects.some((e) => e.type === "counterOpponentsStack" || e.type === "counterOpponentsStackUnless");
 }
 
 /**
@@ -2340,7 +2343,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // Summary Dismissal: only in response to an opponent's spell (see the counterspell response).
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack")) return null;
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "dismissStack" || e.type === "counterOpponentsStack" || e.type === "counterOpponentsStackUnless")) return null;
   // Aggressive Mining: "You can't play lands" only once we have enough of them.
   if (compileCard(d).youCantPlayLands && lands(s, pid) < 6) return null;
   // Mandate of Peace: "End the combat phase" (CR 724.2) only against an attack on us that hasn't dealt its damage yet.

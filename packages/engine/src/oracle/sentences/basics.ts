@@ -1385,6 +1385,26 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
+  // Pale Moon: "Until end of turn, if a player taps a nonbasic land for mana, it produces colorless mana instead of any other
+  // type"; Deep Water: "Until end of turn, if you tap a land you control for mana, it produces {U} instead of any other type"
+  // (rulings: lands you gain control of later this turn too). The same amount of mana, of that type (CR 614.1a).
+  if ((m = /^(?:Until end of turn, if|If) (a player taps a nonbasic land|you tap a land you control) for mana, it produces (\{[WUBRGC]\}|colorless mana) instead of any other type(?: until end of turn)?$/.exec(s)) && /^Until end of turn, | until end of turn$/.test(s))
+    return [{ type: "landManaUntilEndOfTurn", mana: m[2] === "colorless mana" ? "C" : (m[2]![1] as ManaType), ...(m[1] === "a player taps a nonbasic land" ? { nonbasic: true as const } : { yours: true as const }) }];
+  // Mist of Stagnation: "that player chooses a permanent for each card in their graveyard, then untaps those permanents":
+  // any permanents, anyone's, as many different ones as cards in their graveyard (all of them if there aren't that many).
+  if ((m = /^(that player) chooses a permanent for each card in their graveyard and untaps those permanents$/.exec(s)) && ctx.eventPlayer) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseTargetPhrase("permanent");
+    if (who && filter?.kind === "object") return [{ type: "pick", who, filter: { ...filter, text: "permanent" }, n: { count: { kind: "cardsInGraveyard", who } }, action: "choose", anyController: true, prompt: "choose a permanent for each card in your graveyard (anyone's): they untap" }, { type: "untap", what: { ref: "created" } }];
+  }
+  // Quarum Trench Gnomes: "If target Plains is tapped for mana, it produces colorless mana instead of white mana" (the
+  // reminder: "This effect lasts indefinitely"): only its white mana, for as long as it's that permanent (CR 614.1a, 400.7).
+  if ((m = /^If (target (?:Plains|Island|Swamp|Mountain|Forest)) is tapped for mana, it produces colorless mana instead of (white|blue|black|red|green) mana$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[2] as "white"];
+    const land = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" }[m[1]!.slice(7)];
+    return what?.ref === "target" && !what.n && land === color ? [{ type: "replaceLandMana", what, from: color, into: "C" }] : null;
+  }
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller
   // can't ..." (Render Silent), "defending player can't ..." (Xantid Swarm), "Players can't cast noncreature spells this
   // turn" (Calamity's Wake), "Players dealt damage this way can't ..." (Aurelia's Fury): a "can't" for those players

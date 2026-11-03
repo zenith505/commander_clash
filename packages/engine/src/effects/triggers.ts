@@ -942,6 +942,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const a of o.blocking ?? []) {
         const at = s.objects[a];
         if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && fits(t, o, controllerOf(s, w)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, o);
+        // No Quarter: the powers of the two as blockers are declared; the one destroyed is the subject.
+        if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "blockerLess" && power(s, o) < power(s, at), undefined, undefined, o);
+        if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "attackerLess" && power(s, at) < power(s, o), undefined, undefined, at);
       }
     }
     // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
@@ -2078,6 +2081,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).
         // Not an optional cost paid like kicker, as "you may blight 1" (Burning Curiosity) or replicate.
         if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
+        // "A spell using teamwork" (Virtual Assistant): its teamwork cost was paid as it was cast (CR 702.194b).
+        if (t.cast.teamwork && !spell?.teamwork) return false;
         // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
         if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:

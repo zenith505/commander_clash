@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { hiddenInExile, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -2899,6 +2899,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "processExile": {
+      if (e.adventureOf) {
+        // Memory Theft: that player's face-up adventurer cards in exile (CR 715.2; rulings), one or none.
+        const sc = (s.resolving!.scratch ??= {});
+        const owner = players(s, e.adventureOf, ctx)[0];
+        const cards = adventureExileCards(s, owner);
+        if (!sc.found) {
+          if (!cards.length) return;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "a card that has an Adventure", cards, min: 1, max: 1, exiled: true, dig: { looked: cards, to: `to put into ${player(s, owner!).name}'s graveyard`, rest: "stay in exile" } };
+          return "paused";
+        }
+        const found = sc.found.filter((id) => cards.includes(id));
+        sc.found = undefined;
+        for (const id of found) {
+          log(s, `${src} puts ${defOf(s, obj(s, id)).name} into its owner's graveyard.`);
+          moveObject(s, id, "graveyard");
+        }
+        return;
+      }
       // The Eldrazi processors: cards an opponent owns in exile, chosen as it resolves; a face-down one by its group, then
       // at random within it (rulings). Two cards can't be the same card (rulings on Ulamog's Despoiler).
       const sc = (s.resolving!.scratch ??= {});

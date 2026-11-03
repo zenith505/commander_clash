@@ -1,7 +1,7 @@
 # Roadmap
 
-29,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,467 of
+29,491 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,954 of 4,988 (99%), top 10,000: 9,468 of
 9,979 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1828,7 +1828,7 @@ line blocks.
    opponent, choose an artifact or land that player controls. Destroy the chosen permanents" (Ultimate Magic: Meteor,
    with a browser test); "Return target creature card and all other cards with the same name as that card from your
    graveyard to the battlefield tapped" (Rat King, Verminister); "When ~ dies this turn, return it to the battlefield
-   transformed under your control" (Golden Guardian; bots don't use it yet). +9 (29,477 of 31,936).
+   transformed under your control" (Golden Guardian; bots don't use it yet). +9 (29,477 of 31,936; 29,491 with B92).
    Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
    and "that creature's controller may have ~ deal 1 damage to it"); Sorceress's Schemes (a target that is either a card
    in your graveyard or an exiled card with flashback: exile targets aren't supported); Reyhan, Last of the Abzan ("or is
@@ -2529,8 +2529,8 @@ line blocks.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
    - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
-     effect while a {T} mana ability resolves (CR 106.12b); other "produces ... instead" replacements (Contamination,
-     Infernal Darkness, Pulse of Llanowar) are out.
+     effect while a {T} mana ability resolves (CR 106.12b); changes of type (Contamination, Infernal Darkness) since round
+     B92; a color of the player's choice instead (Pulse of Llanowar) is still out.
    - "Each player chooses ..., then sacrifices the rest" still out: Natural Balance, Promise of Loyalty's vow counters,
      Stick Together's party, Single Combat's "can't cast creature or planeswalker spells until the end of your next
      turn".
@@ -4914,6 +4914,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Incriminate, Trial of Agony, Cannibalize, with a browser test); "Whenever you activate an ability of an Elemental"
   (Ceaseless Searblades); "Whenever one or more creatures you control that entered this turn attack a player" (Whirlwind,
   Killer Cyclone). +14 (29,422 of 31,936 with B86 to B90 and rounds 248 to 253; 29,441 with rounds 254 and 255; 29,452 with round 256).
+- Round B92 (one-line templates from the bottom of the list): lands tapped for mana producing another type, a
+  replacement effect on the mana (CR 106.12b, 614.1a) that "could produce" counts too (CR 106.7): "If a land is tapped for
+  mana, it produces {B} (colorless mana) instead of any other type" (Infernal Darkness, Ritual of Subdual), "... and
+  amount" (Contamination: one mana), "Until end of turn, if a player taps a nonbasic land for mana" (Pale Moon), "if you
+  tap a land you control for mana" (Deep Water), "If target Plains is tapped for mana, it produces colorless mana instead
+  of white mana" indefinitely (Quarum Trench Gnomes: only its white mana); with Mana Reflection or Damping Sphere too, the
+  player's order (CR 616.1) is the one giving the most mana, else timestamp order (the engine picks it for them).
+  "Whenever you cast a spell using teamwork" (Virtual Assistant, CR 702.194b); "that player chooses a permanent for each
+  card in their graveyard, then untaps those permanents" (Mist of Stagnation, anyone's permanents, with a browser test);
+  "Each player sacrifices a Plains or a white permanent of their choice for each white permanent they control" (Omen of
+  Fire, each their own number, counted before anyone sacrifices); "You may put a card that has an Adventure that player
+  owns from exile into that player's graveyard" (Memory Theft, face-up ones only, with a browser test); "Choose up to X
+  creatures and/or planeswalkers you control, where X is the number of times ~ was kicked. Those permanents phase out"
+  (Temporal Firestorm, with a browser test); "If ~ would enter, instead sacrifice each other permanent named ~ you
+  control" (Sheltered Valley); "a creature you control with power greater than its base power deals combat damage to a
+  player" (Ms. Marvel, Elastic Ally, CR 208.4b); "Whenever a creature becomes blocked by (blocks) a creature with lesser
+  power" (No Quarter, once for each pair as blockers are declared, CR 509.3c-d). +14 (29,466 of 31,936 with B91 and
+  rounds 254 to 256; 29,475 with round 257).
+- Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
+  basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
+  your choice instead: a choice as the land is tapped), Escaped Shapeshifter (keywords and protection read from opponents'
+  creatures, a layer 6 dependency), Spoils of War (X set by an opponent's graveyard as you cast it), Drain Life, Soul Burn
+  and Consume Spirit ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
+  color on X), Fatal Lore (an opponent chooses the mode), Echo Chamber (an opponent chooses the target), Butcher Orgg and
+  Cunning Giant (combat damage assigned to other creatures).
 - Out after round B91 (looked at, not done): Goblin Test Pilot (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored
   activation cost reduction, "if another creature with flying entered the battlefield under your control this turn"),

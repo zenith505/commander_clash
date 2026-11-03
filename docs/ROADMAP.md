@@ -1,7 +1,7 @@
 # Roadmap
 
-29,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,514 of
+29,625 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,956 of 4,988 (99%), top 10,000: 9,522 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1967,6 +1967,23 @@ line blocks.
    discard a card. Each player who discarded a card this way draws a card. If a creature card was discarded this way, ...
    Then if a noncreature card was discarded this way, ..." (Mog, Moogle Warrior: each in turn order, CR 101.4; one with an
    empty hand isn't asked, 101.3). +8 (29,587 of 31,936; 29,607 with B96 and B97; 29,617 with B98).
+   Round 269 went back over earlier skips from the top. "Each opponent may discard a card or sacrifice a permanent of
+   their choice. ~ deals 3 damage to each opponent who didn't" (Zoyowa Lava-Tongue) and "each opponent may sacrifice a
+   nonland permanent of their choice or discard a card. Then ~ deals damage equal to its power to each opponent who
+   didn't" (Osseous Sticktwister: a punisher, choices in turn order, CR 101.4, its power as the ability resolves or as it
+   last existed; with a browser test); "Whenever a creature you control attacks a player, if no other creatures are
+   attacking that player" (Jin Sakai, Ghost of Tsushima: an intervening if, CR 603.4, checked again as it resolves); "you
+   may remove a counter from a creature or planeswalker you control. If you do" (Sanctuary Warden: any kind of counter;
+   with a browser test) and "remove a +1/+1 counter from each of two creatures you control" (Dyadrine, Synthesis
+   Amalgam); "When you put one or more quest counters on ~ this way ... deals damage equal to the number of quest counters
+   on it to up to one target creature unless that creature's controller has ~ deal that much damage to them" (Craig
+   Boone, Novac Guard: a reflexive trigger for each two counters put, rulings, with Doubling Season twice); "you may
+   sacrifice up to three Zombies. When you sacrifice one or more Zombies this way, each opponent sacrifices that many
+   creatures of their choice" (Ravenous Rotbelly: with a browser test); "Remove a counter from an artifact, creature,
+   land, or planeswalker you control" as a cost, any kind (Soul Diviner). Bots take a harmful counter off first and never
+   a planeswalker's last loyalty counter. +8 (29,595 of 31,936; 29,625 with B96 to B98).
+   Out after round 269 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
+   spell": how the words group isn't settled enough to compile honestly); Summoner's Sending ("if the exiled card's mana value is 4 or greater" isn't parsed yet).
    Out after round 268 (looked at, not done): Eruth, Tormented Prophet ("If you would draw a card, exile the top two cards
    of your library instead": a draw replacement that has to join the choice among the other draw replacements, CR 616.1,
    and the draws a resolution counts); Quintorius Kand's −6 ("You may play those cards this turn" about the cards its own

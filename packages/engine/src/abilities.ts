@@ -208,6 +208,8 @@ export type Count =
   | { kind: "sacrificedThisWayGreatestPower" }
   /** "The total power of the creatures sacrificed this way" (Reign of the Pit): as each last existed, negative powers included (rulings). */
   | { kind: "sacrificedThisWayTotalPower" }
+  /** "The number of colors that creature was" after "Sacrifice a creature." (Bound): its colors as it last existed (CR 608.2h). */
+  | { kind: "sacrificedThisWayColors" }
   /**
    * Angrath, Minotaur Pirate: the total power of the creatures this effect destroyed, as they last existed, plus that of
    * the creatures `survivorsOf` still controls (those it couldn't destroy), as they are now (rulings).
@@ -257,6 +259,9 @@ export type Count =
   /** "The exiled creature card's power" (Phyrexian Ingester): the power (or toughness) of each creature card its linked
    * exile took that's still there, as it is in exile (rulings: no bonus for a card that isn't a creature card). */
   | { kind: "linkedExiledPT"; stat: "power" | "toughness" }
+  /** "The mana value of the exiled card used to craft it" (Jadeheart Attendant): the total mana value of the cards the craft
+   * cost exiled that are still there (CR 702.167c; rulings: all of them if there were several, a token none). */
+  | { kind: "linkedExiledMv" }
   /** "The total power of those creatures": the ones that died in a "one or more ... die" event, as they last existed (The Skullspore Nexus). */
   | { kind: "eventGroupPower" }
   /** "For each card type among those cards" (Polluted Cistern): the cards of a "one or more cards are put into your graveyard" event (CR 205.2a). */
@@ -5976,6 +5981,8 @@ export interface ManaSpend {
   cumulativeUpkeep?: true;
   /** "Only to activate power-up abilities" (Quinjet Technician): ManaUse.powerUp. */
   powerUpAbilities?: true;
+  /** "Only to foretell cards or cast spells that have foretell" (Niko Defies Destiny): ManaUse.foretell, or a spell with foretell. */
+  foretell?: true;
   text: string;
 }
 
@@ -6554,6 +6561,8 @@ export interface CompiledCard {
     /** Rescuer Sphinx: "As ~ enters, you may return a nonland permanent you control to its owner's hand. If you do, ~ enters with a +1/+1 counter on it.": the same choice, returned instead of sacrificed, at most `max`. */
     bounce?: true;
     max?: number;
+    /** Overlaid Terrain: "As ~ enters, sacrifice all lands you control." (CR 614.1c, 614.12): no choice, every one. */
+    all?: true;
   };
   /**
    * "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor; CR 614.12, 119.4): the amount, kept

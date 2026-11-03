@@ -432,6 +432,9 @@ export function normalizeSelf(d: CardDef): string {
   if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
+  // Iron Fist, Living Weapon: '~ gains "{T}: Iron Fist deals damage equal to his power to any other target"': given to
+  // itself, its name in the quote is the object that has the ability, "~" there, and "his" its "its" (CR 201.5).
+  t = t.replace(/((?<![\w~])~ gains )"([^"]*\u27easource\u27eb[^"]*)"/g, (_, a: string, q: string) => `${a}"${q.replaceAll(QUOTED_SOURCE_NAME, "~").replace(/\b(?:his|her) power\b/g, "its power")}"`);
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room|Siege|battle)\b/g, "~");
   // A Room's door (CR 709.5j): "When you unlock this door" is about that half, by its index.
   if (d.faceOf && d.subtypes.includes("Room")) t = t.replace(/\bWhen you unlock this door\b/g, `When you unlock door ${d.faceOf.face}`);
@@ -1679,6 +1682,12 @@ export function compile(d: CardDef): CompiledCard {
       const fits = asSac[1] === "untapped Forests" ? !rider : asSac[1] === "permanents" ? rider === "counters" : rider === "total";
       if (out.devour || !fits) out.unsupported.push(raw);
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
+      continue;
+    }
+    // Overlaid Terrain: "As ~ enters, sacrifice all lands you control." The same, without a choice: all of them (CR 614.12).
+    if (line === "As ~ enters, sacrifice all lands you control." && !isSpell) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: 0, filter: { kind: "object", types: ["Land"], text: "land" }, all: true };
       continue;
     }
     // Devouring Hellion: "As ~ enters, you may sacrifice any number of creatures and/or planeswalkers. If you do, it enters
@@ -5400,7 +5409,10 @@ export function compile(d: CardDef): CompiledCard {
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
       // and turning it face up isn't entering (CR 708.8), so one or the other. Shield Mare: "... or becomes the target of a
       // spell or ability an opponent controls". Champions of the Shoal: "Whenever ~ enters or becomes tapped, ...".
-      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls|becomes tapped), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous|is turned face up|becomes the target of a spell or ability an opponent controls|becomes the target of an Aura spell|becomes tapped), (.+)$/.exec(line) ??
+      // Brinebound Gift: "Whenever ~ enters or enchanted creature becomes the target of an Aura spell": the Aura entering, and
+      // the creature it's attached to targeted, are never one event.
+      /^Whenever ~ enters or (enchanted creature becomes the target of an Aura spell), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       // "When ~ enters and whenever it deals combat damage to a player, create a Blood token." (Ivora, Insatiable Heir)
       /^When ~ enters and whenever it (attacks while saddled|attacks|deals combat damage to a player), (.+)$/.exec(line) ??
@@ -5495,6 +5507,8 @@ export function compile(d: CardDef): CompiledCard {
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
+          : twice[1] === "enchanted creature becomes the target of an Aura spell"
+            ? [`When ~ enters, ${effect}`, `Whenever ${twice[1]}, ${effect}`]
           : twice[1] === "the creature it haunts dies"
             ? [`When ~ enters, ${effect}`, `When the creature ~ haunts dies, ${effect}`]
             : /^at the beginning/.test(twice[1]!)

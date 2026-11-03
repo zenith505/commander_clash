@@ -1930,7 +1930,7 @@ line blocks.
    Return those cards ... at the beginning of your next upkeep" (Nahiri's Resolve, with a browser test); "Sacrifice a
    creature you control with mana value X other than ~: Return target creature card with mana value X plus 1" (Sidisi,
    Regent of the Mire: X announced and bound by the sacrifice, CR 107.3a, 602.2b; bots trade their least useful creature
-   for a bigger card; with a browser test). +7 (29,560 of 31,936; 29,570 with B95).
+   for a bigger card; with a browser test). +7 (29,560 of 31,936; 29,570 with B95; 29,590 with B96 and B97).
    Out after round 266 (looked at, not done): Moxite Refinery ("Remove X counters from an artifact or creature you
    control": X counters of any kinds from one permanent, a cost the counter picker can't limit to one permanent yet).
    Out after round 265 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets ("If a Zombie you control

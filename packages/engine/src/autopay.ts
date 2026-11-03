@@ -825,7 +825,7 @@ export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 
   if (!fd) return null;
   const problem = turnFaceUpProblem(s, pid, id, way, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const taps = problem ? planMana(s, pid, parseManaCost(faceUpManaCost(fd.cost, x))) : [];
+  const taps = problem ? planMana(s, pid, parseManaCost(faceUpManaCost(fd.cost, x)), 0, undefined, [], { ability: o, faceUp: fd.kind }) : [];
   return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id, ...(way ? { way } : {}), ...(x ? { x } : {}), ...(costs && Object.keys(costs).length ? { costs } : {}) }] : null;
 }
 

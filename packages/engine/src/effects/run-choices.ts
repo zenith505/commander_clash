@@ -1,6 +1,6 @@
 import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type SpellCondition, type StaticCondition, type TargetSpec } from "../abilities";
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
-import { canPayFromPool } from "../spend";
+import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
@@ -155,7 +155,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
         if (e.otherwise && onSelf && !objects(s, { ref: "self" }, ctx).length) sc.may = false;
-        else if (ownCost === null || (pay && !canPayNow(s, ctx.controller, pay))) sc.may = false; // can't pay, so can't do it
+        else if (ownCost === null || (pay && !canPayNow(s, ctx.controller, pay, mayPayUse(s, e.cumulativeUpkeep ? { upkeepOf: ctx.sourceId } : undefined)))) sc.may = false; // can't pay, so can't do it
         else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen
         // Paying to untap what's already untapped gets nothing: not worth asking (unless not paying does something).
         else if (pay && !e.otherwise?.length && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
@@ -175,7 +175,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const first = e.effects[0];
           const text = first?.type === "search" ? sayBound(s, e.text, first.filter, amountCtx(s, ctx)) : e.text;
           const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : e.payTimes !== undefined || e.payManaCost ? `${text} (${describePay(pay!) || "{0}"})` : text;
-          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}) };
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}), ...(e.cumulativeUpkeep && ctx.sourceId ? { upkeepOf: ctx.sourceId } : {}) };
           return "paused";
         }
       }
@@ -346,14 +346,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (s.resolving!.scratch ??= {});
       // Liege of the Hollows: from the active player on instead (rulings).
       const i = s.turnOrder.indexOf(e.activeFirst ? s.activePlayer : ctx.controller);
-      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0, by: {} });
+      // Errant Minion: "that player may pay any amount of mana": only that player.
+      const j = (sc.join ??= { queue: e.who ? players(s, e.who, ctx).filter((pid) => !player(s, pid).lost).slice(0, 1) : [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0, by: {} });
       while (j.queue.length) {
         const pid = j.queue[0]!;
         if (j.asked === undefined && sc.payX === undefined) {
           const cap = Math.min(availableMana(s, pid), 40);
           if (cap > 0) {
             const options = ["none", ...Array.from({ length: cap }, (_, k) => String(k + 1))];
-            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana${e.activeFirst ? "" : ` (${j.paid} paid so far)`}` };
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana${e.activeFirst || e.who ? "" : ` (${j.paid} paid so far)`}` };
             return "paused";
           }
         } else if (j.asked === undefined && sc.payX !== "none") {
@@ -525,7 +526,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
-      return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+      return runEffect(s, { type: "may", effects: [paid], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true, cumulativeUpkeep: true }, ctx);
     }
     case "choosePlayer": {
       // Gluntch: one more player, different from those chosen before (rulings), any of them you; asked each time the
@@ -1037,11 +1038,11 @@ function targetSpellSpent(s: GameState, ctx: ResolveCtx, i: number): ManaSpent |
 }
 
 /** Can `pid` pay this now: mana from their pool or untapped sources, life (CR 119.4), energy (CR 107.14)? */
-export function canPayNow(s: GameState, pid: PlayerId, pay: PayCost): boolean {
+export function canPayNow(s: GameState, pid: PlayerId, pay: PayCost, use: ManaUse = "other"): boolean {
   const p = player(s, pid);
   if (pay.life && payableLife(s, pid) < pay.life) return false;
   if (pay.energy && (p.energy ?? 0) < pay.energy) return false;
-  return !pay.mana || canPayFromPool(s, pid, parseManaCost(pay.mana), "other") || !!planMana(s, pid, parseManaCost(pay.mana));
+  return !pay.mana || canPayFromPool(s, pid, parseManaCost(pay.mana), use) || !!planMana(s, pid, parseManaCost(pay.mana), 0, undefined, [], use);
 }
 
 /** The mana cost of the resolving ability's source, X as 0; null when it has none (an unpayable cost, CR 118.6). */

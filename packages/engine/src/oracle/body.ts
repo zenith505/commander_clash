@@ -1695,6 +1695,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Maelstrom Djinn: "put two time counters on it and it gains vanishing", with no duration: for as long as it's on the
   // battlefield (CR 611.2a, 611.2c).
   text = text.replace(/^(put (?:a|an|one|two|three) [a-z]+ counters? on it) and it gains ([a-z]+)\.$/, "$1. It gains $2.");
+  // Life Matrix: "Put a matrix counter on target creature and that creature gains "Remove a matrix counter from this
+  // creature: Regenerate this creature."": two instructions about the target; the ability with no duration, for as long as
+  // it's on the battlefield (CR 611.2a, 400.7), and only its controller can activate it (CR 602.2, rulings).
+  text = text.replace(/^([Pp]ut an? [a-z]+ counter on target creature) and that creature gains ("[^"]+")\.?$/, "$1. It gains $2");
   // Spore Cloud: "Each attacking creature and each blocking creature doesn't untap during its controller's next untap
   // step": both groups as it resolves (CR 611.2c), as two instructions.
   text = text.replace(/\bEach attacking creature and each blocking creature doesn't untap during its controller's next untap step\./, "Each attacking creature doesn't untap during its controller's next untap step. Each blocking creature doesn't untap during its controller's next untap step.");
@@ -5363,6 +5367,51 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!fx) return null;
       effects.push({ type: "joinForces" }, ...replaceX(fx, { count: { kind: "joinForcesPaid" } }));
       si++;
+      continue;
+    }
+    // Dread Wight: "put a paralyzation counter on each creature blocking or blocked by ~ and tap those creatures. Each of
+    // those creatures doesn't untap during its controller's untap step for as long as it has a paralyzation counter on it.
+    // Each of those creatures gains "{4}: Remove a paralyzation counter from this creature."": the same creatures each
+    // time (nothing changes who's in combat in between), the untap lock ending for good once its last counter is gone (CR
+    // 611.2b), the ability with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7).
+    const wight = new RegExp(`^[Pp]ut an? ${COUNTER} counter on each creature blocking or blocked by ~ and tap those creatures$`).exec(s);
+    if (wight) {
+      const counter = counterKind(wight[1]!);
+      const lock = new RegExp(`^Each of those creatures doesn't untap during its controller's untap step for as long as it has an? ${COUNTER} counter on it$`).exec(sentences[si + 1] ?? "");
+      const gains = /^Each of those creatures gains ("[^"]+")$/.exec(sentences[si + 2] ?? "");
+      if (!lock || counterKind(lock[1]!) !== counter || !gains) return null;
+      const grant = parseGrants(gains[1]!);
+      if (grant?.length !== 1 || grant[0]!.kind !== "addAbility") return null;
+      const what = { ref: "inCombatWithSelf" } as const;
+      effects.push(
+        { type: "counters", what, counter, n: 1 },
+        { type: "tap", what },
+        { type: "continuous", what, mods: [{ kind: "doesntUntap" }], duration: "game", whileCounter: counter },
+        { type: "continuous", what, mods: grant, duration: "game" },
+      );
+      si += 2;
+      continue;
+    }
+    // Shambling Swarm: "distribute three -1/-1 counters among one, two, or three target creatures. For each -1/-1 counter
+    // you put on a creature this way, remove a -1/-1 counter from that creature at the beginning of the next end step.": a
+    // delayed trigger for each of those creatures as it is now (CR 603.7c, 400.7), removing as many as were put on it.
+    const swarm = new RegExp(`^For each ${COUNTER} counter you put on a creature this way, remove an? ${COUNTER} counter from that creature at the beginning of the next end step$`).exec(s);
+    if (swarm) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(swarm[1]!);
+      if (prev?.type !== "counters" || !prev.divided || prev.counter !== counter || counterKind(swarm[2]!) !== counter) return null;
+      effects.push({ type: "delayed", when: "nextEndStep", of: { ref: "countersPutThisWay", kind: counter }, perCounterPut: true, effects: [{ type: "removeCounters", what: { ref: "subject" }, counter, n: 1 }], text: `remove ${counter} counters from that creature` });
+      continue;
+    }
+    // Errant Minion, Power Leak: "that player may pay any amount of mana. ~ deals 2 damage to that player. Prevent X of
+    // that damage, where X is the amount of mana that player paid this way.": that player pays, then the damage is dealt
+    // less X, a prevention effect of this instruction (CR 615.1a), so none of it is prevented if damage can't be.
+    if (/^[Tt]hat player may pay any amount of mana$/.test(s) && /^Prevent X of that damage, where X is the amount of mana that player paid this way\.?$/.test(sentences[si + 2] ?? "")) {
+      const fx = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
+      const d = fx?.length === 1 && fx[0]!.type === "damage" ? fx[0]! : null;
+      if (d?.type !== "damage" || d.to.ref !== "eventPlayer" || d.also || d.divided || d.by) return null;
+      effects.push({ type: "joinForces", who: { ref: "eventPlayer" } }, { ...d, preventOf: { count: { kind: "joinForcesPaid" } } });
+      si += 2;
       continue;
     }
     // Liege of the Hollows: "Each player may pay any amount of mana. Then each player creates a number of 1/1 green
@@ -10905,20 +10954,52 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of
     // experience counters you have, return it to the battlefield. Otherwise, put it into your hand." (Meren of Clan Nel
     // Toth): compared as it resolves; with it lower, it can't go to the hand instead (rulings).
-    const ifMv = /^If that card's mana value is less than or equal to (.+?), (.+)$/.exec(s);
+    // Spikeshell Harrier: "return target creature or Vehicle an opponent controls to its owner's hand. If that opponent's
+    // speed is greater than each other player's speed, reduce that opponent's speed by 1. This effect can't reduce their speed
+    // below 1." That opponent is the target's controller (as it last existed, once it's been returned).
+    if (s === "If that opponent's speed is greater than each other player's speed, reduce that opponent's speed by 1" && sentences[si + 1] === "This effect can't reduce their speed below 1") {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (i !== prevTargets || i + 1 !== curTargets || t?.kind !== "object" || t.controller !== "opponent" || t.optional || t.many) return null;
+      effects.push({ type: "reduceSpeedIfFastest", who: { ref: "targetController", index: i } });
+      si++;
+      continue;
+    }
+    // Brilliance Unleashed: "Choose target artifact card in your graveyard. Return it to the battlefield if it's an artifact
+    // creature card. Otherwise, return it to the battlefield and it's a 3/3 Robot artifact creature with flying.": the card
+    // checked as it resolves; otherwise the permanent it becomes is that, from then on (CR 611.2c), keeping its other card
+    // types and its abilities (CR 205.1b: a "[creature type] artifact creature" replaces only its creature types; rulings).
+    const ifCreatureCard = /^Return it to the battlefield if it's an? ([a-z]+ creature card)$/.exec(s);
+    const elseBecomes = ifCreatureCard && /^Otherwise, return it to the battlefield and it's (an? \d+\/\d+ .+)$/.exec(sentences[si + 1] ?? "");
+    if (ifCreatureCard && elseBecomes) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const filter = parseSearchFilter(ifCreatureCard[1]!);
+      const mods = parseBecomes(elseBecomes[1]!);
+      if (i !== prevTargets || i + 1 !== curTargets || t?.kind !== "card" || t.optional || t.many || !filter || !mods) return null;
+      const put: Effect = { type: "putOntoBattlefield", what: { ref: "target", index: i } };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [put], otherwise: [{ ...put, alsoMods: mods }] });
+      si++;
+      continue;
+    }
+    // Bortuk Bonerattle: "Return that card to the battlefield if its mana value is less than or equal to the number of basic
+    // land types among lands you control. Otherwise, put it into your hand.": the same, worded the other way round.
+    const mvFirst = /^If that card's mana value is less than or equal to (.+?), (.+)$/.exec(s);
+    const mvLast = mvFirst ? null : /^(Return (?:that card|it) to the battlefield) if its mana value is less than or equal to (.+)$/.exec(s);
+    const ifMv = mvFirst ? { than: mvFirst[1]!, then: mvFirst[2]! } : mvLast ? { than: mvLast[2]!, then: mvLast[1]! } : null;
     const elseMv = ifMv && /^Otherwise, (.+)$/.exec(sentences[si + 1] ?? "");
     if (ifMv && elseMv) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       if (i !== prevTargets || i + 1 !== curTargets || !t || t.kind !== "card" || t.optional || t.many) return null;
-      const amount = parseCount(ifMv[1]!, ctx);
+      const amount = parseCount(ifMv.than, ctx);
       // The card targeted: "return it to the battlefield", "put it into your hand".
       const move = (x: string): Effect[] | null =>
-        /^return it to the battlefield$/i.test(x) ? [{ type: "putOntoBattlefield", what: { ref: "target", index: i } }] : /^(?:put it into|return it to) your hand$/i.test(x) ? [{ type: "bounce", what: { ref: "target", index: i } }] : null;
-      const yes = amount && ctx.targets.length === i + 1 ? move(ifMv[2]!) : null;
+        /^return (?:it|that card) to the battlefield$/i.test(x) ? [{ type: "putOntoBattlefield", what: { ref: "target", index: i } }] : /^(?:put it into|return it to) your hand$/i.test(x) ? [{ type: "bounce", what: { ref: "target", index: i } }] : null;
+      const yes = amount && ctx.targets.length === i + 1 ? move(ifMv.then) : null;
       const no = yes ? move(elseMv[1]!) : null;
       if (!amount || !yes || !no || ctx.targets.length !== i + 1 || ![...yes, ...no].every((e) => mentionsTarget(e, i))) return null;
-      const filter: TargetSpec = { kind: "card", bound: { key: "manaValue", at: "most", amount }, text: `mana value less than or equal to ${ifMv[1]}` };
+      const filter: TargetSpec = { kind: "card", bound: { key: "manaValue", at: "most", amount }, text: `mana value less than or equal to ${ifMv.than}` };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: yes, otherwise: no });
       si++;
       continue;
@@ -14993,6 +15074,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       // Kirtar's Wrath: "..., instead destroy all creatures, then create two 1/1 white Spirit creature tokens with flying.
       // Creatures destroyed this way can't be regenerated.": the destroy done instead.
+      // War Barge: "When ~ leaves the battlefield this turn, destroy that creature. A creature destroyed this way can't be
+      // regenerated.": the delayed destroy.
+      if (/^A creature destroyed this way/.test(s) && prev?.type === "delayed" && prev.effects.length === 1 && prev.effects[0]!.type === "destroy") {
+        prev.effects[0]!.noRegen = true;
+        continue;
+      }
       const insteadDestroy = /^Creatures destroyed this way/.test(s) && prev?.type === "if" && prev.otherwise && prev.effects[0]?.type === "destroy" && prev.effects.slice(1).every((e) => e.type !== "destroy") ? prev.effects[0] : undefined;
       if (insteadDestroy?.type === "destroy") {
         insteadDestroy.noRegen = true;

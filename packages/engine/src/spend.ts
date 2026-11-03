@@ -6,13 +6,13 @@ import { abilitiesOf, defOf, isType, objIsType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { blackForLife, emptyPool, payFromPool, type CostSymbol, type ManaPool, type ParsedCost, type Payment } from "./mana";
 import { characteristics, controllerOf, everyCreatureType } from "./layers";
-import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, PlayerId } from "./types";
+import type { CardDef, Color, FaceDownKind, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, ObjectId, PlayerId } from "./types";
 
 /**
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
@@ -20,9 +20,15 @@ export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): 
   const anyColor = !!s && !!ab.borrowed && o.zone === "battlefield" && !!abilitiesOf(s, o).borrows?.anyColor && characteristics(s, o).hasPrintedAbilities;
   // "To gain a Class level": its level ability, "~'s level becomes N" (CR 716.2a).
   const level = ab.activateIf?.kind === "classLevel" && ab.body.effects.some((e) => e.type === "classLevel") ? { classLevel: true as const } : {};
-  const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}) };
+  const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}) };
   const only = ab.spendOnlyChosenColor ? (o.chosen?.color ? [o.chosen.color] : []) : ab.spendOnly;
   return only ? { ability: o, onlyColors: only, ...level, ...x, ...(anyColor ? { anyColor } : {}) } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}) };
+}
+
+/** What a "you may pay" question's mana is spent on: a permanent's cumulative upkeep (Adarkar Unicorn's mana), or other. */
+export function mayPayUse(s: GameState, pend: { upkeepOf?: ObjectId } | null | undefined): ManaUse {
+  const o = pend?.upkeepOf ? s.objects[pend.upkeepOf] : undefined;
+  return o ? { ability: o, cumulativeUpkeep: true } : "other";
 }
 
 /** The mana types a payment may use (all of them unless it says otherwise). */
@@ -79,6 +85,14 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   if (use === "other") return !!only.other;
   // Smoky Lounge: "and unlock doors": the special action, no ability (CR 116.2m); otherwise as any other cost.
   if ("ability" in use && use.unlock) return !!only.unlockDoors || !!only.other;
+  // Tin Street Gossip: "to turn creatures face up", any way (CR 116.2b); Qarsi Deceiver only for a morph cost (a megamorph
+  // cost is one, CR 702.37b) or a manifested creature's mana cost (CR 701.40b), not a disguise cost or a cloaked one's.
+  if ("ability" in use && use.faceUp) return !!only.faceUp?.includes(use.faceUp) || !!only.other;
+  // Adarkar Unicorn: "to pay cumulative upkeep costs" (CR 702.24a), a cost paid as the upkeep trigger resolves.
+  if ("ability" in use && use.cumulativeUpkeep) return !!only.cumulativeUpkeep || !!only.other;
+  // Tin Street Gossip, Qarsi Deceiver: a spell cast face down (CR 708.4), whatever its card is; a face-down spell is a
+  // creature spell (CR 708.2a).
+  if ("spell" in use && only.faceDownSpells && use.faceDown) return true;
   // Unblinking Observer: "to pay a disturb cost": any spell cast for its disturb cost, whatever it is (CR 702.146a).
   if ("spell" in use && only.disturb && use.disturb) return true;
   // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand" (CR 106.6).
@@ -95,6 +109,8 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   if ("spell" in use) return !!only.spells && printedMatches(only.spells, use.spell);
   if (only.classLevel && use.classLevel) return true;
   if (only.equipAbilities && use.equip) return true;
+  // Quinjet Technician: "to activate power-up abilities", of any permanent (CR 702.193).
+  if (only.powerUpAbilities && use.powerUp) return true;
   if (only.abilities === "any") return true;
   if (!only.abilities) return false;
   // "Activate abilities of artifacts": of artifact permanents (CR 109.2), so only on the battlefield. A card in
@@ -137,7 +153,7 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   const mine = s.battlefield.map((id) => s.objects[id]!).filter((o) => controllerOf(s, o) === pid);
   const krrik = mine.some((o) => !!abilitiesOf(s, o).lifeForBlack);
   // Agatha's Soul Cauldron: "... to activate abilities of creatures you control".
-  const creatureAbility = !!use && use !== "other" && "ability" in use && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && objIsType(s, use.ability, "Creature");
+  const creatureAbility = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && objIsType(s, use.ability, "Creature");
   // Oath of Nissa: "... to cast planeswalker spells", the spell as it's cast.
   const walkerSpell = !!use && use !== "other" && "spell" in use && isType(use.spell, "Planeswalker");
   // Case File Auditor: "... to cast Case spells".

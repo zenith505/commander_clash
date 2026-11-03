@@ -1,3 +1,4 @@
+import { exiledWithNamed } from "../names";
 import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
@@ -814,7 +815,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.ifHadCounter && !((ev.counters[d.ifHadCounter] ?? 0) > 0)) continue;
       if (d.to?.includes(ev.to))
-        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
+        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about ?? { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
@@ -1707,6 +1708,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
+    // Orcish Mine: "When the last ore counter is removed from ~".
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e, t) => e === "selfLastCounterRemoved" && t.countersKind === ev.counter);
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
@@ -2101,6 +2104,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
           if (!name || !player(s, ev.controller).graveyard.some((g) => sameName(defOf(s, obj(s, g)).name, name))) return false;
         }
+        if (t.cast.nameExiledWithSelf) {
+          const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
+          if (!name || !exiledWithNamed(s, o, name)) return false;
+        }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         if (t.cast.sharesNoTypeWithYours) {
@@ -2179,6 +2186,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (w.spell && item!.kind !== "spell") return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
+        // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.
+        if (w.abilityOf && !(item!.kind === "ability" && item!.sourceId && s.objects[item!.sourceId] && objectMatches(s, w.abilityOf, s.objects[item!.sourceId]!, watcher, false))) return false;
         const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
         if (!mine(by)) return false;
         return !w.first || !before.some(mine);

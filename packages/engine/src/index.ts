@@ -20,3 +20,4 @@ export * from "./scryfall";
 export { partySize, PARTY_TYPES } from "./amounts";
 export { blightOptions } from "./counters";
 export { keywordLabel } from "./keywords";
+export { mayPayUse } from "./spend";

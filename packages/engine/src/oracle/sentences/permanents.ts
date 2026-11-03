@@ -406,6 +406,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // of this turn, whatever zone it goes to; ~ is this ability's source as it is now (a new object after a zone change).
   if (/^When (?:that|the) creature leaves the battlefield this turn, sacrifice ~$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.spell && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "leaves", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~", thisTurn: true }];
+  // War Barge: "{3}: Target creature gains islandwalk until end of turn. When ~ leaves the battlefield this turn, destroy
+  // that creature. A creature destroyed this way can't be regenerated.": a delayed trigger watching this ability's source as
+  // it is now, whatever zone it goes to, for the rest of this turn (CR 603.7c, 400.7), about the creature it targeted.
+  if (/^When ~ leaves the battlefield this turn, destroy that creature$/.test(s) && ctx.activated && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "leaves", of: { ref: "self" }, about: ctx.lastObjectTarget, effects: [{ type: "destroy", what: { ref: "subject" } }], text: "destroy that creature", thisTurn: true }];
   // Barreling Attack: "When that creature becomes blocked this turn, it gets +1/+1 until end of turn for each creature
   // blocking it": a delayed trigger about the target (CR 603.7), its blockers counted as it resolves (rulings).
   if ((m = /^When that creature becomes blocked this turn, it gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
@@ -1762,6 +1767,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     const grant = what?.ref === "target" && !what.n ? parseGrants(m[2]!) : null;
     if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
+  }
+  // Mindbender Spores: "Whenever ~ blocks a creature, put four fungus counters on that creature. The creature gains "This
+  // creature doesn't untap during your untap step if it has a fungus counter on it" and "At the beginning of your upkeep,
+  // remove a fungus counter from this creature."": the trigger's creature, with no duration, so for as long as it stays on
+  // the battlefield (CR 611.2a, 400.7); "your" in them is that creature's controller (CR 109.5).
+  if ((m = /^The creature gains ("[^"]+" and "[^"]+")$/.exec(s)) && ctx.subject) {
+    const grant = parseGrants(m[1]!);
+    if (grant?.length === 2 && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what: { ref: "subject" }, mods: grant, duration: "game" }];
   }
   // Mist Dragon: "~ loses flying. (This effect lasts indefinitely.)" the same.
   // Elder Land Wurm: "When ~ blocks, it loses defender." (rulings: indefinitely) likewise, "it" being ~.

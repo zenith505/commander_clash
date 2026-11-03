@@ -26,10 +26,12 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   // Metalworker: "{T}: Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." A
   // mana ability (rulings): how many is chosen as it's activated.
-  const reveal = /^(.+): Reveal any number of ([a-z]+) cards in your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
+  // Sacellum Godspeaker: "Reveal any number of creature cards with power 5 or greater from your hand. Add {G} for each
+  // card revealed this way." The same (rulings: a mana ability, none revealed adds nothing).
+  const reveal = /^(.+): Reveal any number of ([a-z]+) cards( with power \d+ or greater)? (?:in|from) your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
   if (reveal) {
-    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[3]}.`);
-    const filter = parseSearchFilter(`${reveal[2]} card`);
+    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[4]}.`);
+    const filter = parseSearchFilter(`${reveal[2]} card${reveal[3] ?? ""}`);
     if (!ab || !filter || ab.produces.kind !== "fixed") return null;
     return { ...ab, text: line0, produces: { kind: "revealX", filter, per: ab.produces.mana } };
   }
@@ -430,6 +432,18 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // Smoky Lounge: "Spend this mana only to cast Room spells and unlock doors": a Room spell (an enchantment subtype, CR
   // 205.3h), or unlocking a door (a special action, CR 709.5e).
   if (sentence === "Spend this mana only to cast Room spells and unlock doors.") return { spells: { kind: "spell", subtypes: ["Room"], text: "Room spells" }, unlockDoors: true, text: sentence };
+  // Tin Street Gossip: "Spend this mana only to cast face-down spells or to turn creatures face up": a spell cast face down
+  // (CR 708.4), and the special action of turning a face-down permanent face up by any of its ways (CR 116.2b, 702.37e,
+  // 702.168d, 701.40b, 701.58b).
+  if (sentence === "Spend this mana only to cast face-down spells or to turn creatures face up.") return { faceDownSpells: true, faceUp: ["morph", "megamorph", "disguise", "manifest", "cloak"], text: sentence };
+  // Qarsi Deceiver: "... to cast a face-down creature spell, pay a mana cost to turn a manifested creature face up, or pay a
+  // morph cost": a face-down spell is a 2/2 creature spell (CR 708.2a); a megamorph cost is a morph cost (CR 702.37b); not a
+  // disguise cost, nor a cloaked permanent's mana cost (a cloaked permanent isn't a manifested one, CR 701.58a).
+  if (sentence === "Spend this mana only to cast a face-down creature spell, pay a mana cost to turn a manifested creature face up, or pay a morph cost.") return { faceDownSpells: true, faceUp: ["morph", "megamorph", "manifest"], text: sentence };
+  // Adarkar Unicorn: "Spend this mana only to pay cumulative upkeep costs" (CR 702.24a).
+  if (sentence === "Spend this mana only to pay cumulative upkeep costs.") return { cumulativeUpkeep: true, text: sentence };
+  // Quinjet Technician: "Spend this mana only to activate power-up abilities" (CR 702.193).
+  if (sentence === "Spend this mana only to activate power-up abilities.") return { powerUpAbilities: true, text: sentence };
   // Throne of Makindi: "Spend this mana only to cast kicked spells" (CR 702.33d).
   if (sentence === "Spend this mana only to cast kicked spells.") return { kickedSpells: true, text: sentence };
   // Volshe Tideturner: "only to cast an instant or sorcery spell or a kicked spell": either kind of spell.

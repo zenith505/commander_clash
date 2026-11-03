@@ -49,6 +49,19 @@ function bansOn(s: GameState, name: string | undefined) {
 }
 
 /**
+ * A card exiled with `o` (its linked exile abilities, CR 607.2a, and its "until ~ leaves" ones), still exiled and face up (a face-down card has no name,
+ * CR 708.2a), with `name` (a name in common is the same name, CR 201.2a): Circle of Confinement.
+ */
+export function exiledWithNamed(s: GameState, o: GameObject, name: string): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  // "Until ~ leaves the battlefield" exiles are kept on the permanent (GameObject.exiledUntilLeaves).
+  return [...(s.linkedExile?.[key] ?? []), ...(o.exiledUntilLeaves ?? [])].some((l) => {
+    const c = s.objects[l.id];
+    return !!c && c.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === l.zc && defOf(s, c).name.split(" // ").some((n) => hasName(name, n));
+  });
+}
+
+/**
  * "Spells with the chosen name can't be cast" (Meddling Mage), "Your opponents can't cast spells with the chosen name"
  * (Gideon's Intervention): why `pid` can't cast this card, or null. A spell has its card's name (CR 201.2).
  */

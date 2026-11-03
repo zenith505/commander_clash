@@ -639,6 +639,19 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${p.name} may play ${n === 1 ? "an additional land" : `${n} additional lands`} this turn.`);
       return;
     }
+    case "reduceSpeedIfFastest": {
+      // Spikeshell Harrier: only a speed greater than every other player's (no speed counts as 0, CR 702.179f), and never
+      // below 1.
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const speed = p.speed ?? 0;
+        if (livingPlayers(s).some((q) => q !== pid && (player(s, q).speed ?? 0) >= speed) || speed <= 1) continue;
+        p.speed = speed - 1;
+        invalidateCharacteristics(s); // max speed abilities
+        log(s, `${p.name}'s speed is reduced to ${p.speed}.`);
+      }
+      return;
+    }
     case "increaseSpeed": {
       // The intervening "if your speed is less than 4" again as it resolves (CR 603.4).
       const p = player(s, ctx.controller);

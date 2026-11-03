@@ -19,3 +19,4 @@ export * from "./shortcuts";
 export * from "./scryfall";
 export { partySize, PARTY_TYPES } from "./amounts";
 export { keywordLabel } from "./keywords";
+export { mayPayUse } from "./spend";

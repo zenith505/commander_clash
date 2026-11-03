@@ -206,6 +206,41 @@
   "gameChanger": true
  },
  {
+  "oracleId": "287cd5e8-51e2-42a4-a139-c112ff89706d",
+  "name": "Adarkar Unicorn",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Unicorn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Unicorn"
+  ],
+  "oracleText": "{T}: Add {U} or {C}{U}. Spend this mana only to pay cumulative upkeep costs.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38515f89-348b-4cf3-b7bd-1f6fe4ce2fba",
   "name": "Adeline, Resplendent Cathar",
   "manaCost": "{1}{W}{W}",
@@ -14873,6 +14908,34 @@
   "set": "exp",
   "releasedAt": "2016-01-22",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8a52f3c0-2552-4425-b2e3-5496eb2232a7",
+  "name": "Mystic Remora",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmr",
+  "releasedAt": "2023-01-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

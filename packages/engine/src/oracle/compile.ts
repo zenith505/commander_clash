@@ -1285,6 +1285,16 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byCounters[2]!), n: 1, per, text: line });
       continue;
     }
+    // Blue, Loyal Raptor: "For each kind of counter on ~, each other Dinosaur you control enters with a counter of that kind
+    // on it." The same replacement (CR 614.1c), with the kinds of counters on it as each would enter; not Dinosaurs entering
+    // with it (rulings).
+    const eachKind = /^For each kind of counter on ~, each other ([A-Z][a-z]+) you control enters with a counter of that kind on it\.$/.exec(line);
+    if (eachKind) {
+      const g = CREATURE_TYPES.has(eachKind[1]!) ? parseGroup(`each ${eachKind[1]} you control`) : null;
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: "+1/+1", n: 1, eachKindOnSource: true, text: line });
+      continue;
+    }
     const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s (toughness|power)(?: and as an? ([A-Z][a-z]+) in addition to its other types)?\\.$`).exec(line);
     if (byToughness) {
       const g = parseGroup(`each ${byToughness[1]}`);

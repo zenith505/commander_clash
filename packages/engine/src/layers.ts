@@ -204,6 +204,8 @@ export interface Characteristics {
   attackUnless: TargetSpec[];
   /** Vantress Gargoyle: only at a player with at least this many cards in their graveyard. */
   attackUnlessYard?: number;
+  /** Crown-Hunter Hireling, Chained Throatseeker: only at a player who is the monarch / is poisoned. */
+  attackUnlessDefenderIs?: ("monarch" | "poisoned")[];
   /** "Can't attack if defending player controls ..." (Mogg Jailer): what the defending player mustn't control. */
   attackIfNot?: TargetSpec[];
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound). */
@@ -1818,6 +1820,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnlessDefenderYard":
       c.attackUnlessYard = Math.max(c.attackUnlessYard ?? 0, m.n);
+      return;
+    case "cantAttackUnlessDefenderIs":
+      if (!c.attackUnlessDefenderIs?.includes(m.is)) c.attackUnlessDefenderIs = [...(c.attackUnlessDefenderIs ?? []), m.is];
       return;
     case "cantAttackIf":
       (c.attackIfNot ??= []).push(m.defenderControls);

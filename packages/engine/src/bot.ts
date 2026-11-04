@@ -1846,6 +1846,15 @@ function targetGuard(s: GameState, pid: PlayerId, effects: Effect[], i: number, 
         return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...f, kind: "object" }, obj(s, t.id), pid, false);
       };
       branch = e.effects;
+    } else if (e.cond.kind === "targetSharesColorWith" && e.cond.index === i && !e.otherwise?.length) {
+      // Jaded Response: a spell sharing a color with one of those permanents now.
+      const f = e.cond.filter;
+      const colors = [...new Set(s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, f, o, pid, false)).flatMap((o) => characteristics(s, o).colors))];
+      test = (t) => {
+        const item = t.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+        return !!item && colors.length > 0 && spellMatches(s, { kind: "spell", types: [], notTypes: [], notColors: [], colors, text: "shares a color" }, item);
+      };
+      branch = e.effects;
     } else if (e.cond.kind === "state" && sourceId) branch = staticConditionNow(s, e.cond.cond, sourceId, pid) ? e.effects : (e.otherwise ?? []);
     else return undefined;
     if (!branch.length) continue;

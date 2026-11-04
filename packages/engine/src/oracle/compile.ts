@@ -555,6 +555,12 @@ export function compile(d: CardDef): CompiledCard {
       // Howl of the Hunt: "When ~ enters, if enchanted creature is a Wolf or Werewolf, untap that creature": the enchanted
       // creature the condition is about.
       .replace(/^(When ~ enters, if enchanted creature is an? [A-Z][a-z]+(?: or [A-Z][a-z]+)?), untap that creature\.$/m, "$1, untap enchanted creature.")
+      // Arcades Sabboth: "Each untapped creature you control gets +0/+2 as long as it's not attacking": each creature you
+      // control while it's untapped and not attacking, itself too (rulings), checked continuously (CR 611.3a).
+      .replace(/^Each untapped creature you control gets ([+-]\d+\/[+-]\d+) as long as it's not attacking\.$/m, "Each untapped nonattacking creature you control gets $1.")
+      // Dark Matter Manipulator: "~ gets +2/+0 for every seven cards in your graveyard": each whole group of seven, as
+      // Recursive Recruitment's "for every three" (counted continuously, CR 611.3a).
+      .replace(/^(~ gets [+-]\d+\/[+-]\d+) for every (two|three|four|five|six|seven|eight|nine|ten) cards in your graveyard\.$/m, "$1 for each $2 cards in your graveyard.")
       // Assassin's Ink: "~ costs {1} less to cast if you control an artifact and {1} less to cast if you control an
       // enchantment": two reductions, each with its own condition.
       .replace(/^~ costs (\{\d+\} less to cast if you control an? [a-z]+) and (\{\d+\} less to cast if you control an? [a-z]+)\.$/m, "~ costs $1.\n~ costs $2.")
@@ -1905,6 +1911,15 @@ export function compile(d: CardDef): CompiledCard {
         };
       continue;
     }
+    // Ravaging Riftwurm: "If ~ was kicked, it enters with three additional time counters on it": on top of the ones a
+    // keyword (vanishing) already puts on it as it enters, one replacement for the lot (CR 614.1c, 702.63a).
+    const kickedMore = new RegExp(`^If ~ was kicked, it enters with ${NUM} additional (\\S+) counters? on it\\.$`).exec(line);
+    if (kickedMore) {
+      const prior = out.entersWithCounters;
+      if (!prior || prior.counter !== kickedMore[2] || typeof prior.n !== "number" || Object.keys(prior).length !== 2) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: prior.counter, n: { count: { kind: "wasKicked" } as Count, times: num(kickedMore[1]!), plus: prior.n } };
+      continue;
+    }
     // The Volvers: "If ~ was kicked with its {1}{W} kicker, it enters with two +1/+1 counters on it and with "Whenever ~
     // deals damage, you gain that much life."", "... with a +1/+1 counter on it and with flying": both parts of how it
     // enters (CR 614.1c), the ability for as long as it's on the battlefield. With two such lines, the counters add up.
@@ -1919,6 +1934,18 @@ export function compile(d: CardDef): CompiledCard {
         const kick = { kind: "wasKicked", ...(kickedWith[1] ? { cost: kickedWith[1] } : {}) } as unknown as Count;
         out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "sum", of: [...(priorKicks ?? []), ...Array.from({ length: num(kickedWith[2]!) }, () => ({ ...kick }))] } } };
         (out.entersKicked ??= []).push({ ...(kickedWith[1] ? { cost: kickedWith[1] } : {}), mods });
+      }
+      continue;
+    }
+    // Voidpouncer: "If ~ was kicked, it enters with two +1/+1 counters and a trample counter on it and with haste": both
+    // kinds of counters and the keyword, all only if it was kicked (CR 614.1c).
+    const kickedTwo = new RegExp(`^If ~ was kicked, it enters with ${NUM} \\+1/\\+1 counters? and ${NUM} ${COUNTER} counters? on it and with (.+?)\\.$`).exec(line);
+    if (kickedTwo) {
+      const mods = parseGrants(kickedTwo[4]!);
+      if (out.entersWithCounters || out.entersKicked || counterKind(kickedTwo[3]!) === "+1/+1" || !mods || mods.some((m) => m.kind !== "addKeywords")) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "wasKicked" } as Count, times: num(kickedTwo[1]!) }, also: { counter: counterKind(kickedTwo[3]!), n: num(kickedTwo[2]!) } };
+        out.entersKicked = [{ mods }];
       }
       continue;
     }
@@ -3806,10 +3833,11 @@ export function compile(d: CardDef): CompiledCard {
       out.noZeroLifeLoss = true;
       continue;
     }
-    const handSize = new RegExp(`^(Your|Each opponent's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
-    if (handSize) {
+    // Cursed Rack: "The chosen player's maximum hand size is four": the player chosen as it entered (CR 614.12, 402.2).
+    const handSize = new RegExp(`^(Your|Each opponent's|The chosen player's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
+    if (handSize && (handSize[1] !== "The chosen player's" || out.entersChoosePlayer)) {
       const n = num((handSize[2] ?? handSize[4])!);
-      (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
+      (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : handSize[1] === "The chosen player's" ? "chosen" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
       continue;
     }
     // Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~" (CR 402.2), counted whenever it's

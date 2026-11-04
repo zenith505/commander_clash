@@ -965,6 +965,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
+  // Spike Cannibal: "move all +1/+1 counters from all creatures onto it": each other creature's, at once (CR 122.5).
+  if (ctx.selfEntered && /^Move all \+1\/\+1 counters from all creatures onto (?:it|~)$/i.test(s))
+    return [{ type: "moveAllCounters", from: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, to: { ref: "self" }, only: "+1/+1" }];
   // Resourceful Defense: "Move any number of counters from target permanent you control onto a second target permanent
   // you control": any kinds, chosen one at a time as it resolves (CR 122.5).
   // "Another" or "a second" target: not the first one (CR 115.3 lets one object be both targets otherwise).

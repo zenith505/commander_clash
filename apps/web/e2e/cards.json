@@ -2295,6 +2295,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f5cdb413-2b72-4dc6-b93d-2532ac2ae568",
+  "name": "Black Cat, Cunning Thief",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Rogue Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue",
+   "Villain"
+  ],
+  "oracleText": "When Black Cat enters, look at the top nine cards of target opponent's library, exile two of them face down, then put the rest on the bottom of their library in a random order. You may play the exiled cards for as long as they remain exiled. Mana of any type can be spent to cast spells this way.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dca51281-fb21-45b6-beb4-1f13397caee2",
   "name": "Blackblade Reforged",
   "manaCost": "{2}",
@@ -5052,6 +5086,34 @@
   "commanderLegal": "legal",
   "set": "por",
   "releasedAt": "1997-05-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7a0bc265-6b40-48d6-a588-c9624df7d1bc",
+  "name": "Cruelclaw's Heist",
+  "manaCost": "{B}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Gift a card (You may promise an opponent a gift as you cast this spell. If you do, they draw a card before its other effects.)\nTarget opponent reveals their hand. You choose a nonland card from it. Exile that card. If the gift was promised, you may cast that card for as long as it remains exiled, and mana of any type can be spent to cast it.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Gift"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -290,6 +290,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const one: Effect = { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, ...(who ? { who } : {}) };
     return m[2] ? [one, one] : [one];
   }
+  // Unidentified Hovership: "When ~ leaves the battlefield, the exiled card's owner manifests dread": each owner of a card
+  // its own exile ability took that's still exiled, one after another (rulings); compile() links the two.
+  if (/^[Tt]he exiled card's owner manifests dread$/.test(s) && ctx.selfCard)
+    return [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, each: true, eachOf: { ref: "linkedExileOwners" } }];
   // Valgavoth's Onslaught: "Manifest dread X times" (the spell's X): one manifest dread after another (rulings: players
   // can't act between them), every face-down creature remembered for "each of those creatures".
   if (/^Manifest dread X times$/.test(s) && ctx.spell) return [{ type: "repeat", n: amt("X"), gather: true, effects: [{ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false }] }];

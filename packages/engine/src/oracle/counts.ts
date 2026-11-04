@@ -91,6 +91,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], orAdventure: true, text: "instant or sorcery card or card that has an Adventure" };
     return { count: advCards[1] ? { kind: "cardsInExile", who: { ref: "you" }, filter, graveyardToo: true } : { kind: "cardsInGraveyard", who: { ref: "you" }, filter } };
   }
+  // Embodiment of Agonies: "for each different mana cost among nonland cards in your graveyard".
+  if (each && (m = /^different mana cost among (nonland cards in your graveyard)$/i.exec(p))) {
+    const c = parseCount(m[1]!, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "cardsInGraveyard" && !c.count.greatestPower && !c.count.totalMv && !c.count.greatestMv ? { count: { ...c.count, differentManaCosts: true } } : null;
+  }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
   // Sudden Insight: "for each different mana value among nonland cards in your graveyard".
@@ -830,6 +835,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Karn, Gilded Guardian: "for each color among other artifacts you control".
   if ((m = /^colou?rs? among (other )?(artifacts|creatures|enchantments) you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [capital(m[2]!.slice(0, -1)) as "Artifact"], notTypes: [], notColors: [], controller: "you", text: `${m[2]} you control` }, ...(m[1] ? { other: true as const } : {}) });
+  // General Tazri: "the number of colors among Ally creatures you control" (colorless isn't a color, rulings).
+  if ((m = /^colou?rs? among ([A-Z][a-z]+) creatures you control$/.exec(p)) && CREATURE_TYPES.has(m[1]!))
+    return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], controller: "you", text: `${m[1]} creatures you control` } });
   // Earthen Ally: "for each color among Allies you control" (itself included).
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });

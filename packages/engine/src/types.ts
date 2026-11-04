@@ -1920,6 +1920,8 @@ export interface GameState {
    * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins
    * (CR 611.2b, 800.4m).
    */
+  /** "This turn, each creature you control enters with an additional +1/+1 counter on it" (Zameck Guildmage): ends in the cleanup step (CR 514.2); one for each time it resolved. */
+  entersWithCountersThisTurn?: { controller: PlayerId; filter: TargetSpec; counter: string; n: number; source: string }[];
   entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string; /** "... enter tapped this turn" (Nahiri's Lithoforming): ends in the cleanup step (CR 514.2). */ thisTurn?: true }[];
   /**
    * "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"

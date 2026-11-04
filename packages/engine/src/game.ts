@@ -1729,6 +1729,17 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
  */
 function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = []): Record<string, number> {
   const out: Record<string, number> = {};
+  // Zameck Guildmage: "This turn, each creature you control enters with an additional +1/+1 counter on it" (CR 614.1c).
+  for (const r of s.entersWithCountersThisTurn ?? []) if (objectMatches(s, r.filter, o, r.controller, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+  // Dearly Departed: "As long as ~ is in your graveyard, each Human creature you control enters with an additional +1/+1
+  // counter on it": from its owner's graveyard (CR 113.6b), one for each such card there (rulings).
+  for (const p of s.players) {
+    if (p.lost) continue;
+    for (const id of p.graveyard) {
+      const src = obj(s, id);
+      for (const r of compileCard(defOf(s, src)).othersEnterWithCounters ?? []) if (r.fromGraveyard && objectMatches(s, r.filter, o, p.id, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+    }
+  }
   for (const id of s.battlefield) {
     if (id === o.id) continue;
     const src = obj(s, id);
@@ -1736,6 +1747,7 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
     if (!rules) continue;
     const you = controllerOf(s, src);
     for (const r of rules) {
+      if (r.fromGraveyard) continue; // Dearly Departed: only from a graveyard (above)
       // "Of the chosen type": the one chosen as the source entered.
       const filter = bindChosen(r.filter, src.chosen);
       if (r.while && !staticConditionNow(s, r.while, src.id, you)) continue;
@@ -3985,6 +3997,7 @@ function finishCleanup(s: GameState) {
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
   // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
+  s.entersWithCountersThisTurn = undefined; // Zameck Guildmage's "this turn" (CR 514.2)
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
@@ -4862,7 +4875,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     const shown = revealable(s, o, ab.produces).slice(0, combo!);
     log(s, shown.length ? `${p.name} reveals ${shown.map((c) => nameOf(s, c)).join(", ")} for ${name}.` : `${p.name} reveals no cards for ${name}.`);
   }
-  if (ab.oncePerTurn || ab.sacrificeIfActivated) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  // A planeswalker's mana ability counts as it "was activated this turn" too (Cut Short's rulings).
+  if (ab.oncePerTurn || ab.sacrificeIfActivated || objIsType(s, o, "Planeswalker")) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   // Farrelite Priest: the fourth activation this turn and each one after it make a delayed trigger that sacrifices it
   // (rulings on Dragon Whelp); one made during an end step waits for the next turn's (CR 603.7).
   if (ab.sacrificeIfActivated && o.zone === "battlefield" && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + i).length >= ab.sacrificeIfActivated)

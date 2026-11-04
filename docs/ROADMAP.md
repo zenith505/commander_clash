@@ -1,6 +1,6 @@
 # Roadmap
 
-29,740 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,755 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,540 of
 9,979 (95%).
 
@@ -258,9 +258,9 @@ line blocks.
    the Pit, Biorhythm, Flux, Awaken the Erstwhile, Martha Jones, Phoenix Fleet Airship, Bloodspore Thrinax, Yorvo,
    Prismari Pianist, Baru, Sokka, Arcbound Tracker, Gold Rush, Tainted Treats and others), taking the easy ones.
    Out after round 178: Giott, Colossal Rattlewurm, Dregscape Sliver, Foe-Razer Regent, Mathas, Ozox and Arcbound
-   Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Zameck Guildmage ("this turn" extra counters as creatures enter), Cunning
+   Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Zameck Guildmage (done in round B106) ("this turn" extra counters as creatures enter), Cunning
    Nightbonder (spells "cast", copies left out), Flesh Reaver (done in round B105) (damage to several recipients at once), Quest for the
-   Nihil Stone (two intervening-if conditions), Alpharael (ward with a random discard), Fealty to the Realm. Known
+   Nihil Stone (two intervening-if conditions), Alpharael (ward with a random discard), Fealty to the Realm (done in round B106). Known
    limits: Spellbreaker Behemoth and Carrion Grub read a spell's or card's printed power, so a */* is 0 there. Round 178
    went down from rank 10,060 to about rank 10,640 (Baneful Omen, Galvanic Relay, Lightning, Security Sergeant, Daxos
    of Meletis, Isolated Watchtower, Tale of Momo, Fix What's Broken, Avatar of Might, Deepwood Denizen, Drillworks
@@ -746,7 +746,7 @@ line blocks.
    Wicked Wolf, Triceraton Commander, Hope-Ender Coatl, Fall of the Thran, Rust Harvester. Kappa Cannoneer's "It can't
    be blocked this turn" now means Kappa Cannoneer, not the artifact that entered. No new prompts.
    Out after round 204 (looked at, not done): Codie, Ravenous Codex ("prepared spell" isn't defined yet), Glissa's
-   Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (a type-or-subtype filter), Behold the
+   Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (done in round B106) (a type-or-subtype filter), Behold the
    Unspeakable (a pausing scry inside "Otherwise"), Song of Blood, Indulge // Excess, Harald Unites the Elves, Rent Is
    Due, Search Elemental, Estinien Varlineau.
    Round 205 went on from the top: "if it's the first time that creature has become tapped this turn" (CR 603.4: Captain
@@ -1161,8 +1161,8 @@ line blocks.
    suspended card); Ashcloud Phoenix (return face down); Nightshade Assassin (reveal X black cards); Silverquill
    Lecturer (granted demonstrate); Cosi's Trickster (whenever an opponent shuffles, done in round B71); Ib Halfheart, Goblin Tactician
    ("becomes blocked, sacrifice it. If you do, it deals 4 damage to each creature blocking it"); Vivien's Stampede
-   (each player dealt combat damage this turn); Armored Kincaller ("If you do or if you control another Dinosaur");
-   Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (different mana costs
+   (each player dealt combat damage this turn); Armored Kincaller (done in round B106) ("If you do or if you control another Dinosaur");
+   Tunnel Tipster and Veiled Ascension (face-down creatures entering); Embodiment of Agonies (done in round B106) (different mana costs
    among cards).
    Round 222 (fresh cards from rank 16,000 on): "It gains ..."/"It gets ..." in an activated ability means the source
    (Migloz, Maze Crusher); "for each attacking creature other than ~" (Márton Stromgald); "deals X plus 2 damage
@@ -2650,7 +2650,7 @@ line blocks.
    Left from the round after Show and Tell (Alhammarret's Archive and dredge in either order, Grand Abolisher, Living
    Death, Parallax Wave, Memory Jar, life swaps, Glacial Chasm, Terminus, Bonfire of the Damned, "each other opponent",
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
-   - Life swaps still out: Heart of Bogardan, Spirit of Resistance.
+   - Life swaps still out: Heart of Bogardan, Spirit of Resistance (done in round B106).
    - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
      a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
      (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
@@ -2955,8 +2955,8 @@ line blocks.
      sacrifice it" flips (Frenetic Efreet) only to save the permanent.
    - "Each other creature you control enters with an additional +1/+1 counter on it" works from permanents already on
      the battlefield (Renata, Grumgully, Dragonstorm Globe, Oath of Gideon, Arlinn); still out: "for each" (Giada,
-     Bioengineered Future), "of the chosen type" (Metallic Mimic), conditions (Vampire Socialite, Dearly Departed),
-     "this turn" (Combine Guildmage, Zameck Guildmage), mana that adds the counter (Animal Attendant, Guildmages' Forum),
+     Bioengineered Future), "of the chosen type" (Metallic Mimic), conditions (Vampire Socialite, Dearly Departed (done in round B106)),
+     "this turn" (Combine Guildmage (done in round B106), Zameck Guildmage (done in round B106)), mana that adds the counter (Animal Attendant, Guildmages' Forum),
      and one without "other" that could describe its own card.
    - Bots take the first offer for "what does it attack" (the player the source attacks) and search both zones.
    - "Whenever a creature attacks you (or a planeswalker you control)", "whenever a creature blocks", "whenever a creature
@@ -3014,7 +3014,7 @@ line blocks.
      "its controller" after a list (Acolyte Hybrid-style "its controller draws").
    - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
      target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
-     General Tazri ("colors among those creatures"), Happily Ever After.
+     General Tazri (done in round B106) ("colors among those creatures"), Happily Ever After.
    - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris,
      Immortus, Elenda and Azor, Deem Inferior and Sylvan Library (other lines).
    - "Differently named" still out: Neriv ("differently named tokens"), Survey Mechan (an activated ability costing
@@ -3443,7 +3443,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Invincible Hymn; main's version is kept. +50 (26,197 with round 182; the three Shadowhearts aren't Commander-legal).
 - Skipped there, with reasons: Leitmotif Composer (done in round B105) (a named creature's "can't be blocked" should hold for later
   arrivals too), Blossombind (counters can't be put on it, and wither rulings), Skyblade's Boon (an ability that works
-  from two zones), Cut Short (a planeswalker that activated an ability this turn), Cleansing Meditation (returning the
+  from two zones), Cut Short (done in round B106) (a planeswalker that activated an ability this turn), Cleansing Meditation (returning the
   cards destroyed this way), Fall from Favor (done in round B105) (the monarch condition), Pestilent Spirit (deathtouch on instants and
   sorceries), Storyteller Pixie (Adventure spells), Wildgrowth Walker (explore triggers), Highcliff Felidar (the
   greatest power per opponent), Long Feng (a creature or a land put into a graveyard), Kraken of the Straits (done in round B105) (blockers'
@@ -3554,7 +3554,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
   many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
-  twice: no ruling); Gideon's Triumph and Inferno Hellion ("attacked or blocked this turn", and Gideon's "two of
+  twice: no ruling); Gideon's Triumph and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
   Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
@@ -4069,7 +4069,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B39: Ulamog's Despoiler ("As ~ enters, you may put two cards ... If you do, it enters with four
   +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow ("base power becomes 1 plus the greatest power
   among other creatures you control"), Inquisitor's Snare still (the prevention must follow the creature after it
-  leaves the battlefield, rulings), Skulking Killer ("if that opponent controls no other creatures" as it resolves),
+  leaves the battlefield, rulings), Skulking Killer (done in round B106) ("if that opponent controls no other creatures" as it resolves),
   Wicked Guardian ("have it deal 2 damage to another creature you control", chosen as it resolves), Graveyard Shovel,
   Lumengrid Augur and Desecrator Hag (what the chosen or discarded card was), Canker Abomination (counters for the
   chosen opponent's creatures), Drake Familiar ("unless you return an enchantment"), Cabal Slaver ("Whenever a Goblin
@@ -4180,7 +4180,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "All Slivers are colorless" (Ghostflame Sliver). +28 (27,975 of 31,936).
 - Out after round B45: Tamanoa (a trigger on damage from a noncreature source), Feast of Worms ("another land": a pick
   that leaves out the target), Wall of Dust ("can't attack during its controller's next turn"), Ley Line (a target
-  chosen by the upkeep's player), Skulking Killer ("if that opponent controls no other creatures" as it resolves),
+  chosen by the upkeep's player), Skulking Killer (done in round B106) ("if that opponent controls no other creatures" as it resolves),
   Rivals' Duel (two targets that share no creature type), Culling Scales (a target with the lowest mana value), Loyal
   Sentry ("destroy that creature and ~" at once), Gladewalker Ritualist ("another creature you control named ~"),
   Marvel Boy (power-up activations), Goblin Researcher, Kyren Toy (each needs a new mechanic).
@@ -4255,7 +4255,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   at end of combat, "before the end of combat step"), Feint (tap the target's blockers, prevent its and their combat
   damage), Blood Oath ("Choose a card type" as a spell instruction), Specter's Shriek (exile a chosen card, then a
   rider about its color), Noggin Whack (reveal three, you choose two), Hiveheart Shaman (a basic land card that doesn't
-  share a land type), Song of Blood (a delayed attack trigger counting milled creature cards), Kemba's Legion, Taunt,
+  share a land type), Song of Blood (a delayed attack trigger counting milled creature cards), Kemba's Legion (done in round B106), Taunt,
   Battlefield Scrounger, Slayer's Cleaver ("blocked by an Eldrazi if able"), Illuminated Folio (reveal two cards that
   share a color), Nim Devourer, Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze, Fathom
   Trawl, Thirsting Axe, Sewer Crocodile, Flying Drone.
@@ -4405,7 +4405,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("attacks you if able"), Warren Weirding (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo
   ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar (done in round B105)
   ("sacrifice a token or a land"), Guul Draz Overseer ("If that land is a Swamp ... instead"), Unnatural Aggression
-  (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix and Voltage Surge (what the
+  (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix (done in round B106) and Voltage Surge (what the
   sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane, Thieving Sprite, Serene Sunset, plus the
   multi-line or new-mechanic cards in the same range.
 - Round B54 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000, the easier
@@ -4427,7 +4427,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   every basic land type in addition to its other types" (Nylea's Presence). +19 (28,400 of 31,936 with round 222).
 - Out after round B54 (looked at, not done): Foraging Wickermaw (a mana ability that changes its color), Tomb of Urami
   ("Sacrifice all lands you control" and a mana ability that deals damage), Ohabi Caleria and Sosuke (group "deals
-  damage to a creature" triggers), Gideon, the Oathsworn ("non-Gideon" becomes "non-~" in the normalized text), Garruk,
+  damage to a creature" triggers), Gideon, the Oathsworn (done in round B106) ("non-Gideon" becomes "non-~" in the normalized text), Garruk,
   Veiled Butcher ("If you sacrificed a creature this way", "who didn't discard two nonland cards"), Blackmail (the
   player reveals three of their choice), Cannibalize (two targets controlled by the same player), Moonlace ("target
   spell or permanent"), Living Conundrum (skip a draw from an empty library), Vhati il-Dal (base power 1 or base
@@ -5357,6 +5357,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("power less than the number of Islands you control", counted as blockers are declared), Fall from Favor ("unless that
   player is the monarch"). Also: a milled card exiled instead (Rest in Peace) is still "the milled card" (CR 701.17c), for
   Heed the Mists and the other "milled card's mana value" cards too. +19 (29,740 of 31,936).
+- Round B106 (single-line blockers from the skip lists, least played first): Leaves from the Vine ("if there's a creature or
+  Lesson card in your graveyard": either kind), Spirit of Resistance (all damage to you prevented while five colors are
+  among your permanents, a multicolored one counting as each, rulings), Kemba's Legion (an additional block for each
+  Equipment attached, counted as blockers are declared), Cut Short ("planeswalker that was activated this turn": any of its
+  abilities, mana abilities too, rulings), Gideon, the Oathsworn ("non-Gideon creatures": not Gideon planeswalkers, so the
+  short name there isn't the card), Embodiment of Agonies (different mana costs among nonland cards in your graveyard,
+  compared symbol by symbol; a split card's halves combined, {0} counted, no mana cost not, rulings), Fealty to the Realm
+  ("The monarch controls enchanted creature": layer 2, nobody's while there's no monarch), Zameck Guildmage and Combine
+  Guildmage ("This turn, each creature you control enters with an additional +1/+1 counter": a replacement until the
+  cleanup step, one for each activation), Dearly Departed (from its owner's graveyard, CR 113.6b; one counter for each),
+  Inferno Hellion ("if ~ attacked or blocked this turn, its owner shuffles it into their library"), Foundry Helix ("If the
+  sacrificed permanent was an artifact"), General Tazri ("colors among those creatures": the Ally creatures as it resolves,
+  X fixed then), Armored Kincaller ("If you do or if you control another Dinosaur"), Skulking Killer ("if that opponent
+  controls no other creatures": the target's controller, as it resolves). +15 (29,755 of 31,936).
+- Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
+  each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
+  creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it
+  regenerates this way": shields with riders need the creature's controller to choose which shield applies, CR 616.1).
 - Out after round B105 (looked at, not done): Gloom and Oppressive Rays ("Activated abilities of ... cost {3} more": mana
   abilities too, and the engine taxes only abilities that aren't mana abilities); Briarbridge Patrol ("deals damage to one
   or more creatures": once per damage event, not once per creature); Light of Judgment ("Destroy up to one Equipment
@@ -5649,7 +5667,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dodecapod's "with two +1/+1 counters". Prototype can't be chosen for free casts ("without paying its mana
   cost") yet.
 - Blocking: "whenever ~ blocks two or more creatures" (Lairwatch Giant), "for each creature it's blocking" (Guardian
-  of the Gateless), "an additional creature for each Equipment attached" (Kemba's Legion), Yare's "creature
+  of the Gateless), "an additional creature for each Equipment attached" (Kemba's Legion (done in round B106)), Yare's "creature
   defending player controls". A blocker's damage among several attackers is divided automatically, like an
   attacker's among several blockers.
 - Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, also Doctor's companion);

@@ -804,6 +804,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       player(s, ctx.controller).noMaxHandSize = true;
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;
+    case "entersWithCountersThisTurn":
+      (s.entersWithCountersThisTurn ??= []).push({ controller: ctx.controller, filter: e.filter, counter: e.counter, n: e.n, source: src });
+      log(s, `This turn, each creature ${player(s, ctx.controller).name} controls enters with an additional ${e.counter} counter (${src}).`);
+      return;
     case "enterTappedUntil":
       (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src, ...(e.thisTurn ? { thisTurn: true as const } : {}) });
       return;

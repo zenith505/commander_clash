@@ -514,6 +514,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
       if (c.totalMv) return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).reduce((k, id) => k + defMv(defOf(s, s.objects[id]!)), 0), 0);
       if (c.greatestMv) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => defMv(defOf(s, s.objects[id]!)))));
+      // Embodiment of Agonies: each different mana cost once (a split card's is its halves' together, CR 709.4); a card
+      // with no mana cost isn't counted, {0} is, and {X} differs from {0} (rulings).
+      if (c.differentManaCosts) return new Set(whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).flatMap((id) => manaCostKey(defOf(s, s.objects[id]!).manaCost)))).size;
       // Revivify: only those put there from the battlefield this turn.
       // Risen Executioner: "each other creature card": not the source.
       // Pardic Firecat: counted as a card named Flame Burst by a resolving Flame Burst spell (a copy too, not an ability).
@@ -1561,3 +1564,15 @@ export function substituteX(a: Amount, x: AmountExpr): Amount {
 
 /** Does this amount use the announced X? */
 export const usesX = (a: Amount) => typeof a !== "number" && a.count.kind === "x";
+
+/**
+ * A mana cost as a comparable key (Embodiment of Agonies): its generic amount added up and its other symbols sorted, so
+ * "{1}{R}" and "{1}{U}" as halves of one split card are "{2}{U}{R}" (rulings). No symbols at all is no mana cost: none.
+ */
+function manaCostKey(cost: string): string[] {
+  const syms = [...cost.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]!);
+  if (!syms.length) return [];
+  const generic = syms.filter((x) => /^\d+$/.test(x));
+  const total = generic.reduce((n, x) => n + Number(x), 0);
+  return [`${generic.length ? total : ""}|${syms.filter((x) => !/^\d+$/.test(x)).sort().join(",")}`];
+}

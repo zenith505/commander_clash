@@ -759,6 +759,14 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(text, {});
     return body ? { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body } : "fail";
   }
+  // Loki, God of Mischief: "Whenever a player or permanent becomes the target of an ability you control": any player or
+  // permanent, once for each it targets (CR 603.2c), of an activated or triggered ability (CR 113.3), not a spell.
+  const loki = /^Whenever a player or permanent becomes the target of an ability you control, (.+)$/.exec(line);
+  if (loki) {
+    if (/\b(?:it|its|that player|that permanent|that ability|its controller)\b/.test(loki[1]!)) return "fail";
+    const body = parseBody(loki[1]!, {});
+    return body ? { event: "permanentBecomesTarget", targeted: { by: "you", ability: true, orYou: true, anyPlayer: true }, body } : "fail";
+  }
   // Dormant Gomazoa: "Whenever you become the target of a spell, you may untap ~": any player's spell, not an ability, once
   // for each spell however many of its targets are you (rulings).
   const youSpell = /^Whenever you become the target of a spell, (.+)$/.exec(line);
@@ -2394,6 +2402,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Disa the Restless: "Whenever a Lhurgoyf permanent card is put into your graveyard from anywhere other than the
+  // battlefield, put it onto the battlefield": that card, once for each (CR 603.2c), if it's still in your graveyard (CR
+  // 400.7), under your control (CR 110.2a); an Aura's host is chosen as it enters (CR 303.4f).
+  if (batch.each && batch.what === "toGraveyard" && batch.whose === "you" && batch.from === "notBattlefield" && !batch.other && batch.filter && !yourTurn && /^put it onto the battlefield\.?$/.test(rest))
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" } }], text: rest.replace(/\.$/, "") } };
   // Polluted Cistern: "each opponent loses 1 life for each card type among those cards": the cards put there, card types
   // only (CR 205.2a), each as it last existed in the graveyard if it has left (CR 608.2h).
   if (/^each opponent loses 1 life for each card type among those cards\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && !batch.filter && !yourTurn)

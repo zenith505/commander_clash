@@ -7855,6 +7855,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
     // Abeyance: this turn, in any zone (rulings).
     if (turnRule(s, pid, "noActivations")) return "you can't activate abilities that aren't mana abilities this turn";
+    // Overwhelming Splendor: loyalty abilities stay allowed (CR 606.3), mana abilities too (CR 605.1a).
+    if (ab.loyalty === undefined && !ab.loyaltyX) {
+      const splendor = s.battlefield.find((b) => obj(s, b).attachedToPlayer === pid && abilitiesOf(s, obj(s, b)).enchantedNoActivations);
+      if (splendor) return `${characteristics(s, obj(s, splendor)).name}: you can't activate abilities that aren't mana abilities or loyalty abilities`;
+    }
     // Hand to Hand: during the combat phase, in any zone (CR 506.1).
     const handToHand = inCombatPhase(s) ? s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).combatNoInstantsOrAbilities) : undefined;
     if (handToHand) return `${characteristics(s, obj(s, handToHand)).name}: players can't activate abilities that aren't mana abilities during combat`;
@@ -9363,6 +9368,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "damageSource") {
     // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
     (r.scratch ??= {}).damageSource = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "giveLife") {
+    // Wall of Shards: the opponent for one more age counter (see Effect "cumulativeUpkeep" giveLife).
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the opponents offered");
+    ((r.scratch ??= {}).lifeTo ??= []).push(Number(choice) as PlayerId);
     continueResolution(s);
     return;
   }

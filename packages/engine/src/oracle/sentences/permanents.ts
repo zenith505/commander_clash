@@ -965,6 +965,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
+  // Black Panther, Wakandan King: "Move all +1/+1 counters from target land you control onto target creature": that kind
+  // only; one permanent chosen for both targets moves nothing (CR 115.3, 122.5).
+  if ((m = new RegExp(`^Move all ${COUNTER} counters from (target [^,]+?) onto (target [^,]+)$`, "i").exec(s))) {
+    const from = parseObject(m[2]!, ctx);
+    const to = from && !isGroup(from) ? parseObject(m[3]!, ctx) : null;
+    return from?.ref === "target" && to?.ref === "target" ? [{ type: "moveAllCounters", from, to, counter: counterKind(m[1]!) }] : null;
+  }
   // Resourceful Defense: "Move any number of counters from target permanent you control onto a second target permanent
   // you control": any kinds, chosen one at a time as it resolves (CR 122.5).
   // "Another" or "a second" target: not the first one (CR 115.3 lets one object be both targets otherwise).

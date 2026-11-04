@@ -4599,6 +4599,11 @@ export function compile(d: CardDef): CompiledCard {
       out.noLoyaltyAbilities = true;
       continue;
     }
+    // Overwhelming Splendor: an Aura with enchant player (CR 303.4a, 702.5a); see abilityProblem.
+    if (line === "Enchanted player can't activate abilities that aren't mana abilities or loyalty abilities." && d.subtypes.includes("Aura") && /^Enchant player$/m.test(d.oracleText)) {
+      out.enchantedNoActivations = true;
+      continue;
+    }
     // Solemnity (CR 122.1): the counters already there stay (rulings); see counters.ts.
     if (line === "Players can't get counters.") {
       out.noPlayerCounters = true;
@@ -6018,6 +6023,15 @@ function linkExile(out: CompiledCard) {
     const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown");
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
     else imprints[0]!.linked = true;
+  }
+  // Strata Scythe: "the exiled card" in a static count is the card its imprint ability's search exiled (CR 607.2a), its
+  // only exile instruction.
+  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"sameNameAsLinked":true'))) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const searches = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo && !e.dest.faceDown);
+    const exiles = all.filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search"].includes(e.type) || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (out.spell || searches.length !== 1 || exiles.length !== 1) out.unsupported.push("(counts lands named like an exiled card it can't link to one imprint ability)");
+    else searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
   // Smirking Spelljacker: "you may cast the exiled card" is the spell its enters ability exiled (CR 607.2a), its only exile.
   if ([...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "playLinked" && e.castOnly))) {

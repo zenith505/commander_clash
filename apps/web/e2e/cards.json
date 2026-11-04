@@ -25465,6 +25465,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8fab68ad-169d-46d3-93c4-5bdee4eea2ce",
+  "name": "Wall of Shards",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Snow Creature — Wall",
+  "supertypes": [
+   "Snow"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender, flying\nCumulative upkeep—An opponent gains 1 life. (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)",
+  "power": "1",
+  "toughness": "8",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Cumulative upkeep",
+   "Flying",
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9d32da71-60e5-4eb3-97ca-ae76e2f5df57",
   "name": "Wand of Denial",
   "manaCost": "{2}",

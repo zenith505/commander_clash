@@ -1176,6 +1176,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
     case "playedLandThisTurn":
       return (s.players[you]?.landsPlayedThisTurn ?? 0) > 0;
+    case "noSpellsCastThisGame":
+      return !Object.values(s.players[you]?.castNames ?? {}).some((n) => n > 0);
     case "opponentOwnsExiled":
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && s.players[p]!.exile.length > 0);
     case "uniqueMost":

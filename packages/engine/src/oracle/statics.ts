@@ -161,6 +161,9 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
+  // Fall from Favor: "Enchanted creature doesn't untap during its controller's untap step unless that player is the
+  // monarch": "that player" is its controller, as the untap step comes (CR 502.3, 725).
+  if (line === "Enchanted creature doesn't untap during its controller's untap step unless that player is the monarch.") return { affects: { kind: "attached" }, mods: [{ kind: "doesntUntap", unlessMonarch: true }], text: line };
   // Bombur, Gentle Dreamer: "~ doesn't untap during your untap step unless you have an enduring story": as long as you
   // don't (CR 702.195b).
   if (/^~ doesn't untap during your untap step unless you have an enduring story\.$/.test(line)) {
@@ -3041,6 +3044,12 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  // Kraken of the Straits: "Creatures with power less than the number of Islands you control can't block ~" (CR 509.1b).
+  const belowCount = /^Creatures with power less than (the number of [^,]+ you control) can't block ~$/.exec(text);
+  if (belowCount) {
+    const n = parseCount(belowCount[1]!, null);
+    return n ? { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByPowerBelow", amount: n }], text: line } : null;
+  }
   // Silumgar Assassin: "Creatures with power greater than ~'s power can't block it" (CR 509.1b).
   if (/^Creatures with power greater than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByGreaterPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)

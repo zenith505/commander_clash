@@ -693,6 +693,13 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.chosen?.player : lk && lk.zc === ctx.sourceZc ? lk.chosenPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "hostOwner": {
+      // Enslave: the enchanted creature's owner (an owner never changes, CR 108.3), the creature as it last existed if the
+      // Aura or it has left (CR 608.2h).
+      const host = attachedHost(s, ctx);
+      const o = host ? s.objects[host.id] : undefined;
+      return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
     case "hostController": {
       // Gremlin Infestation: "enchanted artifact's controller", the permanent the source is attached to now.
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1072,6 +1079,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noteLife":
     case "exchangeLife":
     case "exchangeLifeWithSelf":
+    case "loseUnspentMana":
     case "loseLife":
     case "setLife":
     case "addCombatMana":

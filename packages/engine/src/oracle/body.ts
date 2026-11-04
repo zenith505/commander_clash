@@ -1518,6 +1518,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
+  // Mana Short: "Tap all lands target player controls and that player loses all unspent mana": two instructions, in order.
+  text = text.replace(/^(Tap all lands target player controls) and (that player loses all unspent mana\.)$/, (_, a: string, b: string) => `${a}. ${capital(b)}`);
   text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
@@ -3552,8 +3554,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     // Infernal Genesis: "that player mills a card. Then they create X ... tokens, where X is the milled card's mana value":
-    // whoever milled it.
-    ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer");
+    // whoever milled it. Mindshrieker: "Target player mills a card. ~ gets +X/+X until end of turn, where X is the milled
+    // card's mana value": one target player's card.
+    ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer" || (last.who.ref === "target" && !last.who.n));
     ctx.afterAnyMill = last?.type === "mill";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
@@ -10270,6 +10273,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // stays on top.
     if (!dig && /^[Ll]ook at the top two cards of your library$/.test(s) && /^Put one of them into your graveyard\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "graveyard", rest: "keep", reveal: false });
+      si++;
+      continue;
+    }
+    // Horrid Shadowspinner: "you may draw cards equal to its power. If you do, discard that many cards": its power counted
+    // once, as you choose to draw, for both (rulings: even if the power or the number drawn changes).
+    const drawThatMany = /^[Yy]ou may draw cards equal to (~'s power|its power)$/.exec(s);
+    if (drawThatMany && /^If you do, discard that many cards\.?$/.test(sentences[si + 1] ?? "") && !ctx.spell) {
+      const n = parseCount(drawThatMany[1]!.replace(/^its /, "~'s "), ctx);
+      if (!n) return null;
+      const noted: Amount = { count: { kind: "notedAmount" } };
+      effects.push({ type: "noteAmount", n }, { type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: noted }], text: "draw cards equal to its power" }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "discard", who: { ref: "you" }, n: noted }] });
       si++;
       continue;
     }

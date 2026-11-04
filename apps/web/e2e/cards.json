@@ -1014,6 +1014,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cb58055f-8190-4bc7-ad32-844ca66fd2b0",
+  "name": "Arashin Sovereign",
+  "manaCost": "{5}{G}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nWhen this creature dies, you may put it on your choice of the top or bottom of its owner's library.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "dtk",
+  "releasedAt": "2015-03-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5acc8b39-3c3e-4012-8cfd-ac3c2c4ca982",
   "name": "Arc Lightning",
   "manaCost": "{2}{R}",

@@ -136,6 +136,12 @@ export function pickFilter(phrase: string): TargetSpec | null {
     const anyOf = [...orList[1]!.split(", ").filter(Boolean), orList[2]!].map((w) => pickFilter(w));
     return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
   }
+  // West Wind Avatar: "a token or a land": one permanent that's either (a token isn't a type, so not "a land token").
+  const orToken = /^([a-z]+) or (?:an? )?([a-z]+)$/.exec(phrase.trim());
+  if (orToken && (orToken[1] === "token") !== (orToken[2] === "token")) {
+    const anyOf = [pickFilter(orToken[1]!), pickFilter(orToken[2]!)];
+    return anyOf.every((a): a is TargetSpec => a?.kind === "object") ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // Omen of Fire: "a Plains or a white permanent": one permanent that's either.
   const either = /^((?:Plains|Island|Swamp|Mountain|Forest)) or an? ((?:white|blue|black|red|green) permanent)$/.exec(phrase.trim());
   if (either) {
@@ -439,9 +445,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Each creature you control named ~" (Gruff Triplets): with the source's name (CR 201.5), as it last existed if it's gone.
   // Genasi Enforcers: "Creatures you control named ~ get +1/+0 until end of turn".
   // Cylian Sunsinger: "~ and each other creature with the same name as it": every creature named ~ (CR 201.2), anyone's.
-  const namedSelf = /^(each (?:other )?[a-z]+ you control|[a-z]+s you control) named ~$/i.exec(x) ?? (/^~ and each other creature with the same name as it$/i.test(x) ? ["", "each creature"] : null);
+  // Leitmotif Composer: "Creatures named ~ can't be blocked this turn": anyone's, itself too.
+  const namedSelf = /^(each (?:other )?[a-z]+ you control|[a-z]+s you control|creatures) named ~$/i.exec(x) ?? (/^~ and each other creature with the same name as it$/i.test(x) ? ["", "each creature"] : null);
   if (namedSelf) {
-    const each = parseObjectNow(namedSelf[1]!, ctx, cards);
+    const each = parseObjectNow(/^creatures$/i.test(namedSelf[1]!) ? "each creature" : namedSelf[1]!, ctx, cards);
     return each?.ref === "each" && each.filter.named === undefined ? { ...each, filter: { ...each.filter, named: "~", text: `${each.filter.text ?? namedSelf[1]} named ~` } } : null;
   }
   // "Populate. The token created this way gains haste." (Determined Iteration).

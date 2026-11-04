@@ -610,6 +610,15 @@ export function compile(d: CardDef): CompiledCard {
       // Its "destroy enchanted land and ~ deals 2 damage to that land's controller": two instructions, the player the land's
       // controller as it last existed (CR 608.2h, see "hostController").
       .replace(/^(When the last ore counter is removed from ~), destroy enchanted land and ~ deals 2 damage to that land's controller\.$/m, "$1, destroy enchanted land. ~ deals 2 damage to enchanted land's controller.")
+      // Flesh Reaver: "Whenever ~ deals damage to a creature or opponent, ~ deals that much damage to you": once for each
+      // creature and each opponent dealt damage, so the same as one ability for each (combat damage or not, rulings).
+      .replace(/^Whenever ~ deals damage to a creature or opponent, ([^\n]+)$/m, "Whenever ~ deals damage to a creature, $1\nWhenever ~ deals damage to an opponent, $1")
+      // Transcendence: "Whenever you lose life, you gain 2 life for each 1 life you lost": twice that much, once for each
+      // life-loss event.
+      .replace(/^Whenever you lose life, you gain 2 life for each 1 life you lost\.$/m, "Whenever you lose life, you gain twice that much life.")
+      // Centaur Omenreader: "As long as ~ is tapped, creature spells you cast cost {2} less to cast": the condition worded
+      // first, as Gran-Gran's after (one cost change while it's true as the cost is determined, CR 601.2f, 611.3a).
+      .replace(/^As long as (~ is tapped), (creature spells you cast cost \{\d+\} less to cast)\.$/m, (_, c: string, mod: string) => `${capital(mod)} as long as ${c}.`)
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
@@ -4688,7 +4697,9 @@ export function compile(d: CardDef): CompiledCard {
       // "This spell has flash" is only while it's a spell; "Colossal Rattlewurm has flash" is on the battlefield too.
       const permanentHas = /^~ has flash/.test(line) && !/(^|\n)This spell has flash /.test(d.oracleText ?? "") && !d.types.includes("Instant") && !d.types.includes("Sorcery");
       // Swift Reckoning: "two or more instant and/or sorcery cards in your graveyard", a count of your graveyard's cards.
-      const yardCount = cond?.kind === "amount" && typeof cond.amount === "object" && "count" in cond.amount && cond.amount.count.kind === "cardsInGraveyard" && cond.amount.count.who?.ref === "you" && cond.max === undefined;
+      // Graveyard Shift: "five or more mana values among cards in your graveyard", counted as you'd begin to cast it, itself
+      // too if it's cast from there (rulings).
+      const yardCount = cond?.kind === "amount" && typeof cond.amount === "object" && "count" in cond.amount && (cond.amount.count.kind === "cardsInGraveyard" || (cond.amount.count.kind === "graveyardManaValues" && !cond.amount.count.filter)) && cond.amount.count.who?.ref === "you" && cond.max === undefined;
       const aboutPlayer = !!cond && (FLASH_IF.includes(cond.kind) || yardCount) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
       // Colossal Rattlewurm: "~ has flash as long as you control a Desert": while it's a spell, castable at instant speed
       // when you control one (rulings: checked before costs are paid, CR 601.3); on the battlefield the same condition

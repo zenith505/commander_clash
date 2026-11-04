@@ -1083,6 +1083,25 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1, ...(m[2] ? { random: true } : {}) };
     return [{ type: "may", effects: [discard], otherwise: [sacrificeSelf], keep: true, text: `Discard a card${m[2] ?? ""} to keep ~` }];
   }
+  // Mana Short: "That player loses all unspent mana": their mana pool empties, whatever would keep it as steps end (CR
+  // 106.4, 500.4 are about steps ending, not this).
+  if ((m = /^(That player|Target player) loses all unspent mana$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "loseUnspentMana", who }] : null;
+  }
+  // Avatar of Discord: "sacrifice it unless you discard two cards": discarding is a cost paid as it resolves (CR 118.12,
+  // 118.12a), and one that can't be paid in full can't be paid (CR 118.3), so with fewer than two cards it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you discard (two|three) cards$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const n = num(m[2]!);
+    const keep: Effect = { type: "may", effects: [{ type: "discard", who: { ref: "you" }, n }], otherwise: [sacrificeSelf], keep: true, text: `Discard ${m[2]} cards to keep ~` };
+    return [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInHand", who: { ref: "you" } } }, min: n }, effects: [keep], otherwise: [sacrificeSelf] }];
+  }
+  // Bebop & Rocksteady: "sacrifice a permanent unless you discard a card": discarding is the choice, as it resolves; with
+  // no card in hand, a permanent of your choice is sacrificed (if you have one, CR 701.21a).
+  if (/^[Ss]acrifice a permanent unless you discard a card$/.test(s)) {
+    const filter = pickFilter("permanent");
+    return filter ? [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1 }], otherwise: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }], keep: true, text: "Discard a card rather than sacrifice a permanent" }] : null;
+  }
   // Anurid Scavenger: "sacrifice ~ unless you put a card from your graveyard on the bottom of your library": any card,
   // chosen as it resolves; with an empty graveyard it can't be done (see canDoNow), so it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you put a card from your graveyard on the bottom of your library$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))

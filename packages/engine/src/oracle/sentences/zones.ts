@@ -399,6 +399,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.discardedSelf && /^[Ss]huffle ~ into your library from your graveyard$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", moved: true, yours: true } }];
   // "When ~ dies, put it on top of its owner's library" (Dark Revenant): the card in the graveyard, if it's still there.
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
+  // Arashin Sovereign: "put it on your choice of the top or bottom of its owner's library": chosen as it resolves by this
+  // ability's controller (rulings).
+  if (ctx.selfCard && /^[Pp]ut (?:it|~) on your choice of the top or bottom of its owner's library$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "yourChoice" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
   // Gandalf, White Rider: "fifth from the top". Screaming Swarm: "second from the top".
@@ -828,8 +831,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.
-  // Emeritus of Ideation: "exile eight cards from your graveyard".
-  if ((m = new RegExp(`^(?:(Target player|Target opponent) exiles|[Ee]xile) ${NUM} (.+?) from (their|your) graveyard$`).exec(s)) && (m[4] === "their") === !!m[1]) {
+  // Emeritus of Ideation: "exile eight cards from your graveyard". Curse of Oblivion: "that player exiles two cards from
+  // their graveyard" (all of them with fewer, rulings).
+  if ((m = new RegExp(`^(?:(Target player|Target opponent|[Tt]hat player) exiles|[Ee]xile) ${NUM} (.+?) from (their|your) graveyard$`).exec(s)) && (m[4] === "their") === !!m[1]) {
     const who = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : undefined;
     const filter = parseSearchFilter(m[3]!);
     const n = num(m[2]!.replace(/^an?$/, "one"));
@@ -1817,6 +1821,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "other creatures" }, exceptTarget: ctx.lastObjectTarget }];
   // Venser, the Sojourner: "Creatures can't be blocked this turn": all creatures, also ones that arrive later (rulings).
   if (/^Creatures can't be blocked this turn$/.test(s)) return [{ type: "cantBeBlockedRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // Leitmotif Composer: "Creatures named ~ can't be blocked this turn": with the source's name as this resolves, anyone's,
+  // also ones that arrive later this turn (a rule, not a change to characteristics, CR 611.2c).
+  if (/^Creatures named ~ can't be blocked this turn$/.test(s) && !ctx.spell) return [{ type: "cantBeBlockedRule", filter: { kind: "object", types: ["Creature"], named: "~", text: "creatures named ~" } }];
   // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos
   // of Vadrok): what detain does, in words (CR 701.35a); mana abilities too (CR 605.1a).
   if ((m = /^Until your next turn, (.+?) can't attack or block and (?:its|their) activated abilities can't be activated$/.exec(s))) {

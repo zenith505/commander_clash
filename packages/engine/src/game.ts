@@ -10926,6 +10926,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  if (a.cantBeBlockedByPowerBelow !== undefined && b.power < a.cantBeBlockedByPowerBelow) return `creatures with power less than ${a.cantBeBlockedByPowerBelow} can't block ${a.name}`; // CR 509.1b
   for (const id of a.cantBeBlockedByLesserPowerThan) {
     const src = s.objects[id];
     if (src?.zone === "battlefield" && b.power < power(s, src)) return `creatures with power less than ${nameOf(s, id)}'s can't block ${a.name}`; // CR 509.1b

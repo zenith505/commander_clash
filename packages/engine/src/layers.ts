@@ -223,6 +223,8 @@ export interface Characteristics {
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
+  /** "Creatures with power less than the number of Islands you control can't block ~": that number, the largest of them (CR 509.1b). */
+  cantBeBlockedByPowerBelow?: number;
   /** The Ring-bearer's (CR 701.54c). */
   cantBeBlockedByGreaterPower: boolean;
   /** Spitfire Handler: it can't block an attacker with greater power than its own (CR 509.1b). */
@@ -1703,6 +1705,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.cantBeBlocked = true;
       return;
     case "doesntUntap":
+      if (m.unlessMonarch && s.monarch === c.controller) return;
       c.doesntUntap = true;
       return;
     case "cantBecomeUntapped":
@@ -1844,6 +1847,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnlessMore":
       if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];
+      return;
+    case "cantBeBlockedByPowerBelow":
+      c.cantBeBlockedByPowerBelow = Math.max(c.cantBeBlockedByPowerBelow ?? -Infinity, num(m.amount));
       return;
     case "cantBeBlockedByLesserPower":
       if (m.than === "source") {

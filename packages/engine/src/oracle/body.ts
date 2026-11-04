@@ -684,7 +684,9 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
  */
 function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
   const s = sentences[at]!;
-  const LIB = "(your|that player's|target player's|target opponent's|each opponent's|each player's)";
+  // "Whenever equipped creature deals combat damage to a player, look at the top card of their library" (Dream-Thief's
+  // Bandana): "their" is the player dealt damage, as "that player's".
+  const LIB = `(your|that player's|target player's|target opponent's|each opponent's|each player's${ctx.eventPlayer ? "|their" : ""})`;
   const head =
     new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
     new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
@@ -696,7 +698,9 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   // Siphon Insight: "Look at the top two cards of target opponent's library. Exile one of them face down and put the other
   // on the bottom of that library."
   const lookPick = look && !lookThen && look[1] === "two cards" && /^Exile one of them face down and put the other on the bottom of that library$/.test(sentences[at + 1] ?? "");
-  const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
+  // Ixhel, Scion of Atraxa: "each opponent who has three or more poison counters exiles the top card ...", counted as it
+  // resolves.
+  const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent|[Ee]ach opponent who has (?:one|two|three|four|five|six|seven|eight|nine) or more poison counters) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
   // "Whenever a creature deals combat damage to one of your opponents, its controller looks at the top card of that
   // opponent's library and exiles it face down. They may play that card ..." (Gonti, Night Minister): the creature's
   // controller exiles it and may play it (as it last existed, CR 608.2h), "that opponent" being the player dealt damage.
@@ -715,7 +719,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const count = m ? m[1]! : they![2]!;
   const n = count === "card" ? 1 : amt(new RegExp(`^${NUMX} cards$`).exec(count)![1]!);
   // Not yet: whose library is read last, after the permission is known to be there (it may add a target).
-  const whose = m ? (m[m.length - 1] === "your" ? "you" : m[m.length - 1]!.replace(/'s$/, "")) : they![1]!;
+  const whose = m ? (m[m.length - 1] === "your" ? "you" : m[m.length - 1] === "their" ? "that player" : m[m.length - 1]!.replace(/'s$/, "")) : they![1]!;
   let seen = false;
   let play: FaceDownPlay | undefined;
   let upkeepGraveyard = false;
@@ -723,8 +727,12 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   // "As though it were mana of any color": colored symbols paid with any mana, {C} still only with colorless (CR 609.4b).
   const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any (?:type|color) to cast (?:it|them|that spell|those spells))";
   for (;;) {
-    const t = sentences[next];
+    let t = sentences[next];
     if (t === undefined) break;
+    // Dream-Thief's Bandana: "For as long as it remains exiled, you may play it, and mana of any type can be spent to cast
+    // that spell", the same permission with the duration first.
+    const durFirst = /^For as long as (it remains|they remain) exiled, you may (play|cast) (it|that card|those cards|them)(, and .+)?$/.exec(t);
+    if (durFirst) t = `You may ${durFirst[2]} ${durFirst[3]} for as long as ${durFirst[1]} exiled${durFirst[4] ?? ""}`;
     if (/^You may look at (?:it|that card|those cards|them) for as long as (?:it remains|they remain) exiled$/.test(t)) seen = true;
     else {
       const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them|${lookPick ? "the exiled card" : "it"})( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
@@ -2873,6 +2881,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(For each opponent, choose up to one target creature that player controls\. ~ deals [^.]+? to each of) the chosen creatures\./g, "$1 those creatures.");
   // Grozoth: "search your library for any number of cards that have mana value 9": cards with that mana value.
   text = text.replace(/\b(search your library for any number of cards) that have (mana value \d+),/g, "$1 with $2,");
+  // Mindleech Mass: "you may look at that player's hand. If you do, you may cast a spell from among those cards without
+  // paying its mana cost": not looking only means casting nothing, which casting being optional covers anyway (only you
+  // see the hand, CR 402.3), so it's Silent-Blade Oni's "look at that player's hand. You may cast ...".
+  text = text.replace(/^you may look at that player's hand\. If you do, you may cast a spell from among those cards without paying its mana cost\.$/, "look at that player's hand. You may cast a spell from among those cards without paying its mana cost.");
+  // Mercurial Spelldancer: "If you do, when you next cast an instant or sorcery spell this turn, copy that spell. You may
+  // choose new targets for the copy.": the delayed trigger (CR 603.7) is made only if you did, its new targets with it.
+  text = text.replace(/\bIf you do, (when you next cast an? [^.,]+ this turn, copy that spell)\. You may choose new targets for the copy\./, "If you do, $1 and you may choose new targets for the copy.");
   // Tibalt, the Fiend-Blooded: "~ deals damage equal to the number of cards in target player's hand to that player": the
   // same as "~ deals damage to target player equal to the number of cards in that player's hand", counted as it resolves.
   text = text.replace(/^~ deals damage equal to the number of cards in target player's hand to that player\.$/, "~ deals damage to target player equal to the number of cards in that player's hand.");
@@ -7474,6 +7489,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 3;
       continue;
     }
+    // Confiscation Coup: "Choose target artifact or creature. You get {E}{E}{E}{E}, then you may pay an amount of {E} equal
+    // to that permanent's mana value. If you do, gain control of it.": its mana value as it resolves (X as 0, a token's 0
+    // unless it copies something, rulings); with a mana value of 0 you may pay none (rulings).
+    const coupTarget = /^Choose (target artifact or creature)$/.exec(s);
+    const coupGet = coupTarget ? /^You get ((?:\{E\})+)$/.exec(sentences[si + 1] ?? "") : null;
+    if (coupTarget && coupGet && /^(?:Then you|you|You) may pay an amount of \{E\} equal to that permanent's mana value$/.test(sentences[si + 2] ?? "") && /^If you do, gain control of it\.?$/.test(sentences[si + 3] ?? "")) {
+      const before = ctx.targets.length;
+      const what = parseObject(coupTarget[1]!, ctx);
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "getEnergy", who: { ref: "you" }, n: coupGet[1]!.length / 3 });
+      effects.push({ type: "may", effects: [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game" }], pay: {}, payEnergy: { count: { kind: "manaValue", of: what } }, text: "pay an amount of {E} equal to that permanent's mana value. If you do, gain control of it" });
+      si += 3;
+      continue;
+    }
     // Horde of Notions: "You may play target Elemental card from your graveyard without paying its mana cost": cast as the
     // ability resolves (CR 608.2g), or not; no alternative cost like evoke (rulings). An Elemental card is never a land (land
     // subtypes are land types, CR 205.3i), so playing it is casting it; it goes where it would after.
@@ -10069,6 +10098,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (filter === null) return null;
       effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : typeof then !== "string" && /shuffles/.test(then[0]) ? "shuffleIn" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}), ...(gainToughness ? { gainToughness: true as const } : {}) });
       if (!choose[3]) si++;
+      // Cruelclaw's Heist: "Exile that card. If the gift was promised, you may cast that card for as long as it remains
+      // exiled, and mana of any type can be spent to cast it": with its usual timing and costs (rulings), only if the gift
+      // was promised (CR 702.174).
+      const heist = effects.at(-1);
+      if (heist?.type === "takeFromHand" && heist.action === "exile" && !heist.until && ctx.spell && sentences[si + 1]?.replace(/\.$/, "") === "If the gift was promised, you may cast that card for as long as it remains exiled, and mana of any type can be spent to cast it") {
+        heist.youMay = { anyType: true, ifGift: true };
+        si++;
+        continue;
+      }
       // Pick the Brain: "the exiled card" in the sentence after is this one.
       ctx.exiledFromHand = !!(choose[3] || (typeof then !== "string" && /^(?:That player exiles|Exile) that card$/.test(then[0]))) && !until;
       continue;
@@ -12476,21 +12514,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // costs (rulings).
     // Thief of Sanity: "look at the top three cards of that player's library, exile one of them face down, then put the
     // rest into their graveyard. You may cast that card ...", the player dealt combat damage.
-    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's|that player's) library, exile one of them face down(?:, then put| and put)? ?(the rest on the bottom of that library in a random order|the rest into their graveyard)?$`).exec(s);
+    // Black Cat, Cunning Thief: "look at the top nine cards of target opponent's library, exile two of them face down, then
+    // put the rest on the bottom of their library in a random order. You may play the exiled cards for as long as they
+    // remain exiled. Mana of any type can be spent to cast spells this way." Two cards (all of them with fewer), lands
+    // played with the usual timing too (rulings).
+    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's|that player's) library, exile (one|two) of them face down(?:, then put| and put)? ?(the rest on the bottom of (?:that|their) library in a random order|the rest into their graveyard)?$`).exec(s);
     if (gonti && (gonti[2] !== "that player's" || ctx.eventPlayer)) {
       let k = si + 1;
-      let toYard = gonti[3] === "the rest into their graveyard";
-      if (!gonti[3]) {
-        const rest = /^(?:Then )?[Pp]ut the rest (on the bottom of that library in a random order|into their graveyard)$/.exec(sentences[k]?.replace(/\.$/, "") ?? "");
+      let toYard = gonti[4] === "the rest into their graveyard";
+      if (!gonti[4]) {
+        const rest = /^(?:Then )?[Pp]ut the rest (on the bottom of (?:that|their) library in a random order|into their graveyard)$/.exec(sentences[k]?.replace(/\.$/, "") ?? "");
         if (!rest) return null;
         toYard = rest[1] === "into their graveyard";
         k++;
       }
-      if ((sentences[k] ?? "").replace(/\.$/, "") !== "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell") return null;
+      const two = gonti[3] === "two";
+      const perm = (sentences[k] ?? "").replace(/\.$/, "");
+      const playTwo = two && perm === "You may play the exiled cards for as long as they remain exiled" && (sentences[k + 1] ?? "").replace(/\.$/, "") === "Mana of any type can be spent to cast spells this way";
+      if (!playTwo && (two || perm !== "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell")) return null;
       const who = parsePlayer(gonti[2]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
-      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true, ...(toYard ? { restToGraveyard: true as const } : {}) });
-      si = k;
+      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true, ...(toYard ? { restToGraveyard: true as const } : {}), ...(playTwo ? { pick: 2, play: true as const } : {}) });
+      si = k + (playTwo ? 1 : 0);
       continue;
     }
     // Akiri, Fearless Voyager: "You may unattach an Equipment from a creature you control. If you do, tap that creature
@@ -13111,6 +13156,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Mount Velus Manticore: "you may discard a card. When you do, ~ deals X damage to any target, where X is the number
       // of card types the discarded card has": that card's, counted as the reflexive ability triggers (its X, CR 603.12).
       const discTypes = mayDo && where?.[2] === "the number of card types the discarded card has" && prev.effects.length === 1 && prev.effects[0]!.type === "discard" && prev.effects[0]!.n === 1 && prev.effects[0]!.who.ref === "you" && !prev.effects[0]!.random;
+      // Ill-Timed Explosion: "Then you may discard two cards. When you do, ~ deals X damage to each creature, where X is the
+      // greatest mana value among cards discarded this way": the cards as they are in the graveyard ({X} as 0, rulings),
+      // counted as the reflexive ability triggers (its X, CR 603.12).
+      const discMv = mayDo && where?.[2] === "the greatest mana value among cards discarded this way" && prev.effects.length === 1 && prev.effects[0]!.type === "discard" && typeof prev.effects[0]!.n === "number" && prev.effects[0]!.n > 1 && prev.effects[0]!.who.ref === "you" && !prev.effects[0]!.random && si + 1 === sentences.length;
+      if (discMv) {
+        const reflexive = reflexiveBody(whenDo[1]!, ctx, false, false, true);
+        if (!reflexive) return null;
+        si = sentences.length;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive, xAmount: { count: { kind: "discardedManaValue", greatest: true } } }] });
+        continue;
+      }
       // Its own "where X is ..." goes with it.
       let whenText = [where && !discTypes ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
       // "Tap any number of untapped artifacts you control. When you do, this Saga deals that much damage to target

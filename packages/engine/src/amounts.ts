@@ -402,6 +402,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     // discarded (Mercurial Chemister, StackItem.costDiscarded), as it last existed in the graveyard.
     case "discardedManaValue": {
       const done = s.resolving?.discardedAll ?? [];
+      if (done.length && c.greatest) return Math.max(0, ...done.map((id) => (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0)));
       if (done.length) return done.reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
       return (s.resolving?.item.costDiscarded ?? []).reduce((n, k) => n + (s.cards[k] ? defMv(s.cards[k]!) : 0), 0);
     }
@@ -1224,7 +1225,7 @@ function describeCount(c: Count): string {
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "discardedManaValue":
-      return "the discarded card's mana value";
+      return c.greatest ? "the greatest mana value discarded" : "the discarded card's mana value";
     case "revealedManaValue":
       return `the revealed card's ${c.stat ?? "mana value"}`;
     case "exiledFromHandThisWay":

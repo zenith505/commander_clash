@@ -85,6 +85,7 @@ import {
   autoEvidence,
   evidenceProblem,
   altCostsFor,
+  isEmerge,
   payZeroSource,
   linkedFreeGrant,
   commanderTax,
@@ -2532,7 +2533,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -3326,8 +3327,8 @@ function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, {
   return s.battlefield
     .map((x) => obj(s, x))
     .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canSacrificeForCost(s, o)))
-    .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
-    .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
+    .filter((o) => (isEmerge(alt) ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
+    .sort((a, b) => (isEmerge(alt) ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }
 
 /**
@@ -4483,6 +4484,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (only && !only(ab)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
+      // Fractured Powerstone's planar die outside Planechase: nothing to gain.
+      if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.

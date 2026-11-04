@@ -1481,7 +1481,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Ee]xile all tokens with the same name as that creature$/.test(s) && ctx.subject && !ctx.spell) return [{ type: "exile", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], token: true, text: "tokens" }, sameNameAsSubject: true } }];
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
-  if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
+  // Herigast, Erupting Nullkite: "exile your hand", the same.
+  if (/^[Ee]xile (?:all cards from )?your hand$/.test(s)) return [{ type: "exileHand" }];
   // Decree of Annihilation: "exile all cards from all hands": every player's, face up (CR 406.3).
   if (/^[Ee]xile all cards from all hands$/.test(s)) return [{ type: "exileHand", who: { ref: "eachPlayer" } }];
   // Hypnox: "exile all cards from target opponent's hand": the same for that player's hand, face up (CR 406.3).

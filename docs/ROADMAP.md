@@ -1,7 +1,7 @@
 # Roadmap
 
-29,713 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,550 of
+29,723 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,558 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -179,7 +179,7 @@ line blocks.
    Out after round 174: Radagast the Brown and Conjurer's Mantle ("a card that shares a creature type with" a
    creature, among the cards looked at), Quicksilver Elemental (gaining a creature's activated abilities), Secret of
    Bloodbending (controlling a player), Chiss-Goria, Forge Tyrant (granting affinity for artifacts), Molecule Man
-   (granting miracle), Confiscation Coup (done in round 273; paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
+   (done in round 274), Confiscation Coup (done in round 273; paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
    Osseous Sticktwister (a punisher read back with "didn't"), Craig
    Boone, Novac Guard (a reflexive damage trigger with "unless that creature's controller"), Spelltwine (casting copies
    of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
@@ -467,7 +467,7 @@ line blocks.
    Out after round 190 (looked at, not done): Sewer Nemesis (done in Lane B's round B21, left to it), Aether Refinery
    ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park, Case of the
    Uneaten Feast, Cait Sith, Scouring Swarm, Brigid's back face, Bring to
-   Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
+   Light (colors of mana spent), Fractured Powerstone (done in round 274), The Lost and the Damned, Oft-Nabbed Goat (done in round 274; only your
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
    Appropriation, Ixhel (done in round 273), Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
@@ -730,7 +730,7 @@ line blocks.
    chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Admiral Beckett Brass (done in round
    266), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
    nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
-   Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
+   Bioshift, Public Enemy, Bladegraft Aspirant (done in round 274), Archon of Valor's Reach.
    Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
    Skycoach Waypoint, Hexhaven Dueling Arena, Biblioplex Tomekeeper, Infinite Coursework; the bot aims it at its own
    creature with a prepare spell), "you may exile N cards from your graveyard. If you do" with N above one (CR 609.3:
@@ -2041,6 +2041,29 @@ line blocks.
    planeswalker, CR 110.4, checked again as it resolves); "When you do, ~ deals X damage to each creature, where X is
    the greatest mana value among cards discarded this way" (Ill-Timed Explosion: "you may discard two cards" is offered
    only with two cards in hand, as for Thrilling Discovery since round 183). +10, 29,713 of 31,936.
+   Round 274 went on from the top. "Only your opponents may activate this ability and only as a sorcery" with "Gain
+   control of ~ and put a -1/-1 counter on it" and "When ~ dies, if it had one or more -1/-1 counters on it, its owner
+   draws that many cards and each other player loses that much life" (Oft-Nabbed Goat: the activator's own sorcery
+   timing, CR 602.5d; the counters it had as it last existed; bots don't activate other players' permanents' abilities
+   yet); "Each Sliver creature card in your graveyard has encore {X}, where X is its mana value" (Sliver Gravemother);
+   "Each enchantment card in your hand has miracle. Its miracle cost is equal to its mana cost reduced by {4}" (Aminatou,
+   Veil Piercer: generic mana only, CR 601.2f; a card with no mana cost gets none, CR 118.6) and "Nonland cards in your
+   hand have miracle {0}" (Molecule Man); "Roll the planar die" (Fractured Powerstone: no effect outside Planechase,
+   rulings, CR 706.7; bots leave it); "Each creature spell you cast has emerge. The emerge cost is equal to its mana
+   cost" (Herigast, Erupting Nullkite: an Emerge entry in the cast menu beside a spell's own, either may be paid,
+   rulings, CR 702.119a; with a browser test) and "you may exile your hand. If you do, draw three cards" (even with an
+   empty hand, rulings); "If a triggered ability of another Shrine you control triggers while you control six or more
+   Shrines, that ability triggers an additional time" (Sanctum of All, counted as it triggers, CR 603.2d); "Activated
+   abilities of Equipment you control that target ~ cost {1} less to activate" (Bladegraft Aspirant). Detention Vortex
+   (only an opponent, as a sorcery) and Dregscape Sliver (unearth for Sliver creature cards) came with these. +10,
+   29,723 of 31,936.
+   Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
+   replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
+   have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
+   embalm until end of turn); Spectral Searchlight ("That player adds one mana of any color they choose": mana for
+   another player from your mana ability); Primordial Mist ("Exile a face-down permanent you control face up" as a
+   cost); Toggo, Goblin Weaponsmith (a Rock token whose granted ability sacrifices the Rock by name); Ninja Teen (granted
+   sneak from the graveyard).
    Out after round 273 (looked at, not done): Filigree Vector (two "any number of target" groups in one ability: the
    target picker expands only one); Mirrormind Crown and Moonlit Meditation ("you may instead create that many tokens
    that are copies of ...": an optional token replacement, the same gap as Jinnie Fay's); Doors of Durin ("you may
@@ -2270,9 +2293,9 @@ line blocks.
    Shaw, Unstable Glyphbridge, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
-   Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
+   Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man (done in round 274), Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
-   Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
+   Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite (done in round 274), Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
    Dream-Thief's Bandana (done in round 273), Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
    Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,
@@ -2281,7 +2304,7 @@ line blocks.
    Mercurial Spelldancer (done in round 273), Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Erdwal Illuminator, Sigarda, Host of
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription (done in round 267), Bloatfly Swarm, War's
-   Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond (done in round 265), Rot Hulk, Thieving Amalgam.
+   Toll, Quintorius Kand, Aminatou, Veil Piercer (done in round 274), Arcbond (done in round 265), Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
    Smaller gaps from round 174: Howlpack Piper's and Tlincalli Hunter's tests use their front face alone (and Retrieve
    Prey on its own); bots activate "remove all counters" abilities in their second main phase only (Sage of Hours with
@@ -2534,7 +2557,7 @@ line blocks.
    pay {X}. When you do" cards (Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
-   Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother, Spider-Verse and Mirror
+   Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother (done in round 274), Spider-Verse and Mirror
    Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
    Tifa, Vincent); Archetypes; "can't attack you" limits by count (Crawlspace, Judoon). With Silent Arbiter's "no more
    than one creature can block" the requirement check only compares blocks that keep to the limit; bots trim attacks
@@ -3015,7 +3038,7 @@ line blocks.
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
    - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
-     of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All, The
+     of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All (done in round 274), The
      Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
    - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you
      choose); a source leaving at the same time as the dying creature is matched against its current card, not its

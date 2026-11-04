@@ -440,6 +440,8 @@ const checkableMay = (e: Effect): boolean =>
   // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
   // exiling or discarding your hand, Herigast).
   (e.type === "exileFaceDown" && e.from === "hand") ||
+  // Herigast, Erupting Nullkite: "you may exile your hand. If you do, draw three cards": even with no cards in hand (rulings).
+  (e.type === "exileHand" && !e.who && !e.until && !e.linked && e.mayPlayIfNoted === undefined) ||
   // Gallia of the Endless Dance: "you may discard a card at random. If you do, ...": done with any card in hand.
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.filter) ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
@@ -12109,6 +12111,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     if (ctx.fromEach && s === "Untap those creatures and they gain haste until end of turn") {
       effects.push({ type: "untap", what: { ref: "created" } }, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: ["Haste"] }], duration: "endOfTurn" });
+      continue;
+    }
+    // Fractured Powerstone: "Roll the planar die": in a game that isn't Planechase it has no effect (rulings), and outside
+    // Planechase rolling it doesn't count as rolling a die for other abilities either (CR 706.7, 901.9d).
+    if (s === "Roll the planar die" && ctx.activated) {
+      effects.push({ type: "noEffect", text: "rolling the planar die does nothing outside a Planechase game" });
       continue;
     }
     // "If death gets more votes, ...", "If taxes gets more votes or the vote is tied, ...": decided by that vote.

@@ -369,9 +369,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Clergy of the Holy Nimbus: "Only your opponents may activate this ability": any opponent of its controller, who then
   // controls the ability (CR 602.2, 113.8); not its controller.
   let opponentsOnly = false;
-  if (!anyone && !ownerOnly && / Only your opponents may activate this ability\.$/.test(effectText)) {
+  // Oft-Nabbed Goat: "Only your opponents may activate this ability and only as a sorcery": the activator's own sorcery
+  // timing (CR 602.5d).
+  const oppOnly = !anyone && !ownerOnly ? / Only your opponents may activate this ability( and only as a sorcery)?\.$/.exec(effectText) : null;
+  if (oppOnly) {
     anyPlayer = opponentsOnly = true;
-    effectText = effectText.slice(0, effectText.length - " Only your opponents may activate this ability.".length);
+    effectText = `${effectText.slice(0, oppOnly.index)}${oppOnly[1] ? " Activate only as a sorcery." : ""}`;
   }
   for (let found = true; found; ) {
     found = false;

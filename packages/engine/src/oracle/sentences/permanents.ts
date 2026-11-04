@@ -1277,6 +1277,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // (layer 2), until the turn ends.
   if ((m = /^[Gg]ain control of enchanted (creature|permanent) until end of turn$/.exec(s)) && !ctx.spell)
     return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "endOfTurn" }];
+  // Oft-Nabbed Goat: "Gain control of ~ and put a -1/-1 counter on it" in an ability only its controller's opponents may
+  // activate: the activator controls the ability (CR 113.8) and takes the creature for the rest of the game (layer 2).
+  if ((m = /^Gain control of ~( and put an? (-1\/-1|\+1\/\+1) counter on it)?$/.exec(s)) && ctx.activated)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game" }, ...(m[1] ? [{ type: "counters" as const, what: { ref: "self" as const }, counter: m[2]! as "-1/-1" | "+1/+1", n: 1 }] : [])];
   // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
   // cleanup step of your next turn (CR 514.2, 611.2a).
   if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)

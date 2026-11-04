@@ -3348,11 +3348,21 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Lorehold, the Historian: "Each instant and sorcery card in your hand has miracle {2}": miracle for those cards while
     // they're in its controller's hand (CR 702.94a), so one drawn as the first card drawn in a turn triggers.
-    const miracleGrant = /^Each ([a-z]+(?: and [a-z]+)?) card in your hand has miracle ((?:\{[^}]+\})+)\.$/.exec(line.replace(/ \(You may cast a card for its miracle cost when you draw it if it's the first card you drew this turn\.\)$/, ""));
+    // Molecule Man: "Nonland cards in your hand have miracle {0}": the same.
+    const miracleGrant = /^Each ([a-z]+(?: and [a-z]+)?) card in your hand has miracle ((?:\{[^}]+\})+)\.$/.exec(line.replace(/ \(You may cast a card for its miracle cost when you draw it if it's the first card you drew this turn\.\)$/, "").replace(/^Nonland cards in your hand have miracle/, "Each nonland card in your hand has miracle"));
     if (miracleGrant) {
       const f = parseTargetPhrase(`${miracleGrant[1]!.replace(" and ", " or ")} card from a graveyard`);
       if (f?.kind !== "card") out.unsupported.push(raw);
       else (out.handMiracle ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${miracleGrant[1]} cards in your hand` }, mana: miracleGrant[2]!, text: line });
+      continue;
+    }
+    // Aminatou, Veil Piercer: "Each enchantment card in your hand has miracle. Its miracle cost is equal to its mana cost
+    // reduced by {4}": each card's own mana cost less that much generic mana, never colored (CR 601.2f), worked out in game.ts.
+    const miracleLess = /^Each ([a-z]+) card in your hand has miracle\. Its miracle cost is equal to its mana cost reduced by \{(\d+)\}\.$/.exec(line.replace(/ \(You may cast a card for its miracle cost when you draw it if it's the first card you drew this turn\.\)$/, ""));
+    if (miracleLess) {
+      const f = parseTargetPhrase(`${miracleLess[1]} card from a graveyard`);
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else (out.handMiracle ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${miracleLess[1]} cards in your hand` }, mana: "", reduce: Number(miracleLess[2]), text: line });
       continue;
     }
     // Dream Devourer: "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana
@@ -3379,8 +3389,9 @@ export function compile(d: CardDef): CompiledCard {
     // unearth {1}{B}{R}" (Mishra, Tamer of Mak Fawa), "... that's a Cleric, Rogue, Warrior, and/or Wizard" (Solemn
     // Doomguide): activated abilities of each of those cards, not of the source (rulings; CR 113.6, 702.84a). "Each
     // outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's Fixer, CR 702.141a):
-    // each card's own cost, X counted as 0 (CR 202.3e, rulings).
-    const yardGrant = /^Each (artifact|creature|outlaw creature) card in your graveyard( that's a ((?:[A-Z][a-z]+, )+)and\/or ([A-Z][a-z]+))? has (unearth (?:\{[^}]+\})+|encore \{X\}, where X is its mana value)\.$/.exec(line);
+    // each card's own cost, X counted as 0 (CR 202.3e, rulings). "Each Sliver creature card in your graveyard has encore
+    // {X}, where X is its mana value" (Sliver Gravemother): the same, for Sliver creature cards.
+    const yardGrant = /^Each (artifact|creature|outlaw creature|Sliver creature) card in your graveyard( that's a ((?:[A-Z][a-z]+, )+)and\/or ([A-Z][a-z]+))? has (unearth (?:\{[^}]+\})+|encore \{X\}, where X is its mana value)\.$/.exec(line);
     if (yardGrant) {
       const f = parseTargetPhrase(`${yardGrant[1]} card from a graveyard`);
       const types = yardGrant[2] ? [...yardGrant[3]!.split(", ").filter(Boolean), yardGrant[4]!] : [];
@@ -3426,6 +3437,13 @@ export function compile(d: CardDef): CompiledCard {
     const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line.replace(/^Equip costs you pay cost (\{\d+\}) less\.$/, "Equip abilities you activate cost $1 less to activate."));
     if (equipLess) {
       (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      continue;
+    }
+    // Bladegraft Aspirant: "Activated abilities of Equipment you control that target ~ cost {1} less to activate": any
+    // activated ability of those Equipment, equip or not, with ~ as a target (CR 601.2f via 602.2b).
+    const equipAbLess = /^Activated abilities of Equipment you control that target ~ cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (equipAbLess) {
+      (out.equipLess ??= []).push({ n: Number(equipAbLess[1]), targetSelf: true, anyAbility: true });
       continue;
     }
     // Firion's token copies: "This Equipment's equip abilities cost {2} less to activate" (its own only).
@@ -3564,6 +3582,16 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(giveBlitz[1]!);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveBlitz ??= []).push({ filter: f, text: line });
+      continue;
+    }
+    // Herigast, Erupting Nullkite: "Each creature spell you cast has emerge. The emerge cost is equal to its mana cost."
+    // (CR 702.119a): sacrifice a creature and pay the spell's mana cost less that creature's mana value, beside any emerge
+    // of the spell's own (rulings).
+    const giveEmerge = /^Each (creature spell) you cast has emerge\. The emerge cost is equal to its mana cost\.$/.exec(line);
+    if (giveEmerge) {
+      const f = parseTargetPhrase(giveEmerge[1]!);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveEmerge ??= []).push({ filter: f, text: line });
       continue;
     }
     const blitzLess = /^Blitz costs you pay cost \{(\d+)\} less for each time you've cast your commander from the command zone this game\.$/.exec(line);
@@ -6664,6 +6692,15 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   if (story) {
     const again = triggersAgainLine(`If ${story[1]!}`);
     return again && !again.anchor ? { ...again, enduringStory: true } : null;
+  }
+  // Sanctum of All: "If a triggered ability of another Shrine you control triggers while you control six or more Shrines,
+  // ...": counted as the ability triggers (CR 603.2d), Sanctum itself among them.
+  const whileM = /^If a triggered ability of (another [A-Z][a-z]+ you control) triggers while you control (two|three|four|five|six|seven|eight) or more ([A-Z][a-z]+)s, that ability triggers an additional time\.$/.exec(line);
+  if (whileM) {
+    const again = triggersAgainLine(`If a triggered ability of ${whileM[1]!} triggers, that ability triggers an additional time.`);
+    const f = CREATURE_TYPES.has(whileM[3]!) || !/^[A-Z][a-z]+$/.test(whileM[3]!) ? null : parseTargetPhrase(`${whileM[3]!} you control`);
+    const n = ["two", "three", "four", "five", "six", "seven", "eight"].indexOf(whileM[2]!) + 2;
+    return again?.of && !again.by && f?.kind === "object" && f.subtypes?.length === 1 ? { ...again, whileControl: { filter: f, n } } : null;
   }
   // "Wolf or battle you control", "land or Bird you control": any of them.
   // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when

@@ -3088,12 +3088,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
       for (const o of todo) {
         let position = e.position;
-        if (position === "ownersChoice" || position === "ownersChoiceSecond") {
-          // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
+        if (position === "ownersChoice" || position === "ownersChoiceSecond" || position === "yourChoice") {
+          // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7). "Your choice" (Arashin
+          // Sovereign): this ability's controller chooses, whoever owns it (rulings).
           const sc = (s.resolving!.scratch ??= {});
           if (!sc.topOrBottom) {
-            s.pending = position === "ownersChoice"
-              ? { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` }
+            const chooser = position === "yourChoice" ? ctx.controller : o.owner;
+            s.pending = position !== "ownersChoiceSecond"
+              ? { kind: "chooseOption", player: chooser, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], ...(chooser !== o.owner ? { about: o.id } : {}), prompt: `put ${defOf(s, o).name} on the top or bottom of ${chooser === o.owner ? "your" : `${player(s, o.owner).name}'s`} library?` }
               : { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["second", "bottom"], labels: ["Second from the top", "Bottom"], about: o.id, prompt: `put ${defOf(s, o).name} into your library second from the top or on the bottom?` };
             return "paused";
           }

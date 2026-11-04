@@ -567,6 +567,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = parseDamageRecipient(m[2]!, ctx);
     return to && "ref" in to && to.ref === "target" ? [{ type: "damage", amount: Number(m[1]), to, by: "attached" }] : null;
   }
+  // Enslave: "At the beginning of your upkeep, enchanted creature deals 1 damage to its owner": from that creature (not the
+  // Aura), to whoever owns it (CR 108.3).
+  if ((m = /^[Ee]nchanted creature deals (\d+) damage to its owner$/.exec(s)) && !ctx.spell) return [{ type: "damage", amount: Number(m[1]), to: { ref: "hostOwner" }, by: "attached" }];
   // Compel Brutality: "Target planeswalker you control deals damage equal to its loyalty to target creature or
   // planeswalker an opponent controls": from that planeswalker, its loyalty as this resolves (rulings); none if it's gone.
   if ((m = /^(Target planeswalker you control) deals damage equal to its loyalty to (target creature or planeswalker an opponent controls)$/.exec(s))) {

@@ -1289,20 +1289,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     case "moveAllCounters": {
       // Both have to still be there and legal targets, or no counters move (CR 122.5; rulings on Fate Transfer).
-      const from = objects(s, e.from, ctx)[0];
+      // Spike Cannibal (`only`): from every other object in the group, each kind removed from all of them first.
       const to = objects(s, e.to, ctx)[0];
-      if (!from || !to || from.id === to.id) return;
-      const kinds = Object.entries(from.counters).filter(([k, n]) => n > 0 && !countersStay(s, from, k) && (e.counter === undefined || k === e.counter));
-      for (const [kind, n] of kinds) {
-        from.counters[kind] = 0;
-        countersRemoved(s, from, kind, n);
-        // Black Panther: "if one or more +1/+1 counters are moved this way, ... that much": those taken off to move.
-        if (e.counter !== undefined && s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
-        // Put onto the other one, so replacement effects and "whenever counters are put" apply (Nexus Mentality rulings).
-        putCounters(s, to, kind, n);
-      }
+      const froms = (e.only ? objects(s, e.from, ctx) : objects(s, e.from, ctx).slice(0, 1)).filter((o) => o.id !== to?.id);
+      if (!to || !froms.length) return;
+      const moved = froms.map((from) => ({ from, kinds: Object.entries(from.counters).filter(([k, n]) => n > 0 && (!e.only || k === e.only) && !countersStay(s, from, k)) }));
+      for (const { from, kinds } of moved)
+        for (const [kind, n] of kinds) {
+          from.counters[kind] = 0;
+          countersRemoved(s, from, kind, n);
+          // Black Panther: "if one or more +1/+1 counters are moved this way, ... that much": those taken off to move.
+          if (e.only !== undefined && s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
+        }
+      for (const { kinds } of moved)
+        for (const [kind, n] of kinds)
+          // Put onto the other one, so replacement effects and "whenever counters are put" apply (Nexus Mentality rulings).
+          putCounters(s, to, kind, n);
       invalidateCharacteristics(s);
-      if (kinds.length) log(s, `${characteristics(s, from).name}'s counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) move onto ${characteristics(s, to).name}.`);
+      for (const { from, kinds } of moved) if (kinds.length) log(s, `${characteristics(s, from).name}'s counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) move onto ${characteristics(s, to).name}.`);
       return;
     }
     case "removeSelfCounter": {

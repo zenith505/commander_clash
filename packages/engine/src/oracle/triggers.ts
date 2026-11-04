@@ -2512,6 +2512,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(loyalEnchanted[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "you", loyalty: true, equipped: true }, body } : "fail";
   }
+  // Gideon the Oathless: "Whenever an opponent activates a loyalty ability, ~ deals 1 damage to that player": "that
+  // player" is the opponent who activated it (CR 606.3).
+  const oppLoyal = /^Whenever an opponent activates a loyalty ability, (.+)$/.exec(line);
+  if (oppLoyal) {
+    const body = parseBody(oppLoyal[1]!, { activatedAbility: true, eventPlayer: true });
+    return body ? { event: "abilityActivated", activates: { by: "opponent", loyalty: true }, body } : "fail";
+  }
   const loyal = /^Whenever you activate a loyalty ability(?: of an? ([A-Z][a-z]+) planeswalker)?, (?:if you removed (two|three|four|five) or more loyalty counters to activate it, )?(.+)$/.exec(line);
   if (loyal) {
     const of = loyal[1] ? parseTargetPhrase(`${loyal[1]} planeswalker`) : undefined;
@@ -2536,11 +2543,23 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Elrond, Moon-Reader: "Whenever you activate an ability of a creature, ..." with nothing about mana abilities: mana
   // abilities too (rulings).
   // Ceaseless Searblades: "of an Elemental": a permanent of that creature type (rulings: not a card in another zone).
-  const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent|Elemental), (?!if it isn't a mana ability)(.+)$/.exec(line);
+  // Sarkhan's Whelp: "of a Sarkhan planeswalker": a planeswalker with that subtype on the battlefield as it's activated.
+  const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent|Elemental|[A-Z][a-z]+ planeswalker), (?!if it isn't a mana ability)(.+)$/.exec(line);
   if (anyOf) {
     const f = parseTargetPhrase(anyOf[1]!);
     const body = parseBody(anyOf[2]!, { activatedAbility: true });
+    const walker = / planeswalker$/.exec(anyOf[1]!) ? anyOf[1]!.split(" ")[0]! : undefined;
+    if (walker && (f?.kind !== "object" || !f.subtypes?.includes(walker) || !f.types?.includes("Planeswalker"))) return "fail";
     return f?.kind === "object" && body ? { event: "abilityActivated", activates: { by: "you", of: f, mana: true }, body } : "fail";
+  }
+  // Avalanche of Sector 7: "Whenever an opponent activates an ability of an artifact they control, ~ deals 1 damage to
+  // that player": mana abilities too, as nothing says otherwise (CR 605); "they" and "that player" are the opponent who
+  // activated it, and the artifact is one that player controls as it's activated.
+  const theirs = /^Whenever an opponent activates an ability of an? (artifact|creature|land) they control, (.+)$/.exec(line);
+  if (theirs) {
+    const f = parseTargetPhrase(theirs[1]!);
+    const body = parseBody(theirs[2]!, { activatedAbility: true, eventPlayer: true });
+    return f?.kind === "object" && body ? { event: "abilityActivated", activates: { by: "opponent", of: { ...f, controller: "you" }, ofActivators: true, mana: true }, body } : "fail";
   }
   // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
   const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);

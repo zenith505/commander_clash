@@ -3968,7 +3968,7 @@ export function maxHandSize(s: GameState, pid: PlayerId): number {
   const mods = s.battlefield
     .map((id) => obj(s, id))
     .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
-    .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : opponents(s, controllerOf(s, o)).includes(pid)))
+    .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : h.who === "chosen" ? o.chosen?.player === pid : opponents(s, controllerOf(s, o)).includes(pid)))
     .filter(({ h, o }) => !h.if || staticConditionNow(s, h.if, o.id, controllerOf(s, o)))
     .sort((a, b) => a.o.timestamp - b.o.timestamp);
   for (const { h, o } of mods) n = h.equal ? evalAmount(s, h.equal, { controller: controllerOf(s, o), sourceId: o.id }) : h.set !== undefined ? h.set - (h.minus ? evalAmount(s, h.minus, { controller: controllerOf(s, o), sourceId: o.id }) : 0) : n + (h.plus ?? 0);
@@ -10064,7 +10064,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackUnlessDefenderIs?.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -10227,6 +10227,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
   if (c.attackUnlessYard && player(s, defender).graveyard.length < c.attackUnlessYard) return `${c.name} can't attack unless defending player has ${c.attackUnlessYard} or more cards in their graveyard`; // CR 508.1c
+  for (const is of c.attackUnlessDefenderIs ?? [])
+    if (is === "monarch" ? s.monarch !== defender : !player(s, defender).poison) return `${c.name} can't attack unless defending player is ${is === "monarch" ? "the monarch" : "poisoned"}`; // CR 508.1c, 725, 122.1f
   for (const f of c.attackIfNot ?? [])
     if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack while defending player controls ${f.text}`;
@@ -10977,6 +10979,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  if (a.cantBeBlockedByPowerBelow !== undefined && b.power < a.cantBeBlockedByPowerBelow) return `creatures with power less than ${a.cantBeBlockedByPowerBelow} can't block ${a.name}`; // CR 509.1b
   for (const id of a.cantBeBlockedByLesserPowerThan) {
     const src = s.objects[id];
     if (src?.zone === "battlefield" && b.power < power(s, src)) return `creatures with power less than ${nameOf(s, id)}'s can't block ${a.name}`; // CR 509.1b

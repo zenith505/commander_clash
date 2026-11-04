@@ -821,6 +821,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((o) => !!o && ((types) => objects(s, { ref: "costExiled" }, ctx).some((x) => defOf(s, x).types.some((t) => types.includes(t))))(defOf(s, o).types))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "targetsSameColors"
             ? targetsSameColors(s, ctx, e.cond.index, e.cond.n)
+            : e.cond.kind === "targetSharesColorWith"
+            ? ((f, i) => {
+                // Jaded Response: the colors among those permanents as it resolves (rulings), none for colorless ones.
+                const colors = [...new Set(s.battlefield.map((id) => obj(s, id)).filter((o) => objectMatches(s, f, o, ctx.controller, false)).flatMap((o) => characteristics(s, o).colors))];
+                const t = ctx.targets[i];
+                return colors.length > 0 && !!t && targetIs(s, ctx, i, { kind: t.kind === "stack" ? "spell" : "object", types: [], notTypes: [], notColors: [], colors, text: "shares a color" });
+              })(e.cond.filter, e.cond.index)
             : e.cond.kind === "targetGreatestPower"
             ? ((o) => !!o && o.zone === "battlefield" && objIsType(s, o, "Creature") && !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && power(s, obj(s, id)) > power(s, o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "flickeredIs"

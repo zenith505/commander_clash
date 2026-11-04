@@ -8,6 +8,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
+import { emptyPool } from "../mana";
 import { tappedForMana } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { evalAmount } from "../amounts";
@@ -817,10 +818,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${of !== undefined ? `${chosen ? "Other c" : "C"}reatures ${player(s, of).name} controls` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)}`} can't block this turn.`);
       return;
     }
-    case "cantBeBlockedRule":
-      (s.cantBeBlockedThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
-      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't be blocked this turn.`);
+    case "cantBeBlockedRule": {
+      // "Creatures named ~": the source's name now, as it last existed if it's gone (CR 201.5, 608.2h).
+      const me = e.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const filter = e.filter.named === "~" ? { ...e.filter, named: me?.zone === "battlefield" ? characteristics(s, me).name : ctx.sourceDef.name } : e.filter;
+      (s.cantBeBlockedThisTurn ??= []).push({ filter, controller: ctx.controller });
+      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1).replace(/~/g, filter.named ?? "~")} can't be blocked this turn.`);
       return;
+    }
     case "addCombatMana": {
       // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
       const n = amountNow(s, e.n, ctx);
@@ -880,6 +885,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       gainLife(s, up, diff);
       return;
     }
+    case "loseUnspentMana":
+      // Mana Short: all of it, mana kept "until end of turn" or by a permanent too (CR 106.4).
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        if (!Object.values(p.manaPool).some((n) => n > 0)) continue;
+        p.manaPool = emptyPool();
+        p.manaLots = undefined;
+        log(s, `${p.name} loses all unspent mana.`);
+      }
+      return;
     case "exchangeLifeWithSelf": {
       // CR 701.12g: the life total becomes the power or toughness ~ had, and it gets that player's previous life total.
       const [pid] = players(s, e.who, ctx);

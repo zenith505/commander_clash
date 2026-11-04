@@ -466,9 +466,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
-    case "milledManaValue":
-      if (c.greatest) return Math.max(0, ...(s.resolving?.milled ?? []).map(({ id }) => defMv(defOf(s, s.objects[id]!))));
-      return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    case "milledManaValue": {
+      // A milled card is found where it went, a graveyard or exile instead (Rest in Peace), as both are public (CR 701.17c);
+      // with more than one card milled, their total (CR 701.17d).
+      const milled = [...(s.resolving?.milled ?? []), ...(s.resolving?.milledExiled ?? [])];
+      if (c.greatest) return Math.max(0, ...milled.map(({ id }) => defMv(defOf(s, s.objects[id]!))));
+      return milled.reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    }
     case "exiledTopManaValue":
       return (s.resolving?.exiledTopCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopMatching": {

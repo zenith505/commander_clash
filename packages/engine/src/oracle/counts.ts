@@ -347,7 +347,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each player who chose fortune" (Seize the Spotlight): how many chose that word.
   if ((m = /^player who chose ([a-z]+)$/.exec(p)) && ctx?.chooseWords?.includes(m[1]!)) return { count: { kind: "choseWord", option: m[1]! } };
   // Recursive Recruitment: "for every three cards in your graveyard": each whole group of three, rounded down.
-  if (each && (m = /^(two|three|four|five) cards in your graveyard$/.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" } }, per: num(m[1]!) };
+  if (each && (m = /^(two|three|four|five|six|seven|eight|nine|ten) cards in your graveyard$/.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" } }, per: num(m[1]!) };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   // Ventifact Bottle: "Add {C} for each charge counter removed this way" in a triggered ability (no cost to remove them).
   if (each && (/^counter removed this way$/i.test(p) || (!ctx?.activated && /^(?:[+-]1\/[+-]1|[a-z]+) counter removed this way$/i.test(p)))) return { count: { kind: "countersRemovedThisWay" } };

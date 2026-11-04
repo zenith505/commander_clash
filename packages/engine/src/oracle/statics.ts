@@ -161,6 +161,9 @@ function parseConditionalStatic0(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
+  // Fall from Favor: "Enchanted creature doesn't untap during its controller's untap step unless that player is the
+  // monarch": "that player" is its controller, as the untap step comes (CR 502.3, 725).
+  if (line === "Enchanted creature doesn't untap during its controller's untap step unless that player is the monarch.") return { affects: { kind: "attached" }, mods: [{ kind: "doesntUntap", unlessMonarch: true }], text: line };
   // Bombur, Gentle Dreamer: "~ doesn't untap during your untap step unless you have an enduring story": as long as you
   // don't (CR 702.195b).
   if (/^~ doesn't untap during your untap step unless you have an enduring story\.$/.test(line)) {
@@ -1194,6 +1197,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
   // Captain Mar-Vell, Space-Born: "As long as an opponent has cast a spell this turn".
   if (/^an opponent has cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, byOpponent: true };
+  // Lure of Prey: "Cast ~ only if an opponent cast a creature spell this turn" (CR 601.3).
+  if (/^an opponent cast a creature spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", types: ["Creature"], text: "creature spell" }, byOpponent: true };
   // Rhino, Barreling Brute: "if you've cast a spell with mana value 4 or greater this turn": its mana value on the stack,
   // X included (CR 202.3e).
   if ((m = /^you've cast a spell with mana value (\d+) or greater this turn$/.exec(text))) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, mvAtLeast: Number(m[1]) };
@@ -1499,6 +1504,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
+  // The End: "if your life total is 5 or less" (CR 119).
+  if ((m = /^your life total is (\d+) or less$/.exec(text))) return { kind: "life", max: Number(m[1]) };
   // Near-Death Experience: "if you have exactly 1 life".
   if ((m = /^you have exactly (\d+) life$/.exec(text))) return { kind: "life", min: Number(m[1]), max: Number(m[1]) };
   // Battle of Wits: "if you have 200 or more cards in your library".
@@ -2313,6 +2320,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".
   if ((m = new RegExp(`^can't attack unless defending player has ${NUM} or more cards in their graveyard$`).exec(rest))) return [{ kind: "cantAttackUnlessDefenderYard", n: num(m[1]!) }];
+  // Crown-Hunter Hireling: "can't attack unless defending player is the monarch" (CR 725); Chained Throatseeker: "...
+  // is poisoned", one or more poison counters (CR 122.1f). Checked as attackers are declared (CR 508.1c).
+  if ((m = /^can't attack unless defending player is (the monarch|poisoned)$/.exec(rest))) return [{ kind: "cantAttackUnlessDefenderIs", is: m[1] === "poisoned" ? "poisoned" : "monarch" }];
   // Orcish Conscripts: "can't attack unless at least two other creatures attack", "can't block unless at least two other
   // creatures block": declared in the same combat (CR 508.1c, 509.1b).
   if ((m = new RegExp(`^can't (attack|block) unless at least ${NUM} other creatures (attack|block)$`).exec(rest)) && m[1] === m[3]) return [{ kind: m[1] === "attack" ? "cantAttackUnlessOthers" : "cantBlockUnlessOthers", n: num(m[2]!) }];
@@ -3034,6 +3044,12 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  // Kraken of the Straits: "Creatures with power less than the number of Islands you control can't block ~" (CR 509.1b).
+  const belowCount = /^Creatures with power less than (the number of [^,]+ you control) can't block ~$/.exec(text);
+  if (belowCount) {
+    const n = parseCount(belowCount[1]!, null);
+    return n ? { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByPowerBelow", amount: n }], text: line } : null;
+  }
   // Silumgar Assassin: "Creatures with power greater than ~'s power can't block it" (CR 509.1b).
   if (/^Creatures with power greater than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByGreaterPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
@@ -3169,6 +3185,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const c = parseCount(`the number of ${defending[1]} on the battlefield`, null);
     if (!c || typeof c !== "object" || !("count" in c) || c.count.kind !== "permanents" || c.count.whose || Object.keys(c).length !== 1) return null;
     mods = replaceX(mods, { count: { ...c.count, whose: { ref: "selfDefending" } } });
+  } else if (where && where[2] === "its mana value" && affects.kind === "attached" && m[1] === "Equipped creature") {
+    // Hedron Matrix: "Equipped creature gets +X/+X, where X is its mana value": the equipped creature's (a face-down one's
+    // is 0, CR 708.2), counted continuously (CR 611.3a).
+    mods = replaceX(mods, { count: { kind: "affectedManaValue" } });
   } else if (where) {
     const def = counts(parseCount(where[2]!, null), where[2]!);
     if (!def) return null;

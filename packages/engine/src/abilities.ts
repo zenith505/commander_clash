@@ -1439,6 +1439,8 @@ export type PlayerRef =
   | { ref: "selfDefending" }
   /** "Enchanted artifact's controller" (Gremlin Infestation): who controls the permanent the source is attached to now. */
   | { ref: "hostController" }
+  /** "Its owner" after "enchanted creature" (Enslave): whose the permanent the source is attached to is, or was as the source last existed (CR 108.3, 608.2h). */
+  | { ref: "hostOwner" }
   /** "The player to your right" (Bucknard's Everfull Purse): the one before you in turn order, "to your left" the one after (CR 101.4). */
   | { ref: "neighbor"; side: "left" | "right" }
   /** "Its owner" in an ability of ~ about ~ itself (Yes Man): whose ~ is (CR 108.3). */
@@ -1701,7 +1703,7 @@ export type Modification =
   | { kind: "loseActivated"; index: number }
   /** Layer 6: "becomes an Aura enchantment with enchant creature" (a Licid): it has enchant creature (CR 702.5a). */
   | { kind: "enchantCreature" }
-  | { kind: "doesntUntap" }
+  | { kind: "doesntUntap"; /** Fall from Favor: "unless that player is the monarch": not while its controller is (CR 725). */ unlessMonarch?: true }
   /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
   | { kind: "cantBecomeUntapped" }
   /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
@@ -1774,6 +1776,8 @@ export type Modification =
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
   | { kind: "cantAttackUnlessDefenderYard"; n: number }
+  /** "Can't attack unless defending player is the monarch / is poisoned" (Crown-Hunter Hireling, Chained Throatseeker). */
+  | { kind: "cantAttackUnlessDefenderIs"; is: "monarch" | "poisoned" }
   /** "Can't attack if defending player controls an untapped creature with power 2 or less" (Mogg Jailer, CR 508.1c). */
   | { kind: "cantAttackIf"; defenderControls: TargetSpec }
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound): its controller's count against the player it would attack. */
@@ -1791,6 +1795,8 @@ export type Modification =
    * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
    */
   | { kind: "cantBeBlockedByLesserPower"; than?: "source" }
+  /** Kraken of the Straits: "Creatures with power less than the number of Islands you control can't block ~": counted as blockers are declared (CR 509.1b, rulings). */
+  | { kind: "cantBeBlockedByPowerBelow"; amount: Amount }
   /** The Ring-bearer: "can't be blocked by creatures with greater power" (CR 701.54c). */
   | { kind: "cantBeBlockedByGreaterPower" }
   /** Spitfire Handler: "can't block creatures with power greater than ~'s power" (CR 509.1b). */
@@ -2446,6 +2452,8 @@ export type Effect =
    * ~ has left the battlefield, or the life can't change, none of it happens (CR 701.12a, rulings).
    */
   | { type: "exchangeLifeWithSelf"; who: PlayerRef; stat: "power" | "toughness" }
+  /** "That player loses all unspent mana" (Mana Short): their mana pool empties (CR 106.4). */
+  | { type: "loseUnspentMana"; who: PlayerRef }
   /** "Exchange its power and the power of target creature it's blocking until end of combat" (Serene Master): CR 701.12g. */
   | { type: "exchangePower"; what: ObjRef; duration: "endOfTurn" | "endOfCombat" }
   | { type: "destroy"; what: ObjRef; /** "It can't be regenerated." "creatures": "Creatures destroyed this way can't be regenerated" (Catastrophe), only those that are creatures as they're destroyed. */ noRegen?: boolean | "creatures" }
@@ -2803,7 +2811,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth"; /** "Just beneath the top X cards of that library" (Unexpectedly Absent): with `position` "top", under that many cards (on the bottom with fewer, rulings). */ beneath?: Amount; /** "On top of their library in any order" (Misinformation): the controller orders them, not their owner. */ youOrder?: true }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "On your choice of the top or bottom of its owner's library" (Arashin Sovereign): this ability's controller chooses. */ "yourChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth"; /** "Just beneath the top X cards of that library" (Unexpectedly Absent): with `position` "top", under that many cards (on the bottom with fewer, rulings). */ beneath?: Amount; /** "On top of their library in any order" (Misinformation): the controller orders them, not their owner. */ youOrder?: true }
   | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "All cards with flashback" (Tombfire): cards that have it there, their own or given by an effect (CR 702.34a). */ withFlashback?: true; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
@@ -3127,7 +3135,7 @@ export type Effect =
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
   /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
-  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef }
+  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef; /** Spike Cannibal: "move all +1/+1 counters from all creatures onto it": only this kind, from each of `from` (a group) but `to` itself. */ only?: CounterKind }
   /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
@@ -4567,6 +4575,8 @@ export type SpellCondition =
    * colors (all colorless counts), as they are now or, gone from the battlefield, as they last existed (CR 608.2b, 608.2h).
    */
   | { kind: "targetsSameColors"; index: number; n: number }
+  /** Jaded Response: "if it shares a color with a creature you control": the target's colors against those of the permanents matching `filter`, both as it resolves (rulings). */
+  | { kind: "targetSharesColorWith"; index: number; filter: TargetSpec }
   /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
   | { kind: "targetSharesName"; index: number }
   /** "If it shares a card type with the card exiled this way" (Holistic Wisdom): target card `index` and the card the ability's "exile a card from your hand" cost exiled, their card types (CR 205.2a), checked as it resolves. */
@@ -5280,7 +5290,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed, CR 702.128a, 702.129a). */ embalm?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability that targets a creature or player" (Ertha Jo, Frontier Mentor): one of its targets as activated is a creature on the battlefield or a player. */ targetsCreatureOrPlayer?: true; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever you activate a boast ability" (Frenzied Raider, CR 702.142a). */ boast?: true; /** "Whenever you activate an eternalize or embalm ability" (Vizier of the Anointed, CR 702.128a, 702.129a). */ embalm?: true; /** "Whenever you activate an exhaust ability" (Afterburner Expert, CR 702.177a): mana abilities too. */ exhaust?: true; /** "Whenever you activate ~'s outlast ability" (Herald of Anafenza): this permanent's own (CR 702.107a). */ ownOutlast?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true; /** "Whenever you activate a loyalty ability" (Way of the Paradox, CR 606.3): a loyalty ability only. */ loyalty?: true; /** With `loyalty`: "if you removed two or more loyalty counters to activate it" (Way of the Mind Sculptor), the loyalty cost paid (CR 606.4). */ loyaltyRemoved?: number; /** `of` is matched for the player who activated it, not this ability's controller ("an artifact they control", Avalanche of Sector 7). */ ofActivators?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -7081,7 +7091,7 @@ export interface CompiledCard {
    * `minus`: Winter, Misanthropic Guide's "each opponent's maximum hand size is equal to seven minus the number of those
    * card types", `set` less this, counted as it applies; `if`: only while this holds (its delirium).
    */
-  handSize?: { who: "you" | "opponents"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition; /** Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~", counted whenever it's checked. */ equal?: Amount }[];
+  handSize?: { /** "chosen": the player chosen as it entered (Cursed Rack). */ who: "you" | "opponents" | "chosen"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition; /** Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~", counted whenever it's checked. */ equal?: Amount }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */

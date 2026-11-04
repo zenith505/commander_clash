@@ -2348,7 +2348,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;
         }
-        return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
+        return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, a.ofActivators ? ev.player : you, false, undefined, ev.source.chars));
       }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
     }
     // Afterburner Expert: "Whenever you activate an exhaust ability, return this card from your graveyard ...".

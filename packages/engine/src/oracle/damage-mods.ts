@@ -136,7 +136,10 @@ export function parseDamageMod(line: string): StaticAbility | null {
     // "Prevent all combat damage that would be dealt to ~ by enchanted creatures" (Enchanted Being), "... by creatures
     // with first strike" (Tresserhorn Skyknight), "... by Walls" (Marble Priest): sources as they deal it (CR 609.7b).
     .replace(/^Prevent all (combat )?damage that would be dealt to ~ by creatures with (first strike)$/, "If a creature with $2 would deal $1damage to ~, prevent that damage")
-    .replace(/^Prevent all (combat )?damage that would be dealt to ~ by (enchanted creature|Wall)s$/, "If a $2 would deal $1damage to ~, prevent that damage")
+    .replace(/^Prevent all (combat )?damage that would be dealt to ~ by (enchanted creature|Wall|Desert)s$/, "If a $2 would deal $1damage to ~, prevent that damage")
+    // Light of Sanction: "Prevent all damage that would be dealt to creatures you control by sources you control": each
+    // such source's damage to each such creature, both as the damage would be dealt (CR 615.1a).
+    .replace(/^Prevent all damage that would be dealt to creatures you control by sources you control$/, "If a source you control would deal damage to a creature you control, prevent that damage")
     // Wall of Vapor: "Prevent all damage that would be dealt to ~ by creatures it's blocking"; Armored Transport: "... combat
     // damage ... by creatures blocking it": those in combat with it as the damage would be dealt (CR 509.1g, 609.7b).
     .replace(/^Prevent all (combat )?damage that would be dealt to ~ by creatures (it's blocking|blocking it)$/, (_, c: string | undefined, w: string) => `If a creature ${w === "it's blocking" ? "~ is blocking" : "blocking ~"} would deal ${c ?? ""}damage to ~, prevent that damage`)

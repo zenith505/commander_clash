@@ -21815,6 +21815,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e5b29094-0bb4-4c18-ad47-dce4d4379a4f",
+  "name": "Stream of Thought",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player mills four cards. You shuffle up to four cards from your graveyard into your library.\nReplicate {2}{U}{U} (When you cast this spell, copy it for each time you paid its replicate cost. You may choose new targets for the copies.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Replicate",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh1",
+  "releasedAt": "2019-06-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "95385d84-550c-4d6c-a889-62bdbc1d518d",
   "name": "Street Spasm",
   "manaCost": "{X}{R}",

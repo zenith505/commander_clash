@@ -1772,6 +1772,8 @@ export type Modification =
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
   | { kind: "cantAttackUnlessDefenderYard"; n: number }
+  /** "Can't attack unless defending player is the monarch / is poisoned" (Crown-Hunter Hireling, Chained Throatseeker). */
+  | { kind: "cantAttackUnlessDefenderIs"; is: "monarch" | "poisoned" }
   /** "Can't attack if defending player controls an untapped creature with power 2 or less" (Mogg Jailer, CR 508.1c). */
   | { kind: "cantAttackIf"; defenderControls: TargetSpec }
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound): its controller's count against the player it would attack. */
@@ -3125,7 +3127,7 @@ export type Effect =
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
   /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
-  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef }
+  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef; /** Spike Cannibal: "move all +1/+1 counters from all creatures onto it": only this kind, from each of `from` (a group) but `to` itself. */ only?: CounterKind }
   /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
@@ -4563,6 +4565,8 @@ export type SpellCondition =
    * colors (all colorless counts), as they are now or, gone from the battlefield, as they last existed (CR 608.2b, 608.2h).
    */
   | { kind: "targetsSameColors"; index: number; n: number }
+  /** Jaded Response: "if it shares a color with a creature you control": the target's colors against those of the permanents matching `filter`, both as it resolves (rulings). */
+  | { kind: "targetSharesColorWith"; index: number; filter: TargetSpec }
   /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
   | { kind: "targetSharesName"; index: number }
   /** "If it shares a card type with the card exiled this way" (Holistic Wisdom): target card `index` and the card the ability's "exile a card from your hand" cost exiled, their card types (CR 205.2a), checked as it resolves. */
@@ -7077,7 +7081,7 @@ export interface CompiledCard {
    * `minus`: Winter, Misanthropic Guide's "each opponent's maximum hand size is equal to seven minus the number of those
    * card types", `set` less this, counted as it applies; `if`: only while this holds (its delirium).
    */
-  handSize?: { who: "you" | "opponents"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition; /** Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~", counted whenever it's checked. */ equal?: Amount }[];
+  handSize?: { /** "chosen": the player chosen as it entered (Cursed Rack). */ who: "you" | "opponents" | "chosen"; set?: number; plus?: number; minus?: Amount; if?: StaticCondition; /** Midnight Oil: "Your maximum hand size is equal to the number of hour counters on ~", counted whenever it's checked. */ equal?: Amount }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */

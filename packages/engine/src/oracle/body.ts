@@ -1747,6 +1747,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // supertypes (rulings, CR 205.1a).
   text = text.replace(/(^|\. )[Ff]or each player, choose up to one other target (artifact or creature) that player controls\. For as long as ~ remains on the battlefield, the chosen permanents become Treasure artifacts with ("[^"]+") and lose all other abilities\./, "$1For each player, up to one other target $2 that player controls becomes a Treasure artifact with $3 and loses all other card types and abilities for as long as ~ remains on the battlefield.");
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
+  // Gandalf, Wandering Wizard: "~'s owner shuffles ~ into their library and draws three cards": the owner draws even if
+  // ~ is gone by then (CR 608.2c).
+  text = text.replace(/^~'s owner shuffles ~ into their library and draws (a card|two cards|three cards)\.$/, "~'s owner shuffles ~ into their library. ~'s owner draws $1.");
   // Recursive Recruitment: "for every three cards in your graveyard" is "for each" group of three.
   text = text.replace(/ for every (two|three|four|five) cards in your graveyard\./, " for each $1 cards in your graveyard.");
   // Browse: "Look at the top five cards of your library, put one of them into your hand, and exile the rest": the look,
@@ -8067,6 +8070,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Orcish Spy: "Look at the top three cards of target player's library." and nothing else: only looked at, in the same
+    // order (CR 701.16a).
+    if (visions && si === sentences.length - 1) {
+      const who = parsePlayer(visions[2]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      effects.push({ type: "orderTop", who, n: num(visions[1]!), lookOnly: true });
+      continue;
+    }
     // Information Dealer: "Look at the top X cards of your library, where X is the number of Wizards on the battlefield,
     // then put them back in any order."
     const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library(?:, where X is (.+))?$`).exec(s);
@@ -11399,6 +11410,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(capital(ifYours[1]!), ctx);
       if (!fx || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "you control" } }, effects: fx });
+      continue;
+    }
+    // Jaded Response: "Counter target spell if it shares a color with a creature you control": checked as it resolves
+    // (rulings), the spell's colors against those of your creatures then.
+    const sharesWith = /^(Counter target spell) if it shares a color with (a creature you control)$/.exec(s);
+    if (sharesWith) {
+      const fx = parseOne(sharesWith[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const f = parseTargetPhrase(sharesWith[2]!.replace(/^an? /, ""));
+      if (!fx || i !== curTargets || t?.kind !== "spell" || t.optional || t.many || f?.kind !== "object" || f.controller !== "you" || !fx.every((e) => mentionsTarget(e, i))) return null;
+      effects.push({ type: "if", cond: { kind: "targetSharesColorWith", index: i, filter: { ...f, text: sharesWith[2]! } }, effects: fx });
       continue;
     }
     // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,755 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,540 of
+29,765 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,550 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -168,7 +168,7 @@ line blocks.
    "can't cast spells with the same name as a card exiled with ~"), The Red Terror (a damage trigger for any red
    source you control), Amped Raptor (casting a card by paying energy instead of its mana cost), Repeated
    Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Scuttlemutt ("the color or colors of your choice" needs a multi-color
-   picker), Role Reversal, Shifting Loyalties, Daring Thief and The Trickster-God's Heist (two targets that "share a
+   picker), Role Reversal (done in round 273), Shifting Loyalties, Daring Thief and The Trickster-God's Heist (two targets that "share a
    card type" or "permanent type": no target rule between two targets yet), Conjured Currency ("target permanent you
    neither own nor control"), Visions of Duplicity (flashback cheaper by a commander's mana value). Round 173 went
    down the list from Godsend to Dovin, Hand of Control (rank 8,497), taking the cards that parse with small pieces,
@@ -179,7 +179,7 @@ line blocks.
    Out after round 174: Radagast the Brown and Conjurer's Mantle ("a card that shares a creature type with" a
    creature, among the cards looked at), Quicksilver Elemental (gaining a creature's activated abilities), Secret of
    Bloodbending (controlling a player), Chiss-Goria, Forge Tyrant (granting affinity for artifacts), Molecule Man
-   (granting miracle), Confiscation Coup (paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
+   (granting miracle), Confiscation Coup (done in round 273; paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
    Osseous Sticktwister (a punisher read back with "didn't"), Craig
    Boone, Novac Guard (a reflexive damage trigger with "unless that creature's controller"), Spelltwine (casting copies
    of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
@@ -469,7 +469,7 @@ line blocks.
    Uneaten Feast, Cait Sith, Scouring Swarm, Brigid's back face, Bring to
    Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
-   Appropriation, Ixhel, Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
+   Appropriation, Ixhel (done in round 273), Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
    Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
@@ -505,7 +505,7 @@ line blocks.
    Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts),
    Oath of Nissa, Sigurd, Dog Umbra, Call for Aid, Narset
    of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
-   miracle), Coram, Brimaz, Mindleech Mass, Requiem Monolith, Behemoth of
+   miracle), Coram, Brimaz, Mindleech Mass (done in round 273), Requiem Monolith, Behemoth of
    Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
    graveyard"), Undead Alchemist, Auntie Ool (done in round 266),
@@ -1269,7 +1269,7 @@ line blocks.
    Gleeful Spellthief); "Return that creature to its owner's hand at end of combat" after a creature put onto the
    battlefield from the top six (Arthur, Marigold Knight); "that doesn't have the same name as a token you control" (The
    Apprentice's Folly). +16 (28,647 of 31,936 with B64).
-   Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (each poisoned opponent's face-down exiled card,
+   Out after round 226 (looked at, not done): Ixhel, Scion of Atraxa (done in round 273; each poisoned opponent's face-down exiled card,
    playable with mana of any color); Firkraag, Cunning Instigator ("if that creature had to attack this combat");
    Waterbender's Restoration (waterbend {X} as an additional cost); Eruth, Tormented Prophet and Uba Mask (every draw
    replaced, alongside dredge and the other draw replacements, CR 616.1); Hofri Ghostforge and Timothar, Baron of Bats
@@ -1322,7 +1322,7 @@ line blocks.
    resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
-   an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief, Ninja Teen (granted sneak from
+   an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan, Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
@@ -2024,6 +2024,31 @@ line blocks.
    (Proteus Staff: the creature goes to its owner's library, its controller reveals from theirs and orders the rest).
    Bots now treat a permanent put into its owner's library (Excommunicate, Chaos Warp, Proteus Staff) as removal, aimed
    at an opponent's. +10, 29,703 of 31,936 (with Lane B's B96 to B103).
+   Round 273 went on from the top. Cards exiled face down that you may play (CR 406.3): "look at the top card of their
+   library, then exile it face down. For as long as it remains exiled, you may play it, and mana of any type can be
+   spent to cast that spell" (Dream-Thief's Bandana: "their" is the player dealt damage; still yours to play once the
+   Bandana is gone, rulings), "exile two of them face down ... You may play the exiled cards" (Black Cat, Cunning
+   Thief: exactly two, all of them with fewer, lands played with the usual timing, rulings) and "each opponent who has
+   three or more poison counters exiles the top card of their library face down" (Ixhel, Scion of Atraxa); "If the gift
+   was promised, you may cast that card for as long as it remains exiled" (Cruelclaw's Heist; bots now promise the gift
+   for it); "When ~ leaves the battlefield, the exiled card's owner manifests dread" (Unidentified Hovership: each owner
+   of a card its own exile ability took that's still exiled, rulings, CR 607.2a); "you may remove two oil counters from
+   it. If you do, when you next cast an instant or sorcery spell this turn, copy that spell" (Mercurial Spelldancer, CR
+   603.7); "you may look at that player's hand. If you do, you may cast a spell from among those cards without paying
+   its mana cost" (Mindleech Mass); "You get {E}{E}{E}{E}, then you may pay an amount of {E} equal to that permanent's
+   mana value. If you do, gain control of it" (Confiscation Coup: a mana value of 0 costs no energy, rulings); "two
+   target permanents that share a permanent type" (Role Reversal: artifact, battle, creature, enchantment, land or
+   planeswalker, CR 110.4, checked again as it resolves); "When you do, ~ deals X damage to each creature, where X is
+   the greatest mana value among cards discarded this way" (Ill-Timed Explosion: "you may discard two cards" is offered
+   only with two cards in hand, as for Thrilling Discovery since round 183). +10, 29,731 of 31,936 with B104.
+   Out after round 273 (looked at, not done): Filigree Vector (two "any number of target" groups in one ability: the
+   target picker expands only one); Mirrormind Crown and Moonlit Meditation ("you may instead create that many tokens
+   that are copies of ...": an optional token replacement, the same gap as Jinnie Fay's); Doors of Durin ("you may
+   reveal the top card of your library. If a creature card is revealed this way, put it onto the battlefield tapped and
+   attacking", then keywords granted until your next turn by what you control); Abstruse Appropriation ("you may spend
+   colorless mana as though it were mana of any color": only colorless, a payment rule the engine doesn't have);
+   Magus Lucea Kane (the next spell with {X} or activated ability with {X} copied: no delayed trigger on activating an
+   ability yet); The Ruinous Powers ("When you cast a spell this way, its owner loses life equal to its mana value").
    Out after round 272 (looked at, not done): Sigurd, Jarl of Ravensthorpe ("Whenever you put a lore counter on a Saga
    you control": whether several lore counters put at once trigger it once or once for each isn't settled by the CR or
    rulings); Ruxa, Patient Professor ("Creatures you control with no abilities get +1/+1": which permanents have no
@@ -2118,7 +2143,7 @@ line blocks.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
    Legacy would follow); Ob Nixilis, the Adversary (casualty X: the copy's starting loyalty from the chosen X);
    Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
-   Out after round 251 (looked at, not done): Ill-Timed Explosion ("you may discard two cards. When you do": no ruling on
+   Out after round 251 (looked at, not done): Ill-Timed Explosion (done in round 273; "you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).
    Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a
    look-at put "tapped and attacking that player"); Pact Weapon ("draw a card and reveal it", the X lost if the draw is
@@ -2135,7 +2160,7 @@ line blocks.
    cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness ("Pay any amount of
    life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (cards exiled this way gaining
    "You may cast ~ from exile as long as you control a Lukka planeswalker").
-   Out after round 248 (looked at, not done): Unidentified Hovership ("the exiled card's owner manifests dread": each
+   Out after round 248 (looked at, not done): Unidentified Hovership (done in round 273; "the exiled card's owner manifests dread": each
    owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver
    ("Return ~ to the battlefield under that player's control at the beginning of their next upkeep": no instruction yet
    puts a card onto the battlefield under another player's control, and bots have no sense for giving it away);
@@ -2245,15 +2270,15 @@ line blocks.
    Shaw, Unstable Glyphbridge, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
    Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
-   Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
+   Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Psychic Paper,
-   Dream-Thief's Bandana, Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
+   Dream-Thief's Bandana (done in round 273), Chandra, Legacy of Fire (done in round 267), Theoretical Duplication,
    Calamity, Galloping Inferno, Sam, Loyal Attendant, Crystalline Giant,
    Kaervek, the Punisher (done in round 267), Obsessive Pursuit,
    Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
-   Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
+   Mercurial Spelldancer (done in round 273), Vraska, the Silencer, Vren, the Relentless, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Erdwal Illuminator, Sigarda, Host of
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription (done in round 267), Bloatfly Swarm, War's
    Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond (done in round 265), Rot Hulk, Thieving Amalgam.
@@ -2986,7 +3011,7 @@ line blocks.
      name), Murmuration, Mordor Trebuchet, The Great Unclean One. The Balrog is out on its cost reduction.
    Left from the reflexive spells and "triggers an additional time" round (CR 603.12 on instants and sorceries,
    amass's "when you do" and "the amassed Army", 603.2d):
-   - Reflexive spells still out: Ill-Timed Explosion ("the greatest mana value among cards discarded this way" carried
+   - Reflexive spells still out: Ill-Timed Explosion (done in round 273; "the greatest mana value among cards discarded this way" carried
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
    - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
@@ -3081,7 +3106,7 @@ line blocks.
      Expel the Unworthy, The Eagles Are Coming!); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
      (Earth's Mightiest Heroes); "twice X ... instead"
      (Stonesplitter Bolt, Torch the Tower).
-   - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,
+   - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist (done in round 273), Dawn's Truce, Longstalk Brawl,
      Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's "Gift of Chaos" is a flavor word.
    - Wills still out: Sakashima's, Kamahl's and Will of the Abzan (above).
    - "Each player may discard their hand and draw ..." works; Snort's "each opponent who discarded their hand this
@@ -5356,7 +5381,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   damage to its owner"), Curse of Oblivion ("that player exiles two cards from their graveyard"), Kraken of the Straits
   ("power less than the number of Islands you control", counted as blockers are declared), Fall from Favor ("unless that
   player is the monarch"). Also: a milled card exiled instead (Rest in Peace) is still "the milled card" (CR 701.17c), for
-  Heed the Mists and the other "milled card's mana value" cards too. +19 (29,740 of 31,936).
+  Heed the Mists and the other "milled card's mana value" cards too. +19 (29,750 of 31,936 with round 273).
 - Round B106 (single-line blockers from the skip lists, least played first): Leaves from the Vine ("if there's a creature or
   Lesson card in your graveyard": either kind), Spirit of Resistance (all damage to you prevented while five colors are
   among your permanents, a multicolored one counting as each, rulings), Kemba's Legion (an additional block for each
@@ -5370,7 +5395,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Inferno Hellion ("if ~ attacked or blocked this turn, its owner shuffles it into their library"), Foundry Helix ("If the
   sacrificed permanent was an artifact"), General Tazri ("colors among those creatures": the Ally creatures as it resolves,
   X fixed then), Armored Kincaller ("If you do or if you control another Dinosaur"), Skulking Killer ("if that opponent
-  controls no other creatures": the target's controller, as it resolves). +15 (29,755 of 31,936).
+  controls no other creatures": the target's controller, as it resolves). +15 (29,765 of 31,936 with round 273).
 - Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
   each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
   creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it
@@ -5582,7 +5607,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activate "Remove X counters from among" abilities (Retribution of the Ancients); granted casualty (Anhelo, the
   Painter; Ashad) still needs more than one instance of casualty (CR 702.153b).
 - Out after round B69 (looked at, not done): Day of the Moon (names chosen for the Saga each chapter, then goad by
-  them), Anhelo, the Painter and Ashad, the Lone Cyberman (granted casualty, several instances), Unidentified Hovership
+  them), Anhelo, the Painter and Ashad, the Lone Cyberman (granted casualty, several instances), Unidentified Hovership (done in round 273)
   (the owner of each card it exiled), Crafty Cutpurse (tokens an opponent would create, against token doubling and the
   attack rulings), Insatiable Frugivore (a repeat loop), Galloping Lizrog (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),

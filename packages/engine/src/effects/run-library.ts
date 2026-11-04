@@ -7,7 +7,7 @@ import { attackingPermanentOf, castProblem, creatureTypesOf, freeCastable, draw,
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
-import { ResolveCtx, apnap, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
+import { ResolveCtx, apnap, gifteeOf, attachedHostTypes, players, amountNow, amountCtx, amountFor, objects, runEffect } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
@@ -647,7 +647,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           // Covetous Urge: "You may cast that card for as long as it remains exiled" (not a land: "cast").
-          if (e.youMay) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
+          if (e.youMay && (!e.youMay.ifGift || gifteeOf(s, ctx) !== undefined)) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
           // "It becomes plotted" (CR 702.170c): cast without paying its mana cost on a later turn (702.170d).
           if (e.plot) {
@@ -672,7 +672,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const cards = lib.library.slice(0, e.n);
         if (!cards.length) return;
         sc.looked = cards;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: e.castAnyType ? "into exile face down: you may cast it while it's exiled, with mana of any type" : e.castCreature ? "into exile face down: you may cast it while it's exiled if it's a creature spell" : "into exile face down (hideaway)", rest: e.restToGraveyard ? `into ${lib.name}'s graveyard` : e.from ? `on the bottom of ${lib.name}'s library in a random order` : e.castCreature ? "on the bottom of your library" : "on the bottom of your library in a random order" } };
+        const k = Math.min(e.pick ?? 1, cards.length);
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: k === 1 ? "a card" : `${k} cards`, cards, min: k, max: k, dig: { looked: cards, to: e.play ? "into exile face down: you may play them while they're exiled, with mana of any type" : e.castAnyType ? "into exile face down: you may cast it while it's exiled, with mana of any type" : e.castCreature ? "into exile face down: you may cast it while it's exiled if it's a creature spell" : "into exile face down (hideaway)", rest: e.restToGraveyard ? `into ${lib.name}'s graveyard` : e.from ? `on the bottom of ${lib.name}'s library in a random order` : e.castCreature ? "on the bottom of your library" : "on the bottom of your library in a random order" } };
         return "paused";
       }
       const looked = sc.looked ?? [];
@@ -685,9 +686,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], at, ...(e.castAnyType ? { label: "Face down" } : {}) };
         // Gonti: its controller may cast it for as long as it remains exiled, even after Gonti has left (rulings).
         if (e.castAnyType) {
-          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, anyType: true };
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), anyType: true };
           log(s, `${p.name} exiles a card face down from ${lib.name}'s library.`);
-          log(s, `You exiled ${defOf(s, o).name} face down with ${src}; you may cast it while it's exiled.`, p.id);
+          log(s, `You exiled ${defOf(s, o).name} face down with ${src}; you may ${e.play ? "play" : "cast"} it while it's exiled.`, p.id);
           continue;
         }
         // Vivien, Champion of the Wilds: only as a creature spell, with its usual timing (rulings), even after Vivien has left.
@@ -1607,7 +1608,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "Each player looks at the top five cards of their library and may reveal ..." (Explore the Vastlands): one after
         // another in APNAP order, each seeing what the ones before took (CR 101.4).
         const sc = (s.resolving!.scratch ??= {});
-        sc.digQueue ??= apnap(s, players(s, { ref: "eachPlayer" }, ctx));
+        sc.digQueue ??= apnap(s, players(s, e.eachOf ?? { ref: "eachPlayer" }, ctx));
         while (sc.digQueue.length) {
           if (dig(s, e, ctx, src, sc.digQueue[0]!) === "paused") return "paused";
           const r = s.resolving!.scratch!;

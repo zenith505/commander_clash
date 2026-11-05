@@ -1770,7 +1770,14 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.mustAttackMostLife = true;
       return;
     case "mustAttackPlayer":
-      if (m.player === "chosen" || typeof m.player === "object" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
+      if (m.player === "enchantedController") {
+        // Public Enemy: the enchanted creature's controller now (layer 2 is done); not one of that player's own creatures.
+        const host = e.sourceId ? s.objects[e.sourceId]?.attachedTo : undefined;
+        const who = host !== undefined && s.objects[host]?.zone === "battlefield" ? (chars.get(host)?.controller ?? s.objects[host]!.controller) : undefined;
+        if (who !== undefined && who !== c.controller && !c.mustAttack.includes(who)) c.mustAttack.push(who);
+        return;
+      }
+      if (m.player === "chosen" || m.player === "you" || typeof m.player === "object" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
       if (!c.mustAttack.includes(m.player)) c.mustAttack.push(m.player);
       return;
     case "cantBeBlockedBy":

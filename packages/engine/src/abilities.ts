@@ -1337,7 +1337,7 @@ export type ObjRef =
    */
   | { ref: "diedDamagedBySelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
-  | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number }
+  | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number; /** Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it": in combat with the source as it last existed on the battlefield (CR 603.10a, 608.2h), and still blocking or attacking. */ lastKnown?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
   | { ref: "blockingIt"; subject?: true; /** "All creatures blocked by ~" (Wall of Nets): the attackers it's blocking, while it's blocking (CR 509.1h, 506.4). */ blocked?: true }
   /**
@@ -1744,7 +1744,7 @@ export type Modification =
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
   /** Galactus, Devourer of Worlds: "~ attacks an opponent with the most life among your opponents each combat if able" (CR 508.1d). */
   | { kind: "mustAttackMostLife" }
-  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen" | /** "Attacks target opponent this turn if able" (Dulcet Sirens): that target, bound as it resolves. */ { target: number }; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
+  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen" | /** "Attacks target opponent this turn if able" (Dulcet Sirens): that target, bound as it resolves. */ { target: number } | /** "Attacks you this turn if able" (Alluring Siren): the ability's controller, bound as it resolves. */ "you" | /** Public Enemy: "All creatures attack enchanted creature's controller each combat if able": whoever controls the creature the source enchants now. */ "enchantedController"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
@@ -2662,7 +2662,7 @@ export type Effect =
    * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
    * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec; /** "Reveal up to five nonland cards from your hand" (Vault 21: House Gambit): at most this many. */ max?: number; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
+  | { type: "revealFromHand"; filter?: TargetSpec; /** "Reveal up to five nonland cards from your hand" (Vault 21: House Gambit): at most this many. */ max?: number; bottom?: true; /** "Shuffle any number of cards from your hand into your library" (Credit Voucher): the cards chosen are shuffled in, not revealed. */ shuffle?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; /** Hypnox: "exile all cards from target opponent's hand": that player's instead of yours. */ who?: PlayerRef; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean; /** Wheel of Potential: "If seven or more {E} was paid this way, you may play cards you own exiled this way until the end of your next turn": with the amount noted (the {E} paid) at least this, the controller may play the cards they own exiled this way. */ mayPlayIfNoted?: number }
   /**
@@ -3933,7 +3933,7 @@ export type Effect =
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
    */
-  | { type: "cumulativeUpkeep"; pay: PayCost; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true; /** "Cumulative upkeep—Add {R}" (Braid of Fire): the cost is adding this mana for each age counter. */ addMana?: string; /** "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger): a different permanent like this for each age counter. */ sacrificeCost?: TargetSpec; /** "Cumulative upkeep—An opponent gains 1 life" (Wall of Shards): for each age counter an opponent who can gain life, chosen each time (rulings: the same one or different ones), gains this much. */ giveLife?: number } // "If you don't, ...": fabricate (CR 702.123a)
+  | { type: "cumulativeUpkeep"; pay: PayCost; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind; /** "Cumulative upkeep—Draw a card" (Psychic Vortex): the cost is drawing a card for each age counter. */ drawCost?: true; /** "Cumulative upkeep—Add {R}" (Braid of Fire): the cost is adding this mana for each age counter. */ addMana?: string; /** "Cumulative upkeep—Sacrifice a creature" (Phyrexian Soulgorger): a different permanent like this for each age counter. */ sacrificeCost?: TargetSpec; /** "Cumulative upkeep—An opponent gains 1 life" (Wall of Shards): for each age counter an opponent who can gain life, chosen each time (rulings: the same one or different ones), gains this much. */ giveLife?: number; /** "Cumulative upkeep—Discard a card" (Vexing Sphinx): a card discarded for each age counter. */ discardCost?: true; } // "If you don't, ...": fabricate (CR 702.123a)
   /**
    * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
    * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
@@ -6542,7 +6542,7 @@ export interface CompiledCard {
    * choice of a +1/+1 counter or a flying counter on it" (Tizerus Charger, only when it escaped, CR 702.138c): chosen as it
    * enters (CR 614.1c, 614.12), part of how it enters.
    */
-  entersCounterChoice?: { counters: CounterKind[]; escaped?: true };
+  entersCounterChoice?: { counters: CounterKind[]; escaped?: true; /** Grimdancer: "two different counters from among ...": a pair of them, each option "a|b". */ two?: true };
   /**
    * "As ~ enters, it becomes your choice of a 3/3 creature with flying, a 2/5 creature with vigilance, or a 0/12 creature
    * with defender" (Corrupted Shapeshifter, Primal Clay): chosen as it enters (CR 614.12), part of its copiable values

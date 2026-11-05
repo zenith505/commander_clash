@@ -4007,6 +4007,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand${pending.revealFor !== undefined ? `; ${pending.revealFor === HUMAN ? "you choose" : `${s.players[pending.revealFor]!.name} chooses`} one of them for you to discard` : ""}`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
+                : pending.fromHand && pending.shuffle
+                ? `${pending.source}: shuffle ${pending.what} from your hand into your library`
                 : pending.fromHand && pending.exile
                 ? `${pending.source}: exile ${pending.what} from your hand`
                 : pending.fromHand && pending.manifest
@@ -4065,7 +4067,7 @@ function LibrarySearch({
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">

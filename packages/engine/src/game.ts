@@ -9090,8 +9090,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     } else if (pend.what === "counterChoice") {
       // "Enters with your choice of a reach counter or a vigilance counter on it" (CR 614.1c, 614.12).
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
-      const put = putCounters(s, o, choice, 1, true);
-      log(s, `${pend.source} enters with ${put ? `a ${choice} counter` : `no ${choice} counter`}.`);
+      // Grimdancer: a pair, "a|b", one counter of each.
+      for (const kind of choice.split("|")) {
+        const put = putCounters(s, o, kind, 1, true);
+        log(s, `${pend.source} enters with ${put ? `a ${kind} counter` : `no ${kind} counter`}.`);
+      }
     } else if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
@@ -9810,7 +9813,14 @@ function askEntersChoice(s: GameState): boolean {
       return true;
     }
     if (c.what === "counterChoice") {
-      const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
+      const choice = compileCard(defOf(s, o)).entersCounterChoice;
+      const counters = choice?.counters ?? [];
+      if (choice?.two) {
+        // Grimdancer: two different ones, so one of the pairs.
+        const pairs = counters.flatMap((a, i) => counters.slice(i + 1).map((b) => [a, b] as const));
+        s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: pairs.map((p) => p.join("|")), labels: pairs.map(([a, b]) => `${a.charAt(0).toUpperCase()}${a.slice(1)} and ${b} counters`), objectId: o.id, prompt: `enter with your choice of two different counters from among ${counters.slice(0, -1).join(", ")}, and ${counters.at(-1)}` };
+        return true;
+      }
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.length > 2 ? `a ${counters.slice(0, -1).join(", ")}, or ${counters.at(-1)} counter` : counters.map((k) => `a ${k} counter`).join(" or ")}` };
       return true;
     }

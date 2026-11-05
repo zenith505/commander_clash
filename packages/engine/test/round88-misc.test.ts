@@ -34,7 +34,9 @@ const sol = card("Sol Ring", "Artifact", "{1}", { oracleText: "{T}: Add {C}{C}."
 describe("round 88: cards the new lines made playable", () => {
   it("compile, and the 'it' of a later instruction isn't the spell", () => {
     for (const d of [cacophony, font, kenrith, route, greathearted]) expect(isFullySupported(d), d.name).toBe(true);
-    expect(isFullySupported(skywise)).toBe(false);
+    // Since Lane B round B109: "untap ~. It gains protection ..." reads "It" as ~ (the creature untapped), not the spell cast.
+    expect(isFullySupported(skywise)).toBe(true);
+    expect(compileCard(skywise).triggers[0]!.body.effects[2]).toMatchObject({ type: "continuous", what: { ref: "self" } });
     // Since round 164: after "put two +1/+1 counters on this creature", "It" is that creature, never the spell.
     expect(compileCard(berserker).triggers[0]!.body.effects[1]).toMatchObject({ type: "continuous", what: { ref: "self" } });
   });

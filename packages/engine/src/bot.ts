@@ -402,7 +402,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of cards from your hand on the bottom of your library, then draw that many plus one": lands once
     // there are enough of them out, spells too costly for a while.
-    if (pend.kind === "searchLibrary" && pend.fromHand && pend.bottom) {
+    // Credit Voucher's shuffle into the library: the same cards as one put on the bottom.
+    if (pend.kind === "searchLibrary" && pend.fromHand && (pend.bottom || pend.shuffle)) {
       const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => (isType(defOf(s, obj(s, id)), "Land") ? lands >= 5 : mv(s, id) > lands + 2)) }];
     }
@@ -703,7 +704,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
       const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];
       const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
-      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+      // Grimdancer's pairs "a|b": the best two.
+      const pairScore = (o: string) => o.split("|").reduce((t, k) => t + score(k), 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => pairScore(a) - pairScore(b))[0]! }];
     }
     // "As ~ enters, it becomes your choice of a 3/3 creature with flying, ... or a 0/12 creature with defender": the one
     // that attacks best, flying first, never defender, then the most power.

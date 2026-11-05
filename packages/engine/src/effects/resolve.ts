@@ -488,6 +488,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return players(s, ref.who, ctx)
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
       .filter((o): o is GameObject => !!o);
+  if (ref.ref === "inCombatWithSelf" && ref.lastKnown) {
+    const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+    // A leaves-the-battlefield trigger's source is the object it became (one zone change later, CR 400.7).
+    if (!lk || (ctx.sourceZc !== undefined && lk.zc + 1 !== ctx.sourceZc)) return [];
+    // The creatures that were blocking it, still blocking creatures, and those it blocked, still attacking (CR 506.4).
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => (lk.blockedBy?.includes(o.id) && o.blocking !== undefined) || (lk.blocking?.includes(o.id) && o.attacking !== undefined));
+  }
   if (ref.ref === "inCombatWithSelf") {
     const me = ref.ofTarget !== undefined ? objects(s, { ref: "target", index: ref.ofTarget }, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     if (!me || me.zone !== "battlefield" || (ref.ofTarget === undefined && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
@@ -980,7 +987,7 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
       : // "~ attacks that player this combat if able" (Raving Dead): the player chosen as it resolved, in the combat going on.
         m.kind === "mustAttackPlayer"
-        ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(typeof m.player === "object" && ctx.targets[m.player.target]?.kind === "player" ? { player: (ctx.targets[m.player.target] as { id: PlayerId }).id } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }
+        ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(m.player === "you" ? { player: ctx.controller } : {}), ...(typeof m.player === "object" && ctx.targets[m.player.target]?.kind === "player" ? { player: (ctx.targets[m.player.target] as { id: PlayerId }).id } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }
       : m.kind === "mustBeBlocked" && m.combat === "this"
       ? { kind: "mustBeBlocked", combat: s.combatsThisTurn ?? 0 }
       : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.

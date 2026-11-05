@@ -529,6 +529,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!sc.n) return runEffect(s, paid, ctx);
         return runEffect(s, { type: "punisher", who: { ref: "you" }, options: [{ sacrifice: e.sacrificeCost, n: sc.n }], mode: "ifNone", effects: [{ type: "sacrifice", what: { ref: "self" } }], otherwise: [paid], thenText: "sacrifice ~ (cumulative upkeep)" }, ctx);
       }
+      // Vexing Sphinx: that many cards discarded, or ~ is sacrificed; none to discard for no age counters.
+      if (e.discardCost) {
+        if (!sc.n) return runEffect(s, paid, ctx);
+        return runEffect(s, { type: "punisher", who: { ref: "you" }, options: [{ discard: sc.n }], mode: "ifNone", effects: [{ type: "sacrifice", what: { ref: "self" } }], otherwise: [paid], thenText: "sacrifice ~ (cumulative upkeep)" }, ctx);
+      }
       // Wall of Shards: whether to pay first, then an opponent for each age counter (the same or different ones, rulings),
       // only ones who can gain life (CR 119.7); then each chosen gains it all at once, as one payment (CR 702.24a). With no
       // such opponent it can't be paid (CR 118.3); with no age counter there's nothing to pay.

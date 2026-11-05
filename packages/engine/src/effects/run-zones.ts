@@ -2136,10 +2136,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.orControl && filter) cards.push(...s.battlefield.filter((id) => objectMatches(s, { ...filter, kind: "object", controller: "you" }, obj(s, id), p.id, false)));
         s.resolving!.revealedFromHand = 0;
         if (!cards.length) {
-          log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
+          log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : e.shuffle ? `${p.name} has no cards in hand to shuffle into their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : e.max !== undefined ? `up to ${e.max} ${e.filter?.text ?? "card"}s` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : Math.min(e.max ?? cards.length, cards.length), fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : e.max !== undefined ? `up to ${e.max} ${e.filter?.text ?? "card"}s` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : Math.min(e.max ?? cards.length, cards.length), fromHand: true, ...(e.bottom ? { bottom: true as const } : e.shuffle ? { shuffle: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
         return "paused";
       }
       const chosen = sc.found.filter((id) => e.orControl && s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === p.id);
@@ -2151,6 +2151,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       s.resolving!.revealedFromHand = shown.length;
+      if (e.shuffle) {
+        // Credit Voucher: into the library, then it's shuffled (CR 701.24a), even with none chosen.
+        for (const id of shown) moveObject(s, id, "library");
+        shuffleLibrary(s, p);
+        log(s, `${p.name} shuffles ${shown.length === 1 ? "a card" : `${shown.length} cards`} from their hand into their library.`);
+        return;
+      }
       if (!e.bottom) s.resolving!.revealedFromHandIds = shown;
       if (e.bottom) {
         // In the order picked, the first lowest (its owner orders them, CR 401.4).

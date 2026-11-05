@@ -686,8 +686,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Catacomb Dragon: "a nonartifact, non-Dragon creature" is one that's neither (the comma joins two "non-" words).
   // Alaborn Zealot: "When ~ blocks a creature, destroy both creatures.": that creature and ~ (each blocked creature
-  // triggers it once, CR 509.1h).
-  const blockLine = line.replace(/^(Whenever ~ becomes blocked by an? non[-a-z]+), (non-?[A-Za-z]+ creature, )/, "$1 $2").replace(/^When ~ blocks a creature, destroy both creatures\.$/, "Whenever ~ blocks a creature, destroy that creature. Destroy ~.");
+  // triggers it once, CR 509.1h). Loyal Sentry says it as "destroy that creature and ~" (the blocked creature is destroyed
+  // even if ~ has left by then, rulings).
+  const blockLine = line.replace(/^(Whenever ~ becomes blocked by an? non[-a-z]+), (non-?[A-Za-z]+ creature, )/, "$1 $2").replace(/^When ~ blocks a creature, destroy (?:both creatures|that creature and ~)\.$/, "Whenever ~ blocks a creature, destroy that creature. Destroy ~.");
   for (const [re, event] of BLOCK_TRIGGERS) {
     const m = re.exec(blockLine);
     if (!m) continue;
@@ -4926,6 +4927,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // you lose 1 life and return ~ to your hand": one delayed trigger doing both (rulings), about the card in the
       // graveyard now; if it has left there by then, it stays where it went (CR 400.7).
       const brood = event === "selfToGraveyard" && /^When ~ is put into your graveyard/.test(line) ? /^at the beginning of the next end step, you lose (\d+) life and return ~ to your hand\.$/.exec(text) : null;
+      // Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it. They can't be regenerated.": the ones in
+      // combat with it as it last existed (CR 603.10a, 608.2h).
+      if (event === "selfDies" && /^destroy all creatures blocking or blocked by it\. They can't be regenerated\.$/.test(text)) body = { targets: [], effects: [{ type: "destroy", what: { ref: "inCombatWithSelf", lastKnown: true }, noRegen: true }], text };
       if (brood) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "loseLife", who: { ref: "you" }, n: Number(brood[1]) }, { type: "bounce", what: { ref: "subjectCard" } }], text: `you lose ${brood[1]} life and return ~ to your hand` }], text };
       // Ochre Jelly: "create a token that's a copy of it at the beginning of the next end step. The token enters with half
       // that many +1/+1 counters on it, rounded down": a delayed trigger copying ~ as it last existed on the battlefield

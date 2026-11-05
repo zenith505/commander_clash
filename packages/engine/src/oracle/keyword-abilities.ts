@@ -358,12 +358,23 @@ export function parseCostKeyword(
         },
       };
     // Phyrexian Soulgorger: "Cumulative upkeep—Sacrifice a creature": a different creature for each age counter, ~ itself
-    // one of them if you like, or ~ is sacrificed (rulings, CR 702.24a).
-    if (/^Cumulative upkeep—Sacrifice a creature\.?$/.test(line))
+    // one of them if you like, or ~ is sacrificed (rulings, CR 702.24a). Polar Kraken: "Sacrifice a land", the same with
+    // lands.
+    const sacCost = /^Cumulative upkeep—Sacrifice a (creature|land)\.?$/.exec(line);
+    if (sacCost)
       return {
         trigger: {
           event: "yourUpkeep",
-          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, sacrificeCost: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature" } }], text: "Cumulative upkeep—sacrifice a creature: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you sacrifice a creature for each age counter on it." },
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, sacrificeCost: { kind: "object", types: [sacCost[1] === "land" ? "Land" : "Creature"], notTypes: [], notColors: [], controller: "you", text: sacCost[1]! } }], text: `Cumulative upkeep—sacrifice a ${sacCost[1]}: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you sacrifice a ${sacCost[1]} for each age counter on it.` },
+        },
+      };
+    // Vexing Sphinx: "Cumulative upkeep—Discard a card": a card for each age counter, all of them or none (CR 702.24a,
+    // 701.9b: with fewer cards in hand it can't be paid).
+    if (/^Cumulative upkeep—Discard a card\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, discardCost: true }], text: "Cumulative upkeep—discard a card: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you discard a card for each age counter on it." },
         },
       };
     // Wall of Shards: "Cumulative upkeep—An opponent gains 1 life": an opponent chosen for each age counter, the same one or
@@ -877,8 +888,8 @@ export function firebending(n: Amount, text: string): TriggeredAbility {
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: Amount, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
-  // "Ward—{2}, Pay 2 life" is one keyword; so is "Mobilize X, where X is ...".
-  for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)(?<!^mobilize X)[,;]\s*/i)) {
+  // "Ward—{2}, Pay 2 life" is one keyword; so is "Mobilize X, where X is ..." and "Recover—Pay half your life, rounded up".
+  for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)(?<!^mobilize X)(?<!^recover—pay half your life)[,;]\s*/i)) {
     const p = raw.trim();
     let m: RegExpExecArray | null;
     if (keywordOf(p)) continue;
@@ -1186,6 +1197,16 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "permanentDies",
         dies: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], owner: "you", text: "creature you own" } },
         body: { targets: [], effects: [{ type: "may", pay: { mana: cost }, effects: [{ type: "bounce", what: { ref: "selfCard" } }], otherwise: [{ type: "exile", what: { ref: "selfCard" } }], text: `pay ${cost} to return ~ to your hand (otherwise ~ is exiled)` }], text: `Recover ${cost}: you may pay ${cost}. If you do, return ~ from your graveyard to your hand. Otherwise, exile ~.` },
+        zone: "graveyard",
+        ifCond: { kind: "selfInGraveyard" },
+      });
+    } else if (/^recover—pay half your life, rounded up\.?$/i.test(p)) {
+      // Garza's Assassin: the same with "pay half your life, rounded up" (CR 702.59a, 119.4, 107.1a): half the life total
+      // as it's paid.
+      out.triggers.push({
+        event: "permanentDies",
+        dies: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], owner: "you", text: "creature you own" } },
+        body: { targets: [], effects: [{ type: "may", payLife: { count: { kind: "life", who: { ref: "you" } }, half: "up" }, effects: [{ type: "bounce", what: { ref: "selfCard" } }], otherwise: [{ type: "exile", what: { ref: "selfCard" } }], text: "pay half your life, rounded up, to return ~ to your hand (otherwise ~ is exiled)" }], text: "Recover—Pay half your life, rounded up: you may pay half your life, rounded up. If you do, return ~ from your graveyard to your hand. Otherwise, exile ~." },
         zone: "graveyard",
         ifCond: { kind: "selfInGraveyard" },
       });

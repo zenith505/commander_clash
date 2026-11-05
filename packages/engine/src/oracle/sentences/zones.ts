@@ -217,7 +217,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
   // Forcemage Advocate: "Return target card from an opponent's graveyard to their hand": that opponent owns it (a card
   // is in its owner's graveyard, CR 404.2), so it's its owner's hand.
-  if ((m = /^(Return target [a-z ]*card from an opponent's graveyard) to their hand$/.exec(s))) return parseSentence(`${m[1]} to its owner's hand`, ctx);
+  // Nullmage Advocate: "Return two target cards from an opponent's graveyard to their hand", the same.
+  if ((m = /^(Return (?:target [a-z ]*card|two target cards) from an opponent's graveyard) to their hand$/.exec(s))) return parseSentence(`${m[1]} to ${/^Return two/.test(m[1]!) ? "their owner's" : "its owner's"} hand`, ctx);
   // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
   // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
   // every one that has none of those subtypes or card types.
@@ -1388,10 +1389,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Sudden Setback: "The owner of target spell or nonland permanent puts it ...": one target, a spell (it leaves the
     // stack, not countered, so even one that can't be countered) or a nonland permanent, its owner choosing as it
     // resolves (rulings); like Airbend's spell or permanent.
-    if (m[2] === "target spell or nonland permanent" && !/second from the top/.test(m[3]!)) {
-      const perm = parseTargetPhrase("nonland permanent");
+    // Swat Away: "target spell or creature", the same with a creature.
+    const orPerm = m[2] && /^target spell or (nonland permanent|creature)$/.exec(m[2]);
+    if (orPerm && !/second from the top/.test(m[3]!)) {
+      const perm = parseTargetPhrase(orPerm[1]!);
       if (perm?.kind !== "object") return null;
-      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or nonland permanent" });
+      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: m[2]! });
       return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
     }
     const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
@@ -1791,6 +1794,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Dulcet Sirens: "Target creature attacks target opponent this turn if able": that player, not a planeswalker of theirs
   // (rulings), in each combat this turn (CR 508.1d). With either target illegal, nothing happens (rulings). Ravener: the
   // same after a trigger's condition ("When ~ enters, target creature attacks ...").
+  // Alluring Siren: "Target creature an opponent controls attacks you this turn if able": you, not a planeswalker of yours
+  // (rulings), the same way.
+  if (/^[Tt]arget creature an opponent controls attacks you this turn if able$/.test(s)) {
+    const what = parseObject("target creature an opponent controls", ctx);
+    return what && !isGroup(what) && what.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "mustAttackPlayer", player: "you" }], duration: "endOfTurn" }] : null;
+  }
   if (/^[Tt]arget creature attacks target opponent this turn if able$/.test(s)) {
     const what = parseObject("target creature", ctx);
     const whom = parsePlayer("target opponent", ctx);

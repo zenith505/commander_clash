@@ -273,3 +273,27 @@ export function runEachPlayerFlipsEffect(s: GameState, _e: Extract<Effect, { typ
   s.resolving!.flippedTails = tails;
   log(s, `Each player flips a coin for ${src}: ${tails.length ? `tails for ${tails.map((p) => player(s, p).name).join(", ")}` : "all heads"}.`);
 }
+
+/**
+ * Mutalith Vortex Beast: "Flip a coin for each opponent you have": its controller flips one coin for each opponent still
+ * in the game, in turn order, calling each, so each is won or lost (CR 705.2) and is an event of its own. Edgar, King of
+ * Figaro makes them all heads and won as the first flips this turn (CR 705.3); with Krark's Thumb each keeps a won coin if
+ * there is one (as runCoinEffect's flips of several coins). The wins are counted (Count "flipsWon"); the opponents whose
+ * flip was lost are kept as { ref: "flippedTails" }.
+ */
+export function runFlipEachOpponentEffect(s: GameState, _e: Extract<Effect, { type: "flipEachOpponent" }>, ctx: ResolveCtx, src: string): void {
+  const who = ctx.controller;
+  const opps = livingPlayers(s).filter((p) => p !== who).sort((a, b) => turnRank(s, a) - turnRank(s, b));
+  const heads = flipsRigged(s, who);
+  noteFlipped(s, who);
+  const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
+  const lost: PlayerId[] = [];
+  for (const pid of opps) {
+    const won = heads || (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]).some((w) => w);
+    fireEvent(s, { type: "coinFlipped", player: who, won });
+    if (!won) lost.push(pid);
+  }
+  s.resolving!.flipped = { won: lost.length < opps.length, wins: opps.length - lost.length };
+  s.resolving!.flippedTails = lost;
+  log(s, `${player(s, who).name} flips a coin for each opponent for ${src}: ${opps.length - lost.length} won${lost.length ? `, lost for ${lost.map((p) => player(s, p).name).join(", ")}` : ""}${heads ? " (the first coins flipped this turn come up heads)" : ""}.`);
+}

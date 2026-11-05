@@ -1907,6 +1907,15 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
  * ability's controller.
  */
 function parseDestroyedTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Jaws, Relentless Predator: "Whenever a noncreature artifact is sacrificed or destroyed, ~ deals 1 damage to each
+  // opponent": anyone's, once for each.
+  const either = /^Whenever an? (noncreature artifact) is sacrificed or destroyed, (.+)$/.exec(line);
+  if (either) {
+    const filter = parseTargetPhrase(either[1]!);
+    const body = parseBody(either[2]!, {});
+    if (!filter || filter.kind !== "object" || filter.controller || !body) return "fail";
+    return { event: "permanentSacrificedOrDestroyed", sacrificedOrDestroyed: { filter: { ...filter, text: either[1]! } }, body };
+  }
   const m = /^Whenever a spell or ability an opponent controls destroys an? (.+? you control), (.+)$/.exec(line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[1]!);
@@ -4357,6 +4366,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Coveted Jewel: "that player draws three cards and gains control of ~. Untap it." (two instructions for that player, then
   // untapping ~).
+  // Foe-Razer Regent: "Whenever a creature you control fights, put two +1/+1 counters on it at the beginning of the next
+  // end step": about that creature (the subject).
+  const fights = /^Whenever a creature you control fights, (.+)$/.exec(line);
+  if (fights) {
+    const body = parseBody(fights[1]!, { subjectIt: true });
+    return body ? { event: "yourCreatureFights", body } : "fail";
+  }
   // Neyith of the Dire Hunt: "Whenever one or more creatures you control fight or become blocked, draw a card."
   const fightOrBlocked = /^Whenever one or more creatures you control fight or become blocked, (.+)$/.exec(line);
   if (fightOrBlocked) {

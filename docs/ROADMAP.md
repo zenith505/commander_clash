@@ -5539,7 +5539,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a trampler still deals all its damage, 702.19d; the whole band, 702.22i): Dazzling Beauty, Curtain of Light, Trap
   Runner, Fog Patch, Choking Vines; "blocked or was blocked by a Zombie / a legendary creature this turn" (what the other
   creature was as the block was declared, kept in the turn's block log, rulings): Time to Reflect, You Cannot Pass!. +13
-  (29,866 of 31,936 with rounds 276 and 277).
+  (29,876 of 31,936 with rounds 276 to 278).
 - Round B111 (single-line blockers from the skip lists, least played first): Legion's End (that player's cards with the
   target's name from their hand and graveyard too, the name as it last existed, CR 608.2h), Aether Gust ("target spell or
   permanent that's red or green", to the top or bottom of its owner's library, their choice), Crackling Emergence and

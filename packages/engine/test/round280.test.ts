@@ -356,7 +356,7 @@ describe("The Great Aurora: hands and permanents shuffled in, that many drawn, t
     s0.players[ap]!.manaPool.G = 9;
     const owned = (pid: PlayerId) => s0.battlefield.filter((id) => s0.objects[id]!.owner === pid).length;
     const expected = s0.players.map((p) => p.hand.length + owned(p.id) - (p.id === ap ? 1 : 0));
-    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "pool"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto"));
     s = settle(s);
     // Before the lands go down, every player has drawn that many.
     expect(s.players.map((p) => p.hand.length)).toEqual(expected);
@@ -389,7 +389,7 @@ describe("Collision of Realms: creatures shuffled in, each who shuffled a nontok
     s0.objects[token]!.isToken = true;
     invalidateCharacteristics(s0);
     s0.players[ap]!.manaPool.R = 7;
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "pool")));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto")));
     expect(s.pending).toBeNull();
     expect(s.objects[token]?.zone === "battlefield" || s.players[p2]!.library.includes(token)).toBe(false);
     const creaturesOf = (pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.owner === pid && objIsType(s, s.objects[id]!, "Creature"));
@@ -416,7 +416,7 @@ describe("Sculpted Sunburst: you choose a creature, each opponent one with equal
     const p2Big = putOnBattlefield(s0, p2, big);
     invalidateCharacteristics(s0);
     s0.players[ap]!.manaPool.W = 5;
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "pool")));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto")));
     expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "choose" });
     expect(s.pending?.kind === "pickPermanents" && [...s.pending.options].sort()).toEqual([mineBig, mineSmall].sort());
     s = settle(act(s, { type: "pickPermanents", player: ap, ids: [mineSmall] }));
@@ -436,7 +436,7 @@ describe("Sculpted Sunburst: you choose a creature, each opponent one with equal
     const theirs = putOnBattlefield(s0, nextOpp(s0, ap, 1), vanilla());
     invalidateCharacteristics(s0);
     s0.players[ap]!.manaPool.W = 5;
-    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "pool")));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto")));
     expect(s.pending).toBeNull();
     expect(s.objects[theirs]!.zone).toBe("battlefield");
   });
@@ -448,7 +448,7 @@ describe("Deliver Unto Evil: an opponent chooses two of the targets to leave in 
     const p1 = nextOpp(s0, ap, 1);
     const cards = ["Card A", "Card B", "Card C", "Card D"].map((n) => toGraveyard(s0, ap, named(n)));
     s0.players[ap]!.manaPool.B = 3;
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, cards.map(tgt), undefined, "pool")));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, cards.map(tgt), undefined, "auto")));
     s = pickOpp(s, p1);
     expect(s.pending).toMatchObject({ kind: "searchLibrary", player: p1, min: 2, max: 2 });
     s = settle(act(s, { type: "searchLibrary", player: p1, found: [cards[0]!, cards[2]!] }));
@@ -468,7 +468,7 @@ describe("Deliver Unto Evil: an opponent chooses two of the targets to leave in 
       s0.objects[pw]!.counters.loyalty = 5;
       invalidateCharacteristics(s0);
       s0.players[ap]!.manaPool.B = 3;
-      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [...cards.map(tgt), { kind: "none" }], undefined, "pool")));
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [...cards.map(tgt), { kind: "none" }], undefined, "auto")));
       expect(s.pending).toBeNull();
       expect(cards.every((id) => s.objects[id]!.zone === "hand")).toBe(true);
     }
@@ -476,7 +476,7 @@ describe("Deliver Unto Evil: an opponent chooses two of the targets to leave in 
       const { s: s0, ap, ids } = setup([deliver()]);
       const cards = ["Card A", "Card B"].map((n) => toGraveyard(s0, ap, named(n)));
       s0.players[ap]!.manaPool.B = 3;
-      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [...cards.map(tgt), { kind: "none" }, { kind: "none" }], undefined, "pool")));
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [...cards.map(tgt), { kind: "none" }, { kind: "none" }], undefined, "auto")));
       expect(s.pending).toBeNull();
       expect(cards.every((id) => s.objects[id]!.zone === "graveyard")).toBe(true);
     }
@@ -487,7 +487,7 @@ describe("Deliver Unto Evil: an opponent chooses two of the targets to leave in 
     const p1 = nextOpp(s0, ap, 1);
     const cards = [named("Card A", 1), named("Card B", 6), named("Card C", 2), named("Card D", 5)].map((d) => toGraveyard(s0, ap, d));
     s0.players[ap]!.manaPool.B = 3;
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, cards.map(tgt), undefined, "pool")));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, cards.map(tgt), undefined, "auto")));
     s = pickOpp(s, p1);
     const found = (botActions(s, p1)[0] as { found: ObjectId[] }).found;
     expect([...found].sort()).toEqual([cards[1]!, cards[3]!].sort());

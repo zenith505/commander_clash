@@ -163,6 +163,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.foughtThisTurn && o.foughtTurn !== s.turn) return false;
   if (spec.abilityActivatedThisTurn && !o.activatedThisTurn?.length) return false;
   if (spec.combat === "blockedThisTurn" && o.blockedTurn !== s.turn) return false;
+  if (spec.combat === "attackedOrBlockedThisTurn" && o.attacked?.turn !== s.turn && o.blockedTurn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;

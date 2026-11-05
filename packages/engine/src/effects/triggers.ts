@@ -2117,7 +2117,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "If {S} of any of that spell's colors was spent": its colors as it was cast.
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
-        if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // Danitha, Sword of Hope: "an Equipment spell or a spell that targets a creature you control": either one.
+        const orSpell = !!t.cast.orSpell && (item?.objectId ? spellMatches(s, t.cast.orSpell, item) : printedMatches(t.cast.orSpell, ev.card));
+        if (t.cast.targets && !orSpell && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
         // "A spell with one or more targets" (Voracious Bibliophile): cast with at least one (CR 115.1).
         if (t.cast.hasTargets && !(item?.targets ?? []).some((x) => x.kind !== "none")) return false;
         // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.
@@ -2161,7 +2163,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
-        return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
+        return orSpell || (item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card));
       }, triggers, ev.stackId, onlyTarget && (triggers ?? abilitiesOf(s, o).triggers).some((t) => t.cast?.subjectTarget) ? onlyTarget : undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
     const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");

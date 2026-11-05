@@ -1011,6 +1011,16 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
       targets.push(spec);
     }
   }
+  // Danitha, Sword of Hope: "an Equipment spell or a spell that targets a creature you control": either one, a spell that's
+  // both triggering it once.
+  const orTargeting = targets ? /^([A-Z][a-z]+) spell or a spell$/.exec(what) : null;
+  let orSpell: TargetSpec | undefined;
+  if (orTargeting) {
+    const sp = parseTargetPhrase(`${orTargeting[1]} spell`);
+    if (sp?.kind !== "spell" || sp.anyOf) return "fail";
+    orSpell = { ...sp, text: `${orTargeting[1]} spell` };
+    what = "spell";
+  }
   // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
   // "With power 4, 5, or 6" (Sarkhan's Unsealing): "4 through 6" by now.
   const pw = / with (power|toughness) (\d+) (?:or (greater|less)|through (\d+))$/.exec(what);
@@ -1107,7 +1117,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(orSpell ? { orSpell } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -2812,6 +2822,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Furious Forebear: "Whenever a creature you control dies while ~ is in your graveyard, you may pay {1}{W}. If you do,
+    // return ~ from your graveyard to your hand.": an ability that works only in the graveyard (CR 113.6m), as the other
+    // "return ~ from your graveyard" triggers are read below; not if it dies at the same time (rulings).
+    .replace(/^(Whenever a creature you control dies) while ~ is in your graveyard, (?=you may pay [^.]+\. If you do, return ~ from your graveyard to your hand\.$)/, "$1, ")
     // Lifeline: "Whenever a creature dies, if another creature is on the battlefield, return the first card to the
     // battlefield under its owner's control at the beginning of the next end step": another than the one that died, which
     // is gone, so any creature (rulings: none left, none returns, checked again as it resolves, CR 603.4); the card, if

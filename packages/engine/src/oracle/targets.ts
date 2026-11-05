@@ -491,7 +491,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
     return t?.ref === "target" && !t.n && !t.sameName && !t.sharesColor ? { ...t, andSelf: true } : null;
   }
-  const several = / and all (?:Auras|Equipment)(?: you control)? attached to it$/.test(x) && /^another /.test(x) ? null : SEVERAL_TARGETS.exec(x);
+  // Silence the Believers: "any number of target creatures and all Auras attached to them" is read below, with the Auras.
+  const several = (/ and all (?:Auras|Equipment)(?: you control)? attached to it$/.test(x) && /^another /.test(x)) || / and all Auras attached to them$/.test(x) ? null : SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
@@ -1675,6 +1676,13 @@ export function parseTargetPhrase(
   if (attackedYou) {
     extra.combat = "attackedYouThisTurn";
     p = p.slice(0, attackedYou.index);
+  }
+  // Gideon's Triumph: "a creature that attacked or blocked this turn": declared as an attacker or a blocker this turn (CR
+  // 508.1, 509.1), not one put onto the battlefield attacking (rulings), even if it has since left combat.
+  const attackedOrBlocked = / that attacked or blocked this turn$/.exec(p);
+  if (attackedOrBlocked && !extra.combat) {
+    extra.combat = "attackedOrBlockedThisTurn";
+    p = p.slice(0, attackedOrBlocked.index);
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);

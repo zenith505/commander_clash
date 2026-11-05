@@ -1,6 +1,6 @@
 # Roadmap
 
-29,840 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,853 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,579 of
 9,979 (95%).
 
@@ -2105,7 +2105,7 @@ line blocks.
    (Quakebringer: checked when it would trigger, not again as it resolves, CR 603.2); three "If it's a ... card" checks
    of one revealed card (Druidic Satchel: Dryad Arbor gets two); "You may reveal your hand and put all land cards from it
    onto the battlefield. If you do, discard your hand" (Manabond: bots do it with at most one nonland card to lose; with
-   a browser test). +11, 29,840 of 31,936.
+   a browser test). +11, 29,853 of 31,936 with B109.
    Out after round 277 (looked at, not done): World War Hulk ("The next red or green creature spell you cast this turn
    can be cast without paying its mana cost": no such permission yet, and "double its power and toughness"); Tablet of
    the Guilds ("choose two colors", then life for each chosen color a spell is); You Cannot Pass! (whether a creature
@@ -3106,7 +3106,7 @@ line blocks.
      Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize and the rest of the 11 unsupported ones.
    - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
      Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
-     that targets" (Danitha, Sword of Hope), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
+     that targets" (Danitha, Sword of Hope (done in round B109)), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko.
@@ -3392,12 +3392,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +1/+1 counter on it / if you control a Reflection"; "remove a -1/-1 counter from each creature you control";
   oil counters; "investigate four times"; "If you control a Fish, Octopus, Otter, Seal, Serpent, or Whale";
   "Cowards (creatures with defender) can't block this turn"; "attacking Warriors get +1/+1". +74 (25,572 with round 177).
-- Skipped there, with reasons: Silence the Believers ("any number of target creatures and all Auras attached to
+- Skipped there, with reasons: Silence the Believers (done in round B109) ("any number of target creatures and all Auras attached to
   them"); Mark of Eviction (done in round B108) and Deathless Knight (done in round B108) (triggers from the battlefield back to the hand or the graveyard);
   Prairie Dog (a counter replacement until end of turn); Kazandu Stomper ("up to two lands you control": a pick with
   "up to"); Vicious Offering (a kicker cost that isn't mana); Nissa's Defeat (its target phrase); Chandra's Defeat
   ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit (done in round B108), Expel the
-  Unworthy and Agonizing Demise (kicked riders not parsed yet); Morgue Burst ("the power of the card returned this
+  Unworthy and Agonizing Demise (done in round B109) (kicked riders not parsed yet); Morgue Burst (done in round B109) ("the power of the card returned this
   way"); Sudden Insight ("each different mana value among nonland cards in your graveyard"); Doomsday Specter ("The
   player discards that card"); Alaborn Zealot ("destroy both creatures"); Crown-Hunter Hireling (done in round B104) ("unless defending
   player is the monarch"); Landscaper Colos, Draugr Thought-Thief, Reveka, Hellhole Rats, Unyaro Griffin, Liability,
@@ -3425,7 +3425,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control, then create that many ..."; "Your life total becomes equal to your starting life total"; targets "cards
   with cycling (mutate) from your graveyard". +73, four of them also done by round 177: +69 (25,641 with round 177).
 - Skipped there, with reasons: Sadistic Sacrament (a kicked search "instead"); Dark Matter Manipulator (done in round B104) and Master's
-  Councillors ("for every seven": a divided amount); Ichor Shade (a typed "put into a graveyard this turn" count);
+  Councillors ("for every seven": a divided amount); Ichor Shade (done in round B109) (a typed "put into a graveyard this turn" count);
   Crackling Emergence and Harmonious Emergence (a destroy replacement on the enchanted land); Genju of the Fields (a
   damage trigger granted until end of turn); Oppressive Rays, Qal Sisma Behemoth, Myr Prototype and Cowed by Wisdom
   (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid (done in round B108), Gremlin Infestation
@@ -3457,7 +3457,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   block); Orcish Spy (done in round B104) (looking at the top cards without reordering); Gandalf, Wandering Wizard (done in round B104) ("~'s owner ... and
   draws"); Jaded Response (done in round B104) ("shares a color with a
   creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
-  Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (done in round B104) (moving every +1/+1 counter); Driftgloom Coyote
+  Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (done in round B104) (moving every +1/+1 counter); Driftgloom Coyote (done in round B109)
   ("if that creature had power 2 or less" after an exile until).
 - Round B9 (ranks about 19,600 up to about 17,100, the easier templates, plus more played cards the same templates
   cover: Goblin Shrine, Kjeldoran Pride, Ancient Runes, Pippin's Bravery, Giant Opportunity, Regenerate and others):
@@ -3656,7 +3656,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
   many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
-  twice: no ruling); Gideon's Triumph and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
+  twice: no ruling); Gideon's Triumph (done in round B109) and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
   Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
@@ -5501,6 +5501,22 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   end of combat, destroy it and all creatures it blocked this turn"), Sludge Titan ("a creature card and/or a land card
   from among them", one pick after the other). Browser tests for Suffer the Past's targets and Dimir Machinations' pick.
   +14 (29,816 of 31,936 with rounds 273 to 275).
+- Round B109 (single-line blockers from the skip lists, least played first): Overload (the artifact's mana value checked as
+  it resolves, 5 instead of 2 when kicked), Agonizing Demise (kicked: the destroyed creature's last known power to its
+  controller, CR 608.2h), Morgue Burst (the returned card's power; none returned, no damage, rulings), Pristine Skywise
+  ("untap ~. It gains protection from the color of your choice"), Silence the Believers ("any number of target creatures
+  and all Auras attached to them", strive), Enshrouding Mist ("If it's renowned, untap it", CR 702.112b), Ichor Shade ("an
+  artifact or creature was put into a graveyard from the battlefield this turn", tokens too, rulings), Gideon's Triumph
+  ("a creature that attacked or blocked this turn": declared as one, not put onto the battlefield attacking; two with a
+  Gideon planeswalker, checked as it resolves, rulings), Vizier of Deferment (any creature targeted, exiled only if it
+  attacked or blocked this turn, rulings), Driftgloom Coyote (the exiled creature's power as it last existed, rulings),
+  Furious Forebear ("while ~ is in your graveyard": a graveyard ability, not when it dies at the same time, rulings),
+  Danitha, Sword of Hope ("an Equipment spell or a spell that targets a creature you control", once each turn), Flames of
+  the Blood Hand (that player, or the planeswalker's controller, gains no life this turn, rulings). No new prompts. +13
+  (29,842 of 31,936 with round 276).
+- Out after round B109 (looked at, not done): Chainer's Torment (an X/X token that deals X damage to you, each token if
+  several are made, with X fixed as it resolves, rulings), Cruel Calculations (cards put into a graveyard from the library
+  this turn: only "from hand or library" is counted).
 - Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
   announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
   relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal

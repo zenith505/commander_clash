@@ -1274,6 +1274,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
   // sacrificing player chooses anyway, CR 701.21a).
   text = text.replace(/\b(sacrifices a creature) of their choice (that dealt combat damage to you this turn)\b/, "$1 $2");
+  // Gideon's Triumph: "sacrifices a creature of their choice that attacked or blocked this turn" (the sacrificing player
+  // chooses anyway, CR 701.21a).
+  text = text.replace(/\b(sacrifices a creature) of their choice (that attacked or blocked this turn)\b/, "$1 $2");
   // Clip Wings: "sacrifices a creature of their choice with flying": a creature with flying, of their choice.
   text = text.replace(/\b(sacrifices a creature) of their choice (with [a-z]+)(?=\.)/, "$1 $2");
   // Living Laser: "for each card you've discarded this turn, create a token that's a copy of ~, except the token isn't
@@ -2132,6 +2135,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // turn, where X is the toughness of the card returned this way": that card's toughness in your hand; none returned (an
   // illegal target) leaves the creature unaffected (rulings).
   text = text.replace(/^(Return target creature card from your graveyard to your hand\. Target creature gets -X\/-X until end of turn, where X is) the toughness of the card returned this way\.$/, "$1 that card's toughness.");
+  // Pristine Skywise: "untap ~. It gains protection from the color of your choice until end of turn.": it is ~, the only
+  // object named.
+  text = text.replace(/^([Uu]ntap ~\.) It gains (protection from the color of your choice until end of turn\.)$/, "$1 ~ gains $2");
+  // Morgue Burst: "Return target creature card from your graveyard to your hand. ~ deals damage to any target equal to the
+  // power of the card returned this way.": that card's power in your hand, as Foul Renewal's toughness; none returned (an
+  // illegal target) deals no damage (rulings).
+  text = text.replace(/^(Return target creature card from your graveyard to your hand\. ~ deals damage to any target equal to) the power of the card returned this way\.$/, "$1 that card's power.");
   // General Tazri: "Ally creatures you control get +X/+X until end of turn, where X is the number of colors among those
   // creatures": those Ally creatures as it resolves, X fixed then (rulings).
   text = text.replace(/^([A-Z][a-z]+) creatures you control get \+X\/\+X until end of turn, where X is the number of colors among those creatures\.$/, "$1 creatures you control get +X/+X until end of turn, where X is the number of colors among $1 creatures you control.");
@@ -2292,6 +2302,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Voyager Glidecar: "Until end of turn, ~ becomes an artifact creature and gains flying. Put a +1/+1 counter on it.": it
   // is ~, the only object named.
   text = text.replace(/^(Until end of turn, ~ becomes an artifact creature and gains [a-z]+\.) Put a \+1\/\+1 counter on it\.$/, "$1 Put a +1/+1 counter on ~.");
+  // Agonizing Demise: "Destroy target nonblack creature. It can't be regenerated. If ~ was kicked, ~ deals damage equal to
+  // that creature's power to the creature's controller.": the destroyed creature's controller, its power and controller
+  // as it last existed (CR 608.2h).
+  text = text.replace(/^(Destroy target [a-z]+ creature\. It can't be regenerated\. If ~ was kicked, ~ deals damage equal to that creature's power to) the creature's controller\.$/, "$1 that creature's controller.");
   // Suffer the Past: "For each card exiled this way, that player loses 1 life and you gain 1 life.": the cards actually
   // exiled, each player's life changed once (rulings: a single life gain event).
   text = text.replace(/(^Exile X target cards from target player's graveyard\.) For each card exiled this way, that player loses 1 life and you gain 1 life\.$/, "$1 That player loses 1 life for each card exiled this way. You gain 1 life for each card exiled this way.");
@@ -3515,6 +3529,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target" || what.n !== 2) return null;
       effects.push({ type: "opponentSplitsTargets", what });
       si += 5;
+      continue;
+    }
+    // Vizier of Deferment: "you may exile target creature if it attacked or blocked this turn. Return that card to the
+    // battlefield under its owner's control at the beginning of the next end step.": any creature can be targeted, and it's
+    // exiled only if it was declared as an attacker or blocker this turn, checked as this resolves (rulings).
+    if (!ctx.spell && /^[Yy]ou may exile target creature if it attacked or blocked this turn$/.test(s) && /^Return that card to the battlefield under its owner's control at the beginning of the next end step\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+      ctx.lastObjectTarget = index;
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attackedOrBlockedThisTurn", text: "creature that attacked or blocked this turn" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index, filter }, effects: [{ type: "may", effects: [{ type: "flicker", what: { ref: "target", index }, under: "owner", at: "nextEndStep" }], text: "exile target creature" }] });
+      si++;
       continue;
     }
     // Sift Through Sands: "If you've cast a spell named Peer Through Depths and a spell named Reach Through Mists this turn,
@@ -9480,6 +9505,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Driftgloom Coyote: "exile target creature an opponent controls until ~ leaves the battlefield. If that creature had
+    // power 2 or less, put a +1/+1 counter on ~.": its power as it last existed on the battlefield (rulings, CR 608.2h), the
+    // same as it is just before it's exiled.
+    const exileUntilPower = !ctx.spell && /^[Ee]xile target creature an opponent controls until ~ leaves the battlefield$/.test(s) ? /^If that creature had power (\d+) or less, (put a \+1\/\+1 counter on ~)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (exileUntilPower) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "exile" || ctx.targets[before]!.kind !== "object") return null;
+      const then = parseOne(capital(exileUntilPower[2]!), ctx);
+      if (!then || then.length !== 1 || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(exileUntilPower[1]) }, text: `power ${exileUntilPower[1]} or less` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
     // Durkwood Tracker: "If ~ is on the battlefield, it deals damage equal to its power to target attacking creature. That
     // creature deals damage equal to its power to ~.": nothing if it has left (rulings); one after the other, each with
     // its power then (not a fight: the second one's power is read after the first damage).
@@ -9891,6 +9931,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(capital(notCreatureOrVehicle[1]!), ctx);
       if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => e.type === "continuous" && mentionsTarget(e, i))) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: ["Creature"], notSubtypes: ["Vehicle"], notColors: [], text: "not a creature or Vehicle" } }, effects: fx });
+      continue;
+    }
+    // Gideon's Triumph: "Target opponent sacrifices a creature that attacked or blocked this turn. If you control a Gideon
+    // planeswalker, that player sacrifices two of those creatures of their choice instead.": checked only as it resolves,
+    // one such planeswalker being enough (rulings).
+    const twoInstead = /^If you control an? ([A-Z][a-z]+) planeswalker, that player sacrifices two of those creatures(?: of their choice)? instead$/.exec(s);
+    const onePick = effects.at(-1);
+    if (twoInstead && onePick?.type === "pick" && onePick.action === "sacrifice" && onePick.n === 1 && onePick.who.ref === "target" && effects.length - 1 >= prevStart) {
+      const cond: SpellCondition = { kind: "state", cond: { kind: "control", who: "you", filter: { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], subtypes: [twoInstead[1]!], text: `${twoInstead[1]} planeswalker` }, min: 1 } };
+      effects.splice(effects.length - 1, 1, { type: "if", cond, effects: [{ ...onePick, n: 2 }], otherwise: [onePick] });
+      continue;
+    }
+    // Enshrouding Mist: "Target creature gets +1/+1 until end of turn. Prevent all damage that would be dealt to it this turn.
+    // If it's renowned, untap it.": renowned as this resolves (CR 702.112b).
+    const ifRenowned = /^If it's renowned, (untap it)$/.exec(s);
+    const renownedPrev = effects.at(-1);
+    if (ifRenowned && ctx.lastObjectTarget === ctx.targets.length - 1 && renownedPrev && mentionsTarget(renownedPrev, ctx.lastObjectTarget)) {
+      const i = ctx.lastObjectTarget;
+      const t = ctx.targets[i]!;
+      const fx = parseOne(capital(ifRenowned[1]!), ctx);
+      if (t.kind !== "object" || t.many || t.optional || !fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], status: "renowned", text: "renowned" } }, effects: fx });
       continue;
     }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
@@ -11664,6 +11726,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const index = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell" });
       const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "spell", types: [], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `spell with mana value ${n} or less` } }, effects: [{ type: "counterSpell", index }] });
       effects.push({ type: "if", cond: { kind: "kicked" }, effects: [upTo(mvKicked[1]!)], otherwise: [upTo(mvCounter[1]!)] });
+      si++;
+      continue;
+    }
+    // Overload: "Destroy target artifact if its mana value is 2 or less. If ~ was kicked, destroy that artifact if its mana
+    // value is 5 or less instead.": any artifact can be targeted, its mana value checked as Overload resolves, against 5
+    // instead of 2 when kicked (CR 702.33e).
+    const mvDestroy = ctx.spell ? /^Destroy target artifact if its mana value is (\d+) or less$/.exec(s) : null;
+    const mvDestroyKicked = mvDestroy && /^If ~ was kicked, destroy that artifact if its mana value is (\d+) or less instead\.?$/.exec(sentences[si + 1] ?? "");
+    if (mvDestroy && mvDestroyKicked) {
+      const index = addTarget(ctx, { kind: "object", types: ["Artifact"], notTypes: [], notColors: [], text: "target artifact" });
+      const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: ["Artifact"], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `artifact with mana value ${n} or less` } }, effects: [{ type: "destroy", what: { ref: "target", index } }] });
+      effects.push({ type: "if", cond: { kind: "kicked" }, effects: [upTo(mvDestroyKicked[1]!)], otherwise: [upTo(mvDestroy[1]!)] });
       si++;
       continue;
     }

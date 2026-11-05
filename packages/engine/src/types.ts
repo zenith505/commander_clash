@@ -1905,7 +1905,7 @@ export interface GameState {
   /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
   blockTaxes?: { turn: number; n: number }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
-  noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
+  noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" | "player"; /** With "player": the one player. */ player?: PlayerId }[];
   /** "Until end of turn, if one or more tokens would be created under your control, twice that many ..." (Kaya, Geist Hunter): replacements made by a resolved ability, for the turn they were made in (CR 614.1a). */
   turnCountMods?: { turn: number; controller: PlayerId; mod: CountMod; source: ObjectId }[];
   /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */

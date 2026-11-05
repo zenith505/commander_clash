@@ -136,6 +136,8 @@ export interface Ctx {
   afterAnyMill?: boolean;
   /** An instruction before in this ability discarded cards of yours: "for each card discarded this way" (Pyretic Charge). */
   afterYourDiscard?: boolean;
+  /** The instruction before made one target player discard (Skull Raid): "cards discarded this way" are theirs. */
+  afterTargetDiscard?: boolean;
   /** A "whenever you discard one or more cards" trigger: "for each card discarded this way" is how many it discarded (Captain Howler). */
   discardBatch?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
@@ -2286,6 +2288,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Voyager Glidecar: "Until end of turn, ~ becomes an artifact creature and gains flying. Put a +1/+1 counter on it.": it
   // is ~, the only object named.
   text = text.replace(/^(Until end of turn, ~ becomes an artifact creature and gains [a-z]+\.) Put a \+1\/\+1 counter on it\.$/, "$1 Put a +1/+1 counter on ~.");
+  // Suffer the Past: "For each card exiled this way, that player loses 1 life and you gain 1 life.": the cards actually
+  // exiled, each player's life changed once (rulings: a single life gain event).
+  text = text.replace(/(^Exile X target cards from target player's graveyard\.) For each card exiled this way, that player loses 1 life and you gain 1 life\.$/, "$1 That player loses 1 life for each card exiled this way. You gain 1 life for each card exiled this way.");
+  // Skull Raid: "Target opponent discards two cards. If fewer than two cards were discarded this way, you draw cards equal
+  // to the difference.": two minus the cards that player discarded (none drawn when both were).
+  text = text.replace(/^(Target opponent discards (two|three) cards\.) If fewer than \2 cards were discarded this way, you draw cards equal to the difference\.$/, "$1 You draw cards equal to $2 minus the number of cards discarded this way.");
   // Borrowed Knowledge: "Discard your hand, then draw cards equal to the number of cards discarded this way.": the same as
   // two sentences, the count made after the discard.
   text = text.replace(/^Discard your hand, then draw cards equal to the number of cards discarded this way\.$/, "Discard your hand. Draw cards equal to the number of cards discarded this way.");
@@ -3606,6 +3614,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ctx.afterAnyMill = last?.type === "mill";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
+    ctx.afterTargetDiscard = last?.type === "discard" && last.who.ref === "target" && !last.who.n;
     ctx.afterExileTop = last?.type === "exileTop";
     // Kari Zev, Skyship Raider: "Create Ragavan, a legendary 2/1 red Monkey creature token. Ragavan enters tapped and
     // attacking.": the token is created tapped and attacking (CR 506.3d), as "a token that's tapped and attacking".
@@ -6410,13 +6419,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Scrib Nibblers: "Exile the top card of target player's library. If it's a land card, you gain 1 life.": that card as
     // it is in exile, face up (CR 406.3).
-    const exTargetIs = /^[Ee]xile the top card of target player's library$/.test(s) ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec((sentences[si + 1] ?? "").replace(/\.$/, "").replace(/^If it's /, "If it is ")) : null;
-    if (exTargetIs && !/\b(?:it|its|that card|that player)\b/.test(exTargetIs[2]!)) {
+    // Dimensional Infiltrator: "Target opponent exiles the top card of their library. If it's a land card, you may return ~
+    // to its owner's hand.": the same exile (who exiles it changes nothing), the choice made as it resolves (rulings).
+    if (/^Target opponent exiles the top card of their library$/.test(s)) s = "Exile the top card of target opponent's library";
+    const exTargetIs = /^[Ee]xile the top card of target (?:player|opponent)'s library$/.test(s) ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec((sentences[si + 1] ?? "").replace(/\.$/, "").replace(/^If it's /, "If it is ")) : null;
+    if (exTargetIs && !/\b(?:it|its|that card|that player)\b/.test(exTargetIs[2]!.replace(/~ to its owner's/g, "~"))) {
       const filter = parseSearchFilter(`${exTargetIs[1]} card`);
       const ex = parseOne(s, ctx);
       const before = ctx.targets.length;
-      const then = parseOne(capital(exTargetIs[2]!), ctx);
-      if (!filter || !ex || ex.length !== 1 || ex[0]!.type !== "exileTop" || !then || ctx.targets.length !== before || then.some((e) => pauses(e))) return null;
+      const mayDo = /^you may (.+)$/.exec(exTargetIs[2]!);
+      const thenFx = parseOne(capital(mayDo ? mayDo[1]! : exTargetIs[2]!), ctx);
+      const then: Effect[] | null = thenFx && mayDo ? (thenFx.some((e) => pauses(e)) ? null : [{ type: "may", effects: thenFx, text: mayDo[1]! }]) : thenFx;
+      if (!filter || !ex || ex.length !== 1 || ex[0]!.type !== "exileTop" || !then || ctx.targets.length !== before || (then.length > 1 && then.some((e) => pauses(e)))) return null;
       effects.push(ex[0]!, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: then });
       si++;
       continue;
@@ -10368,6 +10382,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Dimir Machinations: "Look at the top three cards of target player's library. Exile any number of those cards, then
+    // put the rest back in any order.": you choose the cards exiled and (as the spell's controller, CR 608.2c) the order of
+    // the rest, as Bamboozle's.
+    const machSplit = /^Exile any number of those cards\.?$/.test(sentences[si + 1] ?? "") && /^Put the rest back in any order\.?$/.test(sentences[si + 2] ?? "");
+    if (yourLook && ctx.spell && (machSplit || /^Exile any number of those cards, then put the rest back in any order\.?$/.test(sentences[si + 1] ?? ""))) {
+      const n = num(yourLook[1]!);
+      const index = addTarget(ctx, { kind: "player", opponent: yourLook[2] === "target opponent", text: yourLook[2]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n, count: n, upTo: true, into: "exile", rest: "keep", reveal: false, library: { ref: "target", index } }, { type: "orderTop", who: { ref: "target", index }, n, digRest: true });
+      si += machSplit ? 2 : 1;
+      continue;
+    }
     // Thoughtpicker Witch: "Look at the top two cards of target opponent's library, then exile one of them.": you choose
     // the one exiled; the other stays on top (one card, no order to choose).
     if (yourLook && yourLook[1] === "two" && /^Exile one of them\.?$/.test(sentences[si + 1] ?? "")) {
@@ -11580,6 +11606,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const f = parseTargetPhrase(sharesWith[2]!.replace(/^an? /, ""));
       if (!fx || i !== curTargets || t?.kind !== "spell" || t.optional || t.many || f?.kind !== "object" || f.controller !== "you" || !fx.every((e) => mentionsTarget(e, i))) return null;
       effects.push({ type: "if", cond: { kind: "targetSharesColorWith", index: i, filter: { ...f, text: sharesWith[2]! } }, effects: fx });
+      continue;
+    }
+    // Prohibit: "Counter target spell if its mana value is 2 or less. If ~ was kicked, counter that spell if its mana value
+    // is 4 or less instead.": any spell can be targeted, its mana value checked as Prohibit resolves (rulings; an X spell's
+    // X counts, CR 202.3e), against 4 instead of 2 when kicked (CR 702.33e).
+    const mvCounter = ctx.spell ? /^Counter target spell if its mana value is (\d+) or less$/.exec(s) : null;
+    const mvKicked = mvCounter && /^If ~ was kicked, counter that spell if its mana value is (\d+) or less instead\.?$/.exec(sentences[si + 1] ?? "");
+    if (mvCounter && mvKicked) {
+      const index = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell" });
+      const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "spell", types: [], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `spell with mana value ${n} or less` } }, effects: [{ type: "counterSpell", index }] });
+      effects.push({ type: "if", cond: { kind: "kicked" }, effects: [upTo(mvKicked[1]!)], otherwise: [upTo(mvCounter[1]!)] });
+      si++;
       continue;
     }
     // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can
@@ -13024,6 +13062,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "mill" || prev.who.ref !== "you") return null;
       effects.push({ type: "chooseFromGraveyard", n: 99, milled: true, all: true, filter: { kind: "card", hasAdventure: true, text: "card that has an Adventure" } });
+      continue;
+    }
+    // Sludge Titan: "mill five cards. You may put a creature card and/or a land card from among them into your hand": up
+    // to one of each, a card that's both being either one; picked one after the other, so any such pair can be had.
+    const millPair = /^[Yy]ou may put (an? [a-z]+ card) and\/or (an? [a-z]+ card) from among them into your hand$/.exec(s);
+    if (millPair && effects[effects.length - 1]?.type === "mill") {
+      const prev = effects[effects.length - 1]!;
+      const filters = [millPair[1]!, millPair[2]!].map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      if (prev.type !== "mill" || prev.who.ref !== "you" || filters.some((f) => !f || f.kind !== "card")) return null;
+      for (const filter of filters) effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, filter: filter! });
       continue;
     }
     const fromMilled =

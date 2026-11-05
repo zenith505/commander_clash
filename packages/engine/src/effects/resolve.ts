@@ -310,6 +310,11 @@ function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
 /** Whose blocks a "blockHistory" ref is about: the object it remembers, or the source or target as it is now. */
 export function blockHistoryAt(s: GameState, ref: Extract<ObjRef, { ref: "blockHistory" }>, ctx: ResolveCtx): { id: ObjectId; zc: number } | undefined {
   if (ref.at) return ref.at;
+  if (ref.diedSelf) {
+    // A leaves-the-battlefield trigger's source is the object it became, one zone change later (CR 400.7).
+    const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+    return lk && (ctx.sourceZc === undefined || lk.zc + 1 === ctx.sourceZc) ? { id: ctx.sourceId!, zc: lk.zc } : undefined;
+  }
   if (ref.of.ref === "self" && ctx.sourceId) return { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 };
   const t = ref.of.ref === "target" ? ctx.targets[ref.of.index] : undefined;
   return t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
@@ -511,6 +516,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (!at) return [];
     const key = `${at.id}@${at.zc}`;
     const with_ = new Set((s.turnLog?.blocks ?? []).filter((b) => !ref.thisCombat || b.combat === (s.combatsThisTurn ?? 0)).flatMap((b) => [...(ref.blockers && b.attacker === key ? [b.blocker] : []), ...(ref.blocked && b.blocker === key ? [b.attacker] : [])]));
+    if (ref.andSelf) with_.add(key);
     return s.battlefield.map((id) => obj(s, id)).filter((o) => with_.has(`${o.id}@${o.zoneChanges ?? 0}`));
   }
   if (ref.ref === "blockingIt") {
@@ -535,7 +541,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // Orcish Mine: "destroy enchanted land and ~ deals 2 damage to that land's controller": its controller as it last
     // existed on the battlefield (CR 608.2h), kept for "hostController".
     if (host?.here && s.resolving) s.resolving.hostControllerWas = controllerOf(s, s.objects[host.id]!);
-    return host?.here ? [s.objects[host.id]!] : [];
+    if (!host?.here) return [];
+    const it = s.objects[host.id]!;
+    if (!ref.aurasToo) return [it];
+    const auras = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo === it.id && characteristics(s, o).subtypes.includes("Aura"));
+    return [it, ...auras];
   }
   if (ref.ref === "targetHost") {
     // Unforge: the permanent the target Equipment is attached to, or was attached to as it was destroyed (rulings).
@@ -1582,7 +1592,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "blockHistory" || to.ref === "inCombatWithSelf" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

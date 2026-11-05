@@ -384,6 +384,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Disappear: "Return enchanted creature and ~ to their owners' hands": the creature, then the Aura, before any state-based
   // action could put the Aura into its owner's graveyard (CR 608.2c, 704.3).
+  // Mark of Eviction: "return enchanted creature and all Auras attached to that creature to their owners' hands": the
+  // creature and every Aura on it as it resolves (this one too), all at once.
+  if (/^[Rr]eturn enchanted creature and all Auras attached to that creature to their owners' hands$/.test(s) && !ctx.spell) return [{ type: "bounce", what: { ref: "attached", aurasToo: true } }];
   if (/^Return enchanted creature and ~ to their owners' hands$/.test(s) && !ctx.spell) return [{ type: "bounce", what: { ref: "attached" } }, { type: "bounce", what: { ref: "self" } }];
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
@@ -439,6 +442,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!what || what.ref !== "target" || ctx.targets[pi]?.kind !== "player") return null;
     for (let i = first; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, inGraveyardOfTarget: pi, text: "target card from that player's graveyard" };
     return [{ type: "shuffleIntoLibrary", what, who: who! }];
+  }
+  // Suffer the Past: "Exile X target cards from target player's graveyard": the player is a target too, and the cards must
+  // be in that player's graveyard (TargetSpec.inGraveyardOfTarget), X of them (CR 601.2c, 107.3a).
+  if ((m = /^[Ee]xile (X) target cards from target player's graveyard$/.exec(s))) {
+    const who = parsePlayer("target player", ctx);
+    const pi = ctx.targets.length - 1;
+    const first = ctx.targets.length;
+    const what = who?.ref === "target" ? parseCardTarget(`${m[1]} target cards from a graveyard`, ctx) : null;
+    if (!what || what.ref !== "target" || ctx.targets[pi]?.kind !== "player") return null;
+    for (let i = first; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, inGraveyardOfTarget: pi, text: "target card from that player's graveyard" };
+    return [{ type: "exile", what }];
   }
   // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
   // libraries." (body.ts reads it as this): each card into its owner's library, each library shuffled once (rulings, CR
@@ -804,6 +818,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: { count: { kind: "revealedFromHand" } }, filter }] : null;
   }
+  // Recall: "Discard X cards, then return a card from your graveyard to your hand for each card discarded this way": as many
+  // as were discarded, chosen after the discard, the discarded cards among them (rulings), not targeted.
+  if (ctx.afterYourDiscard && /^[Rr]eturn a card from your graveyard to your hand for each card discarded this way$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, nAmount: { count: { kind: "discardedThisWay" } } }];
   // "Return X creature cards from your graveyard to the battlefield", after "sacrifice any number of ..." (Lich-Knights'
   // Conquest): that many, chosen as it resolves.
   if ((m = /^[Rr]eturn X (creature cards) from your graveyard to the battlefield$/.exec(s))) {

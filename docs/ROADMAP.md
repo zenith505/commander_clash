@@ -1,6 +1,6 @@
 # Roadmap
 
-29,815 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,829 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,571 of
 9,979 (95%).
 
@@ -287,7 +287,7 @@ line blocks.
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
    Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
-   Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
+   Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
    stun counter on one of them), Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
@@ -329,7 +329,7 @@ line blocks.
    Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
-   Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection,
+   Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection (done in round B108),
    Arcbound Fiend, Consume Spirit, Pestilent Spirit, End Hostilities.
    Round 182 went down from rank 12,330 to about rank 13,222 (Temporal Cleansing, Deem Inferior, Lost Days, Happy Hogan
    and Trickster's Stratagem (second from the top or the bottom, the owner's choice), Phyrexian Hydra, Pain
@@ -2089,7 +2089,7 @@ line blocks.
    flips a coin. Each player whose coin comes up tails sacrifices a creature of their choice" (Goblin Assassin: flips no
    one wins or loses, rulings; Edgar's heads apply; with Krark's Thumb the heads coin is kept, not asked); "Remove any
    number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too; with a
-   browser test). No new prompts (all of them reuse existing ones). +13, 29,815 of 31,936 with B106 and B107.
+   browser test). No new prompts (all of them reuse existing ones). +13, 29,829 of 31,936 with B106 to B108.
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -2441,7 +2441,7 @@ line blocks.
    bots use Shay Cormac's {1} like any other ability. Smaller gaps from round 144: behold works for
    one creature type only, not a planeswalker type (Countersculpt's "behold a Jace"); bots behold a card from their hand first when it's exiled, a permanent first when it isn't, and never
    a token or a commander; the log reads "You beholds" (like "You votes"); Champions of
-   the Shoal ("enters or becomes tapped"), Lys Alana Dignitary, Froghemoth, Rysorian Badger and Suffer the Past still
+   the Shoal ("enters or becomes tapped"), Lys Alana Dignitary, Froghemoth, Rysorian Badger and Suffer the Past (done in round B108) still
    miss a line each. Smaller gaps from round 143: bots sacrifice to Scavenger's Talent only when the best creature
    card in their graveyard is worth more than the creatures they'd give up; what happens to Palace Jailer's
    exiled creature once the Jailer's controller has left the game isn't modeled (no rulings on it).
@@ -2577,7 +2577,7 @@ line blocks.
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
    that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Everything Comes
    to Dust and Knight-Errant of Eos (what convoked them; Ancient Imperiosaur done in round 270); Nissa's two-sentence "Nth time" branches; Rose Room
-   Treasurer; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
+   Treasurer; Eivor and Sludge Titan (done in round B108) ("and/or" after a mill); Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or
@@ -3134,7 +3134,7 @@ line blocks.
      Rupture, Curse of Surveillance; Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
      lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
-     tokens, Insidious Dreams, Recall, Nahiri's Wrath, Abandon Hope; X in an activated ability's non-mana cost (Gix,
+     tokens, Insidious Dreams, Recall (done in round B108), Nahiri's Wrath, Abandon Hope; X in an activated ability's non-mana cost (Gix,
      Champion of Stray Souls, Martyr of Bones); "X target cards from a single graveyard" (Rats' Feast); waterbend {X}.
    - Bots don't sacrifice nontoken permanents for mana abilities on their own (Ashnod's Altar, Phyrexian Tower): only
      the human player does, from the ability menu.
@@ -3371,10 +3371,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   oil counters; "investigate four times"; "If you control a Fish, Octopus, Otter, Seal, Serpent, or Whale";
   "Cowards (creatures with defender) can't block this turn"; "attacking Warriors get +1/+1". +74 (25,572 with round 177).
 - Skipped there, with reasons: Silence the Believers ("any number of target creatures and all Auras attached to
-  them"); Mark of Eviction and Deathless Knight (triggers from the battlefield back to the hand or the graveyard);
+  them"); Mark of Eviction (done in round B108) and Deathless Knight (done in round B108) (triggers from the battlefield back to the hand or the graveyard);
   Prairie Dog (a counter replacement until end of turn); Kazandu Stomper ("up to two lands you control": a pick with
   "up to"); Vicious Offering (a kicker cost that isn't mana); Nissa's Defeat (its target phrase); Chandra's Defeat
-  ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit, Expel the
+  ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit (done in round B108), Expel the
   Unworthy and Agonizing Demise (kicked riders not parsed yet); Morgue Burst ("the power of the card returned this
   way"); Sudden Insight ("each different mana value among nonland cards in your graveyard"); Doomsday Specter ("The
   player discards that card"); Alaborn Zealot ("destroy both creatures"); Crown-Hunter Hireling (done in round B104) ("unless defending
@@ -3406,7 +3406,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Councillors ("for every seven": a divided amount); Ichor Shade (a typed "put into a graveyard this turn" count);
   Crackling Emergence and Harmonious Emergence (a destroy replacement on the enchanted land); Genju of the Fields (a
   damage trigger granted until end of turn); Oppressive Rays, Qal Sisma Behemoth, Myr Prototype and Cowed by Wisdom
-  (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid, Gremlin Infestation
+  (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid (done in round B108), Gremlin Infestation
   (each a template not parsed yet); Wall of Shadows ("can't be the target of spells that can target only Walls");
   Chained Throatseeker (done in round B104) ("can't attack unless defending player is poisoned").
 - Round B8 (ranks about 21,900 up to about 19,500, template clusters, plus more played cards the same templates cover:
@@ -3496,7 +3496,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spell" condition), Centaur Omenreader (done in round B105) (a conditional cost reduction), Hercules (the first damage each turn), Ginger,
   Queen of Sweets (a token copy of the card Gingerbrute), Light of Judgment ("up to one Equipment attached to it"),
   Scrib Nibblers (a condition on the exiled top card), Stream of Thought (done in round B104) (shuffle up to four cards from graveyards),
-  Mindshrieker (done in round B105) (the milled card's mana value), Take Out the Trash ("if you do" after a conditional may), Zenith Flare
+  Mindshrieker (done in round B105) (the milled card's mana value), Take Out the Trash ("if you do" after a conditional may), Zenith Flare (done in round B108)
   (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short (done in round B105), Spreading Plague, Nullmage and
   Spurnmage Advocate (not parsed yet).
 - Round B11 (ranks about 15,100 up to about 13,200, the easier templates, plus more played cards the same templates
@@ -3529,7 +3529,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   greatest power per opponent), Long Feng (a creature or a land put into a graveyard), Kraken of the Straits (done in round B105) (blockers'
   power against a count), End Hostilities (permanents attached to creatures),
   Eiganjo Uprising ("X minus one" tokens), Consume Spirit ("Spend only black mana on X"), Energy Field, Ill-Gotten
-  Gains, Recall, Pyretic Rebirth, Viashino Heretic and Suffer the Past (not parsed yet).
+  Gains, Recall (done in round B108), Pyretic Rebirth, Viashino Heretic and Suffer the Past (done in round B108) (not parsed yet).
 - Round B12 (the lanes have met; the harder templates earlier rounds skipped, least played first): kicker costs that
   aren't mana ("Kicker—Sacrifice two lands", "Pay 3 life", "Return a creature you control to its owner's hand",
   "{2}{R}, Sacrifice a land"; CR 702.33a, 118.8), echo that isn't mana ("Echo—Sacrifice two lands", "Discard a card"),
@@ -4337,7 +4337,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rider about its color), Noggin Whack (reveal three, you choose two), Hiveheart Shaman (a basic land card that doesn't
   share a land type), Song of Blood (a delayed attack trigger counting milled creature cards), Kemba's Legion (done in round B106), Taunt,
   Battlefield Scrounger, Slayer's Cleaver ("blocked by an Eldrazi if able"), Illuminated Folio (reveal two cards that
-  share a color), Nim Devourer, Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze, Fathom
+  share a color), Nim Devourer (done in round B108), Jabari's Influence (a -1/-0 counter after gaining control), Primordial Ooze, Fathom
   Trawl, Thirsting Axe, Sewer Crocodile, Flying Drone.
 - Round B49 (harder skipped cards, least played first): "You choose a nonland card from that player's graveyard or hand
   and exile it" (Never Happened, Memory Leak: one picker for the revealed hand and the graveyard, each card marked with
@@ -4392,7 +4392,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten and Swat Away (top or
   bottom of the library, owner's choice), Case the Joint and Medomai's Prophecy (the top card of each player's
   library), Kayla's Reconstruction, Treacherous Urge, Rogues' Gallery, Liberated Livestock, Borderland Explorer,
-  Cathedral Membrane, Dimensional Infiltrator, Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
+  Cathedral Membrane (done in round B108), Dimensional Infiltrator (done in round B108), Sharp-Eyed Rookie; harder: Grand Master of Flowers, Mana Maze, Eureka,
   Portcullis.
 - Round B51 (cards no earlier round wrote down, least played first, EDHREC rank about 24,700 to 23,200):
   "if you have a card in hand" (Imaginary Pet), "if you control no other colorless creatures" (Dust Stalker), "When a
@@ -4486,7 +4486,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar (done in round B105)
   ("sacrifice a token or a land"), Guul Draz Overseer ("If that land is a Swamp ... instead"), Unnatural Aggression
   (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix (done in round B106) and Voltage Surge (what the
-  sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane, Thieving Sprite, Serene Sunset, plus the
+  sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane (done in round B108), Thieving Sprite, Serene Sunset, plus the
   multi-line or new-mechanic cards in the same range.
 - Round B54 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000, the easier
   ones): spell mastery "If there are two or more instant and/or sorcery cards in your graveyard, ~ can't be countered"
@@ -5464,6 +5464,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Spurnmage Advocate ("two target cards from an opponent's graveyard": both from one opponent's, rulings; Deadeye Tracker's
   two cards now must be too, as its rulings say), Public Enemy ("All creatures attack enchanted creature's controller each
   combat if able": not that player's own creatures). +15 (29,802 of 31,936 with rounds 273 to 275).
+- Round B108 (single-line blockers from the skip lists, least played first): Skull Raid ("If fewer than two cards were
+  discarded this way, you draw cards equal to the difference", rulings), Prohibit (the target's mana value checked as it
+  resolves, 4 instead of 2 when kicked), Dimensional Infiltrator ("Target opponent exiles the top card of their library. If
+  it's a land card, you may return ~", chosen as it resolves, rulings), Zenith Flare ("cards with a cycling ability in your
+  graveyard"), Dazzling Reflection ("The next time that creature would deal damage this turn, prevent that damage": a
+  shield on the target as a source, CR 615.8), Mark of Eviction ("enchanted creature and all Auras attached to that
+  creature", whoever controls them, at once), Suffer the Past ("X target cards from target player's graveyard", life
+  counted by the cards actually exiled, one life gain, rulings), Recall (as many cards returned as were discarded, chosen
+  after the discard, rulings), Deathless Knight (from your graveyard when you gain life for the first time each turn: only
+  if it's there as the life is gained, rulings), Dimir Machinations (exile any number of the top three, the rest back in
+  your order), Nim Devourer ("Return ~ from your graveyard to the battlefield, then sacrifice a creature"), Cathedral
+  Membrane ("each creature it blocked this combat", from the turn's block log, as ~ last existed), Defiant Vanguard ("at
+  end of combat, destroy it and all creatures it blocked this turn"), Sludge Titan ("a creature card and/or a land card
+  from among them", one pick after the other). Browser tests for Suffer the Past's targets and Dimir Machinations' pick.
+  +14 (29,816 of 31,936 with rounds 273 to 275).
+- Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
+  announced in turn order before any sacrifice, rulings), Crypsis ("protection from creatures your opponents control":
+  relative to the protected creature's controller, creature cards owned by an opponent too, rulings), Mister Immortal
+  (an ability activated from exile: no activation from exile yet).
 - Out after round B107 (looked at, not done): Isu the Abominable ("you may pay {G}, {W}, or {U}": a choice of payment), Time
   to Reflect and You Cannot Pass! (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
   creature was when the block happened, rulings, which the turn's block log doesn't keep), Heroic Feast (as many targets as
@@ -5619,7 +5638,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   can't pause yet), Volrath's Laboratory and Riptide Replicator (tokens of the chosen color and creature type), Barbed
   Foliage ("loses flanking" has to remove the trigger), Sunglasses of Urza, Knight of Valor, Grifter's Blade, Halfdane,
   Bronze Horse, Mister Immortal (activated from exile), Wall of Deceit (done in round 271) and Backslide (turn a creature face down),
-  Sarkhan's Whelp (done in round B105), Dredging Claw, Defiant Vanguard. Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
+  Sarkhan's Whelp (done in round B105), Dredging Claw, Defiant Vanguard (done in round B108). Known gaps: Dormant Gomazoa doesn't trigger when a spell's target is
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
   batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (the

@@ -1870,7 +1870,14 @@ function targetGuard(s: GameState, pid: PlayerId, effects: Effect[], i: number, 
       };
       branch = e.effects;
     } else if (e.cond.kind === "state" && sourceId) branch = staticConditionNow(s, e.cond.cond, sourceId, pid) ? e.effects : (e.otherwise ?? []);
-    else return undefined;
+    else if (e.cond.kind === "kicked" && e.effects.length && e.otherwise?.length) {
+      // Prohibit: kicked or not isn't known here, so a target either branch would act on.
+      const a = targetGuard(s, pid, e.effects, i, sourceId);
+      const b = targetGuard(s, pid, e.otherwise, i, sourceId);
+      if (!a || !b) return undefined;
+      tests.push((t) => a(t) || b(t));
+      continue;
+    } else return undefined;
     if (!branch.length) continue;
     const inner = targetGuard(s, pid, branch, i, sourceId);
     tests.push(inner ? (t) => test(t) && inner(t) : test);

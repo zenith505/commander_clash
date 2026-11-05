@@ -288,6 +288,8 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
     const subject = /^(?:that creature|it)$/i.test(next[1]!);
     // "A source of your choice ... prevent that damage" is a prevention rule (prevention.ts), with its riders.
     if (!subject && /^prevent that damage$/i.test(next[4]!)) return undefined;
+    // Dazzling Reflection: "that creature" a target before it: a prevention rule about that target (prevention.ts).
+    if (!until && subject && !ctx.subjectIt && !ctx.subject && /^that creature$/i.test(next[1]!) && /^prevent that damage$/i.test(next[4]!) && !next[2] && !next[3]) return undefined;
     if (until || (subject && !ctx.subjectIt && !(ctx.subject && /^that creature$/i.test(next[1]!)))) return null;
     const mod: DamageMod = /^it deals/.test(next[4]!) ? { op: "times", n: 2, nextTime: true, text } : next[5] ? { op: "half", prevent: true, ...(next[5] === "down" ? { up: true as const } : {}), nextTime: true, text } : { op: "prevent", prevent: true, nextTime: true, text };
     if (next[2]) mod.combat = "only";

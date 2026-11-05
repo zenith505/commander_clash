@@ -179,6 +179,15 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (spec?.kind !== "object") return null;
     return rule({ by: { target: { ref: "target", index: addTarget(ctx, spec) } }, ...(m[1] ? { to: { target: { ref: "self" } } } : {}) });
   }
+  // Dazzling Reflection: "You gain life equal to target creature's power. The next time that creature would deal damage
+  // this turn, prevent that damage.": a shield on that creature as a source, used up by its next damage event (CR 615.8),
+  // for as long as it's that object.
+  if (/^The next time that creature would deal damage this turn, prevent that damage$/.test(s)) {
+    const i = ctx.lastObjectTarget;
+    const t = i === undefined ? undefined : ctx.targets[i];
+    if (i === undefined || t?.kind !== "object" || t.many || t.optional || !t.types?.includes("Creature")) return null;
+    return rule({ by: { target: { ref: "target", index: i } }, nextTime: true });
+  }
   // Terrifying Presence: "Prevent all combat damage that would be dealt by creatures other than target creature this
   // turn": a rule until the turn ends, for creatures that arrive later too (CR 611.2c), but not that creature's.
   if (/^Prevent all combat damage that would be dealt by creatures other than target creature this turn$/.test(s)) {

@@ -607,7 +607,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && ctx?.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) return count({ kind: "x" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
   // Balin, Loremaster: "you may discard your hand. Draw X cards, where X is the number of cards discarded this way".
-  if (each && ctx?.afterYourDiscard && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
+  if (each && (ctx?.afterYourDiscard || ctx?.afterTargetDiscard) && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Captain Howler: "Whenever you discard one or more cards, ... for each card discarded this way": the trigger event's cards.
   if (each && ctx?.discardBatch && /^card discarded this way$/i.test(p)) return count({ kind: "eventAmount" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
@@ -809,7 +809,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Vile Manifestation: "for each card with cycling in your graveyard": its printed cycling or typecycling (see
   // parseTargetPhrase's graveyard keywords).
-  if ((m = /^cards? with (cycling) in your graveyard$/i.exec(p))) {
+  // Zenith Flare: "the number of cards with a cycling ability in your graveyard": the same cards.
+  if ((m = /^cards? with (cycling|a cycling ability) in your graveyard$/i.exec(p))) {
     const spec = parseTargetPhrase(`card with ${m[1]} from a graveyard`, { chosen: true });
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, text: `card with ${m[1]}` } }) : null;
   }

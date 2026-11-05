@@ -1075,6 +1075,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first) && (!t.orLoseLife || s.activePlayer === ev.player) && (!t.onYourTurn || s.activePlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
+    // Deathless Knight: "When you gain life for the first time each turn, return ~ from your graveyard to your hand": from
+    // its owner's graveyard, only if it's there as the life is gained (rulings).
+    fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e, t) => e === "youGainLife" && (!t.firstEachTurn || !!ev.first) && !t.firstOnTheirTurn && !t.orLoseLife && !t.onYourTurn, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
     fromFloating((o, ctrl, triggers) => ctrl === ev.player && add(o, ctrl, (e) => e === "youGainLife", triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // False Cure: "Until end of turn, whenever a player gains life, ...": any player's, "that player" the one who gained it.

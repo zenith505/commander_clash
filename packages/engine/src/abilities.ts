@@ -1314,7 +1314,11 @@ export type ObjRef =
   /** Battle cry's "each other attacking creature". */
   | { ref: "allCreatures"; controller?: "you" | "opponent"; other?: boolean; attacking?: boolean }
   /** "Enchanted creature", "equipped creature": the permanent the source is attached to, while it's still that source. */
-  | { ref: "attached" }
+  | {
+      ref: "attached";
+      /** Mark of Eviction: "enchanted creature and all Auras attached to that creature": those Auras too, whoever controls them, as this resolves. */
+      aurasToo?: true;
+    }
   /** "If that Equipment was attached to a creature, ... to that creature" (Unforge): what target `index` is attached to, or was as it left the battlefield (rulings, CR 608.2h). */
   | { ref: "targetHost"; index: number }
   /** Joint Assault's "if it's paired with a creature, that creature": what target `index` is paired with as this resolves (CR 702.95b). */
@@ -1346,7 +1350,7 @@ export type ObjRef =
    * turn with `of` as it was then (TurnLog.blocks), even if they're no longer blocking (rulings), each still that object.
    * `at`: `of` as a delayed trigger remembers it.
    */
-  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
+  | { ref: "blockHistory"; of: ObjRef; at?: { id: ObjectId; zc: number }; blockers?: true; blocked?: true; /** "This combat" (Ride Down): only blocks declared in the current combat phase (TurnLog.blocks `combat`). */ thisCombat?: true; /** With `of` self, in a dies trigger (Cathedral Membrane): the source as it last existed on the battlefield. */ diedSelf?: true; /** With `of` self: "destroy it and all creatures it blocked this turn" (Defiant Vanguard): the source too, while it's still that object. */ andSelf?: true; /** Heat Stroke: "each creature that blocked or was blocked this turn": every blocker and every blocked attacker of this turn's blocks, whoever's (`of` unused). */ anyone?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.

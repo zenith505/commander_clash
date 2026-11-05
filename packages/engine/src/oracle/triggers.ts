@@ -1153,7 +1153,8 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
     const body = parseBody(firstInvestigate[1]!);
     return body ? { event: "youInvestigate", firstEachTurn: true, body } : "fail";
   }
-  const first = /^Whenever you (gain|lose) life for the first time each turn, (.+)$/.exec(line);
+  // Deathless Knight: "When you gain life for the first time each turn, ...": the same ("when" and "whenever" trigger alike, CR 603.2).
+  const first = /^When(?:ever)? you (gain|lose) life for the first time each turn, (.+)$/.exec(line);
   if (first) {
     const body = parseBody(first[2]!, {});
     return body ? { event: first[1] === "gain" ? "youGainLife" : "youLoseLife", firstEachTurn: true, body } : "fail";
@@ -2774,7 +2775,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Liability: "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1
@@ -3659,6 +3660,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(line.replace(/tap it(\.?)$/, "tap enchanted creature$1"));
     return t && t !== "fail" && t.ifCond?.kind === "attachedIs" ? t : "fail";
   }
+  // Defiant Vanguard: "When ~ blocks, at end of combat, destroy it and all creatures it blocked this turn.": a delayed
+  // trigger at this combat's end (CR 603.7, 511.2) destroying ~ (while it's still that object, CR 400.7) and the attackers
+  // it was declared to block this turn (TurnLog.blocks), all at once.
+  if (/^When(?:ever)? ~ blocks, at end of combat, destroy it and all creatures it blocked this turn\.$/.test(line))
+    return { event: "selfBlocks", body: { targets: [], effects: [{ type: "delayed", when: "endOfCombat", thisTurn: true, effects: [{ type: "destroy", what: { ref: "blockHistory", of: { ref: "self" }, blocked: true, andSelf: true } }], text: "destroy ~ and all creatures it blocked this turn" }], text: line } };
   // Mongrel Pack: "When ~ dies during combat, ...": only a death during a combat phase (CR 506.1).
   const diesCombat = /^When ~ dies during combat, (.+)$/.exec(line);
   if (diesCombat) {
@@ -4929,6 +4935,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const brood = event === "selfToGraveyard" && /^When ~ is put into your graveyard/.test(line) ? /^at the beginning of the next end step, you lose (\d+) life and return ~ to your hand\.$/.exec(text) : null;
       // Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it. They can't be regenerated.": the ones in
       // combat with it as it last existed (CR 603.10a, 608.2h).
+      // Cathedral Membrane: "When ~ dies during combat, it deals 6 damage to each creature it blocked this combat": the
+      // attackers it was declared to block in this combat phase (TurnLog.blocks), each still that object (CR 400.7), the
+      // damage dealt by ~ as it last existed (CR 608.2h).
+      const blockedThisCombat = event === "selfDies" ? /^(?:it|~) deals (\d+) damage to each creature it blocked this combat\.$/.exec(text) : null;
+      if (blockedThisCombat) body = { targets: [], effects: [{ type: "damage", amount: Number(blockedThisCombat[1]), to: { ref: "blockHistory", of: { ref: "self" }, blocked: true, thisCombat: true, diedSelf: true } }], text };
       if (event === "selfDies" && /^destroy all creatures blocking or blocked by it\. They can't be regenerated\.$/.test(text)) body = { targets: [], effects: [{ type: "destroy", what: { ref: "inCombatWithSelf", lastKnown: true }, noRegen: true }], text };
       if (brood) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "loseLife", who: { ref: "you" }, n: Number(brood[1]) }, { type: "bounce", what: { ref: "subjectCard" } }], text: `you lose ${brood[1]} life and return ~ to your hand` }], text };
       // Ochre Jelly: "create a token that's a copy of it at the beginning of the next end step. The token enters with half

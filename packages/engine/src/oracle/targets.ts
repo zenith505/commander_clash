@@ -1676,6 +1676,13 @@ export function parseTargetPhrase(
     extra.combat = "attackedYouThisTurn";
     p = p.slice(0, attackedYou.index);
   }
+  // Time to Reflect: "target creature that blocked or was blocked by a Zombie this turn"; You Cannot Pass!: "... by a
+  // legendary creature this turn": a block this turn with a creature that was one as the block was declared (rulings).
+  const blockedWith = / that blocked or was blocked by (?:a [Zz]ombie|a legendary creature) this turn$/.exec(p);
+  if (blockedWith && !extra.combat) {
+    extra.blockedWith = /zombie/i.test(blockedWith[0]) ? { subtype: "Zombie" } : { supertype: "Legendary" };
+    p = p.slice(0, blockedWith.index);
+  }
   // Gideon's Triumph: "a creature that attacked or blocked this turn": declared as an attacker or a blocker this turn (CR
   // 508.1, 509.1), not one put onto the battlefield attacking (rulings), even if it has since left combat.
   const attackedOrBlocked = / that attacked or blocked this turn$/.exec(p);

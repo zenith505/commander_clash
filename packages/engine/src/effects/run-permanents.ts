@@ -211,6 +211,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (e.remember && s.resolving) s.resolving.created = removed;
       return;
     }
+    case "becomeBlocked": {
+      // An unblocked attacking creature becomes blocked, by no creature (CR 509.1h): it stays blocked for the rest of
+      // combat and deals no combat damage unless it has trample (CR 702.19d). Every creature in its band too (CR
+      // 702.22i). Already blocked, nothing happens (rulings on Choking Vines). "Becomes blocked" abilities trigger, not
+      // "becomes blocked by a creature" ones (CR 509.3c-d).
+      const now: ObjectId[] = [];
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield" || o.attacking === undefined || o.blockedBy) continue;
+        for (const m of o.band ? s.battlefield.map((id) => s.objects[id]!).filter((x) => x.band === o.band && x.attacking !== undefined && !x.blockedBy) : [o]) {
+          m.blockedBy = [];
+          m.becameBlockedTurn = s.turn;
+          now.push(m.id);
+          log(s, `${defOf(s, m).name} becomes blocked (${src}).`);
+        }
+      }
+      if (now.length) fireEvent(s, { type: "becameBlocked", ids: now });
+      return;
+    }
     case "reselectAttack": {
       // Another player, or a planeswalker or battle it could attack (CR 506.2, 310.9b), never its controller or theirs;
       // requirements, restrictions and costs ignored, and it still attacked what it did (rulings).

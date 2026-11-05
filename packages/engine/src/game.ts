@@ -20,7 +20,7 @@ import { blightOptions, countersBanned, countersRemoved, countersStay, putCounte
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, SPARES_AURAS, type Characteristics } from "./layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -11475,6 +11475,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
  */
 function attachmentSBAs(s: GameState): boolean {
   let changed = false;
+  recordSparedAttachments(s);
   for (const id of [...s.battlefield]) {
     const o = s.objects[id];
     if (!o || o.zone !== "battlefield") continue;
@@ -11511,7 +11512,7 @@ function attachmentSBAs(s: GameState): boolean {
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
-      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id && hc.sparedBy?.[k.toLowerCase()] !== SPARES_AURAS) : [];
+      const shielding = hc ? hc.keywords.filter((k) => !sparedFrom(s, hc, k, o, true)) : [];
       const legal =
         !!host &&
         host.zone === "battlefield" &&
@@ -11537,8 +11538,10 @@ function attachmentSBAs(s: GameState): boolean {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
       // And from one an "~ can be attached only to" no longer allows (O-Naginata rulings), or one that "can't be equipped".
+      // Not from protection that "doesn't remove" it (Benevolent Blessing, CR 702.16p).
       const only = abilitiesOf(s, o).attachOnly;
-      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || characteristics(s, host).cantBeEquipped || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host)) || (only && !objectMatches(s, only, host, controllerOf(s, o), false))) {
+      const hk = host ? characteristics(s, host) : undefined;
+      if (!host || !hk || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || hk.cantBeEquipped || protectedFrom(hk.keywords.filter((k) => !sparedFrom(s, hk, k, o, false)), withCastThisTurn(s, o, c), protectionHolder(s, host)) || (only && !objectMatches(s, only, host, controllerOf(s, o), false))) {
         if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
         o.attachedTo = undefined;
         invalidateCharacteristics(s);
@@ -11564,6 +11567,29 @@ function attachmentSBAs(s: GameState): boolean {
     }
   }
   return changed;
+}
+
+/**
+ * Benevolent Blessing (CR 702.16p): when its protection starts to apply (it's attached to a creature, or to another one),
+ * the Auras and Equipment its controller controls already attached to that creature, itself included, are recorded:
+ * that protection doesn't remove them (sparedFrom). Done before the state-based actions look at what's attached.
+ */
+function recordSparedAttachments(s: GameState): void {
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    if (!host || host.zone !== "battlefield" || !abilitiesOf(s, o).statics.some((st) => st.mods.some((m) => m.kind === "addKeywords" && m.spares === "attached"))) continue;
+    const rec = o.sparesAttached;
+    if (rec && rec.zc === (o.zoneChanges ?? 0) && rec.host === host.id && rec.hostZc === (host.zoneChanges ?? 0)) continue;
+    const you = controllerOf(s, o);
+    const ids = s.battlefield.filter((x) => {
+      const a = s.objects[x]!;
+      if (a.attachedTo !== host.id || controllerOf(s, a) !== you) return false;
+      const sub = characteristics(s, a).subtypes;
+      return sub.includes("Aura") || sub.includes("Equipment");
+    });
+    o.sparesAttached = { zc: o.zoneChanges ?? 0, host: host.id, hostZc: host.zoneChanges ?? 0, ids };
+  }
 }
 
 /**

@@ -1,5 +1,5 @@
 import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type SpellCondition, type StaticCondition, type TargetSpec } from "../abilities";
-import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
+import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
@@ -784,6 +784,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (ctx.treasureSpent ?? 0) > 0
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
+            : e.cond.kind === "revealedColoredSymbols"
+            ? ((rv, n) => {
+                const card = rv && s.objects[rv.id];
+                return !!card && (card.zoneChanges ?? 0) === rv.zc && coloredManaSymbols(defOf(s, card).manaCost) >= n;
+              })(s.resolving?.revealed, e.cond.atLeast)
             : e.cond.kind === "revealedIs"
             ? revealedIs(s, bindBound(s, bindChosen(e.cond.filter, ctx.chosen), amountCtx(s, ctx))) !== !!e.cond.not
             : e.cond.kind === "movedLinkedIs"
@@ -849,7 +854,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "playerDamagedThisWay"
             ? (s.resolving!.playersDamagedThisWay ?? []).length > 0
             : e.cond.kind === "playerMoreLifeThanYou"
-            ? ((who) => players(s, who, ctx).some((pid) => player(s, pid).life > player(s, ctx.controller).life))(e.cond.who)
+            ? ((c) => {
+                const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && objIsType(s, s.objects[id]!, "Land")).length;
+                const measure = (pid: PlayerId) => (c.lands ? lands(pid) : player(s, pid).life);
+                return players(s, c.who, ctx).some((pid) => (!c.lands || !player(s, pid).lost) && measure(pid) > measure(ctx.controller));
+              })(e.cond)
             : e.cond.kind === "subjectExploitedBySelf"
             ? !!ctx.lki?.exploitedBy && ctx.lki.exploitedBy.id === ctx.sourceId && (ctx.sourceZc === undefined || ctx.lki.exploitedBy.zc === ctx.sourceZc)
             : e.cond.kind === "subjectWasAttacking"

@@ -6072,6 +6072,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "99140891-face-4015-aacd-1309e87d8f9f",
+  "name": "Display of Power",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "This spell can't be copied.\nCopy any number of target instant and/or sorcery spells. You may choose new targets for the copies.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "12c78cc4-7fbe-4639-bef7-bf959a0d6d68",
   "name": "Distant Memories",
   "manaCost": "{2}{U}{U}",
@@ -13740,6 +13766,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "482006a0-bb2a-4533-891b-2195da5e0f01",
+  "name": "Manabond",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your end step, you may reveal your hand and put all land cards from it onto the battlefield. If you do, discard your hand.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mb2",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -15997,6 +16049,54 @@
   "commanderLegal": "legal",
   "set": "ecc",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "26445dc7-8363-4205-aee8-1cafeb4ba4c0",
+  "name": "Omnath, Locus of All",
+  "manaCost": "{W}{U}{B/P}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Phyrexian Elemental",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Elemental"
+  ],
+  "oracleText": "If you would lose unspent mana, that mana becomes black instead.\nAt the beginning of your first main phase, look at the top card of your library. You may reveal that card if it has three or more colored mana symbols in its mana cost. If you do, add three mana in any combination of its colors and put it into your hand. If you don't reveal it, put it into your hand.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -21535,6 +21635,47 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1c96772b-463c-4655-836b-cf6e9dc6319f",
+  "name": "Sphinx of the Steel Wind",
+  "manaCost": "{5}{W}{U}{B}",
+  "cmc": 8,
+  "typeLine": "Artifact Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying, first strike, vigilance, lifelink, protection from red and from green",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink",
+   "Vigilance",
+   "First strike",
+   "Protection"
+  ],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

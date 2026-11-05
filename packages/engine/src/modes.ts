@@ -285,5 +285,10 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
     else if (o.index < i && typeof o.n === "number" && o.index + o.n > i && (o.ref === "target" || o.ref === "anyTarget")) copy.n = o.n + n - 1;
   }
   if (typeof o.target === "number" && Object.keys(o).length === 1 && o.target > i) copy.target = o.target + n - 1;
+  // Display of Power's copySpell { target, many }: the slot's targets, all of them.
+  if (typeof o.target === "number" && o.many === true && Object.keys(o).every((k) => k === "target" || k === "many" || k === "n")) {
+    if (o.target > i) copy.target = o.target + n - 1;
+    else if (o.target === i) copy.n = n;
+  }
   return copy as T;
 }

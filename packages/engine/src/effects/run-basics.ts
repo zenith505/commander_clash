@@ -740,7 +740,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (!sc.manaMix) {
           const n = Math.max(0, amountNow(s, e.times ?? 1, ctx));
           if (!n) return;
-          s.pending = { kind: "manaMix", player: ctx.controller, source: src, n };
+          // Omnath, Locus of All: "in any combination of its colors", the looked-at card's colors (CR 105.2).
+          const rv = e.revealedColors ? s.resolving?.revealed : undefined;
+          const card = rv && s.objects[rv.id];
+          const colors = e.revealedColors ? (card && (card.zoneChanges ?? 0) === rv!.zc ? characteristics(s, card).colors : []) : undefined;
+          if (colors && !colors.length) {
+            log(s, `${src}: the card has no colors, so no mana is added.`);
+            return;
+          }
+          s.pending = { kind: "manaMix", player: ctx.controller, source: src, n, ...(colors ? { colors: COLORS.filter((c) => colors.includes(c)) } : {}) };
           return "paused";
         }
         const mix = sc.manaMix;

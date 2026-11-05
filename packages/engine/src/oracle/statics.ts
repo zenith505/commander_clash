@@ -1043,7 +1043,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
   // in your graveyard"; Vengeful Firebrand: "... a Warrior card ...": one or more.
   // Grizzled Angler: "if there is a colorless creature card in your graveyard".
-  if ((m = /^(?:there(?:'s| is) an? (colorless \w+|\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
+  // Leaves from the Vine: "if there's a creature or Lesson card in your graveyard": either kind (CR 205.3).
+  if ((m = /^(?:there(?:'s| is) an? (colorless \w+|\w+|\w+ or [A-Z]?\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
     const amount = parseCount(`the number of ${m[1] ?? m[2]} cards in your graveyard`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
   }
@@ -1372,6 +1373,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^~ and at least ${NUM} other creatures attacked this combat$`).exec(text))) return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisCombat" }, { kind: "attackedWith", n: num(m[1]!) + 1, combat: true }] };
   // Lurker: "unless it attacked or blocked this turn": declared as an attacker or blocker this turn (CR 508.1, 509.1).
   if (/^~ didn't attack or block this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn", not: true };
+  // Inferno Hellion: "if ~ attacked or blocked this turn", the same.
+  if (/^~ attacked or blocked this turn$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisTurn" };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
   if (/^it attacked this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackedThisTurn" };
   // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it
@@ -2055,6 +2058,12 @@ export function parseExtraBlocks(text: string): Modification | null {
   // Hundred-Handed One: "an additional ninety-nine creatures".
   if (/^can block an additional ninety-nine creatures each combat$/.test(text)) return { kind: "blockAdditional", n: 99 };
   if ((m = new RegExp(`^can block (?:up to )?(?:an additional ${NUM}|${NUM} additional) creatures(?: each combat| this turn)$`).exec(text))) return { kind: "blockAdditional", n: num(m[1] ?? m[2]!) };
+  // Kemba's Legion: "can block an additional creature each combat for each Equipment attached to ~": counted as blockers
+  // are declared (rulings).
+  if ((m = /^can block an additional creature each combat for each (Equipment attached to ~)$/.exec(text))) {
+    const per = parseCount(m[1]!, null, true);
+    return per ? { kind: "blockAdditional", n: 0, per } : null;
+  }
   return null;
 }
 
@@ -2918,6 +2927,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control), "... enchanted artifact creature." (Domineer)
   if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // Fealty to the Realm: "The monarch controls enchanted creature" (CR 725, layer 2).
+  if (text === "The monarch controls enchanted creature") return { affects: { kind: "attached" }, mods: [{ kind: "control", monarch: true }], text: line };
   // Onakke Oathkeeper: "Creatures can't attack planeswalkers you control unless their controller pays {1} for each creature
   // they control that's attacking a planeswalker you control": only on the attacks on those planeswalkers (CR 508.1g-h).
   const pwTax = /^Creatures can't attack planeswalkers you control unless their controller pays \{(\d+)\} for each creature they control that's attacking a planeswalker you control$/.exec(text);

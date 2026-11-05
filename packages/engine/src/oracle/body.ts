@@ -1062,6 +1062,25 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (filter?.kind !== "object") return null;
     return { ...b!, effects: [gain, { type: "continuous", what: gain.what, mods: [{ kind: "blockableOnlyBy", filters: [{ ...filter, text: "creatures with haste" }], text: "creatures with haste" }], duration: "endOfTurn" }], text };
   }
+  // Skulking Killer: "target creature an opponent controls gets -2/-2 until end of turn if that opponent controls no other
+  // creatures": the target's controller, checked as it resolves (rulings).
+  const alone = /^(target creature an opponent controls gets [-+]\d+\/[-+]\d+ until end of turn) if that opponent controls no other creatures\.$/.exec(text.trim());
+  if (alone) {
+    const b = parseBody(`${capital(alone[1]!)}.`, opts);
+    if (!b || b.targets.length !== 1 || b.effects.length !== 1) return null;
+    return { ...b, effects: [{ type: "if", cond: { kind: "targetAlone", index: 0 }, effects: b.effects }], text };
+  }
+  // Armored Kincaller: "you may reveal a Dinosaur card from your hand. If you do or if you control another Dinosaur, you gain
+  // 3 life": either one, the Dinosaur you control checked as it resolves, whether or not ~ is still there (rulings).
+  const revealOr = /^(you may reveal an? ([A-Z][a-z]+) card from your hand\.) If you do or if you control another \2, ([^.]+\.)$/.exec(text.trim());
+  if (revealOr && CREATURE_TYPES.has(revealOr[2]!)) {
+    const b = parseBody(`${revealOr[1]} If you do, ${revealOr[3]}`, opts);
+    const other = parseStaticCondition(`you control another ${revealOr[2]}`, { affects: { kind: "self" }, mods: [], text: "" });
+    const [reveal, cond] = b?.effects.length === 2 ? b.effects : [];
+    if (!b || !other || reveal?.type !== "revealFromHand" || cond?.type !== "if" || cond.cond.kind !== "amountNow" || cond.otherwise) return null;
+    const revealed: StaticCondition = { kind: "amount", amount: cond.cond.amount, min: cond.cond.min ?? 1 };
+    return { ...b, effects: [reveal, { ...cond, cond: { kind: "state", cond: { kind: "anyOf", conds: [revealed, other] } } }], text };
+  }
   // Expand the Sphere: "If you put fewer than two lands onto the battlefield this way, proliferate a number of times equal
   // to the difference": 2 minus the lands the look put onto the battlefield, none for two (CR 701.34).
   const fewerLands = /^(Look at the top (?:six|seven|five) cards of your library\. Put up to two land cards from among them onto the battlefield tapped and the rest on the bottom of your library in a random order\.) If you put fewer than two lands onto the battlefield this way, proliferate a number of times equal to the difference\.$/.exec(text.trim());
@@ -2107,6 +2126,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // turn, where X is the toughness of the card returned this way": that card's toughness in your hand; none returned (an
   // illegal target) leaves the creature unaffected (rulings).
   text = text.replace(/^(Return target creature card from your graveyard to your hand\. Target creature gets -X\/-X until end of turn, where X is) the toughness of the card returned this way\.$/, "$1 that card's toughness.");
+  // General Tazri: "Ally creatures you control get +X/+X until end of turn, where X is the number of colors among those
+  // creatures": those Ally creatures as it resolves, X fixed then (rulings).
+  text = text.replace(/^([A-Z][a-z]+) creatures you control get \+X\/\+X until end of turn, where X is the number of colors among those creatures\.$/, "$1 creatures you control get +X/+X until end of turn, where X is the number of colors among $1 creatures you control.");
   // Lyzolda, the Blood Witch: "~ deals 2 damage to any target if the sacrificed creature was red. Draw a card if the
   // sacrificed creature was black.": each condition first, as "If ..., ...".
   text = text.replace(/(^|\. )([^.]+?) if (the sacrificed creature was (?:white|blue|black|red|green))(?=\.)/g, (_, lead: string, what: string, cond: string) => `${lead}If ${cond}, ${what.startsWith("~") ? what : what.charAt(0).toLowerCase() + what.slice(1)}`);
@@ -16029,6 +16051,9 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   // last existed (CR 700.12).
   const sacOutlaw = ctx.activated && !ctx.spell ? /^If an outlaw was sacrificed this way, (.+)$/.exec(s) : null;
   if (sacOutlaw) return { cond: { kind: "sacrificedSubtype", subtype: "Assassin", orSubtypes: ["Mercenary", "Pirate", "Rogue", "Warlock"] }, not: false, text: sacOutlaw[1]!, noTargets: true };
+  // Foundry Helix: "If the sacrificed permanent was an artifact, ...": one of its card types as it last existed.
+  const sacKind = /^If the sacrificed permanent was an? (artifact|creature|enchantment|land|planeswalker), (.+)$/.exec(s);
+  if (sacKind) return { cond: { kind: "sacrificedType", type: capital(sacKind[1]!) }, not: false, text: sacKind[2]!, noTargets: true };
   // Evereth, Viceroy of Plunder: "If the sacrificed permanent was a Treasure": an artifact subtype it had as it last existed.
   const sacArtifact = /^If the sacrificed permanent was an? (Treasure|Food|Clue|Blood|Map|Powerstone|Equipment|Vehicle), (.+)$/.exec(s);
   if (sacArtifact) return { cond: { kind: "sacrificedSubtype", subtype: sacArtifact[1]! }, not: false, text: sacArtifact[2]!, noTargets: true };

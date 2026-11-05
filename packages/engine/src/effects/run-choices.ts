@@ -712,6 +712,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
               if (c.controlledByEventPlayer) return ctx.event?.player !== undefined && controllerOf(s, o) === ctx.event.player;
               return c.controlledByTarget !== undefined ? t?.kind === "player" && controllerOf(s, o) === t.id : !c.yours || controllerOf(s, o) === ctx.controller;
             })
+          : e.cond.kind === "targetAlone"
+          ? ((t) => {
+              const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+              if (!o || o.zone !== "battlefield") return false;
+              const pid = controllerOf(s, o);
+              return !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid);
+            })(ctx.targets[(e.cond as { index: number }).index])
           : e.cond.kind === "lifeAtLeastNoted"
           ? ((o) => o?.notedLife !== undefined && player(s, ctx.controller).life >= o.notedLife)(ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined)
           : e.cond.kind === "libraryHas"
@@ -898,6 +905,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.sacrificed?.[0]?.legendary
             : e.cond.kind === "sacrificedColor"
             ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
+            : e.cond.kind === "sacrificedType"
+            ? !!ctx.sacrificed?.[0]?.types?.includes((e.cond as { type: string }).type)
             : e.cond.kind === "sacrificedSubtype"
             ? ((k, c) => !!k && (!!k.allCreatureTypes || [c.subtype, ...(c.orSubtypes ?? [])].some((t) => !!k.subtypes?.includes(t))))(ctx.sacrificed?.[0], e.cond)
             : e.cond.kind === "youDiscardedGreatestMv"

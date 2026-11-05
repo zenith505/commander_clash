@@ -1500,6 +1500,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     evalAmount(s, a, { controller: controllerOfInst(e, chars), sourceId: e.sourceId, chosen: e.sourceId ? s.objects[e.sourceId]?.chosen : undefined, view: (o) => chars.get(o.id), affected: id });
   switch (m.kind) {
     case "control":
+      // Fealty to the Realm: the monarch, with the static's own timestamp; with no monarch it does nothing (rulings).
+      if (m.monarch) {
+        if (s.monarch !== undefined && !s.players[s.monarch]?.lost) c.controller = s.monarch;
+        return;
+      }
       c.controller = controllerOfInst(e, chars);
       return;
     case "addTypes": {
@@ -1911,7 +1916,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.assignsAbsPower = true;
       return;
     case "blockAdditional":
-      c.extraBlocks += m.n;
+      c.extraBlocks += m.per !== undefined ? num(m.per) : m.n;
       return;
     case "blockAny":
       c.blockAny = true;

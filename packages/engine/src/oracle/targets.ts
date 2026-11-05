@@ -1679,6 +1679,12 @@ export function parseTargetPhrase(
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
   }
+  // Cut Short: "planeswalker that was activated this turn": one whose ability was activated this turn (rulings).
+  const activatedTurn = / that was activated this turn$/.exec(p);
+  if (activatedTurn) {
+    extra.abilityActivatedThisTurn = true;
+    p = p.slice(0, activatedTurn.index);
+  }
   // Boxing Ring: "a creature that fought this turn" (CR 701.14).
   const fought = / that fought this turn$/.exec(p);
   if (fought) {
@@ -2096,7 +2102,7 @@ export function parseTargetPhrase(
   }
   // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell"; Sokka, Bold Boomeranger:
   // "artifact or Lesson spell": either one (CR 205.3). Larval Scoutlander: "a land or Lander" (an artifact subtype).
-  const orSub = /^(creature|instant) or (spacecraft|aura)$|^(artifact|land) or (lesson|lander)$/.exec(p);
+  const orSub = /^(creature|instant) or (spacecraft|aura|lesson)$|^(artifact|land) or (lesson|lander)$/.exec(p);
   if (orSub && !extra.orSubtypes) {
     extra.orSubtypes = [capital(orSub[2] ?? orSub[4]!)];
     p = orSub[1] ?? orSub[3]!;
@@ -2210,7 +2216,7 @@ export function parseTargetPhrase(
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
         // "Non-Lesson instant and sorcery card" (Iroh, Grand Lotus): a leading "non-" word is for every alternative, as
         // "nonartifact instant or sorcery" is.
-        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga", "Bolas", "Spacecraft"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson", "non-Spacecraft"
+        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga", "Bolas", "Gideon", "Spacecraft"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson", "non-Spacecraft"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.

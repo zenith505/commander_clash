@@ -304,7 +304,7 @@ export type Count =
   /** "For each player who chose fortune": how many players chose that word (Effect eachChooses). */
   | { kind: "choseWord"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
-  | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
+  | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec; /** "The greatest power among creature cards in your graveyard" (Carrion Grub): the greatest power of those cards, 0 with none, instead of how many. */ greatestPower?: true; /** "The greatest mana value among cards in your graveyard" (Hapatra, the Desert Fang): the greatest mana value of those cards, 0 with none. */ greatestMv?: true; /** "The total mana value of instant and sorcery cards in your graveyard" (Inferno Project): their mana values added up. */ totalMv?: true; /** "For each different mana cost among nonland cards in your graveyard" (Embodiment of Agonies): each mana cost once, compared symbol by symbol (a split card's halves combined; cards with no mana cost not counted, rulings). */ differentManaCosts?: true; /** "In its controller's graveyard" (Death's Approach): the graveyard of the affected permanent's controller, instead of `who`'s. */ affectedController?: true; /** "With the same name as that spell" in a cast trigger (the Shrines): only cards with the spell's name as it was cast (StackItem.castName). */ sameNameAsCast?: true }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef; /** With "manaValue": "the total mana value of those cards" (Command the Dreadhorde): every one of them added up, as each card is where it is (X counting 0, CR 107.3). */ total?: true }
   /** Goliath Hatchery: "its total toxic value": the sum of the N of its toxic abilities (CR 702.164b), 0 if it's gone. */
@@ -813,6 +813,8 @@ export interface TargetSpec {
   damagedBySource?: true;
   /** For players: "target opponent previously dealt damage by it" (Diseased Vermin): any damage, by the source as the object it is now (GameObject.damagedPlayers). */
   damagedBySourceEver?: true;
+  /** "Planeswalker that was activated this turn" (Cut Short): one of its abilities was activated this turn, loyalty or not, mana abilities included, even if it's still on the stack or was countered (rulings). */
+  abilityActivatedThisTurn?: true;
   /** "A creature that fought this turn" (Boxing Ring): one that fought since it became this object (CR 701.14, 400.7). */
   foughtThisTurn?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
@@ -1637,7 +1639,7 @@ export interface DamageMod {
 }
 
 export type Modification =
-  | { kind: "control" } // layer 2: the effect's controller controls it
+  | { kind: "control"; /** "The monarch controls enchanted creature" (Fealty to the Realm): whoever is the monarch, nobody's while there's none (rulings). */ monarch?: true } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
   /** `chosenType`: also the creature type chosen as its source entered ("~ is the chosen type in addition to its other types"). */
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; chosenType?: true; /** The basic land type chosen as its source entered ("This land is the chosen type", Multiversal Passage). */ chosenLandType?: true }
@@ -1856,7 +1858,7 @@ export type Modification =
    * "Can block an additional creature each combat", "an additional seven creatures", "any number of creatures":
    * how many attackers it may block (CR 509.1a). Additional ones add up (rulings).
    */
-  | { kind: "blockAdditional"; n: number }
+  | { kind: "blockAdditional"; n: number; /** Kemba's Legion: one more for each of these, counted when blockers are declared. */ per?: Amount }
   | { kind: "blockAny" };
 
 /** What a static ability's effect applies to. */
@@ -2945,6 +2947,8 @@ export type Effect =
   | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true; /** "Until your next turn" (Enter the Infinite). */ untilYourNextTurn?: true }
   /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. `thisTurn`: "Lands you control enter tapped this turn" (Nahiri's Lithoforming). */
   | { type: "enterTappedUntil"; filter: TargetSpec; thisTurn?: true }
+  /** "This turn, each creature you control enters with an additional +1/+1 counter on it" (Zameck Guildmage): GameState.entersWithCountersThisTurn, a replacement effect until the cleanup step (CR 614.1c, 514.2). */
+  | { type: "entersWithCountersThisTurn"; filter: TargetSpec; counter: CounterKind; n: number }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   /**
@@ -4455,6 +4459,8 @@ export type SpellCondition =
    * The source is still on the battlefield as the same object (CR 400.7), with `yours` under your control: "Sacrifice ~.
    * When you do, ..." can be done (CR 701.21a).
    */
+  /** "If that opponent controls no other creatures" (Skulking Killer): target `index`'s controller controls no creature but it, as this resolves (rulings). */
+  | { kind: "targetAlone"; index: number }
   | { kind: "selfHere"; yours?: true; /** "When they do" after "target opponent gains control of ~" (Yes Man): that target player controls it. */ controlledByTarget?: number; /** "If they do" after "that player gains control of ~" (Kain, Traitorous Dragoon): the trigger's player controls it. */ controlledByEventPlayer?: true }
   /** Your library has at least `n` cards, so "mill n cards" mills them all ("Mill three cards. When you do, ..."). */
   | { kind: "libraryHas"; n: number }
@@ -4519,6 +4525,8 @@ export type SpellCondition =
   | { kind: "sacrificedSubtype"; subtype: string; /** "If an outlaw was sacrificed this way" (Boneyard Desecrator): any one of these too (CR 700.12). */ orSubtypes?: string[] }
   /** "If the sacrificed creature was red" (Lyzolda, the Blood Witch): one of its colors as it last existed (CR 608.2h). */
   | { kind: "sacrificedColor"; color: Color }
+  /** "If the sacrificed permanent was an artifact" (Foundry Helix): one of its card types as it last existed (CR 608.2h). */
+  | { kind: "sacrificedType"; type: string }
   /**
    * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
    * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen
@@ -6457,7 +6465,7 @@ export interface CompiledCard {
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
   /** "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types" (Displaced Dinosaurs): other permanents like this enter with these changes, for as long as they're on the battlefield (CR 614.1c, 614.12). */
   othersEnterAs?: { filter: TargetSpec; mods: Modification[]; text: string }[];
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; /** "As long as an opponent lost life this turn, ..." (Vampire Socialite): only while this holds, as the creature would enter. */ while?: StaticCondition; /** "For each opponent who lost life this turn" (Gev, Scaled Scorch): n times this, counted as the creature would enter. */ per?: Amount; /** Blue, Loyal Raptor: "For each kind of counter on ~, ... a counter of that kind": n of each kind on the source as the permanent would enter (`counter` unused). */ eachKindOnSource?: true; text: string }[];
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; /** "As long as an opponent lost life this turn, ..." (Vampire Socialite): only while this holds, as the creature would enter. */ while?: StaticCondition; /** "For each opponent who lost life this turn" (Gev, Scaled Scorch): n times this, counted as the creature would enter. */ per?: Amount; /** Blue, Loyal Raptor: "For each kind of counter on ~, ... a counter of that kind": n of each kind on the source as the permanent would enter (`counter` unused). */ eachKindOnSource?: true; /** "As long as ~ is in your graveyard, ..." (Dearly Departed): it works from its owner's graveyard only (CR 113.6b), not the battlefield. */ fromGraveyard?: true; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   /**
    * The Volvers: "If ~ was kicked with its {U} kicker, it enters ... with flying": the abilities it enters with when that
@@ -6663,7 +6671,7 @@ export interface CompiledCard {
   /** Nine Lives: "If a source would deal damage to you, prevent that damage and put an incarnation counter on ~": the counter kind, one for each source (rulings, CR 615.5, 615.12). */
   preventToYouCounter?: string;
   /** "Prevent all noncombat damage that would be dealt to you and other permanents you control." (The Wanderer, CR 615.1): see staticRules in damage.ts. */
-  preventToYou?: { combat?: "only" | "non"; others?: true; /** Purity: "You gain life equal to the damage prevented this way" (CR 615.5). */ gain?: true };
+  preventToYou?: { combat?: "only" | "non"; others?: true; /** Purity: "You gain life equal to the damage prevented this way" (CR 615.5). */ gain?: true; /** Spirit of Resistance: only while this holds. */ cond?: StaticCondition };
   /**
    * Stormwild Capridor: "If noncombat damage would be dealt to ~, prevent that damage. Put a +1/+1 counter on ~ for each 1
    * damage prevented this way" (CR 615.5): no counters for damage that can't be prevented (rulings). See staticRules in damage.ts.

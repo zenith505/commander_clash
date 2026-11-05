@@ -458,7 +458,7 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     if (nine) out.push({ id: `static-counter:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "you" }, counterOn: { id, kind: nine } });
     // The Wanderer: "Prevent all noncombat damage that would be dealt to you and other permanents you control."
     const pv = abilitiesOf(s, cover).preventToYou;
-    if (pv) out.push({ id: `static-prevent:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(pv.combat ? { combat: pv.combat } : {}), to: { players: "you", ...(pv.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" }, notObject: id } : {}) }, ...(pv.gain ? { gainLife: {} } : {}) });
+    if (pv && (!pv.cond || staticConditionNow(s, pv.cond, id, controllerOf(s, cover)))) out.push({ id: `static-prevent:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(pv.combat ? { combat: pv.combat } : {}), to: { players: "you", ...(pv.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" }, notObject: id } : {}) }, ...(pv.gain ? { gainLife: {} } : {}) });
     // Stormwild Capridor: "prevent that damage. Put a +1/+1 counter on ~ for each 1 damage prevented this way."
     const selfCounters = abilitiesOf(s, cover).preventToSelfCounters;
     if (selfCounters) out.push({ id: `static-selfcounters:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(selfCounters.combat ? { combat: selfCounters.combat } : {}), to: { object: { id, zc: cover.zoneChanges ?? 0 } }, countersOn: { counter: selfCounters.counter } });

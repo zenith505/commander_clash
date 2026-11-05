@@ -10238,6 +10238,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "76243b38-cab1-465f-aa7d-5bc617541753",
+  "name": "Herigast, Erupting Nullkite",
+  "manaCost": "{9}",
+  "cmc": 9,
+  "typeLine": "Legendary Creature — Eldrazi Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Dragon"
+  ],
+  "oracleText": "Emerge {6}{R}{R} (You may cast this spell by sacrificing a creature and paying the emerge cost reduced by that creature's mana value.)\nWhen you cast this spell, you may exile your hand. If you do, draw three cards.\nFlying\nEach creature spell you cast has emerge. The emerge cost is equal to its mana cost.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Emerge"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "454a8902-8120-4373-96ee-bbf352b04e8d",
   "name": "Hero of Bladehold",
   "manaCost": "{2}{W}{W}",
@@ -15851,6 +15885,36 @@
   "commanderLegal": "legal",
   "set": "m13",
   "releasedAt": "2012-07-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "63193ad4-bbd2-4cc3-98e2-9f6b985e8ae7",
+  "name": "Oft-Nabbed Goat",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Goat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat"
+  ],
+  "oracleText": "{1}: Draw a card. Gain control of this creature and put a -1/-1 counter on it. Only your opponents may activate this ability and only as a sorcery.\nWhen this creature dies, if it had one or more -1/-1 counters on it, its owner draws that many cards and each other player loses that much life.",
+  "power": "0",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecc",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

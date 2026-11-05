@@ -747,6 +747,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return me && !player(s, me.owner).lost ? [me.owner] : [];
     }
+    case "otherThanSelfOwner": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return me ? livingPlayers(s).filter((p) => p !== me.owner) : [];
+    }
     case "activePlayer":
       return player(s, s.activePlayer).lost ? [] : [s.activePlayer];
     case "combatDamagedBySelf": {
@@ -1087,6 +1091,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ascend":
     case "gainLife":
     case "noteLife":
+    case "noEffect":
     case "exchangeLife":
     case "exchangeLifeWithSelf":
     case "loseUnspentMana":

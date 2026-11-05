@@ -4729,8 +4729,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // at the beginning of the next end step" (Nine-Lives Familiar): an intervening if (CR 603.4) on the creature as it
       // last existed (CR 603.10a), and the counters it comes back with counted from that too.
       let ifHadCounter: string | undefined;
-      // Promising Duskmage: "if it had a +1/+1 counter on it".
-      const hadKind = /^if it had an? ([a-z]+|\+1\/\+1|-1\/-1) counter on it, (.+)$/.exec(body0);
+      // Promising Duskmage: "if it had a +1/+1 counter on it"; Oft-Nabbed Goat: "if it had one or more -1/-1 counters on
+      // it", the same.
+      const hadKind = /^if it had (?:an?|one or more) ([a-z]+|\+1\/\+1|-1\/-1) counters? on it, (.+)$/.exec(body0);
       if (hadKind) {
         if (event !== "selfDies") return "fail" as const;
         ifHadCounter = hadKind[1]!;
@@ -4915,6 +4916,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // (CR 608.2h, 707.2), with half the counters it had (rulings), even if the card has left the graveyard by then.
       const split = event === "selfDies" && ifHadCounter && ifHadCounterMin ? new RegExp(`^create a token that's a copy of it at the beginning of the next end step\\. The token enters with half that many ${ifHadCounter.replace(/[+/]/g, "\\$&")} counters on it, rounded down\\.$`).exec(text) : null;
       if (split) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, lkiCopy: { halfCounters: ifHadCounter as CounterKind } }], text: "create a token that's a copy of it with half that many counters on it" }], text };
+      // Oft-Nabbed Goat: "if it had one or more -1/-1 counters on it, its owner draws that many cards and each other player
+      // loses that much life": the counters of that kind it had as it last existed (CR 603.10a), "each other player" every
+      // player but that owner (whoever controlled it, rulings).
+      const ownerDraws = event === "selfDies" && ifHadCounter && !ifHadCounterMin && /^its owner draws that many cards and each other player loses that much life\.$/.test(text);
+      if (ownerDraws) {
+        const n = { count: { kind: "counters" as const, counter: ifHadCounter as CounterKind, of: { ref: "self" as const } } };
+        body = { targets: [], effects: [{ type: "draw", who: { ref: "selfOwner" }, n }, { type: "loseLife", who: { ref: "otherThanSelfOwner" }, n }], text };
+      }
       if (body && attackingPlayer) body = { ...(JSON.parse(JSON.stringify(body).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body), text: body.text.replace(/\bthat player\b/g, "attacking player") };
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {

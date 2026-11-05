@@ -74,6 +74,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
     for (const a of again) {
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       if (a.enduringStory && !s.players[controller]?.enduringStory) continue;
+      if (a.whileControl && s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === controller && objectMatches(s, a.whileControl!.filter, obj(s, b), controller, false)).length < a.whileControl.n) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
       if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;

@@ -1445,6 +1445,8 @@ export type PlayerRef =
   | { ref: "neighbor"; side: "left" | "right" }
   /** "Its owner" in an ability of ~ about ~ itself (Yes Man): whose ~ is (CR 108.3). */
   | { ref: "selfOwner" }
+  /** "Its owner draws that many cards and each other player loses that much life" (Oft-Nabbed Goat): every player but ~'s owner. */
+  | { ref: "otherThanSelfOwner" }
   /** "The player whose turn it is" (Obeka, Brute Chronologist): the active player as it resolves. */
   | { ref: "activePlayer" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
@@ -3459,6 +3461,8 @@ export type Effect =
   | { type: "randomCounterKind"; what: ObjRef; kinds: CounterKind[] }
   /** Sigarda's Splendor: "Then note your life total": noted for the source (GameObject.notedLife), its controller's life now. */
   | { type: "noteLife" }
+  /** An instruction that does nothing in this game, logged (Fractured Powerstone's "Roll the planar die" outside Planechase, rulings). */
+  | { type: "noEffect"; text: string }
   /** Count `n` now and keep it for the rest of this resolution (Count notedAmount): one X for several instructions. */
   | { type: "noteAmount"; n: Amount }
   | { type: "mill"; who: PlayerRef; n: Amount; /** Grindstone: "If two cards that share a color were milled this way, repeat this process" (each player's own repeats). */ repeatSharedColor?: true }
@@ -6235,7 +6239,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
 /** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | /** Freerunning a permanent gives a spell (Ezio Auditore da Firenze: "Assassin spells you cast have freerunning {B}{B}"): a cost of its own beside the spell's own freerunning (CR 702.173a). */ "grantedFreerunning" | /** Web-slinging a permanent gives a spell (Amazing Spider-Man: "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}"), CR 702.188a, beside any of the spell's own. */ "grantedWebSlinging" | /** Blitz a permanent gives a spell (Henzie "Toolbox" Torre: "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost"), CR 702.152a, beside any blitz of the spell's own. */ "grantedBlitz" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl" | /** Kentaro, the Smiling Cat: {X} where X is the spell's mana value (CompiledCard.payZero `genericMv`). */ "genericMv" | /** Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast" (CompiledCard.payZero `energy`). */ "energyForSpell";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | /** Freerunning a permanent gives a spell (Ezio Auditore da Firenze: "Assassin spells you cast have freerunning {B}{B}"): a cost of its own beside the spell's own freerunning (CR 702.173a). */ "grantedFreerunning" | /** Web-slinging a permanent gives a spell (Amazing Spider-Man: "Each legendary spell you cast that's one or more colors has web-slinging {G}{W}{U}"), CR 702.188a, beside any of the spell's own. */ "grantedWebSlinging" | /** Blitz a permanent gives a spell (Henzie "Toolbox" Torre: "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost"), CR 702.152a, beside any blitz of the spell's own. */ "grantedBlitz" | /** Emerge a permanent gives a spell (Herigast, Erupting Nullkite: "Each creature spell you cast has emerge. The emerge cost is equal to its mana cost"), CR 702.119a, beside any emerge of the spell's own (rulings: either may be paid). */ "grantedEmerge" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl" | /** Kentaro, the Smiling Cat: {X} where X is the spell's mana value (CompiledCard.payZero `genericMv`). */ "genericMv" | /** Nissa, Worldsoul Speaker: "You may pay eight {E} rather than pay the mana cost for permanent spells you cast" (CompiledCard.payZero `energy`). */ "energyForSpell";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -7177,12 +7181,14 @@ export interface CompiledCard {
   spellsHaveWebSlinging?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Each creature spell you cast with mana value 4 or greater has blitz. The blitz cost is equal to its mana cost." (Henzie "Toolbox" Torre), CR 702.152a: blitz for those spells, its cost their mana cost (AltCostKind "grantedBlitz"). */
   spellsHaveBlitz?: { filter: TargetSpec; text: string }[];
+  /** "Each creature spell you cast has emerge. The emerge cost is equal to its mana cost." (Herigast, Erupting Nullkite), CR 702.119a: emerge for those spells, its cost their mana cost (AltCostKind "grantedEmerge"). */
+  spellsHaveEmerge?: { filter: TargetSpec; text: string }[];
   /** Henzie "Toolbox" Torre: "Blitz costs you pay cost {1} less for each time you've cast your commander from the command zone this game" (CR 601.2f): this much generic mana per such cast, off each blitz cost its controller pays. */
   blitzLessPerCommanderCast?: number;
   /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
   handWarp?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Each instant and sorcery card in your hand has miracle {2}" (Lorehold, the Historian): miracle for those cards in its controller's hand (CR 702.94a), so drawing one as the first card drawn this turn triggers it. */
-  handMiracle?: { filter: TargetSpec; mana: string; text: string }[];
+  handMiracle?: { filter: TargetSpec; mana: string; /** Aminatou, Veil Piercer: "Its miracle cost is equal to its mana cost reduced by {4}": the card's mana cost less this much generic mana (`mana` unused). */ reduce?: number; text: string }[];
   /** "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}." (Dream Devourer): foretell for those cards in its controller's hand (CR 702.143a), a foretell cost of their mana cost less this much generic mana (rulings). */
   handForetell?: { reduce: number; text: string }[];
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
@@ -7263,7 +7269,7 @@ export interface CompiledCard {
    * Flesh; CR 602.2b applies 601.2f): mana abilities count as that first ability too (rulings). See TurnLog.artifactAbility.
    */
   firstArtifactAbilityLess?: number;
-  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "~'s equip abilities" (Firion's token copies): only this Equipment's own. */ self?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** "If it targets a colorless creature" (Ghostfire Blade): its target has no color as the cost is set. */ targetColorless?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  equipLess?: { n: number; targetSelf?: true; /** Bladegraft Aspirant: "Activated abilities of Equipment you control that target ~": any activated ability of an Equipment its controller controls, not only equip. */ anyAbility?: true; otherEquipment?: true; /** "~'s equip abilities" (Firion's token copies): only this Equipment's own. */ self?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** "If it targets a colorless creature" (Ghostfire Blade): its target has no color as the cost is set. */ targetColorless?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
   auraLessEnchanted?: number;
   /** "You can't choose an untapped permanent as this spell's target as you cast it." (Dream Leash): its target must be tapped as it's cast only (castTimeTargets). */
@@ -7292,7 +7298,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Krang, the All-Powerful: "If a player drawing a card causes ...". */ "draws" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Krang, the All-Powerful: "If a player drawing a card causes ...". */ "draws" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true; /** Sanctum of All: "while you control six or more Shrines": at least `n` permanents matching `filter` its controller controls as the ability triggers. */ whileControl?: { filter: TargetSpec; n: number } }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

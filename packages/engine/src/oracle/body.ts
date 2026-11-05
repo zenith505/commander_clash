@@ -11099,6 +11099,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Mutalith Vortex Beast: "Flip a coin for each opponent you have. For each flip you win, draw a card. For each flip you
+    // lose, ~ deals 3 damage to that player.": one flip of yours for each opponent (CR 705.2, you call them); then you draw
+    // for the flips won and the source deals 3 damage to each opponent whose flip you lost, at once (rulings: 3 to each).
+    const perOppFlip = /^[Ff]lip a coin for each opponent you have$/.test(s) ? /^For each flip you lose, ~ deals (\d+) damage to that player\.?$/.exec(sentences[si + 2] ?? "") : null;
+    if (perOppFlip && /^For each flip you win, draw a card\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "flipEachOpponent" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "flipsWon" } } }, { type: "damage", to: { ref: "flippedTails" }, amount: Number(perOppFlip[1]) });
+      si += 2;
+      continue;
+    }
     // Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails.
     // Repeat this process until both players' coins come up heads on the same flip." (Effect flipClash; CR 705).
     if (/^You and target opponent each flip a coin$/.test(s) && /^~ deals (\d+) damage to each player whose coin comes up tails\.?$/.test(sentences[si + 1] ?? "") && /^Repeat this process until both players' coins come up heads on the same flip\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length && !ctx.targets.length) {

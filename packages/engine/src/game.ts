@@ -727,6 +727,8 @@ export function moveObject(
     cost?: true;
     /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
     destroyedBy?: PlayerId;
+    /** It was destroyed (CR 701.8a), by anything (a state-based action too, CR 704.5g-h), for Jaws, Relentless Predator. */
+    destroyed?: true;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
     exploitedBy?: { id: ObjectId; zc: number };
     /** Exiled as a material while its controller activates a craft ability (CR 702.167a): Market Gnome. */
@@ -1288,7 +1290,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.destroyed ? { destroyed: true as const } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -2312,7 +2314,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   log(s, message);
   const noncreature = !objIsType(s, o, "Creature");
   const controller = controllerOf(s, o);
-  moveObject(s, o.id, "graveyard", by !== undefined ? { destroyedBy: by } : {});
+  moveObject(s, o.id, "graveyard", { destroyed: true, ...(by !== undefined ? { destroyedBy: by } : {}) });
   // Destroyed even when a replacement (Rest in Peace, "exile it instead") sends it elsewhere: that replaces only where it
   // goes (CR 614.6), not the destruction (Fumigate's and Bane of Progress' rulings). Only regeneration, a shield counter
   // or umbra armor replace the destruction itself, and they returned above.
@@ -6620,9 +6622,10 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const b of abilitiesOf(s, o).cantBeCast ?? []) {
       const { manaValue: range, ...rest } = b.filter;
-      if (!printedMatches(rest, d) || (b.hasX && !parseManaCost(d.manaCost).hasX)) continue;
+      // Archon of Valor's Reach: "spells of the chosen type", the card type chosen as it entered (none chosen: none).
+      if (!printedMatches(bindChosen(rest, o.chosen), d) || (b.hasX && !parseManaCost(d.manaCost).hasX)) continue;
       if (range && (value === undefined || value < (range.min ?? 0) || value > (range.max ?? Infinity))) continue;
-      return `${characteristics(s, o).name}: ${b.filter.text}s can't be cast`;
+      return `${characteristics(s, o).name}: ${b.filter.chosen === "cardType" ? `${(o.chosen?.cardType ?? "").toLowerCase()} spell` : b.filter.text}s can't be cast`;
     }
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;

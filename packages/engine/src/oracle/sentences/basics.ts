@@ -869,6 +869,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);
+  // Angrath, the Flame-Chained: "Sacrifice it at the beginning of the next end step if it has mana value 3 or less": the
+  // delayed trigger about it, which checks its mana value only as it resolves (rulings; CR 603.7c).
+  if ((m = /^(Sacrifice it at the beginning of the next end step) if it has mana value (\d+) or less$/.exec(s))) {
+    const d = parseSentence(m[1]!, ctx);
+    const one = d?.length === 1 && d[0]!.type === "delayed" && d[0]!.of?.ref === "target" && d[0]!.effects.length === 1 && d[0]!.effects[0]!.type === "sacrifice" ? d[0]! : null;
+    if (!one) return null;
+    return [{ ...one, effects: [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", manaValue: { max: Number(m[2]) }, text: `permanent with mana value ${m[2]} or less` } }, effects: one.effects }], text: `${one.text} if it has mana value ${m[2]} or less` }];
+  }
   if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of (?:the|your) next end step|the beginning of your next upkeep)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
     const before = ctx.targets.length;
     // "Sacrifice it", "its controller sacrifices it" (Celestial Sword): only a permanent its controller controls then

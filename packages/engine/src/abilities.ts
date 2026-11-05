@@ -1764,7 +1764,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only damage from sources of the color chosen as the static ability's source entered (none chosen: none prevented). */ fromChosenColor?: true; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only damage from sources of the color chosen as the static ability's source entered (none chosen: none prevented). */ fromChosenColor?: true; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** With plusOnes, "put that many +1/+1 counters on ~" (Anti-Venom): as many as the damage, even if it can't be prevented (CR 615.12). */ thatMany?: true; /** With plusOnes, "prevent that damage and put a +1/+1 counter on ~" (Ironscale Hydra): one counter for each source's damage, even if it can't be prevented (rulings, CR 615.12). */ oneEach?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -3655,6 +3655,12 @@ export type Effect =
   | { type: "flipClash"; with: PlayerRef; damage: number }
   /** Goblin Assassin: "Each player flips a coin": one coin each, in turn order, that no one wins or loses (rulings, CR 705.2); who got tails is kept for { ref: "flippedTails" }. */
   | { type: "eachPlayerFlips" }
+  /**
+   * Mutalith Vortex Beast: "Flip a coin for each opponent you have": its controller flips and calls one coin for each
+   * opponent in the game (CR 705.2), wins counted (Count "flipsWon"); the opponents whose flip was lost are kept as
+   * { ref: "flippedTails" }.
+   */
+  | { type: "flipEachOpponent" }
   | { type: "flipCoin"; /** "That player flips a coin" (Planar Chaos): the flipper, who wins or loses it (default: you). */ who?: PlayerRef; untilLose?: true; /** With `untilLose`: "or choose to stop flipping" (Fiery Gambit): asked after each flip won whether to flip again (rulings); stopping, the last flip was won. `enough`: wins past which more flips do nothing more (for bots). */ mayStop?: { enough: number }; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
@@ -4839,6 +4845,8 @@ export type TriggerEvent =
   | "permanentDies"
   /** "Whenever a spell or ability an opponent controls destroys a noncreature permanent you control" (Karmic Justice): see TriggeredAbility.destroyed. */
   | "permanentDestroyed"
+  /** "Whenever a noncreature artifact is sacrificed or destroyed" (Jaws, Relentless Predator): see TriggeredAbility.sacrificedOrDestroyed. */
+  | "permanentSacrificedOrDestroyed"
   /** "Whenever ~ becomes unattached from a permanent" (it leaving too, CR 603.10a): the subject is that permanent. */
   | "selfBecomesUnattached"
   /** "Whenever ~ becomes attached to a creature" (Enormous Energy Blade): equipped or enchanted onto it, or entering attached to it; the subject is that creature. */
@@ -5087,6 +5095,8 @@ export type TriggerEvent =
    * (CR 701.14) one of yours is in, and once when blockers are declared if one or more of yours became blocked (rulings).
    */
   | "yourCreaturesFightOrBlocked"
+  /** "Whenever a creature you control fights" (Foe-Razer Regent): once for each creature of yours in a fight (CR 701.14), that creature the subject. */
+  | "yourCreatureFights"
   /** "Whenever one or more creatures you control become blocked" (Hezrou): once when blockers are declared if one or more of yours became blocked (CR 509.3c). */
   | "yourCreaturesBecomeBlocked"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
@@ -5443,6 +5453,12 @@ export interface TriggeredAbility {
    * Not a sacrifice, nor lethal damage destroyed by a state-based action (rulings on Karmic Justice).
    */
   destroyed?: { filter: TargetSpec; by: "opponent" };
+  /**
+   * For "permanentSacrificedOrDestroyed" (Jaws, Relentless Predator): anyone's permanent like this sacrificed (CR 701.21a)
+   * or destroyed for any reason (CR 701.8a), as it last existed on the battlefield (CR 603.10a); the event player is its
+   * controller.
+   */
+  sacrificedOrDestroyed?: { filter: TargetSpec };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher); "time" (Deadly Grub). */
   ifNoCounter?: string;
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */

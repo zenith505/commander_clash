@@ -42,6 +42,7 @@ import {
   type CostChoices,
   type ExtraTurn,
   type FaceDownKind,
+  type BlockQualities,
   type GameObject,
   type GameState,
   type LastKnown,
@@ -8624,9 +8625,11 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, p.id, t.sourceId, t.x ?? 0));
+  // Another player choosing the target for the ability's controller (TargetSpec.chosenBy): legal for the controller.
+  const controller = pend.controller ?? p.id;
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, controller, t.sourceId, t.x ?? 0));
   if (typeof fit === "string") throw new RulesError(fit);
-  const problem = targetProblem(s, fit.body.targets, fit.targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+  const problem = targetProblem(s, fit.body.targets, fit.targets, controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
   s.pending = null;
   pushTrigger(s, t, targets);
@@ -8902,6 +8905,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "targetChooser") {
+    // "Target ... of an opponent's choice": that opponent chooses it next, as the trigger is put on the stack.
+    const t = s.triggerQueue[0];
+    if (!t) throw new RulesError("no ability is waiting for its target");
+    t.targetChooser = Number(choice);
+    log(s, `${player(s, Number(choice)).name} chooses the target of ${pend.source}'s ability (picked by ${p.name}).`);
+    return;
+  }
   if (pend.what === "secretNumber") {
     // Kept secret until all are revealed (Wheel of Misfortune): the log says only that it was chosen.
     const st = s.resolving?.scratch?.numbers;
@@ -10831,6 +10842,17 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   blocksDeclared(s, chooser, p, blocks, pend.remaining);
 }
 
+/** The two creatures' creature types and supertypes as a block is declared, kept only when someone could ask (a Zombie or a legendary creature in it). */
+function blockQualities(s: GameState, bl: GameObject, at: GameObject): { bq?: BlockQualities; aq?: BlockQualities } {
+  const q = (o: GameObject): BlockQualities => {
+    const c = characteristics(s, o);
+    return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}) };
+  };
+  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary");
+  const [b, a] = [q(bl), q(at)];
+  return { ...(notable(b) ? { bq: b } : {}), ...(notable(a) ? { aq: a } : {}) };
+}
+
 /** The blocks are declared (and paid for): each blocks, then the next defending player declares (CR 509.1). */
 function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[], remaining: PlayerId[]) {
   for (const b of blocks) {
@@ -10840,7 +10862,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
     bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
-    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0 });
+    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, at) });
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -10855,7 +10877,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
       m.becameBlockedTurn = s.turn;
-      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0 });
+      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m) });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }

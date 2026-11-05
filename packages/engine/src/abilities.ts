@@ -680,6 +680,15 @@ export interface TargetSpec {
   anyOf?: TargetSpec[];
   /** "Target creature an opponent controls chosen at random" (Scab-Clan Giant): a triggered ability's one target, chosen at random among the legal ones as it's put on the stack (rulings). */
   random?: true;
+  /**
+   * "Target creature that player controls of their choice" (The Abyss), "of defending player's choice" (Erithizon), "of an
+   * opponent's choice" (Mausoleum Turnkey): a triggered ability's one target, chosen by another player as it's put on the
+   * stack, though the ability's controller still controls it and targets it (rulings: hexproof is checked against the
+   * controller). "eventPlayer" is the trigger's player (whose upkeep it is, the player ~ attacks), "subjectController"
+   * the controller of the object the trigger is about (Death Match's entering creature), "opponent" an opponent the
+   * ability's controller chooses first (PendingTrigger.targetChooser).
+   */
+  chosenBy?: "eventPlayer" | "subjectController" | "opponent";
   keywords?: string[]; // "creature with flying"
   /** "Creatures you control with toxic" (Skrelv's Hive): any toxic ability, whatever its number (CR 702.164). */
   toxic?: true;
@@ -738,6 +747,8 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
+  /** "That blocked or was blocked by a Zombie this turn" (Time to Reflect), "by a legendary creature" (You Cannot Pass!): a block declared this turn with a creature that had this creature type or supertype as the block was declared (TurnLog.blocks `aq`/`bq`, rulings). */
+  blockedWith?: { subtype?: string; supertype?: string };
   combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked you this turn" (Jabari's Influence): declared as an attacker of you this turn (not your planeswalker). */ "attackedYouThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked or blocked this turn" (Gideon's Triumph): either one declared this turn. */ "attackedOrBlockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
@@ -2707,6 +2718,8 @@ export type Effect =
   | { type: "commandersOntoBattlefield" }
   | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; /** "With an additional -1/-1 counter on it" (Pyrrhic Revival). */ counters?: Record<string, number>; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** With `toHand`: "Mill six cards, then put all instant and sorcery cards from among them into your hand" (Gleam of Death): only the cards the mill just before put there, still those cards (CR 400.7). */ milled?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
+  /** "Target unblocked attacking creature becomes blocked" (Dazzling Beauty), "Attacking creatures become blocked" (Fog Patch): blocked by no creature (CR 509.1h), its whole band too (CR 702.22i). */
+  | { type: "becomeBlocked"; what: ObjRef }
   | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
   /**
    * "Reselect which player or permanent target attacking creature is attacking" (Misleading Signpost): its controller's

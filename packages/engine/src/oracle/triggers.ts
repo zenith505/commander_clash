@@ -2807,6 +2807,32 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", /** Old One Eye: "At the beginning of your first main phase" (CR 505.1a). */ "yourFirstMain", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut", "youSacrifice", "opponentGainsLife", /** Deathless Knight. */ "youGainLife"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
+  // "Destroy target nonartifact creature that player controls of their choice" (The Abyss), "put a +1/+1 counter on
+  // target creature of defending player's choice" (Erithizon), "return target creature card of an opponent's choice from
+  // your graveyard" (Mausoleum Turnkey): the ability is read without the chooser, then its one target is marked as
+  // chosen by that player (TargetSpec.chosenBy; rulings: the controller still controls the ability and targets).
+  const ofChoice = /\btarget ((?:(?:nonartifact|nonland|nontoken|tapped|untapped|attacking|blocking) )?creature(?: card)?(?: that player controls)?) of (their|defending player's|an opponent's) choice\b/.exec(raw);
+  if (ofChoice && /^(?:When|Whenever|At)\b/.test(raw)) {
+    const before = raw.slice(0, ofChoice.index);
+    const by: TargetSpec["chosenBy"] | undefined =
+      ofChoice[2] === "an opponent's"
+        ? "opponent"
+        : ofChoice[2] === "defending player's"
+          ? "eventPlayer"
+          : /\bthat creature's controller may (?:have )?$/.test(before)
+            ? "subjectController"
+            : /^At the beginning of each player's upkeep, /.test(raw)
+              ? "eventPlayer"
+              : undefined;
+    const t = by && parseTrigger(raw.slice(0, ofChoice.index) + `target ${ofChoice[1]}` + raw.slice(ofChoice.index + ofChoice[0].length));
+    if (!t || t === "fail" || t.body.modal || t.body.targets.length !== 1 || t.body.targets[0]!.random) return "fail";
+    // "Defending player" is the trigger's player only in an attack trigger (the player ~ attacks, CR 506.2).
+    if (ofChoice[2] === "defending player's" && t.event !== "selfAttacks") return "fail";
+    // The entering creature's controller (Death Match): a trigger about another object.
+    if (by === "subjectController" && t.event !== "permanentEnters") return "fail";
+    const tgt = t.body.targets[0]!;
+    return { ...t, body: { ...t.body, targets: [{ ...tgt, chosenBy: by, text: `${tgt.text} of ${ofChoice[2]} choice` }], text: t.body.text.replace(`target ${ofChoice[1]}`, ofChoice[0]) } };
+  }
   // Liability: "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1
   // life.": a card goes to its owner's graveyard (CR 400.3), so that player is its owner.
   if (raw === "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1 life.") raw = "Whenever a nontoken permanent is put into a graveyard from the battlefield, its owner loses 1 life.";

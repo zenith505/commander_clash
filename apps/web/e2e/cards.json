@@ -14044,6 +14044,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d4a61685-7149-4d14-bc17-85b060945687",
+  "name": "Mausoleum Turnkey",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Ogre Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ogre",
+   "Rogue"
+  ],
+  "oracleText": "When this creature enters, return target creature card of an opponent's choice from your graveyard to your hand.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1eb489d-104c-4801-b6d2-3f1a7ee73a75",
   "name": "Mechtitan Core",
   "manaCost": "{2}",
@@ -23185,6 +23216,34 @@
   "commanderLegal": "legal",
   "set": "rix",
   "releasedAt": "2018-01-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a02a7816-c967-4503-bb08-f8db44915250",
+  "name": "The Abyss",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "World Enchantment",
+  "supertypes": [
+   "World"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, destroy target nonartifact creature that player controls of their choice. It can't be regenerated.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

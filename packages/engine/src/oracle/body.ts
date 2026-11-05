@@ -5828,6 +5828,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Ley Line: "that player may put a +1/+1 counter on target creature (of their choice)"; Death Match: "that creature's
+    // controller may have target creature (of their choice) get -3/-3 until end of turn": the target chosen as it's put on
+    // the stack (TargetSpec.chosenBy), then that player's choice to do it as it resolves (CR 101.4).
+    const theyMayTarget = !ctx.spell && !ctx.targets.length ? /^(?:[Tt]hat player may (put (?:an?|one|two|three) \+1\/\+1 counters? on target creature)|(?:[Tt]hat creature's|[Ii]ts) controller may have target creature (get [+-]\d+\/[+-]\d+ until end of turn))$/.exec(s) : null;
+    if (theyMayTarget && (theyMayTarget[1] ? ctx.eventPlayer : ctx.subject || ctx.subjectIt)) {
+      const inner = parseOne(theyMayTarget[1] ? capital(theyMayTarget[1]) : `Target creature ${theyMayTarget[2]!.replace(/^get/, "gets")}`, ctx);
+      if (!inner || inner.some((e) => pauses(e)) || ctx.targets.length !== 1) return null;
+      effects.push({ type: "eachMay", who: theyMayTarget[1] ? { ref: "eventPlayer" } : { ref: "subjectController" }, effects: inner, text: theyMayTarget[1] ?? `have target creature ${theyMayTarget[2]!}` });
+      continue;
+    }
     // Web of Inertia: "that player may exile a card from their graveyard. If the player doesn't, ...": their choice (none
     // to make with an empty graveyard, CR 101.3), then what not doing it means.
     const webMay = ctx.eventPlayer && !ctx.spell && /^[Tt]hat player may exile a card from their graveyard$/.test(s) ? /^If (?:the player|that player|they) (?:doesn't|don't), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;

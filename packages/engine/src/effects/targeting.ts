@@ -8,7 +8,7 @@ import { characteristics, controllerOf, everyCreatureType, mostCommonColors, sta
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, LAND_TYPE_LIST, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
-import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
+import type { BlockQualities, CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
@@ -181,6 +181,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.abilityActivatedThisTurn && !o.activatedThisTurn?.length) return false;
   if (spec.combat === "blockedThisTurn" && o.blockedTurn !== s.turn) return false;
   if (spec.combat === "attackedOrBlockedThisTurn" && o.attacked?.turn !== s.turn && o.blockedTurn !== s.turn) return false;
+  if (spec.blockedWith && !blockedWithThisTurn(s, o, spec.blockedWith)) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
@@ -1384,4 +1385,14 @@ function hasManaAbility(s: GameState, o: GameObject, c: Characteristics): boolea
   const own = c.hasPrintedAbilities ? compileCard(defOf(s, o)) : undefined;
   if (own && (own.mana.length || own.manaTriggers?.length)) return true;
   return c.grantedAbilities.some((t) => compileGranted(t).mana.length || compileGranted(t).manaTriggers?.length);
+}
+
+/**
+ * Whether `o` (as this object) blocked or was blocked this turn by a creature that, as the block was declared, had
+ * this creature type or supertype (TargetSpec.blockedWith; rulings on Time to Reflect: it may since have changed or left).
+ */
+function blockedWithThisTurn(s: GameState, o: GameObject, w: { subtype?: string; supertype?: string }): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  const fits = (q?: BlockQualities) => !!q && (w.subtype ? q.sub === "all" || q.sub.includes(w.subtype) : true) && (w.supertype ? !!q.sup?.includes(w.supertype) : true);
+  return (s.turnLog?.blocks ?? []).some((b) => (b.blocker === key && fits(b.aq)) || (b.attacker === key && fits(b.bq)));
 }

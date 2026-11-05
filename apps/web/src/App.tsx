@@ -586,8 +586,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setDiscards([]);
     setTapPick(null);
     if (pending?.kind === "chooseTargets") {
-      const specs = offerTargets(s!, pending.specs, HUMAN, pending.x ?? 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
-      setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
+      // Choosing the target of another player's ability ("target creature of your choice", TargetSpec.chosenBy): legal for them.
+      const specs = offerTargets(s!, pending.specs, pending.controller ?? HUMAN, pending.x ?? 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
+      const forWhom = pending.controller !== undefined && pending.controller !== HUMAN ? `You choose the target for ${s!.players[pending.controller]!.name}'s ability: ` : "";
+      setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: `${forWhom}${pending.description}` });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
     else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}${pending.allOrNone ? " (change all of them, or keep them)" : ""}` });
@@ -644,7 +646,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   // "Another target creature" on a permanent's ability can't be that permanent.
   // A spell or ability getting new targets: legal for it, as its controller (CR 115.7d).
   const retargeted = targeting?.mode === "retarget" && pending?.kind === "newTargets" ? s?.stack.find((x) => x.id === pending.stackId) : undefined;
-  const targetController = retargeted?.controller ?? HUMAN;
+  const targetController = retargeted?.controller ?? (targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? (pending.controller ?? HUMAN) : HUMAN);
   const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : retargeted?.sourceId;
   // The spell's own colors, or the ability's source's, for protection and "can't be the target of black spells" (CR 115.4).
   const castObj = targeting?.mode === "cast" && s ? s.objects[targeting.draft.objectId] : undefined;
@@ -1454,7 +1456,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <div className="targeting">
               <span>
                 {/* Blatant Thievery: one required target for each opponent, named. */}
-                <strong>{targeting.label}</strong>: choose {nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : nextSpec?.text}{" "}
+                <strong>{targeting.label}</strong>: choose {(nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player controls\b/, nextSpec.controlledBy === HUMAN ? "you control" : `${s.players[nextSpec.controlledBy]!.name} controls`).replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : (nextSpec?.text ?? "")).replace(/ of (?:their|defending player's|an opponent's) choice$/, "")}{" "}
                 {inRun
                   ? `(optional, one for each ${targeting.specs.slice(targeting.chosen.length, runEnd).some((sp) => sp.controlledBy === HUMAN) ? "player" : "opponent"}: ${targeting.specs
                       .slice(targeting.chosen.length, runEnd)
@@ -5010,7 +5012,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

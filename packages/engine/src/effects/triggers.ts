@@ -149,6 +149,8 @@ export type TriggerSourceEvent =
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
+  /** Attacking creatures an effect made blocked, by no creature (Effect becomeBlocked, CR 509.1h). */
+  | { type: "becameBlocked"; ids: ObjectId[] }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -1063,6 +1065,28 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           // it at end of combat" (CR 701.54c).
           if (bl && bearer) ringTrigger(s, you, 1, bl);
         }
+      }
+    }
+  } else if (ev.type === "becameBlocked") {
+    // An effect made these unblocked attackers blocked (Dazzling Beauty, Fog Patch): "whenever ~ becomes blocked"
+    // triggers, "becomes blocked by a creature" doesn't (CR 509.3c-d), nor one counting or naming its blockers.
+    const watchers = s.battlefield.map((id) => obj(s, id));
+    const plain = (t: TriggeredAbility) => !t.blockFilter && !t.blockedByAtLeast;
+    const blockedNow = ev.ids.map((id) => s.objects[id]).filter((o): o is GameObject => !!o && o.zone === "battlefield" && o.attacking !== undefined);
+    for (const o of blockedNow) {
+      const you = controllerOf(s, o);
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBecomesBlocked" && plain(t) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, o, controllerOf(s, w), false)), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
+      add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && plain(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+      add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf" && plain(t), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
+      addHosted(o, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && plain(t), undefined, o, { player: o.attacking });
+      for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
+    }
+    // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked.
+    for (const w of watchers) {
+      const you = controllerOf(s, w);
+      if (blockedNow.some((o) => controllerOf(s, o) === you)) {
+        add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+        add(w, you, (e) => e === "yourCreaturesBecomeBlocked");
       }
     }
   } else if (ev.type === "fought") {
@@ -2702,7 +2726,25 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         added = true;
         continue;
       }
-      s.pending = { kind: "chooseTargets", player: t.controller, sourceId: t.sourceId, specs: body.targets, description: describeAbility(def, body.text), ...(t.x ? { x: t.x } : {}) };
+      // "Target creature of their choice" (TargetSpec.chosenBy): another player chooses it for the controller, who still
+      // targets (rulings on The Abyss, Erithizon). "Of an opponent's choice": the controller chooses that opponent first
+      // (rulings on Evangelize, Cuombajj Witches).
+      const by = body.targets.length === 1 ? body.targets[0]!.chosenBy : undefined;
+      let chooser = t.controller;
+      if (by === "opponent") {
+        const opps = opponents(s, t.controller);
+        if (t.targetChooser === undefined && opps.length > 1) {
+          s.pending = { kind: "chooseOption", player: t.controller, source: def.name, what: "targetChooser", options: opps.map(String), labels: opps.map((q) => player(s, q).name), prompt: `which opponent chooses ${body.targets[0]!.text.replace(/ of an opponent's choice$/, "")}?` };
+          return added;
+        }
+        chooser = t.targetChooser ?? opps[0] ?? t.controller;
+      } else if (by === "eventPlayer") chooser = t.event?.player ?? t.controller;
+      else if (by === "subjectController") {
+        const subj = t.subject && s.objects[t.subject.id];
+        chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);
+      }
+      if (player(s, chooser).lost) chooser = t.controller;
+      s.pending = { kind: "chooseTargets", player: chooser, sourceId: t.sourceId, specs: body.targets, description: describeAbility(def, body.text), ...(t.x ? { x: t.x } : {}), ...(chooser !== t.controller ? { controller: t.controller } : {}) };
       return added;
     }
     pushTrigger(s, t, []);

@@ -703,6 +703,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Erratic Explosion: they stay in the library for now; "that card" is the nonland card (none if every card was a
         // land: its mana value counts as 0, rulings).
         if (e.then === "keep") {
+          // Undying Flames: exiled, not revealed, one at a time (rulings on Laelia); "that card" is the one in exile.
+          if (!e.reveal)
+            for (const id of seen) {
+              moveObject(s, id, "exile");
+              closeZoneBatch(s);
+            }
           s.resolving!.revealed = hit ? { id: hit, zc: obj(s, hit).zoneChanges ?? 0 } : undefined;
           s.resolving!.revealedUntil = seen;
           return;

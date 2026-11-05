@@ -58,6 +58,7 @@ export function layerOf(m: Modification): Layer {
     case "addAbility":
     case "unblockedDamage":
     case "loseActivated":
+    case "loseStatic":
     case "enchantCreature":
       return "6";
     case "definePT":
@@ -196,6 +197,8 @@ export interface Characteristics {
   cantHave?: string[];
   /** "~ loses this ability" (a Licid): the indexes of its printed activated abilities it doesn't have (abilitiesOf). */
   lostActivated?: number[];
+  /** Glittering Lion: "~ loses "Prevent all damage ..."": the texts of its printed static abilities it doesn't have. */
+  lostStatics?: string[];
   /** "Becomes an Aura enchantment with enchant creature" (a Licid): enchant creature from an effect (enchantOf). */
   enchantCreature?: true;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
@@ -481,6 +484,8 @@ interface Inst {
   /** A static ability an effect gave its source, not one of its card's (grantedStatics): the quoted text it came from. */
   granted?: true;
   grantedText?: string;
+  /** A permanent's printed static ability: its text, which a "loseStatic" effect can take away (Glittering Lion). */
+  staticText?: string;
   /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
   emblem?: true;
   /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
@@ -583,6 +588,7 @@ function gather(s: GameState): Inst[] {
         mods: st.mods,
         affects: st.affects,
         condition: st.condition,
+        staticText: st.text,
         ...(st.offField ? { offField: true as const } : {}),
         ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
         ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
@@ -603,6 +609,8 @@ function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
   // A granted one exists only while its source still has the ability (an effect in layer 6 may take it away, CR 613.8a).
   if (e.grantedText !== undefined && !src.grantedAbilities.includes(e.grantedText)) return false;
+  // Glittering Lion: a printed static ability an effect in layer 6 took away (CR 613.1f).
+  if (e.staticText !== undefined && src.lostStatics?.includes(e.staticText)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
@@ -1630,6 +1638,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "loseActivated":
       c.lostActivated = [...(c.lostActivated ?? []), m.index];
+      return;
+    case "loseStatic":
+      c.lostStatics = [...(c.lostStatics ?? []), m.text];
       return;
     case "enchantCreature":
       c.enchantCreature = true;

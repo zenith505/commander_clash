@@ -4155,6 +4155,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = filter?.kind === "object" && parseBody(tappedMany[2]!);
     return filter && body ? { event: "permanentsBecomeTapped", tappedFilter: filter, body } : "fail";
   }
+  // Royal Decree: "Whenever a Swamp, Mountain, black permanent, or red permanent becomes tapped": any one of these, once
+  // for a permanent that's more than one (rulings: Badlands is both).
+  const tappedMixed = /^Whenever a (Plains|Island|Swamp|Mountain|Forest), (Plains|Island|Swamp|Mountain|Forest), (white|blue|black|red|green) permanent, or (white|blue|black|red|green) permanent becomes tapped, (.+)$/.exec(line);
+  if (tappedMixed) {
+    const lands = parseTargetPhrase(`${tappedMixed[1]} or ${tappedMixed[2]}`);
+    const colored = parseTargetPhrase(`${tappedMixed[3]} or ${tappedMixed[4]} permanent`);
+    const body = parseBody(tappedMixed[5]!, { subjectIt: true });
+    if (lands?.kind !== "object" || lands.subtypes?.length !== 2 || colored?.kind !== "object" || colored.colors?.length !== 2 || !body) return "fail";
+    const text = `${tappedMixed[1]}, ${tappedMixed[2]}, ${tappedMixed[3]} permanent, or ${tappedMixed[4]} permanent`;
+    return { event: "permanentBecomesTapped", tappedFilter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [lands, colored], text }, body };
+  }
   const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {
     const filter = parseTargetPhrase(tapped[1]!);

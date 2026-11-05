@@ -149,7 +149,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Nightmare Incursion: "for up to X cards, where X is the number of Swamps you control, and exile them" (parseBody
   // moves the "where" to the end); Neverending Torment: "for X cards, where X is ...": as many as there are, up to X (CR
   // 701.23d), counted as it resolves.
-  const theirMany = new RegExp(`^Search (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
+  // Earwig Squad: "search target opponent's library for three cards and exile them", a triggered ability's (lowercase).
+  const theirMany = new RegExp(`^[Ss]earch (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
   if (theirMany && (theirMany[3] !== "X" || ctx.whereX)) {
     const library = parsePlayer(theirMany[1]!.replace(/'s$/, ""), ctx);
     return library ? [{ type: "search", n: amt(theirMany[3]!), upTo: !!theirMany[2], reveal: false, dest: { zone: "exile" }, library }] : null;

@@ -63,6 +63,16 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (!library || !permanents) return null;
     return [{ type: "search", n: 99, upTo: true, reveal: false, dest: { zone: "battlefield" }, library, filter: { kind: "card", text: `card with the same name as a ${m[2]} that player controls` }, sameName: { permanents, whose: library, each: true } }];
   }
+  // Legion's End: "Exile target creature ... and all other creatures that player controls with the same name as that
+  // creature. Then that player reveals their hand and exiles all cards with that name from their hand and graveyard.":
+  // the target's controller and name as it last existed (CR 608.2h), every such card there, no search and no shuffle
+  // (rulings: even if that player has hexproof).
+  if (/^That player reveals their hand and exiles all cards with that name from their hand and graveyard$/.test(s)) {
+    const i = ctx.controllerNamed;
+    if (i === undefined || i !== ctx.lastObjectTarget || ctx.lastPlayerTarget !== undefined || ctx.targets[i]?.kind !== "object" || ctx.targets[i]!.many) return null;
+    const who = { ref: "targetController" as const, index: i };
+    return [{ type: "lookAtHand", who, reveal: true }, { type: "exileNamed", who, filter: { kind: "card", text: "card with the same name as that creature" }, all: true, sameAs: i, handOnly: true, andGraveyard: true }];
+  }
   // "Target player reveals their hand and discards all cards with that name" (Cabal Therapy, CR 701.9b: no choice).
   if ((m = /^(Target player|Target opponent|That player) reveals their hand and discards all cards with (?:that|the chosen) name$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

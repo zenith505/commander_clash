@@ -212,8 +212,10 @@ export function parseCostKeyword(
   // its back face up on the stack (rulings), on a transforming double-faced card's front face.
   if ((m = /^More Than Meets the Eye ((?:\{[^}]+\})+)$/.exec(line)))
     return d.layout === "transform" && (d.faceOf?.face ?? 0) === 0 && plainMana(m[1]!) ? { alt: { kind: "convert", mana: m[1]! } } : "fail";
-  if ((m = /^If (.+), you may cast ~ without paying its mana cost\.?$/.exec(line))) {
-    const cond = altCondition(m[1]!);
+  if ((m = /^If (.+), you may cast ~ without paying its mana cost\.?$/.exec(line) ?? /^If (~ is the first spell you've cast this game), you may cast it without paying its mana cost\.$/.exec(line))) {
+    // Once Upon a Time: "If ~ is the first spell you've cast this game": none cast before it (rulings: its first chance is
+    // the first player's upkeep), only as an alternative cost's condition, checked as it's cast.
+    const cond = m[1] === "~ is the first spell you've cast this game" ? ({ kind: "noSpellsCastThisGame" } as const) : altCondition(m[1]!);
     return cond ? { alt: { kind: "alternative", mana: "", if: cond, text: "without paying its mana cost" } } : "fail";
   }
   // "If you control a Forest, rather than pay ~'s mana cost, you may have an opponent gain 3 life" (Invigorate), "...
@@ -362,6 +364,15 @@ export function parseCostKeyword(
         trigger: {
           event: "yourUpkeep",
           body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, sacrificeCost: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature" } }], text: "Cumulative upkeep—sacrifice a creature: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you sacrifice a creature for each age counter on it." },
+        },
+      };
+    // Wall of Shards: "Cumulative upkeep—An opponent gains 1 life": an opponent chosen for each age counter, the same one or
+    // different ones (rulings), each able to gain life (CR 119.7), then all of it paid at once or none (CR 702.24a).
+    if (/^Cumulative upkeep—An opponent gains 1 life\.?$/.test(line))
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, giveLife: 1 }], text: "Cumulative upkeep—an opponent gains 1 life: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless an opponent you choose gains 1 life for each age counter on it." },
         },
       };
     // Braid of Fire: "Cumulative upkeep—Add {R}": adding mana is the cost (rulings), {R} for each age counter, which can

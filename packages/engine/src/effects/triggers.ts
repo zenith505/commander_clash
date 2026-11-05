@@ -74,6 +74,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
     for (const a of again) {
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       if (a.enduringStory && !s.players[controller]?.enduringStory) continue;
+      if (a.whileControl && s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === controller && objectMatches(s, a.whileControl!.filter, obj(s, b), controller, false)).length < a.whileControl.n) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
       if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;
@@ -2203,6 +2204,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = tr.targeted;
         if (!w) return true;
         if (w.spell && item!.kind !== "spell") return false;
+        if (w.ability && item!.kind !== "ability") return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.
@@ -2250,8 +2252,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
-        if (wc !== pid) continue;
-        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orYou && !tr.targeted.once && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+        // Loki, God of Mischief: "a player", any player (TriggeredAbility.targeted.anyPlayer).
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orYou && (wc === pid || !!tr.targeted.anyPlayer) && !tr.targeted.once && (!tr.targeted.spell || item!.kind === "spell") && (!tr.targeted.ability || item!.kind === "ability") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
       }
     }
     // Leyline of Combustion: "you and/or at least one permanent you control" (TriggeredAbility.targeted.once): once for

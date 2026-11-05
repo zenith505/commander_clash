@@ -10,6 +10,7 @@ import {
   abilityProblem,
   definedX,
   altCost,
+  isEmerge,
   altCostsFor,
   canCast,
   castProblem,
@@ -2064,7 +2065,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
@@ -2087,6 +2088,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   grantedFreerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
   grantedWebSlinging: "return a tapped creature you control to its owner's hand",
   grantedBlitz: "haste, and you draw a card when it dies; sacrificed at the end step",
+  grantedEmerge: "its mana cost, sacrificing a creature as you cast it: the cost is reduced by its mana value",
   foretell: "a foretold card is cast for its foretell cost",
   sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
   surge: "only if you've cast another spell this turn",
@@ -2235,7 +2237,7 @@ function canCastAlt(s: GameState, id: string, alt: AltCostKind, prototyped?: tru
   if (!/not enough mana/.test(problem)) return false;
   if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null) return true;
   // Emerge: what's sacrificed lowers the cost (CR 702.119a), so try each permanent that could be.
-  const sac = alt === "emerge" ? altCost(cardOf(s, id), alt)?.costs?.find((c) => c.kind === "sacrifice") : undefined;
+  const sac = isEmerge(alt) ? altCost(cardOf(s, id), alt, s, HUMAN)?.costs?.find((c) => c.kind === "sacrifice") : undefined;
   return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
@@ -5006,7 +5008,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

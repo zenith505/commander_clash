@@ -110,6 +110,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // Strata Scythe: "for each land on the battlefield with the same name as the exiled card", anyone's (rulings), the card
+  // its imprint ability exiled (CR 607.2a, linked by compile.ts).
+  if (each && /^land on the battlefield with the same name as the exiled card$/.test(p))
+    return { count: { kind: "permanents", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" }, sameNameAsLinked: true } };
   // Jadeheart Attendant: "the mana value of the exiled card used to craft it" (CR 702.167c): the cards its craft cost exiled.
   if (/^the mana value of the exiled card used to craft (?:it|~)$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "linkedExiledMv" } };
   // Wood Elemental: "the number of Forests sacrificed as it entered", what its "As ~ enters, sacrifice any number of
@@ -376,6 +380,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!, { chosen: true });
     return spec?.kind === "object" ? { count: { kind: "destroyedThisWay", filter: { ...spec, text: m[1]! }, died: true } } : null;
   }
+  // Convert to Slime: "the total mana value of permanents destroyed this way", each as it last existed (rulings).
+  if (!each && /^the total mana value of permanents destroyed this way$/.test(p))
+    return { count: { kind: "destroyedThisWay", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanents" }, totalMv: true } };
   if ((m = /^(?:the number of )?(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
     if (spec?.kind !== "object") return null;

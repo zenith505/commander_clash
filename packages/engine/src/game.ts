@@ -5541,7 +5541,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   }
   // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
-  const emerged = how.alt === "emerge" && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
+  const emerged = isEmerge(how.alt) && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
   if (emerged?.zone === "battlefield") less += defMv(defOf(s, emerged));
   // Offering (CR 702.48c): the sacrificed permanent's mana cost, colored mana included.
   const offered = how.offering !== undefined && !how.faceDown ? s.objects[how.offering] : undefined;
@@ -5888,6 +5888,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "grantedFreerunning") return s && pid !== undefined ? grantedFreerunning(s, pid, d) : undefined;
   if (alt === "grantedWebSlinging") return s && pid !== undefined ? grantedWebSlinging(s, pid, d) : undefined;
   if (alt === "grantedBlitz") return s && pid !== undefined ? grantedBlitz(s, pid, d) : undefined;
+  if (alt === "grantedEmerge") return s && pid !== undefined ? grantedEmerge(s, pid, d) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
@@ -5895,8 +5896,21 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
 function grantedMiracles(s: GameState, pid: PlayerId, d: CardDef): string[] {
   return s.battlefield.flatMap((id) => {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).handMiracle ?? []).filter((x) => printedMatches(x.filter, d)).map((x) => x.mana) : [];
+    // Aminatou, Veil Piercer: its mana cost less that much generic mana; a card with no mana cost has none to reduce, so no
+    // miracle cost (CR 118.6, as for Dream Devourer's foretell).
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).handMiracle ?? []).filter((x) => printedMatches(x.filter, d) && (x.reduce === undefined || !!d.manaCost)).map((x) => (x.reduce === undefined ? x.mana : reduceGeneric(d.manaCost, x.reduce))) : [];
   });
+}
+
+/** A mana cost less `n` generic mana, never colored mana (CR 601.2f): "{4}{W}" less {4} is "{W}"; nothing left is "{0}". */
+export function reduceGeneric(cost: string, n: number): string {
+  let left = n;
+  const out = cost.replace(/\{(\d+)\}/g, (_, k: string) => {
+    const r = Math.max(0, Number(k) - left);
+    left = Math.max(0, left - Number(k));
+    return r ? `{${r}}` : "";
+  });
+  return out || "{0}";
 }
 
 /**
@@ -5956,6 +5970,23 @@ function grantedBlitz(s: GameState, pid: PlayerId, d: CardDef): NonNullable<Comp
   });
   return given ? { kind: "grantedBlitz", mana: d.manaCost } : undefined;
 }
+
+/**
+ * Emerge a permanent `pid` controls gives this creature spell, checked by its characteristics as a spell (Herigast,
+ * Erupting Nullkite; CR 702.119a): its mana cost and sacrificing a creature, less that creature's mana value. A spell
+ * without a mana cost has none.
+ */
+function grantedEmerge(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (!isType(d, "Creature") || !d.manaCost) return undefined;
+  const given = s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveEmerge ?? []).some((x) => printedMatches(x.filter, d));
+  });
+  return given ? { kind: "grantedEmerge", mana: d.manaCost, costs: [{ kind: "sacrifice", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 1 }] } : undefined;
+}
+
+/** Is this alternative cost emerge, the card's own or one a permanent gave it (CR 702.119a)? */
+export const isEmerge = (alt: AltCostKind | undefined) => alt === "emerge" || alt === "grantedEmerge";
 
 /** The prowl cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (CR 702.76a). */
 function grantedProwl(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
@@ -6048,7 +6079,8 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const freerun = grantedFreerunning(s, pid, defOf(s, o));
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  const emerge = grantedEmerge(s, pid, defOf(s, o));
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -6404,7 +6436,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const returned: LastKnown = {};
   const discarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}), taxLife }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge"));
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}), ...(via ? { viaWay: via } : {}), taxLife }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled, !!compileCard(d).altCosts?.some((a) => a.kind === "emerge") || isEmerge(choices.alt) || !!grantedEmerge(s, p.id, d));
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
   // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
   if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
@@ -7837,6 +7869,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
     // Abeyance: this turn, in any zone (rulings).
     if (turnRule(s, pid, "noActivations")) return "you can't activate abilities that aren't mana abilities this turn";
+    // Overwhelming Splendor: loyalty abilities stay allowed (CR 606.3), mana abilities too (CR 605.1a).
+    if (ab.loyalty === undefined && !ab.loyaltyX) {
+      const splendor = s.battlefield.find((b) => obj(s, b).attachedToPlayer === pid && abilitiesOf(s, obj(s, b)).enchantedNoActivations);
+      if (splendor) return `${characteristics(s, obj(s, splendor)).name}: you can't activate abilities that aren't mana abilities or loyalty abilities`;
+    }
     // Hand to Hand: during the combat phase, in any zone (CR 506.1).
     const handToHand = inCombatPhase(s) ? s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).combatNoInstantsOrAbilities) : undefined;
     if (handToHand) return `${characteristics(s, obj(s, handToHand)).name}: players can't activate abilities that aren't mana abilities during combat`;
@@ -8086,7 +8123,9 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !ab.costLessIfTarget && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
+  // Bladegraft Aspirant: any activated ability of an Equipment you control, not only equip.
+  const ofEquipment = !ab.mana && o.zone === "battlefield" && controllerOf(s, o) === pid && characteristics(s, o).subtypes.includes("Equipment");
+  if (!ab.equip && !ofEquipment && !ab.costLess && !ab.costLessIf && !ab.costLessIfTarget && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
   let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // Raft Security Officer: "if it targets a creature with power 3 or less", as that target is now.
@@ -8121,13 +8160,20 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     if (n) less += Math.max(0, evalAmount(s, n, { controller: pid, sourceId: src.id }));
   }
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
-  for (const id of ab.equip ? s.battlefield : []) {
+  for (const id of ab.equip || ofEquipment ? s.battlefield : []) {
     const src = obj(s, id);
     const mods = compileCard(defOf(s, src)).equipLess;
     if (!mods) continue;
     const c = characteristics(s, src);
     if (!c.hasPrintedAbilities || c.controller !== pid) continue;
     for (const m of mods) {
+      if (!ab.equip && !m.anyAbility) continue;
+      // Bladegraft Aspirant: any of the ability's targets; before they're chosen, whether ~ could be one.
+      if (m.anyAbility) {
+        if (!ofEquipment || src.id === o.id || !ab.body.targets.length || (targets ? !targets.some((x) => x.kind === "object" && x.id === src.id) : !c.types.includes("Creature"))) continue;
+        less += m.n;
+        continue;
+      }
       if (m.otherEquipment && src.id === o.id) continue;
       if (m.self && src.id !== o.id) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, pid)) continue;
@@ -9336,6 +9382,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "damageSource") {
     // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
     (r.scratch ??= {}).damageSource = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "giveLife") {
+    // Wall of Shards: the opponent for one more age counter (see Effect "cumulativeUpkeep" giveLife).
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the opponents offered");
+    ((r.scratch ??= {}).lifeTo ??= []).push(Number(choice) as PlayerId);
     continueResolution(s);
     return;
   }

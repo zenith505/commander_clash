@@ -85,6 +85,7 @@ import {
   autoEvidence,
   evidenceProblem,
   altCostsFor,
+  isEmerge,
   payZeroSource,
   linkedFreeGrant,
   commanderTax,
@@ -252,6 +253,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const left = self?.zone === "battlefield" ? toughness(s, self) - (upkeepFx.selfCounter === "-1/-1" ? n : 0) : 0;
       return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
     }
+    // Wall of Shards: a wall worth a few life for the opponents, while the total stays small.
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.giveLife) return [{ type: "chooseMay", player: pid, yes: (s.resolving?.scratch?.n ?? 0) * upkeepFx.giveLife <= 4 }];
     // Braid of Fire: adding the mana costs nothing, so keep it.
     if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.addMana) return [{ type: "chooseMay", player: pid, yes: true }];
     // Psychic Vortex: keep drawing while the library has plenty left and the hand isn't overfull.
@@ -389,6 +392,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         return [{ type: "searchLibrary", player: pid, found }];
       }
       return [{ type: "searchLibrary", player: pid, found: pend.helps ? ranked.slice(ranked.length - pend.max) : ranked.slice(0, pend.max) }];
+    }
+    // Strata Scythe: the land whose name the most lands on the battlefield share.
+    const scythe = pend.kind === "searchLibrary" && !pend.dig && !pend.fromHand && !pend.fromGraveyard && s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+    if (pend.kind === "searchLibrary" && scythe && compileCard(defOf(s, scythe)).statics.some((st) => JSON.stringify(st.mods).includes('"sameNameAsLinked":true'))) {
+      const named = (id: string) => s.battlefield.filter((x) => objIsType(s, obj(s, x), "Land") && characteristics(s, obj(s, x)).name === defOf(s, obj(s, id)).name).length;
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => named(b) - named(a)).slice(0, Math.min(pend.max, Math.max(1, pend.min))) }];
     }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of cards from your hand on the bottom of your library, then draw that many plus one": lands once
@@ -762,6 +771,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pw = [...pws].sort((a, b) => (obj(s, a).counters.loyalty ?? 0) - (obj(s, b).counters.loyalty ?? 0))[0];
       return [{ type: "chooseOption", player: pid, choice: low || pw === undefined ? them! : pw }];
     }
+    // Wall of Shards: the life to the opponent who has the most already, where it matters least.
+    if (pend.kind === "chooseOption" && pend.what === "giveLife") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
       const next = r ? r.body.effects[r.next + 1] : undefined;
@@ -2054,6 +2065,8 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     // "Remove all counters from", "move all counters from": only something with counters on it.
     const countersFrom = allEffects(body.effects).some((e) => ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    // Black Panther: "move all +1/+1 counters from target land": one with that kind on it.
+    const countersKind = allEffects(body.effects).flatMap((e) => (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i && e.only !== undefined ? [e.only] : []))[0];
     // "Remove up to three counters from" (Glissa Sunslayer): counters worth removing, harmful ones from our own.
     const chosenCounters = allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.what.ref === "target" && refCovers(e.what, i));
     // "Move any number of counters from target permanent ... onto a second target permanent" (Resourceful Defense): bots don't.
@@ -2063,7 +2076,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const guard = targetGuard(s, pid, body.effects, i, sourceId);
     const holds = (t: TargetChoice) => !guard || guard(t);
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
@@ -2541,7 +2554,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -3335,8 +3348,8 @@ function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, {
   return s.battlefield
     .map((x) => obj(s, x))
     .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canSacrificeForCost(s, o)))
-    .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
-    .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
+    .filter((o) => (isEmerge(alt) ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
+    .sort((a, b) => (isEmerge(alt) ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }
 
 /**
@@ -4492,6 +4505,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (only && !only(ab)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
+      // Fractured Powerstone's planar die outside Planechase: nothing to gain.
+      if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.

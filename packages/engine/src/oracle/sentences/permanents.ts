@@ -973,6 +973,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
+  // Black Panther, Wakandan King: "Move all +1/+1 counters from target land you control onto target creature": that kind
+  // only; one permanent chosen for both targets moves nothing (CR 115.3, 122.5).
+  if ((m = new RegExp(`^Move all ${COUNTER} counters from (target [^,]+?) onto (target [^,]+)$`, "i").exec(s))) {
+    const from = parseObject(m[2]!, ctx);
+    const to = from && !isGroup(from) ? parseObject(m[3]!, ctx) : null;
+    return from?.ref === "target" && to?.ref === "target" ? [{ type: "moveAllCounters", from, to, only: counterKind(m[1]!) }] : null;
+  }
   // Spike Cannibal: "move all +1/+1 counters from all creatures onto it": each other creature's, at once (CR 122.5).
   if (ctx.selfEntered && /^Move all \+1\/\+1 counters from all creatures onto (?:it|~)$/i.test(s))
     return [{ type: "moveAllCounters", from: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, to: { ref: "self" }, only: "+1/+1" }];
@@ -1288,6 +1295,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // (layer 2), until the turn ends.
   if ((m = /^[Gg]ain control of enchanted (creature|permanent) until end of turn$/.exec(s)) && !ctx.spell)
     return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "endOfTurn" }];
+  // Oft-Nabbed Goat: "Gain control of ~ and put a -1/-1 counter on it" in an ability only its controller's opponents may
+  // activate: the activator controls the ability (CR 113.8) and takes the creature for the rest of the game (layer 2).
+  if ((m = /^Gain control of ~( and put an? (-1\/-1|\+1\/\+1) counter on it)?$/.exec(s)) && ctx.activated)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game" }, ...(m[1] ? [{ type: "counters" as const, what: { ref: "self" as const }, counter: m[2]! as "-1/-1" | "+1/+1", n: 1 }] : [])];
   // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
   // cleanup step of your next turn (CR 514.2, 611.2a).
   if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)

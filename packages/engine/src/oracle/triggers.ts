@@ -759,6 +759,14 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(text, {});
     return body ? { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body } : "fail";
   }
+  // Loki, God of Mischief: "Whenever a player or permanent becomes the target of an ability you control": any player or
+  // permanent, once for each it targets (CR 603.2c), of an activated or triggered ability (CR 113.3), not a spell.
+  const loki = /^Whenever a player or permanent becomes the target of an ability you control, (.+)$/.exec(line);
+  if (loki) {
+    if (/\b(?:it|its|that player|that permanent|that ability|its controller)\b/.test(loki[1]!)) return "fail";
+    const body = parseBody(loki[1]!, {});
+    return body ? { event: "permanentBecomesTarget", targeted: { by: "you", ability: true, orYou: true, anyPlayer: true }, body } : "fail";
+  }
   // Dormant Gomazoa: "Whenever you become the target of a spell, you may untap ~": any player's spell, not an ability, once
   // for each spell however many of its targets are you (rulings).
   const youSpell = /^Whenever you become the target of a spell, (.+)$/.exec(line);
@@ -2394,6 +2402,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Disa the Restless: "Whenever a Lhurgoyf permanent card is put into your graveyard from anywhere other than the
+  // battlefield, put it onto the battlefield": that card, once for each (CR 603.2c), if it's still in your graveyard (CR
+  // 400.7), under your control (CR 110.2a); an Aura's host is chosen as it enters (CR 303.4f).
+  if (batch.each && batch.what === "toGraveyard" && batch.whose === "you" && batch.from === "notBattlefield" && !batch.other && batch.filter && !yourTurn && /^put it onto the battlefield\.?$/.test(rest))
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" } }], text: rest.replace(/\.$/, "") } };
   // Polluted Cistern: "each opponent loses 1 life for each card type among those cards": the cards put there, card types
   // only (CR 205.2a), each as it last existed in the graveyard if it has left (CR 608.2h).
   if (/^each opponent loses 1 life for each card type among those cards\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && !batch.filter && !yourTurn)
@@ -4732,8 +4745,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // at the beginning of the next end step" (Nine-Lives Familiar): an intervening if (CR 603.4) on the creature as it
       // last existed (CR 603.10a), and the counters it comes back with counted from that too.
       let ifHadCounter: string | undefined;
-      // Promising Duskmage: "if it had a +1/+1 counter on it".
-      const hadKind = /^if it had an? ([a-z]+|\+1\/\+1|-1\/-1) counter on it, (.+)$/.exec(body0);
+      // Promising Duskmage: "if it had a +1/+1 counter on it"; Oft-Nabbed Goat: "if it had one or more -1/-1 counters on
+      // it", the same.
+      const hadKind = /^if it had (?:an?|one or more) ([a-z]+|\+1\/\+1|-1\/-1) counters? on it, (.+)$/.exec(body0);
       if (hadKind) {
         if (event !== "selfDies") return "fail" as const;
         ifHadCounter = hadKind[1]!;
@@ -4918,6 +4932,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // (CR 608.2h, 707.2), with half the counters it had (rulings), even if the card has left the graveyard by then.
       const split = event === "selfDies" && ifHadCounter && ifHadCounterMin ? new RegExp(`^create a token that's a copy of it at the beginning of the next end step\\. The token enters with half that many ${ifHadCounter.replace(/[+/]/g, "\\$&")} counters on it, rounded down\\.$`).exec(text) : null;
       if (split) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, lkiCopy: { halfCounters: ifHadCounter as CounterKind } }], text: "create a token that's a copy of it with half that many counters on it" }], text };
+      // Oft-Nabbed Goat: "if it had one or more -1/-1 counters on it, its owner draws that many cards and each other player
+      // loses that much life": the counters of that kind it had as it last existed (CR 603.10a), "each other player" every
+      // player but that owner (whoever controlled it, rulings).
+      const ownerDraws = event === "selfDies" && ifHadCounter && !ifHadCounterMin && /^its owner draws that many cards and each other player loses that much life\.$/.test(text);
+      if (ownerDraws) {
+        const n = { count: { kind: "counters" as const, counter: ifHadCounter as CounterKind, of: { ref: "self" as const } } };
+        body = { targets: [], effects: [{ type: "draw", who: { ref: "selfOwner" }, n }, { type: "loseLife", who: { ref: "otherThanSelfOwner" }, n }], text };
+      }
       if (body && attackingPlayer) body = { ...(JSON.parse(JSON.stringify(body).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body), text: body.text.replace(/\bthat player\b/g, "attacking player") };
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {

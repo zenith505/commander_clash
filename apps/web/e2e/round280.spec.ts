@@ -109,6 +109,6 @@ test("Boneyard Parley: put the pile of your choice onto the battlefield under yo
     expect(after.objects[id]!.zone).toBe("battlefield");
     expect(controllerOf(after, after.objects[id]!)).toBe(0);
   }
-  for (const id of piles[1 - mine]) expect(after.objects[id]!.zone).toBe("graveyard");
+  for (const id of piles[mine === 0 ? 1 : 0]) expect(after.objects[id]!.zone).toBe("graveyard");
   expect(pageErrors(page)).toEqual([]);
 });

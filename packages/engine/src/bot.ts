@@ -165,6 +165,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseTargets") {
       const t = s.triggerQueue[0]!;
       const body = withModes(triggerBody(s, t), t.modes);
+      // Choosing the target of another player's ability (TargetSpec.chosenBy): the one best for us.
+      if (pend.controller !== undefined && pend.controller !== pid) return [{ type: "chooseTargets", player: pid, targets: targetForOther(s, pid, pend.controller, body, t.sourceId) }];
       return [{ type: "chooseTargets", player: pid, targets: chooseTargets(s, pid, body, true, t.sourceId, t.x ?? 0)! }];
     }
     if (pend.kind === "copyTargets") {
@@ -785,6 +787,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: low || pw === undefined ? them! : pw }];
     }
     // Wall of Shards: the life to the opponent who has the most already, where it matters least.
+    // "Target ... of an opponent's choice" (Mausoleum Turnkey): any one of them will choose against us; the next in turn order.
+    if (pend.kind === "chooseOption" && pend.what === "targetChooser") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "giveLife") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
@@ -1893,6 +1897,31 @@ function targetGuard(s: GameState, pid: PlayerId, effects: Effect[], i: number, 
     tests.push(inner ? (t) => test(t) && inner(t) : test);
   }
   return (t) => tests.some((f) => f(t));
+}
+
+/** Whether what an ability does to its one target is bad for that target's controller: removal, damage, -3/-3. */
+function harmsChosenTarget(body: AbilityBody): boolean {
+  // Inside "that player may" (Effect eachMay) too.
+  const flat = (es: Effect[]): Effect[] => es.flatMap((e) => (e.type === "eachMay" ? flat(e.effects) : [e]));
+  const effects = flat(body.effects);
+  return !!harmfulTargets({ ...body, effects })[0] || allEffects(effects).some((e) => e.type === "continuous" && e.what.ref === "target" && e.what.index === 0 && modsAreHarmful(e.mods));
+}
+
+/**
+ * The target of `controller`'s triggered ability that we choose for them ("target creature of their choice", TargetSpec
+ * chosenBy): legal for the controller (rulings), and the best for us, our most valuable if what it does helps, else
+ * theirs (an opponent's), our least valuable only when there's nothing else.
+ */
+function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body: AbilityBody, sourceId: ObjectId): TargetChoice[] {
+  const all = legalTargets(s, body.targets[0]!, controller, undefined, botSource(s, sourceId), sourceId);
+  const harm = harmsChosenTarget(body);
+  const score = (t: TargetChoice) => {
+    if (t.kind !== "object") return t.kind === "player" ? (t.id === pid) !== harm ? 1 : -1 : 0;
+    const o = obj(s, t.id);
+    const v = o.zone === "battlefield" ? worth(s, pid, o) : 1 + defMv(defOf(s, o));
+    return (isMine(s, pid, t) !== harm ? 1 : -1) * v;
+  };
+  return [[...all].sort((a, b) => score(b) - score(a))[0] ?? { kind: "none" }];
 }
 
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
@@ -3782,6 +3811,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
   // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
   if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
+  // Ley Line, Death Match: "that player may ..." to the target they chose for it (TargetSpec.chosenBy): only when it's
+  // good for us, a counter on ours or -3/-3 on an opponent's.
+  if (r && e?.type === "eachMay" && r.body.targets.length === 1 && r.body.targets[0]!.chosenBy) {
+    const t = r.item.targets?.[0];
+    return !!t && t.kind === "object" && !!s.objects[t.id] && isMine(s, pid, t) !== harmsChosenTarget(r.body);
+  }
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).

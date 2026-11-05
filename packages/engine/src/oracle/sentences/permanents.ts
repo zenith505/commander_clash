@@ -335,6 +335,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("each attacking creature", ctx);
     return what && isGroup(what) ? [{ type: "removeFromCombat", what, remember: true }, { type: "untap", what: { ref: "created" } }] : null;
   }
+  // Dazzling Beauty, Trap Runner: "Target unblocked attacking creature becomes blocked"; Choking Vines: "X target
+  // attacking creatures become blocked"; Fog Patch: "Attacking creatures become blocked" (CR 509.1h).
+  if ((m = /^(Target unblocked attacking creature|X target attacking creatures|Attacking creatures) becomes? blocked$/.exec(s))) {
+    const what = parseObject(m[1] === "Attacking creatures" ? "each attacking creature" : m[1]!.replace(/^T/, "t"), ctx);
+    return what && (m[1] === "Attacking creatures") === isGroup(what) ? [{ type: "becomeBlocked", what }] : null;
+  }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   // Observed Stasis: "remove enchanted creature from combat".
   if (/^[Rr]emove enchanted creature from combat$/.test(s) && !ctx.spell) return [{ type: "removeFromCombat", what: { ref: "attached" } }];

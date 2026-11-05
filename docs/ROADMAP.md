@@ -1,8 +1,8 @@
 # Roadmap
 
-29,866 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,579 of
-9,979 (95%).
+29,876 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,584 of
+9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -238,7 +238,7 @@ line blocks.
    Foes!, Scrounging Bandar, Malboro, Kothophed, Argent Dais, Propagator Drone, Vampire Nocturnus, Mul Daya
    Channelers, Lluwen, Wartime Protestors, Horned Loch-Whale, Sinkhole Surveyor, Haliya, Realm Seekers, Reality Heist
    and others), taking the easy ones.
-   Out after round 177: Muraganda Petroglyphs ("creatures with no abilities"), Ertai's Scorn and Even the Score
+   Out after round 177: Muraganda Petroglyphs (done in round 278) ("creatures with no abilities"), Ertai's Scorn and Even the Score
    (colored cost reductions), Skyscribing (forecast), Clever Conjurer ("not named ~" in target legality), Zaffai,
    Thunder Conductor (an opponent chosen at random), Super-Soldier Serum, Xathrid Demon, Minion of Leshrac and Oath
    of Lim-Dûl (their other lines), Geralf, the Fleshwright ("each other Zombie that entered this turn": the count
@@ -254,7 +254,7 @@ line blocks.
    Custodi Lich, Resolute Archangel, Jadelight Spelunker, Smaug, Tatyova, Gaddock Teeg, Aether Storm, Taigam, Lord of
    the Pit, Biorhythm, Flux, Awaken the Erstwhile, Martha Jones, Phoenix Fleet Airship, Bloodspore Thrinax, Yorvo,
    Prismari Pianist, Baru, Sokka, Arcbound Tracker, Gold Rush, Tainted Treats and others), taking the easy ones.
-   Out after round 178: Giott, Colossal Rattlewurm, Dregscape Sliver, Foe-Razer Regent, Mathas, Ozox and Arcbound
+   Out after round 178: Giott, Colossal Rattlewurm, Dregscape Sliver, Foe-Razer Regent (done in round 278), Mathas, Ozox and Arcbound
    Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Zameck Guildmage (done in round B106) ("this turn" extra counters as creatures enter), Cunning
    Nightbonder (spells "cast", copies left out), Flesh Reaver (done in round B105) (damage to several recipients at once), Quest for the
    Nihil Stone (two intervening-if conditions), Alpharael (ward with a random discard), Fealty to the Realm (done in round B106). Known
@@ -637,7 +637,7 @@ line blocks.
    graveyard" (Dragonlord Kolaghan: not a copy, not face down), "a creature you control with flash or haste is dealt
    damage" (Sonic the Hedgehog). Browser tests click through the Blademaster's attach picker and Dream Cache's
    top-or-bottom choice.
-   Out after round 199 (looked at, not done): Jaws, Relentless Predator (no "is sacrificed or destroyed" event),
+   Out after round 199 (looked at, not done): Jaws, Relentless Predator (done in round 278) (no "is sacrificed or destroyed" event),
    Iron Monger (no "whenever you connive" trigger). Bots answer Eternity Vessel's "you may" only when it raises their
    life.
    Round 200 went on from the top: legendary instants and sorceries now need a legendary creature or planeswalker
@@ -726,7 +726,7 @@ line blocks.
    chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Admiral Beckett Brass (done in round
    266), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
    nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
-   Bioshift, Public Enemy, Bladegraft Aspirant (done in round 274), Archon of Valor's Reach.
+   Bioshift, Public Enemy, Bladegraft Aspirant (done in round 274), Archon of Valor's Reach (done in round 278).
    Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
    Skycoach Waypoint, Hexhaven Dueling Arena, Biblioplex Tomekeeper, Infinite Coursework; the bot aims it at its own
    creature with a prepare spell), "you may exile N cards from your graveyard. If you do" with N above one (CR 609.3:
@@ -763,7 +763,7 @@ line blocks.
    +21, 20 of them legal (27,472 of 31,936 with rounds 202 to 204 and Lane B rounds B27 to B34).
    Out after round 205 (looked at, not done): Brimaz, Blight of Oreskos (which spells it means), Osgir, the Reconstructor
    (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Sigurd, Jarl of Ravensthorpe ("whenever you put a
-   lore counter on a Saga"), Ruxa, Patient Professor ("creatures with no abilities"), The Ruinous Powers ("When you cast
+   lore counter on a Saga"), Ruxa, Patient Professor (done in round 278) ("creatures with no abilities"), The Ruinous Powers ("When you cast
    a spell this way"), Curse of Hospitality ("creatures attacking enchanted player").
    Round 206 went on from the top: "the next spell you cast this turn costs {1} less to cast" (Hardened Berserker,
    Peerless Samurai) and "{X} less, where X is ... as this ability resolves" (Maelstrom Muse, Kaza, Roil Chaser), one
@@ -2112,6 +2112,21 @@ line blocks.
    blocked or was blocked by a legendary creature this turn isn't recorded); Myriad Construct (counters by the nonbasic
    lands opponents control if kicked, and "becomes the target of a spell" with tokens by its power); Spell Queller
    (exiling a spell from the stack, which its owner may cast for free when the Queller leaves).
+   Round 278 went on with the skip lists' blockers. "Creatures with no abilities" (Muraganda Petroglyphs; Ruxa, Patient
+   Professor; Rise from the Wreck): no rules text, keywords (keyword counters too) or granted abilities, nor a basic land
+   type's mana ability (rulings); Ruxa's layer 6 "assign combat damage as though it weren't blocked" applies after the
+   effects that give abilities (CR 613.8a); "Flip a coin for each opponent you have" (Mutalith Vortex Beast: you call each,
+   draw for each won, 3 damage to each opponent whose flip you lost); "Sacrifice it at the beginning of the next end step
+   if it has mana value 3 or less" (Angrath, the Flame-Chained: checked as the delayed trigger resolves); "you may have
+   target creature block it this turn if able" (Grappling Hook); "Whenever a creature you control fights" (Foe-Razer
+   Regent, once for each of yours in the fight); one +1/+1 counter for each creature whose combat damage is prevented,
+   even if it can't be (Ironscale Hydra); "Whenever a noncreature artifact is sacrificed or destroyed" (Jaws, Relentless
+   Predator: anyone's, destroyed for any reason); "Players can't cast spells of the chosen type" (Archon of Valor's Reach:
+   bots choose the type of the fewest of their own cards). +10, 29,863 of 31,936.
+   Out after round 278 (looked at, not done): Enchanter's Bane (the target enchantment deals the damage, and its
+   controller's punisher option is sacrificing that one target); Squee's Revenge ("choose a number" with no upper bound);
+   Ashiok, Nightmare Muse and Jace, Architect of Thought (their other loyalty abilities); Spectral Searchlight and Radiant
+   Lotus (mana another player adds); Coram, the Undertaker (casting from every graveyard).
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -2129,7 +2144,7 @@ line blocks.
    ability yet); The Ruinous Powers ("When you cast a spell this way, its owner loses life equal to its mana value").
    Out after round 272 (looked at, not done): Sigurd, Jarl of Ravensthorpe ("Whenever you put a lore counter on a Saga
    you control": whether several lore counters put at once trigger it once or once for each isn't settled by the CR or
-   rulings); Ruxa, Patient Professor ("Creatures you control with no abilities get +1/+1": which permanents have no
+   rulings); Ruxa, Patient Professor (done in round 278) ("Creatures you control with no abilities get +1/+1": which permanents have no
    abilities is known only after layer 6, and a static filter that reads abilities inside the layers isn't safe yet);
    Call for Aid ("You can't attack that player this turn. You can't sacrifice those creatures this turn": no "can't
    sacrifice" restriction yet); Soovril, Patient Antiquarian ("target nonland card in exile that was put there from your
@@ -2228,7 +2243,7 @@ line blocks.
    replaced, rulings); Long River Lurker (a floating "whenever that creature deals combat damage this turn" on the
    target); Olivia, Crimson Bride (done in round 267);
    Horrid Shadowspinner (done in round B105) (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (done in round 277) (the X
-   from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (a
+   from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (done in round 278) (a
    prevention that puts a counter for each creature's damage prevented); Professor Hojo (the first activated ability that
    targets a creature you control).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
@@ -2245,14 +2260,14 @@ line blocks.
    Osteomancer Adept (casting creature spells from your graveyard by foraging); Tangle Wire ("that player taps an untapped
    artifact, creature, or land they control for each fade counter": that player's choice of that many).
    Out after round 247 (looked at, not done): Hushbringer (see round 156); Endless Detour ("target spell, nonland
-   permanent, or card in a graveyard": one target across three zones); Jaws, Relentless Predator ("Whenever one or more
+   permanent, or card in a graveyard": one target across three zones); Jaws, Relentless Predator (done in round 278) ("Whenever one or more
    ... are sacrificed or destroyed": no event for that pair); Wall of Shards (done in round 275); Night Soil ("Exile two creature cards
    from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity (done in round
    272).
    Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
    "the chosen creature": no choice of a permanent as something enters yet, and it needs a prompt); Urborg (done in round
    270); Consume Spirit ("Spend only black mana on X":
-   autopay has no restriction on the mana for X); Catastrophe (done in round 270); Muraganda Petroglyphs ("creatures with no abilities", a layer dependency on ability-adding effects).
+   autopay has no restriction on the mana for X); Catastrophe (done in round 270); Muraganda Petroglyphs (done in round 278) ("creatures with no abilities", a layer dependency on ability-adding effects).
    Out after round 245 (looked at, not done): Back for Seconds (bargained: one of the returned target cards onto the
    battlefield instead of into the hand, chosen as it resolves); World War Hulk (chapter I's "the next red or green
    creature spell you cast this turn can be cast without paying its mana cost" and chapter III's doubled power and
@@ -2336,7 +2351,7 @@ line blocks.
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
-   7, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
+   7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
@@ -3045,12 +3060,12 @@ line blocks.
      unblocked source), Quest for Pure Flame, Taii Wakeen, Goblin Goliath and Jeska (other lines), Rankle and Torbran
      (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
      (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
-     (Nine Lives, Swans of Bryn Argoll, Mindskinner, Hostility, Weeping Angel, Ironscale Hydra). A replacement applies
+     (Nine Lives, Swans of Bryn Argoll, Mindskinner, Hostility, Weeping Angel, Ironscale Hydra (done in round 278)). A replacement applies
      to all of one source's damage to one recipient at once, so one order per recipient. Bots' attacks and blocks count
      doublers, halvers and prevention.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends, Mana
-     Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast, Fighting
+     Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast (done in round 278), Fighting
      Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, and lines
      that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
      them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
@@ -5524,7 +5539,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a trampler still deals all its damage, 702.19d; the whole band, 702.22i): Dazzling Beauty, Curtain of Light, Trap
   Runner, Fog Patch, Choking Vines; "blocked or was blocked by a Zombie / a legendary creature this turn" (what the other
   creature was as the block was declared, kept in the turn's block log, rulings): Time to Reflect, You Cannot Pass!. +13
-  (29,866 of 31,936 with rounds 276 and 277).
+  (29,876 of 31,936 with rounds 276 to 278).
 - Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
   Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only

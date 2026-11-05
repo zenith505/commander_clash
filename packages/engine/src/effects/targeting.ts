@@ -76,6 +76,23 @@ function attacksYouOrYourPlaneswalker(s: GameState, o: GameObject, pid: PlayerId
   return !!pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === o.attackingPermanent.zc && characteristics(s, pw).types.includes("Planeswalker") && controllerOf(s, pw) === pid;
 }
 
+/** The basic land types, each with its intrinsic mana ability (CR 305.6). */
+const BASIC_LAND_TYPES = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
+
+/**
+ * "A creature with no abilities" (Muraganda Petroglyphs, Ruxa, Patient Professor): no rules text at all (CR 113.1), counting
+ * abilities that work only in other zones; no keywords (keyword counters too, CR 122.1b) or abilities an effect gave it; no
+ * intrinsic mana ability of a basic land type (CR 305.6). Face down or having lost all abilities, its printed text doesn't
+ * count (CR 708.2, 613.1f). An effect that only says something is true of it gives no ability (rulings).
+ */
+export function hasNoAbilities(s: GameState, o: GameObject, c: Characteristics): boolean {
+  if (c.keywords.length || c.grantedAbilities.length || c.enchantCreature) return false;
+  if (c.subtypes.some((t) => BASIC_LAND_TYPES.includes(t))) return false;
+  if (!c.hasPrintedAbilities || o.faceDown) return true;
+  const d = defOf(s, o);
+  return !d.faces?.length && d.oracleText.replace(/\([^)]*\)/g, "").trim() === "";
+}
+
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
@@ -84,7 +101,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
-  if (spec.noAbilities) return false; // a card's printed text only (printedMatches)
+  if (spec.noAbilities && !hasNoAbilities(s, o, c)) return false;
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.hasAdventure && !(s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
@@ -442,7 +459,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
   if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   // Fang-Druid Summoner: "a creature card with no abilities": nothing in its rules text but reminder text (CR 113.1, 207.2a).
-  if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "")) return false;
+  // Dryad Arbor: a Forest has its intrinsic mana ability (CR 305.6).
+  if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.hasAdventure && d.layout !== "adventure") return false;
   if (spec.enchantCreature && !/^Enchant creature$/m.test(d.oracleText)) return false;

@@ -146,7 +146,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Attacking creatures an effect made blocked, by no creature (Effect becomeBlocked, CR 509.1h). */
@@ -934,6 +934,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
+    // Jaws, Relentless Predator: "Whenever a noncreature artifact is sacrificed or destroyed": anyone's, for whatever
+    // reason (CR 701.8a, 701.21a), as it last existed (CR 603.10a); the permanents leaving with it look back too.
+    if ((ev.sacrificed || ev.destroyed) && ev.snapshot && ev.chars) {
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const gone = { o: ev.snapshot, c: ev.chars };
+      const consider = (src: GameObject, ctrl: PlayerId, triggers?: TriggeredAbility[]) =>
+        add(src, ctrl, (e, t) => e === "permanentSacrificedOrDestroyed" && !!t.sacrificedOrDestroyed && diesMatches(s, t.sacrificedOrDestroyed, src.id, undefined, gone, ctrl), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+      for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
+      for (const left of s.leftTogether ?? []) {
+        const src = s.objects[left.id];
+        if (!src || src.zone === "battlefield") continue;
+        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+      }
+    }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
@@ -1081,6 +1095,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const you = controllerOf(s, w);
       if (ev.controllers.includes(you)) add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+      // Foe-Razer Regent: once for each creature of yours that fought, that one the subject (as it was as it fought).
+      ev.ids.forEach((fid, i) => {
+        const f = s.objects[fid];
+        if (f && ev.controllers[i] === you) add(w, you, (e) => e === "yourCreatureFights", undefined, undefined, f);
+      });
     }
   } else if (ev.type === "untapStepUntapped") {
     for (const id of s.battlefield) {

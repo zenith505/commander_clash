@@ -1408,6 +1408,13 @@ export function parseTargetPhrase(
     const rest = parseTargetPhrase(`${lesserCard[1] ?? ""}${lesserCard[2]} ${lesserCard[3]}`, opts);
     return rest?.kind === "card" && !rest.power && !rest.many ? { ...rest, lesserPowerThanSource: true, text: `target ${phrase.trim().replace(/^target /i, "").toLowerCase()}` } : null;
   }
+  // Ruxa, Patient Professor: "target creature card with no abilities from your graveyard": nothing in its rules text but
+  // reminder text (TargetSpec.noAbilities, printedMatches).
+  const noAbCard = /^(target )?([a-z]+ card) with no abilities (from your graveyard)$/i.exec(phrase.trim());
+  if (noAbCard) {
+    const rest = parseTargetPhrase(`${noAbCard[1] ?? ""}${noAbCard[2]} ${noAbCard[3]}`, opts);
+    return rest?.kind === "card" && !rest.noAbilities && !rest.many ? { ...rest, noAbilities: true, text: `target ${phrase.trim().replace(/^target /i, "").toLowerCase()}` } : null;
+  }
   // Tsabo's Web: "land with an activated ability that isn't a mana ability", printed or granted (CR 605.1a).
   const nonMana = / with an activated ability that isn't a mana ability$/.exec(phrase.trim());
   if (nonMana) {

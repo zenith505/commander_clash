@@ -2135,7 +2135,7 @@ line blocks.
    Auction, Mages' Contest, Pain's Reward: you open, the others top it in turn order, around until all but the high
    bidder decline; a loss of life, so more than your life can be bid; the UI's "Bid N life" and "Don't bid"); piles of
    your top cards with one card taken from the chosen pile, the opponent of your choice picked once the piles are made
-   (Truth or Tale, which also moves Steam Augury's choice of opponent after the separating, as the rulings order it); a
+   (Truth or Tale, as its rulings order it; Steam Augury still chooses the opponent first, as before); a
    face-down and a face-up pile made by the target opponent, the face-down one shown as card backs (Atris, Oracle of
    Half-Truths; Fortune's Favor); the exiled creature cards in piles, yours onto the battlefield (Boneyard Parley); hands
    and permanents shuffled in, that many drawn, tokens counted (The Great Aurora); creatures shuffled in and one creature

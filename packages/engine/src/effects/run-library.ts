@@ -1459,13 +1459,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (sc.moved) return toBottom(s, p.id, sc.looked.filter((id) => obj(s, id).zone === "library"), src, false);
       const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
-      // An opponent who separates is chosen first; one who chooses a pile you made, once the piles are made (rulings on
-      // Truth or Tale: you separate, then an opponent of your choice chooses).
+      // The opponent is chosen first, except for Truth or Tale, whose rulings have you separate and then an opponent of your
+      // choice choose a pile.
+      const late = !!e.pickOne;
       const whichOpp = () => (target?.kind === "player" ? target.id : chooseAnOpponent(s, ctx, src, e.separator === "opponent" ? "choose an opponent to separate the cards into two piles" : "choose an opponent to choose a pile"));
-      let opp = e.separator === "opponent" ? whichOpp() : undefined;
+      let opp = late ? undefined : whichOpp();
       if (opp === "paused") return "paused";
       // No opponent left to separate or to choose: the game is over, and nothing more happens.
-      if (e.separator === "opponent" && (opp === undefined || player(s, opp).lost)) return;
+      if (!late && (opp === undefined || player(s, opp).lost)) return;
       const separator = e.separator === "you" ? p.id : (opp as PlayerId);
       const mode = e.faceDown ? ("faceDown" as const) : e.pickOne ? ("pickOne" as const) : undefined;
       if (sc.separating && sc.found) {
@@ -1478,7 +1479,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "searchLibrary", player: separator, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, dig: { looked, to: e.faceDown ? "for the face-down pile" : "for the first pile", rest: e.faceDown ? "form the face-up pile" : "form the second pile" }, piles: true, ...(separator !== p.id ? { forPlayer: p.id } : {}) };
         return "paused";
       }
-      if (e.separator === "you") {
+      if (late) {
         opp = whichOpp();
         if (opp === "paused") return "paused";
         if (opp === undefined || player(s, opp).lost) return;

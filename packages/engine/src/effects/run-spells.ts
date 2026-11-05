@@ -153,7 +153,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
       // Dragonhawk: "for each of those cards that are still exiled", the cards this ability exiled.
       for (const x of effects) if (x.type === "damage" && typeof x.amount === "object" && x.amount.count.kind === "stillExiled") Object.assign(x, { amount: { ...x.amount, count: { kind: "stillExiled", cards: impulsed } } });
-      const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      const body = { targets: e.targets ?? [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "dies") {
         // "When that creature dies this turn, flip ~" (Initiate of Blood): about that permanent as it is now (CR 603.7c,
         // 400.7), its instructions about this ability's source.
@@ -162,7 +162,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           if (o.zone !== "battlefield") continue;
           addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
           const d = s.delayed![s.delayed!.length - 1]!;
-          Object.assign(d, { to: ["graveyard"], dies: true, ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(e.underYourControl ? { underControl: true } : {}), ...(e.anyPermanent ? { anyPermanent: true } : {}), ...(e.intoYourGraveyard ? { ownedByController: true } : {}), ...(e.ifHadCounter ? { ifHadCounter: e.ifHadCounter } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
+          Object.assign(d, { to: ["graveyard"], dies: true, ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(e.underYourControl ? { underControl: true } : {}), ...(e.anyPermanent ? { anyPermanent: true } : {}), ...(e.intoYourGraveyard ? { ownedByController: true } : {}), ...(e.ifHadCounter ? { ifHadCounter: e.ifHadCounter } : {}), ...(e.lkiCounters ? { lkiCounters: true as const } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
         }
         return;
       }

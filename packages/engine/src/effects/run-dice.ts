@@ -108,6 +108,16 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   // "That player flips a coin" (Planar Chaos): they flip it, win or lose it (CR 705.2), and their Krark's Thumb applies.
   const who = e.who ? players(s, e.who, ctx).find((p) => !player(s, p).lost) : ctx.controller;
   if (who === undefined) return;
+  // "Flip that many coins" (Yusri): the number as it resolves; no coins for 0 (nothing won or lost).
+  if (e.nAmount !== undefined) {
+    const n = Math.max(0, amountNow(s, e.nAmount, ctx));
+    if (!n) {
+      s.resolving!.flipped = { won: false, wins: 0, flips: 0 };
+      log(s, `${player(s, who).name} flips no coins for ${src}.`);
+      return;
+    }
+    e = { ...e, n, nAmount: undefined };
+  }
   const sc = (s.resolving!.scratch ??= {});
   // Krark's Thumb (a replacement, CR 614.1a): each flip is two coins, one of them ignored, so only the kept one counts
   // as won or lost. A second Thumb is treated as one (not modeled: ROADMAP).
@@ -191,7 +201,7 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
     if (won) wins++;
     if (e.n ? i + 1 >= e.n : !won || !e.untilLose) break;
   }
-  s.resolving!.flipped = { won, wins };
+  s.resolving!.flipped = { won, wins, ...(e.n ? { flips: e.n } : {}) };
   log(s, (e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip`) + `${edgar}.`);
 }
 

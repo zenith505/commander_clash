@@ -1091,6 +1091,8 @@ export interface DelayedTrigger {
   ownedByController?: true;
   /** With `dies`: "if it has an egg counter on it" (Xira, the Golden Sting): only if it had one as it last existed (CR 603.4). */
   ifHadCounter?: string;
+  /** With `dies`: the trigger knows the counters the creature had as it last existed (Heroic Sacrifice's "put its counters on", CR 608.2h). */
+  lkiCounters?: true;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
    * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's
@@ -2463,7 +2465,7 @@ export interface Resolving {
   /** For an ability that asks: how many times this ability of its source has resolved this turn, this time included (SpellCondition "resolvedNth"). */
   nth?: number;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */
-  flipped?: { won: boolean; wins: number };
+  flipped?: { won: boolean; wins: number; /** How many coins were flipped in that set, when it was several (Yusri). */ flips?: number };
   /** Effect "chooseOwnCommander" (Stinging Study): the chosen commander's mana value. */
   commanderMv?: number;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */

@@ -1372,6 +1372,8 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         sc.queue = undefined;
       }
       pu.queue.shift();
+      // Sin Prodder: once a player does, no one else is asked (rulings).
+      if (e.firstOnly && made.some((x) => x !== "none")) pu.queue.length = 0;
     }
     if (!pu.acted) {
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
@@ -1401,6 +1403,8 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     if (e.mode) {
       const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
       const then = did === (e.mode === "ifAny") ? e.effects : (e.otherwise ?? []);
+      // "That player" (Sin Prodder): the one who did.
+      if (e.firstOnly && did && sc.mayStep === 0) s.resolving!.choseThisWay = Object.keys(pu.made).map(Number).filter((pid) => pu.made[pid]!.some((x) => x !== "none")) as PlayerId[];
       for (; sc.mayStep! < then.length; sc.mayStep!++) if (runEffect(s, then[sc.mayStep!]!, ctx) === "paused") return "paused";
       sc.punish = sc.punished = sc.mayStep = undefined;
       return;

@@ -263,6 +263,19 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const redirect: DamageRecipient = m[3] === "~" ? { ref: "self" } : { ref: "targetController", index };
     return rule({ ...(m[1] ? { combat: "only" as const } : {}), to: { players: "you" }, by: { target: { ref: "target", index } }, redirect });
   }
+  // Gideon's Sacrifice: "Choose a creature or planeswalker you control. All damage that would be dealt this turn to you and
+  // permanents you control is dealt to the chosen permanent instead (if it's still on the battlefield)": a redirection
+  // (CR 614.9) to the one picked as it resolved, not targeted; none while it's gone or isn't a creature or planeswalker,
+  // the damage it's dealt itself left alone; with several such effects the player being dealt the damage picks one for
+  // each damage event (rulings, CR 616.1). Heroic Sacrifice ("Choose target creature you control. Until end of turn, all
+  // damage that would be dealt to you and creatures you control is dealt to the chosen creature instead", rewritten in
+  // body.ts): that target.
+  if ((m = /^All damage that would be dealt this turn to (you and (?:permanents|creatures) you control) is dealt to the chosen (permanent|creature) instead$/.exec(s))) {
+    const to = protectedGroup(m[1]!);
+    const target = ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many && !ctx.lastChosen ? ctx.lastObjectTarget : undefined;
+    const redirect: DamageRecipient | null = ctx.lastChosen && target === undefined ? { ref: "created" } : target !== undefined ? { ref: "target", index: target } : null;
+    return to && redirect ? rule({ to, redirect }) : null;
+  }
   // Kjeldoran Royal Guard: "All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~
   // instead": not if ~ has left the battlefield by then (rulings, CR 614.9).
   if (/^All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~ instead$/.test(s))

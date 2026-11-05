@@ -729,7 +729,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "countersPutOnThisWay":
       return new Set((s.resolving?.countersPutThisWay ?? []).map((x) => `${x.id}@${x.zc}`)).size;
     case "flipsWon":
-      return s.resolving?.flipped?.wins ?? 0;
+      return c.lost ? Math.max(0, (s.resolving?.flipped?.flips ?? (s.resolving?.flipped ? 1 : 0)) - (s.resolving?.flipped?.wins ?? 0)) : (s.resolving?.flipped?.wins ?? 0);
     case "milledThisWay":
       return (s.resolving?.milled ?? []).filter((m) => !!s.objects[m.id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[m.id]!)))).length;
     case "drawnThisWay":
@@ -1547,7 +1547,7 @@ function describeCount(c: Count): string {
     case "discardedMatching":
       return `#${c.filter.text}s discarded`;
     case "flipsWon":
-      return c.heads ? "coins that came up heads" : "flips won";
+      return c.heads ? "coins that came up heads" : c.lost ? "flips lost" : "flips won";
     case "mutations":
       return "times mutated";
     default:

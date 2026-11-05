@@ -3,7 +3,7 @@
 import type { AmountExpr, Count, Effect, Modification, ObjRef, TargetSpec } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular, X } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
-import { addTarget } from "../body";
+import { addTarget, parseBody } from "../body";
 import { parseCount } from "../counts";
 import { parseBecomes, parseChanges, parseSentence } from "../sentence";
 import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMods } from "../statics";
@@ -447,6 +447,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (e?.type !== "search" || !e.filter || e.filter.bound || e.filter.manaValue) return null;
     const filter: TargetSpec = { ...e.filter, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1, signed: true } }, text: `${e.filter.text} with lesser mana value` };
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ ...e, filter }], text: s.replace(/^When that creature dies this turn, /, ""), thisTurn: true }];
+  }
+  // Heroic Sacrifice: "When that creature dies this turn, put its counters on up to one target creature you control and
+  // draw a card": a delayed trigger about the target (CR 603.7) with a target of its own, chosen as it's put on the stack
+  // (CR 603.3d); as many of each kind of counter as the creature had as it last existed, put on (CR 608.2h), and the draw
+  // either way.
+  if (/^When that creature dies this turn, put its counters on up to one target creature you control and draw a card$/.test(s) && ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many) {
+    const inner = parseBody("Put those counters on up to one target creature you control. Draw a card.", { subjectLeft: true });
+    if (!inner || inner.targets.length !== 1 || inner.effects.length !== 2 || inner.effects[0]!.type !== "lastKnownCounters") return null;
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: inner.effects, targets: inner.targets, lkiCounters: true, text: "put its counters on up to one target creature you control and draw a card", thisTurn: true }];
   }
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,863 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,584 of
+29,870 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2123,6 +2123,18 @@ line blocks.
    even if it can't be (Ironscale Hydra); "Whenever a noncreature artifact is sacrificed or destroyed" (Jaws, Relentless
    Predator: anyone's, destroyed for any reason); "Players can't cast spells of the chosen type" (Archon of Valor's Reach:
    bots choose the type of the fewest of their own cards). +10, 29,863 of 31,936.
+   Round 279: "Put a number of +1/+1 counters on it equal to its power" (Experiment Twelve, read before the counters go
+   on); "All damage that would be dealt this turn to you and permanents you control is dealt to the chosen permanent
+   instead" (Gideon's Sacrifice, Heroic Sacrifice, CR 614.9; the Heroic one also moves the sacrificed creature's
+   counters, last known, to up to one target creature when it dies this turn); "Flip that many coins" after choosing a
+   number, and free casts from hand this turn for five wins (Yusri, Fortune's Flame); a creature you may spare from
+   damage to each other creature (Thunderwave); "That creature's controller may have ~ deal 1 damage to it" (Requiem
+   Monolith); a revealed card any opponent may have you put into your graveyard, asked in turn order, the first yes
+   stops (Sin Prodder). +7, 29,870 of 31,936.
+   Out after round 279 (looked at, not done): Game of Chaos (each next flip's stakes double and the winner or loser
+   decides whether to flip again); Grothama, All-Devouring (damage dealt to it by each player's sources this turn);
+   Lich's Mastery (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy ("pay
+   any amount of mana" plus its emblem); Deathmist Raptor (return it face up or face down).
    Out after round 278 (looked at, not done): Enchanter's Bane (the target enchantment deals the damage, and its
    controller's punisher option is sacrificing that one target); Squee's Revenge ("choose a number" with no upper bound);
    Ashiok, Nightmare Muse and Jace, Architect of Thought (their other loyalty abilities); Spectral Searchlight and Radiant

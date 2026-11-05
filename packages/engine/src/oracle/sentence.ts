@@ -567,7 +567,10 @@ export function parseChanges(text: string): Modification[] | null {
   const notType = /^(.+?),? and isn't an? ([A-Z][a-z]+)$/.exec(text);
   const lostSubtype = notType && CREATURE_TYPES.has(notType[2]!) ? notType[2]! : undefined;
   if (lostSubtype) text = notType![1]!;
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) |isn't an artifact$)|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i);
+  // Not inside a quoted ability (Requiem Monolith: 'gains "Whenever this creature is dealt damage, you draw that many
+  // cards and lose that much life."'): its spaces are hidden while splitting.
+  const masked = text.replace(/"[^"]*"/g, (q) => q.replace(/ /g, "\u0001"));
+  const parts = masked.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) |isn't an artifact$)|, (?=(?:assigns? |can attack |gets? [+-]|gains? |loses? all abilities,))/i).map((x) => x.replace(/\u0001/g, " "));
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();

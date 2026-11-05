@@ -1086,6 +1086,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAnyCounters", what, n: /^a$/i.test(m[2]!) ? 1 : amt(m[2]!), ...(m[1] ? { upTo: true as const } : {}) }] : null;
   }
+  // Rhys, the Evermore: "Remove any number of counters from target creature you control": chosen one at a time as it
+  // resolves, any kinds and as many as there are, none too; then removed together.
+  if ((m = /^Remove any number of counters from (target .+)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "removeAnyCounters", what, n: { count: { kind: "counters", counter: "any", of: what } }, upTo: true }] : null;
+  }
   // Gremlin Mine: "Remove up to four charge counters from target noncreature artifact": as many of them as its controller
   // chooses as it resolves, none to four (only that kind).
   if ((m = new RegExp(`^Remove up to (${NUM.slice(1, -1)}) ${COUNTER} counters from (target .+)$`, "i").exec(s))) {
@@ -1355,6 +1361,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }] : null;
   }
+  // Fateful Handoff: "... target artifact or creature you control. An opponent gains control of that permanent": the one
+  // target, given to the opponent chosen as it resolves, for the rest of the game (layer 2).
+  if (/^That player gains control of that permanent$/.test(s) && ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && !ctx.targets[0]!.many && !ctx.targets[0]!.optional)
+    return [{ type: "continuous", what: { ref: "target", index: ctx.lastObjectTarget }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   if (/^That player gains control of ~$/.test(s) && ctx.chosenOpponent && !ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // Act of Authority: "you may exile target artifact or enchantment. If you do, its controller gains control of ~": who
   // controlled it, as it last existed on the battlefield (CR 608.2h), for the rest of the game (layer 2).

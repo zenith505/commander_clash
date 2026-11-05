@@ -62,6 +62,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
       mark(e.giveTo.index);
       if (e.what.ref === "target") mark(e.what.index, e.what.n);
     }
+    // Fateful Handoff: "... target artifact or creature you control. An opponent gains control of that permanent": given
+    // away like Donate's, so bots don't cast it on their own creatures. (Discerning Financier's Treasure is worth giving.)
+    if (e.type === "continuous" && e.giveTo?.ref === "chosenPlayer" && e.what.ref === "target" && e.mods.some((m) => m.kind === "control") && body.targets[e.what.index]?.types?.includes("Creature")) mark(e.what.index, e.what.n);
     // "Destroy all creatures target player controls": aimed at an opponent, like the permanents themselves would be.
     const group = "what" in e && e.what && typeof e.what === "object" && "ref" in e.what ? e.what : e.type === "damage" ? e.to : undefined;
     if (group?.ref === "each" && group.of?.ref === "target") {

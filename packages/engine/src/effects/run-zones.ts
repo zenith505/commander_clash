@@ -3511,7 +3511,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // they controlled (CR 608.2h). A destroyed one counts even if it went somewhere other than a graveyard (rulings).
       const counts = new Map<PlayerId, number>();
       for (const x of s.resolving?.[e.which] ?? [])
-        if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + (e.manaValue ? (x.o.faceDown ? 0 : defMv(defOf(s, x.o))) : 1));
+        if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + (e.manaValue ? (x.o.faceDown ? 0 : defMv(defOf(s, x.o))) : e.power ? Math.max(0, x.ch.power ?? 0) : 1));
       // A search pauses for its player's choice (Winds of Abandon): the players done so far are kept.
       const done = (s.resolving!.scratch ??= {}).forEachDone ?? [];
       s.resolving!.scratch.forEachDone = done;

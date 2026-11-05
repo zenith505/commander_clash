@@ -1544,7 +1544,8 @@ export function parseTargetPhrase(
   }
   // Dutiful Replicator: "target token you control not named ~": a permanent with any other name. Clever Conjurer:
   // "target permanent not named ~" (CR 201.5: its own name, so another one with that name can't be untapped either).
-  if (opts.target && /^(?:[a-z ]*token you control|permanent) not named ~$/.test(p)) {
+  // Detention Sphere: "target nonland permanent not named ~" the same.
+  if (opts.target && /^(?:[a-z ]*token you control|permanent|nonland permanent) not named ~$/.test(p)) {
     extra.notNamed = "~";
     p = p.replace(/ not named ~$/, "");
   }

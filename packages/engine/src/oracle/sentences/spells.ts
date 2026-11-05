@@ -725,6 +725,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const except = m[3] ? { colors: [COLOR_WORDS[m[3].toLowerCase()]!] } : m[2] ? { notLegendary: true } : undefined;
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(except ? { except } : {}) }] : null;
   }
+  // Display of Power: "Copy any number of target instant and/or sorcery spells": one copy of each of them (rulings), as many
+  // targets as announced (TargetSpec.many), the copies put on the stack one at a time in the order they were targeted.
+  if (/^Copy any number of target instant and\/or sorcery spells$/.test(s)) {
+    const spec: TargetSpec = { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "target instant or sorcery spell", many: "any" };
+    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec), many: true }, n: 1, newTargets: false }];
+  }
   // Meletis Charlatan: "The controller of target instant or sorcery spell copies it and may choose new targets for the
   // copy" (body.ts joins the two sentences): any such spell, anyone's; its controller controls the copy and chooses the new
   // targets (rulings, CR 707.10).

@@ -9116,6 +9116,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "549e6de7-56e9-4f5c-8c88-30e446bc53bb",
+  "name": "Glittering Lion",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Cat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat"
+  ],
+  "oracleText": "Prevent all damage that would be dealt to this creature.\n{3}: Until end of turn, this creature loses \"Prevent all damage that would be dealt to this creature.\" Any player may activate this ability.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e3886fe8-9b76-4613-8891-4ec74657c087",
   "name": "Glorious Anthem",
   "manaCost": "{1}{W}{W}",

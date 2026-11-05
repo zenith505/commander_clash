@@ -1,7 +1,7 @@
 # Roadmap
 
-29,772 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,570 of
+29,785 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,571 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2088,8 +2088,8 @@ line blocks.
    Deliberation); "... If they don't, they lose 2 life and you draw a card" (Braids's Frightful Return); "each player
    flips a coin. Each player whose coin comes up tails sacrifices a creature of their choice" (Goblin Assassin: flips no
    one wins or loses, rulings; Edgar's heads apply; with Krark's Thumb the heads coin is kept, not asked); "Remove any
-   number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too). No new
-   prompts (all of them reuse existing ones). +13, 29,748 of 31,936.
+   number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too; with a
+   browser test). No new prompts (all of them reuse existing ones). +13, 29,785 of 31,936.
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining

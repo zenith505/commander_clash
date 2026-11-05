@@ -178,6 +178,8 @@ export interface Ctx {
   chooseResult?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
   defending?: boolean;
+  /** An activated ability with "Activate only if ~ is attacking" (Ancient Hellkite): "defending player" is the player ~ attacks. */
+  selfAttacking?: boolean;
   /** "Whenever a source you control deals damage to a permanent or player": "that permanent or player" is the one dealt it. */
   eventRecipient?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
@@ -1049,7 +1051,7 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
   return undefined;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // Vildin-Pack Alpha: "Whenever a Werewolf you control enters, you may transform it": the whole instruction, about the
   // permanent that entered while it's still that object (CR 400.7); one that can't transform doesn't (CR 701.27c).
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
@@ -1171,7 +1173,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
@@ -1413,6 +1415,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.activatedAbility ? { activatedAbility: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
+    ...(opts.selfAttacking ? { selfAttacking: true } : {}),
     ...(opts.eventRecipient ? { eventRecipient: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
     ...(opts.selfEntered ? { selfEntered: true } : {}),
@@ -5034,6 +5037,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay", subtype: sacSub[1]! }, effects: inner });
       continue;
     }
+    // Warren Weirding: "Target player sacrifices a creature of their choice. If a Goblin is sacrificed this way, that player
+    // creates two 1/1 black Goblin Rogue creature tokens, and those tokens gain haste until end of turn.": the creature as it
+    // last existed (CR 608.2h), a changeling too.
+    const sacTheirSub = /^If an? ([A-Z][a-z]+) is sacrificed this way, (that player creates [^.]+ tokens), and those tokens (gain [a-z]+ until end of turn)$/.exec(s);
+    if (sacTheirSub && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "target" && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber) {
+      const made = parseOne(capital(sacTheirSub[2]!), ctx);
+      const gain = made && parseOne(`They ${sacTheirSub[3]!}`, ctx);
+      if (!made || !gain) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", subtype: sacTheirSub[1]! }, effects: [...made, ...gain] });
+      continue;
+    }
     // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life.": only if it was
     // exiled from the battlefield (rulings: not from the zone it went to if it left first).
     if (sacDo && !/, where X is /.test(s) && sacPrev?.type === "exile" && sacPrev.what.ref === "self" && Object.keys(sacPrev).length === 2) {
@@ -5829,6 +5843,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(webMay[1]!), ctx);
       if (!then || then.some((e) => pauses(e))) return null;
       effects.push({ type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile" }], text: "exile a card from your graveyard", each: true, need: { zone: "graveyard", filter: { kind: "card", text: "card" } } }, { type: "if", cond: { kind: "theyChose", not: true }, effects: then });
+      si++;
+      continue;
+    }
+    // Apathy: "At the beginning of the upkeep of enchanted creature's controller, that player may discard a card at random.
+    // If the player does, untap that creature.": their choice (none to make with an empty hand, CR 101.3), then what it buys.
+    const discardMay = ctx.eventPlayer && !ctx.spell ? /^[Tt]hat player may discard a card( at random)?$/.exec(s) : null;
+    const discardDo = discardMay ? /^If (?:the player|that player|they) (?:does|do), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (discardMay && discardDo) {
+      const then = parseOne(capital(discardDo[1]!), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: !!discardMay[1] }], text: `discard a card${discardMay[1] ?? ""}`, each: true, need: { zone: "hand", filter: { kind: "card", text: "card" } } }, { type: "if", cond: { kind: "theyChose" }, effects: then });
       si++;
       continue;
     }
@@ -7992,6 +8017,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // discarded (rulings: with one card in hand, it's discarded and they draw).
     if (/^If the player does, they draw a card$/.test(s) && prevDiscard?.type === "discard" && prevDiscard.who.ref === "eventPlayer" && prevDiscard.n === 1 && !prevDiscard.upTo) {
       effects.push({ type: "draw", who: prevDiscard.who, n: { count: { kind: "discardedThisWay" } } });
+      continue;
+    }
+    // Mind Roots: "Target player discards two cards. Put up to one land card discarded this way onto the battlefield tapped
+    // under your control.": you choose among the cards that discard put into that player's graveyard, still there (CR 400.7).
+    const putDiscarded = /^Put up to one (land) card discarded this way onto the battlefield( tapped)? under your control$/.exec(s);
+    const prevDiscard0 = effects[effects.length - 1];
+    if (putDiscarded && prevDiscard0?.type === "discard" && prevDiscard0.who.ref === "target" && !("n" in prevDiscard0.who && prevDiscard0.who.n)) {
+      const filter = parseSearchFilter(`${putDiscarded[1]} card`);
+      if (!filter) return null;
+      effects.push({ type: "chooseFromGraveyard", who: prevDiscard0.who, youChoose: true, filter, n: 1, upTo: true, discarded: true, dest: "battlefield", ...(putDiscarded[2] ? { tapped: true as const } : {}) });
       continue;
     }
     // Gerrard's Verdict: "Target player discards two cards. You gain 3 life for each land card discarded this way."

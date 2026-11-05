@@ -1772,6 +1772,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Equipment, "you" the controller of the source (rulings).
   if ((m = /^an Equipment named (.+) is attached to a creature you control$/.exec(text)))
     return { kind: "onBattlefield", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], named: m[1]!, attachedTo: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, text: `Equipment named ${m[1]} attached to a creature you control` }, min: 1 };
+  // Lurebound Scarecrow: "When you control no permanents of the chosen color": the color chosen as it entered; with none
+  // chosen the condition is undefined and never true (rulings), see layers.ts.
+  if (text === "you control no permanents of the chosen color") return { kind: "control", who: "you", filter: { kind: "object", types: [], notTypes: [], notColors: [], chosen: "color", text: "permanent of the chosen color" }, max: 0 };
   // Dust Stalker: "if you control no other colorless creatures".
   if ((m = /^you control no other ((?:colorless )?(?:artifact|creature|land|enchantment))s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the

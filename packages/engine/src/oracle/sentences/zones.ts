@@ -872,6 +872,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
   if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];
+  // Entrails Feaster: "exile a creature card from a graveyard": the same, a card of that kind.
+  if ((m = /^[Ee]xile an? ((?:creature|artifact|land|instant|sorcery|enchantment) card) from a graveyard$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true, filter }] : null;
+  }
   // Realmbreaker, the Invasion Tree: "Target opponent mills three cards. Put a land card from their graveyard onto the
   // battlefield tapped under your control." Not targeted: you choose it as this resolves, any land card there, milled
   // just now or not (rulings).

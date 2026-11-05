@@ -3030,6 +3030,22 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${entersInCombat[1]} enters, ${entersInCombat[2]}`);
     return t && t !== "fail" && t.event === "permanentEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "combat" } } : "fail";
   }
+  // Artificer's Hex: "At the beginning of your upkeep, if enchanted Equipment is attached to a creature, destroy that
+  // creature.": an intervening if (CR 603.4), checked again as it resolves; the creature it's attached to then (rulings).
+  const hexed = /^(At the beginning of your upkeep), if enchanted Equipment is attached to a creature, destroy that creature\.$/.exec(line);
+  if (hexed) {
+    const t = parseTrigger(`${hexed[1]}, destroy enchanted creature.`);
+    if (!t || t === "fail" || t.ifCond || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "destroy") return "fail";
+    const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    return { ...t, body: { ...t.body, effects: [{ type: "destroy", what: { ref: "attachedHost" } }], text: "destroy that creature." }, ifCond: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], attachedTo: creature, text: "Equipment attached to a creature" } } };
+  }
+  // Encumbered Reejerey: "Whenever ~ becomes tapped while it has a -1/-1 counter on it, ...": it triggers only if the counter
+  // is on it as it becomes tapped (a trigger condition, not an intervening if: nothing is checked again as it resolves).
+  const tappedWithCounter = new RegExp(`^Whenever ~ becomes tapped while it has an? ${COUNTER} counter on it, (.+)$`).exec(line);
+  if (tappedWithCounter) {
+    const t = parseTrigger(`Whenever ~ becomes tapped, ${tappedWithCounter[2]}`);
+    return t && t !== "fail" && t.event === "selfBecomesTapped" && !t.activeIf ? { ...t, activeIf: { kind: "selfCounter", counter: counterKind(tappedWithCounter[1]!) } } : "fail";
+  }
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
   if (lossOnYourTurn) {
     const t = parseTrigger(`Whenever an opponent loses life, ${lossOnYourTurn[1]}`);

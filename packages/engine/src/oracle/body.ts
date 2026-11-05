@@ -1261,6 +1261,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Choose two target creatures\. Tap those creatures, then /, "Tap two target creatures, then ");
   // Willowdusk, Essence Seer: "Choose another target creature. Put a number of +1/+1 counters on it equal to ...": the same.
   text = text.replace(/(^|: )Choose (another target creature)\. (Put a number of [+-]1\/[+-]1 counters) on it (equal to [^.]+)\./, "$1$3 on $2 $4.");
+  // Heroic Sacrifice: "Until end of turn, all damage that would be dealt to you and creatures you control is dealt to the
+  // chosen creature instead": the same as "all damage that would be dealt this turn to ..." (sentences/prevention.ts).
+  text = text.replace(/(^|\. )Until end of turn, all damage that would be dealt to (you and creatures you control) is dealt to the chosen creature instead\./, "$1All damage that would be dealt this turn to $2 is dealt to the chosen creature instead.");
+  // Experiment Twelve: "put +1/+1 counters on that creature equal to its power": the same as "put a number of +1/+1
+  // counters on it equal to its power" (its power as the trigger resolves).
+  text = text.replace(/^([Pp])ut ([+-]1\/[+-]1) counters on (it|that creature) (equal to its power)\.$/, "$1ut a number of $2 counters on $3 $4.");
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
   // (rulings), the same as "Choose an opponent. That player gains control of ~."
   if (opts.selfIt || !/\bit\b/.test(text)) text = text.replace(/^[Aa]n opponent gains control of (?:~|it)\.$/, "Choose an opponent. That player gains control of ~.");
@@ -5563,6 +5569,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Sin Prodder: "Reveal the top card of your library. Any opponent may have you put that card into your graveyard. If a
+    // player does, ~ deals damage to that player equal to that card's mana value. Otherwise, put that card into your
+    // hand.": each opponent in turn order, starting after you, until one does (rulings); that one is dealt the damage. The
+    // damage is worked out from the card while it's still the revealed one, so it's dealt before the card moves (nothing
+    // happens in between that either could change).
+    if (s === "Any opponent may have you put that card into your graveyard" && effects.at(-1)?.type === "revealTop" && sentences[si + 1]?.replace(/\.$/, "") === "If a player does, ~ deals damage to that player equal to that card's mana value" && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, put that card into your hand") {
+      const toYard = revealedAction("put it into your graveyard", ctx);
+      const toHand = revealedAction("put it into your hand", ctx);
+      if (!toYard || !toHand) return null;
+      effects.push({ type: "punisher", who: { ref: "eachOpponent" }, options: [{ allow: "Have them put it into their graveyard" }], effects: [{ type: "damage", amount: { count: { kind: "revealedManaValue" } }, to: { ref: "choseThisWay" } }, ...toYard], mode: "ifAny", firstOnly: true, otherwise: toHand, thenText: "the revealed card goes to their graveyard and ~ deals damage to you equal to its mana value (if no one does, it goes to their hand)" });
+      si += 2;
+      continue;
+    }
     const anyMay = /^[Aa]ny (player|opponent) may (.+)$/.exec(s);
     const anyThen = anyMay && /^If (a player does|no one does), (.+)$/.exec(sentences[si + 1] ?? "");
     if (anyMay && anyThen) {
@@ -5655,6 +5674,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!fx || fx.length !== 1 || fx[0]!.type !== "createToken") return null;
       effects.push({ type: "joinForces", activeFirst: true }, ...replaceX(fx, { count: { kind: "joinForcesPaid", whose: { ref: "eachOne" } } }));
       si++;
+      continue;
+    }
+    // Requiem Monolith: "Until end of turn, target creature gains "...". That creature's controller may have ~ deal 1
+    // damage to it.": that player decides as it resolves (CR 608.2d); the damage is dealt to the target by ~ (after the
+    // ability is gained, so the gained trigger sees it).
+    const ctrlHave = /^That creature's controller may have ~ deal (\d+) damage to it$/.exec(s);
+    if (ctrlHave && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many) {
+      const index = ctx.lastObjectTarget;
+      effects.push({ type: "eachMay", who: { ref: "targetController", index }, effects: [{ type: "damage", amount: Number(ctrlHave[1]), to: { ref: "target", index } }], text: `have ~ deal ${ctrlHave[1]} damage to their creature` });
       continue;
     }
     // "Target opponent may have ~ deal 4 damage to them. If that player doesn't, you draw three cards." (Risk Factor): the
@@ -8620,7 +8648,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
-    if (/^[Rr]eveal the top card of your library$/.test(s) && /\bthat card's mana value\b/.test(sentences[si + 1] ?? "") && !/^If /.test(sentences[si + 1] ?? "")) {
+    // Sin Prodder: "Reveal the top card of your library. Any opponent may have you put that card into your graveyard. ..."
+    // (see the punisher below).
+    if (/^[Rr]eveal the top card of your library$/.test(s) && ((/\bthat card's mana value\b/.test(sentences[si + 1] ?? "") && !/^If /.test(sentences[si + 1] ?? "")) || sentences[si + 1]?.replace(/\.$/, "") === "Any opponent may have you put that card into your graveyard")) {
       effects.push({ type: "revealTop" });
       ctx.revealedTop = true;
       continue;
@@ -11135,6 +11165,31 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (perOppFlip && /^For each flip you win, draw a card\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "flipEachOpponent" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "flipsWon" } } }, { type: "damage", to: { ref: "flippedTails" }, amount: Number(perOppFlip[1]) });
       si += 2;
+      continue;
+    }
+    // Thunderwave: "You may choose a creature. ~ deals 3 damage to each creature not chosen this way.": any one creature
+    // or none, not targeted, chosen as it resolves (CR 608.2d), then the damage to all the rest at once.
+    const notChosenDamage = /^You may choose a creature$/.test(s) ? /^~ deals (\d+) damage to each creature not chosen this way\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (notChosenDamage) {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "pick", who: { ref: "you" }, filter: creature, n: 1, action: "choose", upTo: true, anyController: true, prompt: `click up to one creature to spare, then choose it (~ deals ${notChosenDamage[1]} damage to each creature not chosen).` }, { type: "damage", amount: Number(notChosenDamage[1]), to: { ref: "each", filter: creature, notCreated: true } });
+      si++;
+      continue;
+    }
+    // Yusri, Fortune's Flame: "choose a number between 1 and 5. Flip that many coins.": as many flips as the number chosen
+    // as it resolves (CR 705.2, you call them), the wins and losses counted for "for each flip you win" and "for each
+    // flip you lose".
+    const chosenN = effects.at(-1);
+    if (/^Flip that many coins$/.test(s) && chosenN?.type === "choose" && chosenN.choice === "number" && chosenN.range && !chosenN.each && !chosenN.who) {
+      effects.push({ type: "flipCoin", nAmount: { count: { kind: "chosenNumber" } } });
+      continue;
+    }
+    // Yusri: "If you won five flips this way, you may cast spells from your hand this turn without paying their mana
+    // costs": Omniscience's alternative cost for the rest of this turn (CR 118.9), with the normal timing; X is 0 and
+    // additional costs are still paid (rulings).
+    const wonN = /^If you won (two|three|four|five) flips this way, you may cast spells from your hand this turn without paying their mana costs$/.exec(s);
+    if (wonN && effects.some((e) => e.type === "flipCoin" && (e.nAmount || e.n))) {
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "flipsWon" } }, min: num(wonN[1]!) }, effects: [{ type: "turnRules", rules: ["castFromHandFree"] }] });
       continue;
     }
     // Mana Clash: "You and target opponent each flip a coin. ~ deals 1 damage to each player whose coin comes up tails.

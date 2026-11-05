@@ -1374,7 +1374,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Each player chooses a creature type." (Patriarch's Bidding, Harsh Mercy): one each, "a type chosen this way" after.
   if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
   // "Choose a number between 0 and 10." (Expel the Interlopers): as it resolves, kept for the rest (CR 608.2d).
-  if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
+  if ((m = /^[Cc]hoose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
   // Terraformer: "Choose a basic land type. Each land you control becomes that type until end of turn."
   if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
   // Illusionary Presence, Barbarian Guides: "Choose a land type." as it resolves: any land type (CR 205.3i), for "landwalk

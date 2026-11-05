@@ -3674,6 +3674,14 @@ export type Effect =
    * { ref: "flippedTails" }.
    */
   | { type: "flipEachOpponent" }
+  /**
+   * Life bidding (Illicit Auction, Mages' Contest, Pain's Reward): `bidders` bid, you first with `start` (a number, or
+   * "any": you choose one, 0 or more), then in turn order after you each may top the high bid; it ends once every other
+   * bidder has declined to top the bid that stands (rulings). The high bidder loses that much life (a loss, not a
+   * payment: more than their life total can be bid, rulings) and is kept as { ref: "chosenPlayer" }; SpellCondition
+   * "wonBidding" asks whether that's you. `prize` says what the bidding is for (bots).
+   */
+  | { type: "bidLife"; bidders: "each" | "targetSpellController"; start: number | "any"; prize: "control" | "draw" | "counter" }
   | { type: "flipCoin"; /** "That player flips a coin" (Planar Chaos): the flipper, who wins or loses it (default: you). */ who?: PlayerRef; untilLose?: true; /** With `untilLose`: "or choose to stop flipping" (Fiery Gambit): asked after each flip won whether to flip again (rulings); stopping, the last flip was won. `enough`: wins past which more flips do nothing more (for bots). */ mayStop?: { enough: number }; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "Choose a number between 1 and 5. Flip that many coins." (Yusri, Fortune's Flame): `n` worked out as it resolves; none flipped for 0. */ nAmount?: Amount; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
@@ -4213,7 +4221,17 @@ export type Effect =
    * beginning of the next end step." An opponent you choose (as it resolves) picks one of the targets still legal; with
    * only one, that one goes to your hand (rulings).
    */
-  | { type: "opponentSplitsTargets"; what: ObjRef }
+  | {
+      type: "opponentSplitsTargets";
+      what: ObjRef;
+      /**
+       * Deliver Unto Evil: "If you control a Bolas planeswalker, return those cards to your hand. Otherwise, an opponent
+       * chooses two of them. Leave the chosen cards in your graveyard and put the rest into your hand.": the opponent
+       * chooses this many of the targets still legal (all of them if fewer), which stay; the rest go to your hand; all go
+       * to your hand while you control a planeswalker with this subtype as it resolves (rulings).
+       */
+      leave?: { n: number; unlessPlaneswalker: string };
+    }
   /**
    * "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
    * hand and the other into your graveyard." (Fact or Fiction), or you separate them and an opponent chooses the pile
@@ -4221,7 +4239,39 @@ export type Effect =
    * opponent is one you choose as it resolves (rulings). `rest`: the other pile goes to the graveyard, or on the bottom
    * of the library in any order (Jace, Architect of Thought).
    */
-  | { type: "piles"; n: Amount; separator: "you" | "opponent"; rest: "graveyard" | "bottom" }
+  | {
+      type: "piles";
+      n: Amount;
+      separator: "you" | "opponent";
+      rest: "graveyard" | "bottom";
+      /** Truth or Tale: the chosen pile isn't put into the hand; you choose one card of it, and every other revealed card goes on the bottom (rulings). */
+      pickOne?: true;
+      /** Atris, Oracle of Half-Truths: the separator only looks at the cards (they aren't revealed), and the first pile is face down: the chooser sees how many cards it has, not which (rulings). */
+      faceDown?: true;
+      /** The opponent who separates is this target player, not one chosen as it resolves. */
+      by?: number;
+    }
+  /**
+   * Boneyard Parley: "An opponent separates those cards into two piles. Put all cards from the pile of your choice onto
+   * the battlefield under your control and the rest into their owners' graveyards." The cards this resolution exiled from
+   * graveyards (ResolvingInfo.exiledCards), separated by an opponent chosen as it resolves, not targeted (rulings).
+   */
+  | { type: "exiledPiles" }
+  /**
+   * Collision of Realms: "Each player shuffles all creatures they own into their library. Each player who shuffled a
+   * nontoken creature into their library this way reveals cards from the top of their library until they reveal a
+   * creature card, then puts that card onto the battlefield and the rest on the bottom of their library in a random
+   * order." All at once at each step (rulings): every creature leaves, every player shuffles, the players who shuffled a
+   * nontoken creature reveal, the creature cards enter together, then the rest go to the bottom.
+   */
+  | { type: "shuffleCreaturesReveal" }
+  /**
+   * Sculpted Sunburst: "Choose a creature you control, then each opponent chooses a creature they control with equal or
+   * lesser power. If you chose a creature this way, exile each creature not chosen by any player this way." Chosen as it
+   * resolves, not targeted, you first and then each opponent in turn order (rulings, CR 101.4); with no creature chosen
+   * by you, nothing is exiled.
+   */
+  | { type: "sunburstChoose" }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -4501,6 +4551,8 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
   | { kind: "wonFlip"; lost?: true }
+  /** "If you win the bidding" (Mages' Contest): you're the high bidder of Effect "bidLife". */
+  | { kind: "wonBidding" }
   /** "Choose flying or indestructible at random" (Blitzwing, Adaptive Assailant): the first of two, with even chances, decided as the instruction is reached. */
   | { kind: "atRandom" }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */

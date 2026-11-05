@@ -1087,10 +1087,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "shuffleZones": {
       const shuffled: [PlayerId, number][] = [];
+      // The Great Aurora: how many permanents each owner shuffled in, tokens too, for "draws that many" (rulings).
+      const permsOf: Record<number, number> = {};
       if (e.permanents) {
         // Sway of the Stars: all of them leave the battlefield at once (CR 101.4), each into its owner's library.
         const who = new Set(players(s, e.who, ctx));
         const leaving = s.battlefield.filter((id) => who.has(obj(s, id).owner));
+        for (const id of leaving) permsOf[obj(s, id).owner] = (permsOf[obj(s, id).owner] ?? 0) + 1;
         if (leaving.length) log(s, `${src} puts ${leaving.map((id) => characteristics(s, obj(s, id)).name).join(", ")} into their owners' libraries.`);
         for (const id of leaving) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "library");
       }
@@ -1127,9 +1130,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
-        shuffled.push([pid, ids.length]);
+        shuffled.push([pid, ids.length + (e.drawThatMany ? (permsOf[pid] ?? 0) : 0)]);
         if (e.countThisWay && s.resolving) s.resolving.movedLinked = (s.resolving.movedLinked ?? 0) + ids.length;
-        log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? (e.permanents ? "hand, graveyard and permanents" : "hand and graveyard") : e.hand ? "hand" : "graveyard"}`} into their library.`);
+        log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? (e.permanents ? "hand, graveyard and permanents" : "hand and graveyard") : e.hand ? (e.permanents ? "hand and permanents" : "hand") : "graveyard"}`} into their library.`);
       }
       // Winds of Change: each draws as many as they shuffled into their own library (rulings).
       if (e.drawThatMany) for (const [pid, n] of shuffled) if (n && !player(s, pid).lost) draw(s, pid, n);
@@ -1438,24 +1441,33 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "piles": {
       // CR 700.3: the revealed cards are separated into two piles while still in the library (700.3c); one pile is chosen
       // and put into the hand, the other into the graveyard (or on the bottom of the library, in an order its owner
-      // chooses). Piles can be empty (rulings).
+      // chooses). Piles can be empty (rulings). Truth or Tale (`pickOne`): one card of the chosen pile goes into the hand
+      // and all the others on the bottom. Atris (`faceDown`): the target opponent only looks at the cards, and the first
+      // pile is face down, so the chooser sees only how many cards it has (rulings).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const p = player(s, ctx.controller);
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      const count = (n: number) => (n === 1 ? "1 card" : `${n} cards`);
+      const target = e.by !== undefined ? ctx.targets[e.by] : undefined;
+      if (e.by !== undefined && (target?.kind !== "player" || !ctx.legal[e.by] || player(s, target.id).lost)) return;
       if (!sc.looked) {
         sc.looked = p.library.slice(0, Math.max(0, amountNow(s, e.n, ctx)));
         if (!sc.looked.length) return;
-        log(s, `${p.name} reveals the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library (${names(sc.looked)}).`);
+        if (e.faceDown && target?.kind === "player") log(s, `${player(s, target.id).name} looks at the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${p.name}'s library.`);
+        else log(s, `${p.name} reveals the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library (${names(sc.looked)}).`);
       }
       if (sc.moved) return toBottom(s, p.id, sc.looked.filter((id) => obj(s, id).zone === "library"), src, false);
       const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
-      const opp = chooseAnOpponent(s, ctx, src, e.separator === "opponent" ? "choose an opponent to separate the cards into two piles" : "choose an opponent to choose a pile");
+      // An opponent who separates is chosen first; one who chooses a pile you made, once the piles are made (rulings on
+      // Truth or Tale: you separate, then an opponent of your choice chooses).
+      const whichOpp = () => (target?.kind === "player" ? target.id : chooseAnOpponent(s, ctx, src, e.separator === "opponent" ? "choose an opponent to separate the cards into two piles" : "choose an opponent to choose a pile"));
+      let opp = e.separator === "opponent" ? whichOpp() : undefined;
       if (opp === "paused") return "paused";
       // No opponent left to separate or to choose: the game is over, and nothing more happens.
-      if (opp === undefined || player(s, opp).lost) return;
-      const separator = e.separator === "you" ? p.id : opp;
-      const chooser = e.separator === "you" ? opp : p.id;
+      if (e.separator === "opponent" && (opp === undefined || player(s, opp).lost)) return;
+      const separator = e.separator === "you" ? p.id : (opp as PlayerId);
+      const mode = e.faceDown ? ("faceDown" as const) : e.pickOne ? ("pickOne" as const) : undefined;
       if (sc.separating && sc.found) {
         sc.pileOne = sc.found;
         sc.separating = undefined;
@@ -1463,20 +1475,43 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (!sc.pileOne) {
         sc.separating = true;
-        s.pending = { kind: "searchLibrary", player: separator, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true, ...(separator !== p.id ? { forPlayer: p.id } : {}) };
+        s.pending = { kind: "searchLibrary", player: separator, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, dig: { looked, to: e.faceDown ? "for the face-down pile" : "for the first pile", rest: e.faceDown ? "form the face-up pile" : "form the second pile" }, piles: true, ...(separator !== p.id ? { forPlayer: p.id } : {}) };
         return "paused";
       }
+      if (e.separator === "you") {
+        opp = whichOpp();
+        if (opp === "paused") return "paused";
+        if (opp === undefined || player(s, opp).lost) return;
+      }
+      const chooser = e.separator === "you" ? (opp as PlayerId) : p.id;
       const one = sc.pileOne.filter((id) => looked.includes(id));
       const two = looked.filter((id) => !one.includes(id));
       if (sc.pileChoice === undefined) {
-        log(s, `${player(s, separator).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
-        const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, prompt: `choose the pile to put into ${chooser === p.id ? "your" : `${p.name}'s`} hand (the other goes ${e.rest === "graveyard" ? "into the graveyard" : "on the bottom of the library"})` };
+        if (e.faceDown) log(s, `${player(s, separator).name} separates them into a face-down pile of ${count(one.length)} and a face-up pile: ${names(two) || "no cards"}.`);
+        else log(s, `${player(s, separator).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+        const label = (pile: ObjectId[], i: number) => (e.faceDown ? (i === 0 ? `Face-down pile: ${count(pile.length)}` : `Face-up pile: ${pile.length ? names(pile) : "no cards"}`) : `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`);
+        const where = e.pickOne ? `${chooser === p.id ? "you put" : `${p.name} puts`} a card from it into ${chooser === p.id ? "your" : "their"} hand, the rest go on the bottom of the library` : `the other goes ${e.rest === "graveyard" ? "into the graveyard" : "on the bottom of the library"}`;
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, ...(mode ? { pileMode: mode } : {}), prompt: e.pickOne ? `choose a pile (${where})` : `choose the pile to put into ${chooser === p.id ? "your" : `${p.name}'s`} hand (${where})` };
         return "paused";
       }
       const hand = sc.pileChoice === 0 ? one : two;
       const rest = sc.pileChoice === 0 ? two : one;
-      log(s, `${p.name} puts ${hand.length ? names(hand) : "no cards"} into their hand${e.rest === "graveyard" ? ` and ${rest.length ? names(rest) : "no cards"} into their graveyard` : ""}.`);
+      if (e.pickOne) {
+        // You choose one card of the chosen pile; every other revealed card goes on the bottom (rulings).
+        if (hand.length && sc.pileCard === undefined) {
+          s.pending = { kind: "chooseOption", player: p.id, source: src, what: "pileCard", options: hand, labels: hand.map((id) => defOf(s, obj(s, id)).name), prompt: "choose a card from the chosen pile to put into your hand" };
+          return "paused";
+        }
+        const pick = hand.find((id) => id === sc.pileCard);
+        if (pick) {
+          log(s, `${p.name} puts ${names([pick])} into their hand.`);
+          moveObject(s, pick, "hand");
+        }
+        sc.moved = true;
+        return toBottom(s, p.id, looked.filter((id) => id !== pick), src, false);
+      }
+      const shown = (ids: ObjectId[]) => (e.faceDown && ids === one ? `the face-down pile (${count(ids.length)})` : ids.length ? names(ids) : "no cards");
+      log(s, `${p.name} puts ${shown(hand)} into their hand${e.rest === "graveyard" ? ` and ${rest.length ? names(rest) : "no cards"} into their graveyard` : ""}.`);
       enterTogether(s, () => {
         for (const id of hand) moveObject(s, id, "hand");
         if (e.rest === "graveyard") for (const id of rest) moveObject(s, id, "graveyard");
@@ -1484,6 +1519,77 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.rest !== "bottom") return;
       sc.moved = true;
       return toBottom(s, p.id, rest, src, false);
+    }
+    case "shuffleCreaturesReveal": {
+      // Collision of Realms: all creatures leave at once, each into its owner's library (tokens cease to exist, CR 111.7);
+      // every player shuffles, even one who shuffled none in (rulings).
+      const leaving = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature"));
+      const nontoken = new Set(leaving.filter((id) => !obj(s, id).isToken).map((id) => obj(s, id).owner));
+      if (leaving.length) log(s, `${src} puts ${leaving.map((id) => characteristics(s, obj(s, id)).name).join(", ")} into their owners' libraries.`);
+      for (const id of leaving) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "library");
+      const order = apnap(s, s.players.map((p) => p.id)).filter((pid) => !player(s, pid).lost);
+      for (const pid of order) {
+        shuffleLibrary(s, player(s, pid));
+        log(s, `${player(s, pid).name} shuffles their library.`);
+      }
+      // Then the players who shuffled a nontoken creature in each reveal until a creature card (one at most each).
+      const found: ObjectId[] = [];
+      const rest: [PlayerId, ObjectId[]][] = [];
+      for (const pid of order.filter((x) => nontoken.has(x))) {
+        const p = player(s, pid);
+        const at = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Creature"));
+        const revealed = at < 0 ? [...p.library] : p.library.slice(0, at + 1);
+        if (!revealed.length) continue;
+        log(s, `${p.name} reveals ${revealed.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+        if (at >= 0) found.push(p.library[at]!);
+        rest.push([pid, at < 0 ? revealed : revealed.slice(0, -1)]);
+      }
+      // The creature cards enter at the same time, then the others go to the bottom (rulings).
+      if (found.length) enterTogether(s, () => {
+        for (const id of found) moveObject(s, id, "battlefield");
+      });
+      for (const [pid, ids] of rest) toBottom(s, pid, ids, src, true);
+      return;
+    }
+    case "exiledPiles": {
+      // Boneyard Parley: the cards exiled this way, separated by an opponent you choose as it resolves (rulings, CR 700.3);
+      // you choose the pile put onto the battlefield under your control, the other goes to its owners' graveyards.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const p = player(s, ctx.controller);
+      const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      sc.looked ??= (r.exiledCards ?? []).filter((id) => obj(s, id).zone === "exile");
+      const looked = sc.looked.filter((id) => obj(s, id).zone === "exile");
+      if (!looked.length) return;
+      const opp = chooseAnOpponent(s, ctx, src, "choose an opponent to separate the cards into two piles");
+      if (opp === "paused") return "paused";
+      if (opp === undefined || player(s, opp).lost) return;
+      if (sc.separating && sc.found) {
+        sc.pileOne = sc.found;
+        sc.separating = undefined;
+        sc.found = undefined;
+      }
+      if (!sc.pileOne) {
+        sc.separating = true;
+        s.pending = { kind: "searchLibrary", player: opp, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, exiled: true, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true, forPlayer: p.id };
+        return "paused";
+      }
+      const one = sc.pileOne.filter((id) => looked.includes(id));
+      const two = looked.filter((id) => !one.includes(id));
+      if (sc.pileChoice === undefined) {
+        log(s, `${player(s, opp).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+        const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, pileMode: "battlefield", prompt: "choose the pile to put onto the battlefield under your control (the other goes to its owners' graveyards)" };
+        return "paused";
+      }
+      const mine = sc.pileChoice === 0 ? one : two;
+      const rest = sc.pileChoice === 0 ? two : one;
+      log(s, `${p.name} puts ${mine.length ? names(mine) : "no cards"} onto the battlefield${rest.length ? ` and ${names(rest)} into ${rest.every((id) => obj(s, id).owner === p.id) ? "their" : "their owners'"} graveyard${rest.every((id) => obj(s, id).owner === obj(s, rest[0]!).owner) ? "" : "s"}` : ""}.`);
+      enterTogether(s, () => {
+        for (const id of mine) moveObject(s, id, "battlefield", { controller: p.id });
+        for (const id of rest) moveObject(s, id, "graveyard");
+      });
+      return;
     }
     case "revealPick": {
       // "Reveal the top three cards of your library. An opponent chooses one of them." (Murmurs from Beyond): revealed
@@ -1530,6 +1636,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const cards = [...at.keys()];
       if (!cards.length) return;
+      if (e.leave) {
+        // Deliver Unto Evil: whether you control a Bolas planeswalker is checked as it resolves (rulings).
+        const p = player(s, ctx.controller);
+        const bolas = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && objIsType(s, obj(s, id), "Planeswalker") && characteristics(s, obj(s, id)).subtypes.includes(e.leave!.unlessPlaneswalker));
+        const stay = bolas ? [] : opponentPicks(s, ctx, src, undefined, ctx.controller, cards, cards, e.leave.n, { zone: "graveyard" }, { zone: "hand" });
+        if (stay === "paused") return "paused";
+        sc.splitDone = true;
+        const back = cards.filter((x) => !stay.includes(x));
+        if (stay.length) log(s, `${stay.map((id) => defOf(s, obj(s, id)).name).join(", ")} stay${stay.length === 1 ? "s" : ""} in ${p.name}'s graveyard (${src}).`);
+        if (back.length) log(s, `${p.name} returns ${back.map((id) => defOf(s, obj(s, id)).name).join(", ")} to their hand (${src}).`);
+        for (const id of back) moveObject(s, id, "hand");
+        return;
+      }
       const got = opponentPicks(s, ctx, src, undefined, ctx.controller, cards, cards, 1, { zone: "hand" }, { zone: "battlefield" });
       if (got === "paused") return "paused";
       sc.splitDone = true;

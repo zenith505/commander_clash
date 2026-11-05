@@ -192,6 +192,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || chooser === null || (revealPick[7] && revealPick[1] !== "two")) return null;
     return [{ type: "revealPick", n: num(revealPick[1]!), ...(chooser ? { chooser } : {}), ...(filter ? { filter } : {}), to: zoneOf(revealPick[5]!), ...(revealPick[6] ? { rest: zoneOf(revealPick[6]) } : revealPick[7] ? { rest: { zone: "exile" as const, counter: counterKind(revealPick[7]) } } : {}) }];
   }
+  // Truth or Tale (as parseBody rewrites it): one card of the chosen pile into your hand, every other revealed card on the
+  // bottom (rulings). Atris, Oracle of Half-Truths: the target opponent looks and separates them, the first pile face down.
+  const pickOne = /^[Rr]eveal the top (two|three|four|five|six|seven) cards of your library; you separate them into two piles and an opponent chooses one; put a card from the chosen pile into your hand and the rest on the bottom of your library in any order$/.exec(s);
+  if (pickOne) return [{ type: "piles", n: amt(pickOne[1]!), separator: "you", rest: "bottom", pickOne: true }];
+  const faceDownPiles = /^[Tt]arget opponent looks at the top (two|three|four|five) cards of your library and separates them into a face-down pile and a face-up pile; put one pile into your hand and the other into your graveyard$/.exec(s);
+  if (faceDownPiles) {
+    const who = parsePlayer("target opponent", ctx);
+    return who?.ref === "target" ? [{ type: "piles", n: amt(faceDownPiles[1]!), separator: "opponent", rest: "graveyard", faceDown: true, by: who.index }] : null;
+  }
   // Fact or Fiction, Steam Augury (as parseBody rewrites them): piles (CR 700.3).
   const piles = /^[Rr]eveal the top (two|three|four|five|six|seven|X|X plus one) cards of your library; (an opponent separates them into two piles|you separate them into two piles and an opponent chooses one); put one pile into your hand and the other (into your graveyard|on the bottom of your library in any order)$/.exec(s);
   if (piles) {

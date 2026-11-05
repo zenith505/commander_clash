@@ -2834,6 +2834,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
     (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
   );
+  // Truth or Tale: "Reveal the top five cards of your library and separate them into two piles. An opponent chooses one
+  // of those piles. Put a card from the chosen pile into your hand, then put all other cards revealed this way on the
+  // bottom of your library in any order." Atris, Oracle of Half-Truths: "target opponent looks at the top three cards of
+  // your library and separates them into a face-down pile and a face-up pile. Put one pile into your hand and the other
+  // into your graveyard." One instruction each (CR 700.3).
+  text = text.replace(
+    /\b([Rr])eveal the top (\w+) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put a card from the chosen pile into your hand, then put all other cards revealed this way on the bottom of your library in any order\./g,
+    (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put a card from the chosen pile into your hand and the rest on the bottom of your library in any order.`,
+  );
+  text = text.replace(
+    /\b([Tt])arget opponent looks at the top (\w+) cards of your library and separates them into a face-down pile and a face-up pile\. Put one pile into your hand and the other into your graveyard\./g,
+    (_, t, n) => `${t}arget opponent looks at the top ${n} cards of your library and separates them into a face-down pile and a face-up pile; put one pile into your hand and the other into your graveyard.`,
+  );
   // Selvala, Explorer Returned (parley): "For each nonland card revealed this way, add {G} and you gain 1 life." is two
   // instructions, each counting those cards (see parleyReveal).
   text = text.replace(/\bFor each ((?:non)?land card revealed this way), add (\{[WUBRGC]\}) and you gain (\d+) life\./g, "Add $2 for each $1. You gain $3 life for each $1.");
@@ -3535,6 +3548,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target" || what.n !== 2) return null;
       effects.push({ type: "opponentSplitsTargets", what });
       si += 5;
+      continue;
+    }
+    // Deliver Unto Evil: "Choose up to four target cards in your graveyard. If you control a Bolas planeswalker, return
+    // those cards to your hand. Otherwise, an opponent chooses two of them. Leave the chosen cards in your graveyard and put
+    // the rest into your hand." One instruction (Effect opponentSplitsTargets `leave`).
+    if (ctx.spell && /^Choose up to four target cards in your graveyard$/.test(s) && sentences.slice(si + 1, si + 4).map((x) => x.replace(/\.$/, "")).join("|") === "If you control a Bolas planeswalker, return those cards to your hand|Otherwise, an opponent chooses two of them|Leave the chosen cards in your graveyard and put the rest into your hand") {
+      const what = parseObject("up to four target cards in your graveyard", ctx, true);
+      if (what?.ref !== "target" || what.n !== 4) return null;
+      effects.push({ type: "opponentSplitsTargets", what, leave: { n: 2, unlessPlaneswalker: "Bolas" } });
+      si += 3;
       continue;
     }
     // Vizier of Deferment: "you may exile target creature if it attacked or blocked this turn. Return that card to the
@@ -11147,6 +11170,64 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "flipEachOpponent" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "flipsWon" } } }, { type: "damage", to: { ref: "flippedTails" }, amount: Number(perOppFlip[1]) });
       si += 2;
       continue;
+    }
+    // The Great Aurora: "Each player shuffles all cards from their hand and all permanents they own into their library, then
+    // draws that many cards": each draws as many as the cards from their hand plus the permanents they owned, tokens too
+    // (rulings: a token counts, though it ceases to exist in the library, CR 111.7), once all have shuffled.
+    if (/^Each player shuffles all cards from their hand and all permanents they own into their library$/.test(s)) {
+      if (!/^Each player draws that many cards\.?$/.test(sentences[si + 1] ?? "")) return null;
+      effects.push({ type: "shuffleZones", who: { ref: "eachPlayer" }, hand: true, permanents: true, drawThatMany: true });
+      si++;
+      continue;
+    }
+    // Sculpted Sunburst (Effect "sunburstChoose"): "then" splits the first sentence in two.
+    if (/^Choose a creature you control$/.test(s) && /^Each opponent chooses a creature they control with equal or lesser power$/.test(sentences[si + 1] ?? "") && /^If you chose a creature this way, exile each creature not chosen by any player this way\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "sunburstChoose" });
+      si += 2;
+      continue;
+    }
+    // Collision of Realms (Effect "shuffleCreaturesReveal").
+    if (/^Each player shuffles all creatures they own into their library$/.test(s) && /^Each player who shuffled a nontoken creature into their library this way reveals cards from the top of their library until they reveal a creature card$/.test(sentences[si + 1] ?? "") && /^Puts that card onto the battlefield and the rest on the bottom of their library in a random order\.?$/.test(sentences[si + 2] ?? "")) {
+      effects.push({ type: "shuffleCreaturesReveal" });
+      si += 2;
+      continue;
+    }
+    // Boneyard Parley: piles of the cards just exiled from graveyards, one onto the battlefield under your control.
+    if (/^An opponent separates those cards into two piles$/.test(s) && /^Put all cards from the pile of your choice onto the battlefield under your control and the rest into their owners' graveyards\.?$/.test(sentences[si + 1] ?? "")) {
+      const prev = effects[effects.length - 1];
+      const spec = prev?.type === "exile" && prev.what.ref === "target" ? ctx.targets[prev.what.index] : undefined;
+      if (effects.length !== 1 || !spec || spec.kind !== "card" || !/from a graveyard$/.test(spec.text)) return null;
+      effects.push({ type: "exiledPiles" });
+      si++;
+      continue;
+    }
+    // Life bidding (Illicit Auction, Mages' Contest, Pain's Reward): who bids, your opening bid, then "In turn order, each
+    // player may top the high bid. The bidding ends if the high bid stands." and what the high bidder gets (Effect
+    // "bidLife"; rulings: bidding goes around until all but the high bidder decline to top the bid).
+    const bidWho = /^(Each player may bid life for control of target creature|You and target spell's controller bid life|Each player may bid life)$/.exec(s);
+    const bidStart = bidWho ? /^You start the bidding with a bid of (\d+|any number)$/.exec(sentences[si + 1] ?? "") : null;
+    if (bidWho && bidStart && /^In turn order, each player may top the high bid$/.test(sentences[si + 2] ?? "") && /^The bidding ends if the high bid stands$/.test(sentences[si + 3] ?? "") && !ctx.targets.length) {
+      const prizeText = (sentences[si + 4] ?? "").replace(/\.$/, "");
+      const start = bidStart[1] === "any number" ? ("any" as const) : Number(bidStart[1]);
+      if (bidWho[1] === "Each player may bid life for control of target creature" && prizeText === "The high bidder loses life equal to the high bid and gains control of the creature") {
+        const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+        // Gaining control lasts indefinitely (CR 611.2a, the reminder text).
+        effects.push({ type: "bidLife", bidders: "each", start, prize: "control" }, { type: "continuous", what: { ref: "target", index }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } });
+        si += 4;
+        continue;
+      }
+      if (bidWho[1] === "Each player may bid life" && prizeText === "The high bidder loses life equal to the high bid and draws four cards") {
+        effects.push({ type: "bidLife", bidders: "each", start, prize: "draw" }, { type: "draw", who: { ref: "chosenPlayer" }, n: 4 });
+        si += 4;
+        continue;
+      }
+      if (bidWho[1] === "You and target spell's controller bid life" && prizeText === "The high bidder loses life equal to the high bid" && /^If you win the bidding, counter that spell\.?$/.test(sentences[si + 5] ?? "")) {
+        const index = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell" });
+        effects.push({ type: "bidLife", bidders: "targetSpellController", start, prize: "counter" }, { type: "if", cond: { kind: "wonBidding" }, effects: [{ type: "counterSpell", index }] });
+        si += 5;
+        continue;
+      }
+      return null;
     }
     // Thunderwave: "You may choose a creature. ~ deals 3 damage to each creature not chosen this way.": any one creature
     // or none, not targeted, chosen as it resolves (CR 608.2d), then the damage to all the rest at once.

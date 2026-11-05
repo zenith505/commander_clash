@@ -1538,6 +1538,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8b2b00ab-f1c5-4057-9957-d7daac95a847",
+  "name": "Atris, Oracle of Half-Truths",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "Menace\nWhen Atris enters, target opponent looks at the top three cards of your library and separates them into a face-down pile and a face-up pile. Put one pile into your hand and the other into your graveyard.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "34e05dc1-35af-402d-96ae-e249b3738493",
   "name": "Augur il-Vec",
   "manaCost": "{1}{W}",
@@ -2880,6 +2917,32 @@
   "set": "pal03",
   "releasedAt": "2003-01-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a3d048c8-e8df-4b50-a422-fc94a69f44bb",
+  "name": "Boneyard Parley",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile up to five target creature cards from graveyards. An opponent separates those cards into two piles. Put all cards from the pile of your choice onto the battlefield under your control and the rest into their owners' graveyards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10729,6 +10792,32 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dea8c725-455e-4668-877a-df388fe22255",
+  "name": "Illicit Auction",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player may bid life for control of target creature. You start the bidding with a bid of 0. In turn order, each player may top the high bid. The bidding ends if the high bid stands. The high bidder loses life equal to the high bid and gains control of the creature. (This effect lasts indefinitely.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -24645,6 +24734,32 @@
   "set": "c13",
   "releasedAt": "2013-11-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "10674c2f-7920-4505-b8d5-e96f3da1cda3",
+  "name": "Truth or Tale",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top five cards of your library and separate them into two piles. An opponent chooses one of those piles. Put a card from the chosen pile into your hand, then put all other cards revealed this way on the bottom of your library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

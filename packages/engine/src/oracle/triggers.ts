@@ -2779,6 +2779,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Liability: "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1
   // life.": a card goes to its owner's graveyard (CR 400.3), so that player is its owner.
   if (raw === "Whenever a nontoken permanent is put into a player's graveyard from the battlefield, that player loses 1 life.") raw = "Whenever a nontoken permanent is put into a graveyard from the battlefield, its owner loses 1 life.";
+  // Inferno Hellion: "At the beginning of each end step, if ~ attacked or blocked this turn, its owner shuffles it into
+  // their library": "it" is ~, the one the condition is about.
+  raw = raw.replace(/^(At the beginning of (?:each|your) end step, if ~ [^,]+), its owner shuffles it into their library\.$/, "$1, ~'s owner shuffles ~ into their library.");
   // Wiitigo: "At the beginning of your upkeep, put a +1/+1 counter on ~ if it has blocked or been blocked since your last
   // upkeep. Otherwise, remove a +1/+1 counter from it." Shape of the Wiitigo: the same about enchanted creature, "if it
   // attacked or blocked": checked as it resolves (not an intervening if, CR 603.4); none to remove, nothing happens.

@@ -1268,6 +1268,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "skipUntap":
     case "noUntapNext":
     case "enterTappedUntil":
+    case "entersWithCountersThisTurn":
     case "noMaxHandSize":
     case "counters":
     case "distribute":

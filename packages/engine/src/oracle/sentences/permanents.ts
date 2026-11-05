@@ -112,6 +112,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return g && !g.other ? [{ type: "enterTappedUntil", filter: g.filter, thisTurn: true }] : null;
   }
 
+  // Zameck Guildmage, Combine Guildmage: "This turn, each creature you control enters with an additional +1/+1 counter on
+  // it": a replacement effect on creatures entering for the rest of the turn (CR 614.1c, 611.2a), as they'd exist there.
+  const turnCounters = new RegExp(`^This turn, each (creature you control) enters with an additional ${COUNTER} counter on it$`).exec(s);
+  if (turnCounters) {
+    const g = parseGroup(`each ${turnCounters[1]}`);
+    return g && !g.other && g.filter.kind === "object" && g.filter.controller === "you" ? [{ type: "entersWithCountersThisTurn", filter: g.filter, counter: counterKind(turnCounters[2]!), n: 1 }] : null;
+  }
+
   // Maddening Hex: "Then attach ~ to another one of your opponents chosen at random."
   if (/^(?:[Tt]hen )?[Aa]ttach ~ to another one of your opponents chosen at random$/.test(s)) return [{ type: "attachToRandomOpponent" }];
   // "Unlock a locked door of a Room you control" (CR 709.5f), "... of up to one target Room you control" (Ghostly

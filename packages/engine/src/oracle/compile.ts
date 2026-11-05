@@ -408,7 +408,8 @@ export function normalizeSelf(d: CardDef): string {
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
     // Not "each Garruk you control" in Garruk, Cursed Huntsman: there it's the planeswalker type (CR 205.3j).
     // Nor "Empower Jace X" in Jace, Reality Sculptor: a Jace planeswalker token (CR 701.71a), not ~ itself (rulings).
-    const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an|Empower) )" : "";
+    // Nor "non-Gideon creatures" in Gideon, the Oathsworn: creatures that aren't Gideon planeswalkers (rulings).
+    const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an|Empower) )(?<!non-)" : "";
     // Lizard, Connors's Curse: "becomes a green Lizard creature" is the creature type its short name also is (CR 205.3m).
     const shortTyped = CREATURE_TYPES.has(short) ? "(?! creatures?\\b)" : "";
     const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${shortTyped}${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first || firstUsed ? "(?!'s [A-Z])" : ""}`, "gu");
@@ -1365,6 +1366,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Vampire Socialite: "As long as an opponent lost life this turn, each other Vampire you control enters with an
     // additional +1/+1 counter on it": only while that's so, as each one would enter.
+    // Dearly Departed: "As long as ~ is in your graveyard, each Human creature you control enters with an additional +1/+1
+    // counter on it": the same replacement, from its owner's graveyard (CR 113.6b); there it can't describe itself.
+    const departed = new RegExp(`^As long as ~ is in your graveyard, each ([A-Z][a-z]+) creature you control enters with an additional ${COUNTER} counter on it\\.$`).exec(line);
+    if (departed) {
+      const g = CREATURE_TYPES.has(departed[1]!) ? parseGroup(`each ${departed[1]} creature you control`) : null;
+      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(departed[2]!), n: 1, fromGraveyard: true, text: line });
+      continue;
+    }
     const socialite = /^As long as (an opponent lost life this turn), (each other .+)$/.exec(line);
     const socialiteIf = socialite ? parseStaticCondition(socialite[1]!, { affects: { kind: "self" }, mods: [], text: line }) : undefined;
     const othersLine = socialite ? `E${socialite[2]!.slice(1)}` : line;
@@ -4283,6 +4293,14 @@ export function compile(d: CardDef): CompiledCard {
       out.preventToYou = { ...(toYou[1] ? { combat: toYou[1] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(toYou[2] ? { others: true as const } : {}) };
       continue;
     }
+    // Spirit of Resistance: "As long as you control a permanent of each color, prevent all damage that would be dealt to you":
+    // the same shield, while five colors are among your permanents (a multicolored one counts as each of its colors,
+    // rulings; CR 105.2).
+    const resist = /^As long as you control a permanent of each color, prevent all damage that would be dealt to you\.$/.test(line);
+    if (resist) {
+      out.preventToYou = { cond: { kind: "colorsAmong", n: 5 } };
+      continue;
+    }
     // Purity: "If noncombat damage would be dealt to you, prevent that damage. You gain life equal to the damage prevented
     // this way." The life is part of the prevention (CR 615.5). See staticRules in damage.ts.
     const purity = /^If (combat |noncombat )?damage would be dealt to you, prevent that damage\. You gain life equal to the damage prevented this way\.$/.exec(line);
@@ -6400,7 +6418,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.sharesColorWithSacrificed || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedColor") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.sharesColorWithSacrificed || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedType" || o.kind === "sacrificedColor") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;

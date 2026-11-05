@@ -496,6 +496,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Put a +1/+1 counter on ~ for each flip you won" (Crazed Firecat).
   // "For each flip you win, create ..." (Goblin Traprunner, after "flip three coins") too.
   if (each && /^flip you w(?:on|in)$/i.test(p)) return count({ kind: "flipsWon" });
+  // Yusri, Fortune's Flame: "For each flip you lose, ~ deals 2 damage to you", after "flip that many coins".
+  if (each && /^flip you lose$/i.test(p)) return count({ kind: "flipsWon", lost: true });
   // Ral Zarek: "for each coin that comes up heads", after uncalled flips (see body.ts).
   if (each && /^coin that comes up heads$/i.test(p) && ctx?.uncalledFlips) return count({ kind: "flipsWon", heads: true });
   // Life and hands.

@@ -654,6 +654,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = pend.options.filter((id) => controllerOf(s, obj(s, id)) !== pid).map((id) => ({ id, w: permanentWorth(s, pid, id) })).sort((a, b) => b.w - a.w);
       return [{ type: "pickPermanents", player: pid, ids: theirs[0] && theirs[0].w > 0 ? [theirs[0].id] : [] }];
     }
+    // Thunderwave: "You may choose a creature. ~ deals 3 damage to each creature not chosen this way": spare our best one.
+    const sparing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.count === 1 ? s.resolving?.body.effects : undefined;
+    const spareAt = sparing ? allEffects(sparing).find((x) => x.type === "damage" && "ref" in x.to && x.to.ref === "each" && x.to.notCreated) : undefined;
+    if (pend.kind === "pickPermanents" && spareAt) {
+      const ours = pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "pickPermanents", player: pid, ids: ours.slice(0, 1) }];
+    }
     // Temporal Firestorm: "up to X creatures and/or planeswalkers you control" phase out before the damage: our best ones.
     const phasing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && phasing?.type === "phaseOut" && phasing.what.ref === "created")
@@ -2875,6 +2882,11 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
     if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
+    // Sin Prodder: the revealed card's mana value in damage to us, rather than that card in its controller's hand.
+    if ("allow" in w && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "punisher" && x.firstOnly)) {
+      const rv = s.resolving.revealed && s.objects[s.resolving.revealed.id];
+      return rv ? lifeCost(defMv(defOf(s, rv))) : 0;
+    }
     // Distant Memories: the one card it found, rather than the three cards it draws if no one does.
     if ("allow" in w) return 1;
     if ("halfLife" in w) return lifeCost(w.halfLife === "up" ? Math.ceil(Math.max(0, p.life) / 2) : Math.floor(Math.max(0, p.life) / 2));
@@ -3813,6 +3825,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // The Second Doctor: "each player may draw a card. Each opponent who does can't attack you ... during their next turn":
   // the card, unless that player is the only opponent left to attack.
   if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
+  // Requiem Monolith: "That creature's controller may have ~ deal 1 damage to it" (after it gained "whenever this creature
+  // is dealt damage, you draw that many cards and lose that much life"): only if the creature survives it, with life and
+  // cards to spare.
+  const hurtOwn = r && e?.type === "eachMay" && !e.each && e.effects.length === 1 && e.effects[0]!.type === "damage" && "ref" in e.effects[0]!.to && e.effects[0]!.to.ref === "target" ? e.effects[0]! : undefined;
+  if (r && hurtOwn?.type === "damage" && typeof hurtOwn.amount === "number" && "index" in hurtOwn.to) {
+    const t = r.item.targets?.[hurtOwn.to.index];
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    if (!o || o.zone !== "battlefield") return false;
+    const me = player(s, pid);
+    return toughness(s, o) - (o.damage ?? 0) > hurtOwn.amount && me.life > 10 + hurtOwn.amount && me.library.length > 3;
+  }
   // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
   if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
   // Ley Line, Death Match: "that player may ..." to the target they chose for it (TargetSpec.chosenBy): only when it's
@@ -4102,6 +4125,14 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
   if (s.resolving && /^Discard any number of cards at random\./.test(card?.oracleText ?? "")) {
     const attackers = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && obj(s, id).attacking !== undefined);
     return String(attackers && r.max <= 3 ? r.max : r.min);
+  }
+  // Yusri, Fortune's Flame: "choose a number between 1 and 5. Flip that many coins": each coin is a card won or 2 damage
+  // lost, and only five won lets us cast from hand for free; all five while that much damage is safe, fewer as life runs
+  // low, and no more draws than the library holds.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "flipCoin" && !!e.nAmount)) {
+    const me = player(s, pid);
+    const n = Math.min(me.life > 20 ? 5 : me.life > 12 ? 3 : 1, Math.max(1, me.library.length - 1));
+    return String(Math.max(r.min, Math.min(r.max, n)));
   }
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;

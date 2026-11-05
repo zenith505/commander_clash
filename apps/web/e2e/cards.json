@@ -18607,6 +18607,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "13a8b19b-23bd-4e45-81ff-23371665e4fc",
+  "name": "Requiem Monolith",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Until end of turn, target creature gains \"Whenever this creature is dealt damage, you draw that many cards and lose that much life.\" That creature's controller may have this artifact deal 1 damage to it. Activate only as a sorcery.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d4c4ad11-7e71-4ad0-aee7-58ac7b1b38f8",
   "name": "Rescuer Sphinx",
   "manaCost": "{2}{U}{U}",
@@ -20798,6 +20824,38 @@
   "set": "dis",
   "releasedAt": "2006-05-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "745efa76-7063-4971-9d1b-b2b4cb336a57",
+  "name": "Sin Prodder",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Devil",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Devil"
+  ],
+  "oracleText": "Menace\nAt the beginning of your upkeep, reveal the top card of your library. Any opponent may have you put that card into your graveyard. If a player does, this creature deals damage to that player equal to that card's mana value. Otherwise, put that card into your hand.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "soi",
+  "releasedAt": "2016-04-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -24011,6 +24069,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "43de944b-e630-45f0-bce4-c66803e8b5c1",
+  "name": "Thunderwave",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Roll a d20.\n1—9 | Thunderwave deals 3 damage to each creature.\n10—19 | You may choose a creature. Thunderwave deals 3 damage to each creature not chosen this way.\n20 | Thunderwave deals 6 damage to each creature your opponents control.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3c307122-bc18-41f1-87d5-ae6b3ca9b8b9",
   "name": "Timeline Culler",
   "manaCost": "{B}{B}",
@@ -26999,6 +27083,42 @@
   "commanderLegal": "legal",
   "set": "c18",
   "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c0a0a7d-b12f-47c8-a6a6-d046f999ec6b",
+  "name": "Yusri, Fortune's Flame",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Efreet",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Efreet"
+  ],
+  "oracleText": "Flying\nWhenever Yusri attacks, choose a number between 1 and 5. Flip that many coins. For each flip you win, draw a card. For each flip you lose, Yusri deals 2 damage to you. If you won five flips this way, you may cast spells from your hand this turn without paying their mana costs.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

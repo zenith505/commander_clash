@@ -909,7 +909,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const otherWalkers = !other && !another && !ctx.spell && !ctx.targets.length && /^creatures and\/or other planeswalkers$/.test(mine1);
   const mine0 = otherWalkers ? "creatures and/or planeswalkers" : mine1;
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
-  const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
+  // Nullmage Advocate: "two target cards from an opponent's graveyard": both from the same one (rulings: a single opponent
+  // with two cards in their graveyard).
+  const single = (n > 1 || !!many) && (/ from a single graveyard$/.test(mine0) || (n > 1 && !many && / from an opponent's graveyard$/.test(mine0)));
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   // "Up to six target creature cards with different names" (Behold the Sinister Six!): each a name the others don't have.
   const differ = n > 1 && !many && / with different names(?= from |$)/.test(mine0);

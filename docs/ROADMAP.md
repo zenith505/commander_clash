@@ -1,6 +1,6 @@
 # Roadmap
 
-29,800 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,815 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,571 of
 9,979 (95%).
 
@@ -2089,7 +2089,7 @@ line blocks.
    flips a coin. Each player whose coin comes up tails sacrifices a creature of their choice" (Goblin Assassin: flips no
    one wins or loses, rulings; Edgar's heads apply; with Krark's Thumb the heads coin is kept, not asked); "Remove any
    number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too; with a
-   browser test). No new prompts (all of them reuse existing ones). +13, 29,800 of 31,936 with B106.
+   browser test). No new prompts (all of them reuse existing ones). +13, 29,815 of 31,936 with B106 and B107.
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -5451,6 +5451,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrificed permanent was an artifact"), General Tazri ("colors among those creatures": the Ally creatures as it resolves,
   X fixed then), Armored Kincaller ("If you do or if you control another Dinosaur"), Skulking Killer ("if that opponent
   controls no other creatures": the target's controller, as it resolves). +15 (29,787 of 31,936 with rounds 273 to 275).
+- Round B107 (single-line blockers from the skip lists, least played first): Loyal Sentry ("destroy that creature and ~", like
+  Alaborn Zealot), Abu Ja'far ("When ~ dies, destroy all creatures blocking or blocked by it": those in combat with it as it
+  last existed, still blocking or attacking, CR 603.10a, 506.4), Swat Away ("target spell or creature", its owner choosing
+  top or bottom), Scrib Nibblers ("Exile the top card of target player's library. If it's a land card"), Grimdancer (two
+  different counters out of three as it enters; with a browser test), Laquatus's Creativity (the number of cards in hand
+  counted once, before the draw, for the discard too), Garza's Assassin (recover by paying half your life, rounded up),
+  Vexing Sphinx and Polar Kraken (cumulative upkeep of discarding a card or sacrificing a land, all of it or none, CR
+  702.24a, 701.9b), Searing Blood ("When that creature dies this turn": whatever kills it, to whoever controlled it then,
+  rulings), Credit Voucher (shuffle any number of cards from your hand into your library, then draw that many; with a
+  browser test), Alluring Siren ("attacks you this turn if able": you, not a planeswalker of yours, rulings), Nullmage and
+  Spurnmage Advocate ("two target cards from an opponent's graveyard": both from one opponent's, rulings; Deadeye Tracker's
+  two cards now must be too, as its rulings say), Public Enemy ("All creatures attack enchanted creature's controller each
+  combat if able": not that player's own creatures). +15 (29,802 of 31,936 with rounds 273 to 275).
+- Out after round B107 (looked at, not done): Isu the Abominable ("you may pay {G}, {W}, or {U}": a choice of payment), Time
+  to Reflect and You Cannot Pass! (a creature that blocked or was blocked by a Zombie / legendary creature: what the other
+  creature was when the block happened, rulings, which the turn's block log doesn't keep), Heroic Feast (as many targets as
+  the life gained), Bioshift (moving any number of counters), Erithizon, Mausoleum Turnkey and Evangelize (a target chosen by
+  another player), Titania, Rugged Rumbler (a ward cost with a choice).
 - Out after round B106 (looked at, not done): Tamanoa ("Whenever a noncreature source you control deals damage": once for
   each source's damage event, which single-target damage doesn't report as one yet), Mercadia's Downfall (each attacking
   creature's own defending player), Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Debt of Loyalty ("When it

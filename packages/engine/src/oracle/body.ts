@@ -6007,6 +6007,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Searing Blood: "~ deals 2 damage to target creature. When that creature dies this turn, ~ deals 3 damage to the
+    // creature's controller.": a delayed trigger about the target (CR 603.7), whatever makes it die, the damage dealt to
+    // whoever controlled it as it died (rulings).
+    const diesDamage = /^When that creature dies this turn, ~ deals (\d+) damage to the creature's controller\.?$/.exec(s);
+    if (diesDamage) {
+      const index = ctx.lastObjectTarget;
+      if (index === undefined || ctx.targets[index]?.kind !== "object" || ctx.targets[index]!.many) return null;
+      effects.push({ type: "delayed", when: "dies", of: { ref: "target", index }, effects: [{ type: "damage", amount: Number(diesDamage[1]), to: { ref: "subjectController" } }], text: `~ deals ${diesDamage[1]} damage to the creature's controller`, thisTurn: true });
+      continue;
+    }
     // Tectonic Giant: "Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may
     // play that card." The same, the card chosen as it resolves (rulings).
     // You Find Some Prisoners: "Exile the top three cards of target opponent's library. Choose one of them. Until the end
@@ -6398,6 +6408,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Scrib Nibblers: "Exile the top card of target player's library. If it's a land card, you gain 1 life.": that card as
+    // it is in exile, face up (CR 406.3).
+    const exTargetIs = /^[Ee]xile the top card of target player's library$/.test(s) ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec((sentences[si + 1] ?? "").replace(/\.$/, "").replace(/^If it's /, "If it is ")) : null;
+    if (exTargetIs && !/\b(?:it|its|that card|that player)\b/.test(exTargetIs[2]!)) {
+      const filter = parseSearchFilter(`${exTargetIs[1]} card`);
+      const ex = parseOne(s, ctx);
+      const before = ctx.targets.length;
+      const then = parseOne(capital(exTargetIs[2]!), ctx);
+      if (!filter || !ex || ex.length !== 1 || ex[0]!.type !== "exileTop" || !then || ctx.targets.length !== before || then.some((e) => pauses(e))) return null;
+      effects.push(ex[0]!, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: then });
+      si++;
+      continue;
+    }
     // Chaos Harlequin: "Exile the top card of your library. If that card is a land card, ~ gets -4/-0 until end of turn.
     // Otherwise, ~ gets +2/+0 until end of turn.": the card as it is in exile, face up (CR 406.3); nothing more about it.
     const exiledIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
@@ -6601,6 +6624,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer("target player", ctx);
       if (!who) return null;
       effects.push({ type: "discard", who, n: 99, upTo: true }, { type: "draw", who, n: { count: { kind: "discardedThisWay", who } } });
+      si++;
+      continue;
+    }
+    // Credit Voucher: "Shuffle any number of cards from your hand into your library, then draw that many cards": chosen as
+    // it resolves (CR 107.1c), as many drawn as were shuffled in.
+    if (/^[Ss]huffle any number of cards from your hand into your library$/.test(s) && /^Draw that many cards\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "revealFromHand", shuffle: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "revealedFromHand" } } });
       si++;
       continue;
     }
@@ -10401,6 +10431,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!n) return null;
       const noted: Amount = { count: { kind: "notedAmount" } };
       effects.push({ type: "noteAmount", n }, { type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: noted }], text: "draw cards equal to its power" }, { type: "if", cond: { kind: "youDid" }, effects: [{ type: "discard", who: { ref: "you" }, n: noted }] });
+      si++;
+      continue;
+    }
+    // Laquatus's Creativity: "Target player draws cards equal to the number of cards in their hand, then discards that many
+    // cards": the number counted once, before the draw, for both.
+    if (/^Target player draws cards equal to the number of cards in their hand$/.test(s) && /^That player discards that many cards\.?$/.test(sentences[si + 1] ?? "")) {
+      const who = { ref: "target" as const, index: addTarget(ctx, { kind: "player", text: "target player" }) };
+      const noted: Amount = { count: { kind: "notedAmount" } };
+      effects.push({ type: "noteAmount", n: { count: { kind: "cardsInHand", who } } }, { type: "draw", who, n: noted }, { type: "discard", who, n: noted });
       si++;
       continue;
     }

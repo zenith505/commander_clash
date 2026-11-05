@@ -244,6 +244,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n = num(m[2]!);
     return [{ type: "eachMay", who, text: `discard your hand and draw ${m[2]} cards`, wheel: n, effects: [{ type: "discard", who: { ref: "choseThisWay" }, n: 0, hand: true }, { type: "draw", who: { ref: "choseThisWay" }, n }] }];
   }
+  // Step Between Worlds: "Each player may shuffle their hand and graveyard into their library. Each player who does draws
+  // seven cards." (body.ts makes it one sentence): each decides in turn order, seeing the earlier answers; then those who
+  // chose to shuffle, then draw seven, even with no cards in hand or graveyard (rulings).
+  if ((m = new RegExp(`^Each player may shuffle their hand and graveyard into their library and draw ${NUM} cards$`).exec(s))) {
+    const n = num(m[1]!);
+    if (!Number.isInteger(n)) return null;
+    return [{ type: "eachMay", who: { ref: "eachPlayer" }, text: `shuffle your hand and graveyard into your library and draw ${m[1]} cards`, wheel: n, effects: [{ type: "shuffleZones", who: { ref: "choseThisWay" }, hand: true, graveyard: true }, { type: "draw", who: { ref: "choseThisWay" }, n }] }];
+  }
   // Imposing Grandeur: "Each player may discard their hand and draw cards equal to the greatest mana value of a commander
   // they own on the battlefield or in the command zone": each player's own number, counted as they draw.
   if ((m = /^Each player may discard their hand and draw cards equal to (the greatest mana value of a commander they own .+)$/.exec(s))) {
@@ -546,6 +554,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (a?.ref !== "target" || a.n) return null;
     const to = parseDamageRecipient(m[2]!, ctx);
     return (to?.ref === "target" && !to.n) || to?.ref === "eachOpponent" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
+  }
+  // Breaking of the Fellowship: "Target creature an opponent controls deals damage equal to its power to another target
+  // creature that player controls": a second creature with the same controller as the first (as targets are chosen and
+  // as it resolves), the first the source of the damage, its power as this resolves; none if either is illegal.
+  if (/^Target creature an opponent controls deals damage equal to its power to another target creature that player controls$/.test(s) && !ctx.targets.length) {
+    const a = parseObject("target creature an opponent controls", ctx);
+    if (a?.ref !== "target" || a.n || ctx.targets.length !== 1) return null;
+    const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "opponent", sameControllerAs: [a.index], distinctFrom: [a.index], text: "another target creature that player controls" });
+    return [{ type: "bite", a, b: { ref: "target", index } }];
   }
   // "Target creature you control deals damage equal to twice its power to target creature you don't control" (Polliwallop).
   if ((m = /^(target creature you control) deals damage equal to twice its power to (target .+)$/i.exec(s))) {

@@ -247,7 +247,7 @@ line blocks.
    controller's next combat phase if able"), Brotherhood Outcast (an Aura card returned to the battlefield), Fury Charm
    (time counters on a suspended card), Exterminate! (replicate by tapping a Dalek), Flaming Gambit (the player
    redirects the damage to a creature), Drach'Nyen ("the exiled card's power"), Kalamax ("whenever you copy an instant
-   spell"), Extinction Event (odd or even), Fateful Handoff (draw by a target's mana value, then give it away),
+   spell"), Extinction Event (odd or even), Fateful Handoff (done in round 276),
    Reprocess (sacrifice any number of three kinds), Wave of Rats ("if it dealt combat damage to a player this turn"),
    Darksteel Angel (-1/-1 counters can't be put), Hammerheim (landwalk). Round 177
    went down from rank 9,240 to about rank 10,060 (Frost Titan, Seasoned Pyromancer, Devil's Play, Mind Funeral,
@@ -300,15 +300,15 @@ line blocks.
    Faithbound Judge, Feast on the Fallen, Kami of Transience, Lightmine Field, Mark of Sakiko, Miles "Tails" Prower,
    Caradora, Melira, Samut, She-Hulk, Herald of Ilharg, Vengeful Regrowth, Panther Habit, Tide Shaper, Essence
    Symbiote, Mask of the Schemer, Vantress Gargoyle, Aether Snap, Serra Avenger and others), taking the easy ones.
-   Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial
-   ("that player gains life equal to its power", per target), Old Man Willow (done in round B105) ("another creature or a token" to
+   Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial (done in round 276),
+   Old Man Willow (done in round B105) ("another creature or a token" to
    sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble!, Chocobo Camp,
-   Transcendence (done in round B105), Fumble, Goblin Assassin, Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
-   Gorex, the Tombshell, Council's Deliberation, Lumbering Megasloth, Braids's Frightful Return, Awakening of
-   Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship, Stoic Farmer, See the Unwritten, Razorlash
+   Transcendence (done in round B105), Fumble, Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
+   Gorex, the Tombshell, Council's Deliberation (done in round 276), Lumbering Megasloth, Braids's Frightful Return (done in round 276), Awakening of
+   Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder, Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
    Ringleader, Fiery Annihilation, Spell Crumple; past rank 12,200: Academy Loremaster, Cait, Celebrate the Harvest,
-   Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack ("deals damage to itself equal to its
+   Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack (done in round 276; "deals damage to itself equal to its
    power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller, Peer Pressure, Reckless
    Blaze, Resplendent Marshal, Sporogenic Infection, Ward of Bones. Round 181 went down from rank 11,770 to about rank
    12,330 (Ugin's Conjurant and Polukranos, Unchained (damage prevented by removing +1/+1 counters), Hinder (top or
@@ -324,7 +324,7 @@ line blocks.
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact, Fear of Infinity, Elderscale Wurm, Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
    Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
-   Manipulator, Endless Whispers, Burn from Within, Skyfire Phoenix, Contagion, Gutter Grime, Coffin Queen, Genesis
+   Manipulator, Endless Whispers, Burn from Within, Skyfire Phoenix (done in round 276), Contagion, Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return, Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
    Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
@@ -708,7 +708,7 @@ line blocks.
    untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
    Assassin Lord (done in round 265), Kros, Defense Contractor (no record of who put
    counters on a creature), Glorious Purpose (the sixth
-   plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
+   plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (done in round 276; remove any number of
    counters), Bladegriff Prototype (a target the damaged player chooses), Zidane, Tantalus Thief ("an
    opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
    hand), Obeka, Splitter of Seconds (done in round 265).
@@ -2072,6 +2072,24 @@ line blocks.
    age counter, the same one more than once if you like, rulings; with no opponent able to gain life it can't be paid,
    CR 118.3; with a browser test). +12, 29,772 of 31,936 with B105. Nothing new was skipped; the rest of the top of the list is
    still in the skip lists below.
+   Round 276 went on with the skip lists' one-line blockers. "When you cast your commander, return ~ from your graveyard
+   to the battlefield" (Skyfire Phoenix: a commander you own, CR 903.3, from the graveyard); "Target creature deals damage
+   equal to its power to itself. If that creature is attacking, ~ deals 2 damage to that creature's controller"
+   (Wisecrack) and "... If that creature has flying, it deals twice that much damage to itself instead" (Cut Propulsion:
+   the creature is the source, its lifelink applies; checked as it resolves, CR 608.2c); "Draw cards equal to the mana
+   value of target artifact or creature you control. An opponent gains control of that permanent" (Fateful Handoff, an
+   opponent you choose as it resolves; bots don't give their creatures away); "Each player may shuffle their hand and
+   graveyard into their library. Each player who does draws seven cards" (Step Between Worlds, Turtles in Time: each
+   decides in turn order, then those who did shuffle and draw, rulings); "for each opponent, exile up to one target
+   creature that player controls and that player gains life equal to its power" (Luminate Primordial, the power as it
+   last existed, rulings); "Target creature an opponent controls deals damage equal to its power to another target
+   creature that player controls" (Breaking of the Fellowship, Mutiny: no damage if either is illegal, rulings);
+   "Whenever you scry, if you control an Island, you may exile ~ from your graveyard. If you do, draw a card" (Council's
+   Deliberation); "... If they don't, they lose 2 life and you draw a card" (Braids's Frightful Return); "each player
+   flips a coin. Each player whose coin comes up tails sacrifices a creature of their choice" (Goblin Assassin: flips no
+   one wins or loses, rulings; Edgar's heads apply; with Krark's Thumb the heads coin is kept, not asked); "Remove any
+   number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too). No new
+   prompts (all of them reuse existing ones). +13, 29,748 of 31,936.
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -2690,7 +2708,7 @@ line blocks.
      hidden like Show and Tell's. Bots always accept: accepting never leaves a bot behind the other opponents, and the
      offerer gets only what the bot also gets. Still out: Tempt with Discovery ("who searches a library this way"),
      Tempt with Mayhem (copies), Braids, Fandaniel, The Second Doctor ("who doesn't"), Step Between Worlds and
-     Turtles in Time ("each player who does draws seven").
+     Turtles in Time (done in round 276).
    - Granted persist and undying (Haunted One) are abilities, not keywords: "creatures with undying" doesn't see them.
    - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
      (other lines). Suspend Aggression and Elite Spellbinder ("its owner may play it until the end of their next turn",

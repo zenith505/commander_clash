@@ -1237,6 +1237,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
   // (rulings), the same as "Choose an opponent. That player gains control of ~."
   if (opts.selfIt || !/\bit\b/.test(text)) text = text.replace(/^[Aa]n opponent gains control of (?:~|it)\.$/, "Choose an opponent. That player gains control of ~.");
+  // Step Between Worlds: "Each player may shuffle their hand and graveyard into their library. Each player who does draws
+  // seven cards.": one choice for each player, then both instructions for those who chose (sentences/spells.ts). Turtles in
+  // Time: "..., then each player who does draws seven cards", the same (rulings).
+  text = text.replace(/(^|\. )Each player may shuffle their hand and graveyard into their library(?:\. Each player who does|, then each player who does) draws (\w+) cards\./, "$1Each player may shuffle their hand and graveyard into their library and draw $2 cards.");
+  // Fateful Handoff: "Draw cards equal to the mana value of target artifact or creature you control. An opponent gains
+  // control of that permanent.": an opponent chosen as it resolves, not targeted, the same as Akroan Horse's.
+  text = text.replace(/^(Draw cards equal to the mana value of target artifact or creature you control\.) An opponent gains control of that permanent\.$/, "$1 Choose an opponent. That player gains control of that permanent.");
   // Discerning Financier: "Choose another player. That player gains control of target Treasure you control.": with no teams,
   // every other player is an opponent (CR 102.3), so the same as "Choose an opponent."
   text = text.replace(/^Choose another player\. (?=That player gains control of target [^.]+ you control\.)/, "Choose an opponent. ");
@@ -5697,14 +5704,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // unless they discard a card".
     const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
     // Pillar Tombs of Aku: "... If that player doesn't, they lose 5 life and you sacrifice ~": your part after theirs.
-    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life(?: and you (sacrifice ~))?$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Braids's Frightful Return: "... If they don't, they lose 2 life and you draw a card", the same.
+    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life(?: and you (sacrifice ~|draw a card))?$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (mayOut && mayLose) {
       const fx = parseOne(`${mayOut[1]!} loses ${mayLose[1]!} life unless they ${mayOut[2]!}s ${mayOut[3]!}`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "punisher") return null;
       if (mayLose[2]) {
         const more = parseOne(capital(mayLose[2]), ctx);
-        if (more?.length !== 1 || more[0]!.type !== "sacrifice") return null;
-        fx[0] = { ...fx[0]!, effects: [...fx[0]!.effects, ...more], penalty: `Lose ${mayLose[1]} life ({you} sacrifices ~)` };
+        if (more?.length !== 1 || more[0]!.type !== (mayLose[2] === "sacrifice ~" ? "sacrifice" : "draw")) return null;
+        fx[0] = { ...fx[0]!, effects: [...fx[0]!.effects, ...more], penalty: `Lose ${mayLose[1]} life ({you} ${mayLose[2] === "sacrifice ~" ? "sacrifices ~" : "draws a card"})` };
       }
       effects.push(...fx);
       si++;
@@ -9438,6 +9446,31 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Wisecrack: "Target creature deals damage equal to its power to itself. If that creature is attacking, ~ deals 2
+    // damage to that creature's controller." Cut Propulsion: "Target creature deals damage to itself equal to its power.
+    // If that creature has flying, it deals twice that much damage to itself instead." The creature is the source of the
+    // damage to itself (its deathtouch, lifelink and infect apply), its power as this resolves; whether it's attacking or
+    // has flying is checked as this resolves (CR 608.2c), Wisecrack's after the damage. None of it if the target is
+    // illegal (CR 608.2b).
+    const selfBiteThen = /^Target creature deals (?:damage equal to its power to itself|damage to itself equal to its power)$/.test(s) ? sentences[si + 1] : undefined;
+    const biteAttacking = selfBiteThen !== undefined ? /^If that creature is attacking, ~ deals (\d+) damage to that creature's controller\.?$/.exec(selfBiteThen) : null;
+    const biteFlyingTwice = selfBiteThen !== undefined && /^If that creature has flying, it deals twice that much damage to itself instead\.?$/.test(selfBiteThen);
+    if (biteAttacking || biteFlyingTwice) {
+      const before = ctx.targets.length;
+      const fx = parseOne("Target creature deals damage to itself equal to its power", ctx);
+      const bite = fx?.length === 1 && fx[0]!.type === "bite" ? fx[0]! : undefined;
+      if (!bite || bite.a.ref !== "target" || bite.a.index !== before || bite.times || ctx.targets.length !== before + 1) return null;
+      const base = { kind: "object" as const, types: [], notTypes: [], notColors: [] };
+      if (biteFlyingTwice) {
+        effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: { ...base, keywords: ["Flying"], text: "with flying" } }, effects: [{ ...bite, times: 2 }], otherwise: [bite] });
+      } else {
+        const then = parseOne(`~ deals ${biteAttacking![1]} damage to that creature's controller`, ctx);
+        if (!then?.length || ctx.targets.length !== before + 1) return null;
+        effects.push(bite, { type: "if", cond: { kind: "targetIs", index: before, filter: { ...base, combat: "attacking", text: "attacking" } }, effects: then });
+      }
+      si++;
+      continue;
+    }
     // Deathbringer Liege: "you may destroy target creature if it's tapped": any creature is a legal target; whether it's
     // tapped is checked as this resolves, and only then may it be destroyed (rulings).
     if (/^[Yy]ou may destroy target creature if it's tapped$/.test(s)) {
@@ -10856,6 +10889,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(sentences[si + 1]!.replace(/^If you do, /, "").replace(/\.$/, "")), ctx);
       if (!then) return null;
       effects.push({ type: "may", effects: inner, pay: payLifeAnd ? { life: Number(payLifeAnd[1]) } : { mana: payAnd[1]! }, text: `pay ${payAnd[1]} and ${payAnd[2]}` }, { type: "if", cond: { kind: "youDid" }, effects: then });
+      si++;
+      continue;
+    }
+    // Goblin Assassin: "Each player flips a coin. Each player whose coin comes up tails sacrifices a creature of their
+    // choice.": one coin each, no one winning or losing it (rulings); then each of those players sacrifices one, each
+    // choosing in turn order, all at once (CR 101.4).
+    if (/^[Ee]ach player flips a coin$/.test(s) && /^Each player whose coin comes up tails sacrifices a creature of their choice\.?$/.test(sentences[si + 1] ?? "")) {
+      const before = ctx.targets.length;
+      const sac = parseOne("Each player sacrifices a creature of their choice", ctx);
+      if (sac?.length !== 1 || sac[0]!.type !== "pick" || sac[0]!.who.ref !== "eachPlayer" || ctx.targets.length !== before) return null;
+      effects.push({ type: "eachPlayerFlips" }, { ...sac[0]!, who: { ref: "flippedTails" } });
       si++;
       continue;
     }
@@ -12834,6 +12878,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const spec = parseTargetPhrase(singularWord(lossThisWay[1]!), { chosen: true });
       if (effects[effects.length - 1]?.type !== "destroy" || spec?.kind !== "object") return null;
       effects.push({ type: "forEachThisWay", which: "destroyed", filter: { ...spec, text: lossThisWay[1]! }, effects: [{ type: "loseLife", who: { ref: "eachOne" }, n: 1 }] });
+      continue;
+    }
+    // Luminate Primordial: "for each opponent, exile up to one target creature that player controls and that player gains
+    // life equal to its power": each opponent gains life equal to the power of the creature of theirs exiled, as it last
+    // existed on the battlefield (CR 608.2h, rulings); none for a target that's illegal as this resolves (CR 608.2b).
+    const exileGain = /^([Ff]or each opponent, exile up to one target creature that player controls) and that player gains life equal to its power$/.exec(s);
+    if (exileGain) {
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(exileGain[1]!), ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "exile" || ctx.targets.length !== before + 1 || !ctx.targets[before]!.perOpponent || ctx.targets[before]!.perPlayer) return null;
+      effects.push(fx[0]!, { type: "forEachThisWay", which: "exiled", power: true, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, effects: [{ type: "gainLife", who: { ref: "eachOne" }, n: 1 }] });
       continue;
     }
     // Seeds of Innocence: "Destroy all artifacts. They can't be regenerated. The controller of each of those artifacts gains
@@ -16800,6 +16855,13 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
       const what = (of[2] ?? of[3])!;
       const index = addTarget(ctx, { kind: "object", types: ["Creature"], ...(/you control$/.test(what) ? { controller: "you" as const } : {}), text: what });
       return replaceX(fx, { count: { kind: (of[1] ?? of[4]) as "power" | "toughness", of: { ref: "target", index } } });
+    }
+    // Fateful Handoff: "Draw cards equal to the mana value of target artifact or creature you control": that permanent's
+    // mana value as this resolves (an {X} in its cost counts 0, CR 107.3, rulings).
+    const mvOf = /^the mana value of (target (?:artifact or creature|creature|artifact) you control)$/.exec(m[group ?? m.length - 1]!);
+    if (fx && mvOf && /^(?:You )?[Dd]raw X cards$/.test(rewrite(m))) {
+      const what = parseObject(mvOf[1]!, ctx);
+      return what?.ref === "target" && !what.n ? replaceX(fx, { count: { kind: "manaValue", of: what } }) : null;
     }
     // "Each opponent loses life equal to the number of creatures attacking them" (Within Range): each that player's own
     // number, "them" being the one losing life.

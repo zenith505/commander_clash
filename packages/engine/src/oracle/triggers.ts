@@ -844,6 +844,16 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Skyfire Phoenix: "When you cast your commander, ...": a commander spell you own (CR 903.3), cast from the command zone
+  // or anywhere else; a copy of it isn't a commander (CR 903.3, 707.2) and wasn't cast. "When" triggers each time, as
+  // "whenever" does (CR 603.2).
+  const yourCommander = /^When(?:ever)? you cast your commander, (.+)$/.exec(line);
+  if (yourCommander) {
+    if (/\b(?:it|its|that spell|that creature)\b/.test(yourCommander[1]!.replace(/~/g, ""))) return "fail";
+    const t = parseCastTrigger(`Whenever you cast a spell, ${yourCommander[1]}`);
+    if (!t || t === "fail" || !t.cast || t.cast.by !== "you" || t.cast.orCopy || Object.keys(t.cast).length !== 2) return "fail";
+    return { ...t, cast: { ...t.cast, spell: { ...t.cast.spell, text: "your commander" }, commander: true } };
+  }
   // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
@@ -3574,7 +3584,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const yardExile = /^((?:When|Whenever)\b.+?), (you may exile ~ from your graveyard\. (?:If|When) you do, .+)$/.exec(line);
   if (yardExile && !/^(When|Whenever) ~ /.test(yardExile[1]!)) {
     const t = parseTrigger(`${yardExile[1]}, draw a card.`);
-    if (!t || t === "fail" || t.event !== "castSpell" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || t.ifCond) return "fail";
+    // Council's Deliberation: "Whenever you scry, if you control an Island, you may exile ~ from your graveyard. If you do,
+    // draw a card.": watched from your graveyard (effects/triggers.ts), with an intervening if about what you control,
+    // checked as it triggers and as it resolves (CR 603.4).
+    const scryIf = t && t !== "fail" && t.event === "youScry" && t.ifCond?.kind === "control" && t.ifCond.who === "you" && !t.firstEachTurn;
+    if (!t || t === "fail" || (t.event !== "castSpell" && !scryIf) || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || (t.ifCond && !scryIf)) return "fail";
     const body = parseBody(`${yardExile[2]![0]!.toUpperCase()}${yardExile[2]!.slice(1)}`, { selfCard: true });
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }

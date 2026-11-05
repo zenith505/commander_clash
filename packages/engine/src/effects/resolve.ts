@@ -15,7 +15,7 @@ import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runCoinEachEffect, runFlipClashEffect, runCoinEffect, runDiceEffect } from "./run-dice";
+import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -797,6 +797,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "choseWord":
       return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
+    case "flippedTails":
+      return (s.resolving?.flippedTails ?? []).filter((p) => !player(s, p).lost);
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost && (!ref.opponents || p !== ctx.controller));
     case "notChoseThisWay": {
@@ -1430,6 +1432,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runCoinEachEffect(s, e, ctx, src);
     case "flipClash":
       return runFlipClashEffect(s, e, ctx, src);
+    case "eachPlayerFlips":
+      return runEachPlayerFlipsEffect(s, e, ctx, src);
     case "vote":
     case "eachChooses":
     case "controlFromEach":

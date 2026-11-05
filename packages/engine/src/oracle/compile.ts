@@ -951,6 +951,18 @@ export function compile(d: CardDef): CompiledCard {
       else out.triggers.push({ ...t, ifCond: { kind: "selfStill", zone: "battlefield" } }, { ...t, zone: "graveyard", ifCond: { kind: "selfStill", zone: "graveyard" } });
       continue;
     }
+    // Quakebringer: "At the beginning of your upkeep, ~ deals 2 damage to each opponent. This ability triggers only if ~ is
+    // on the battlefield or if ~ is in your graveyard and you control a Giant." One ability that works in both zones (CR
+    // 113.6b); the condition is only for it to trigger (CR 603.2, not an intervening if, so not checked again as it
+    // resolves; rulings: on the battlefield it triggers with no Giant).
+    const onlyIfYard = /^(At the beginning of your upkeep, .+?) This ability triggers only if ~ is on the battlefield or if ~ is in your graveyard and (you control an? [A-Z][a-z]+)\.$/.exec(line);
+    if (onlyIfYard) {
+      const t = parseTrigger(onlyIfYard[1]!);
+      const cond = parseStaticCondition(onlyIfYard[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!t || t === "fail" || t.zone || t.ifCond || t.host || t.activeIf || t.event !== "yourUpkeep" || !cond) out.unsupported.push(raw);
+      else out.triggers.push(t, { ...t, zone: "graveyard", activeIf: cond });
+      continue;
+    }
     // "∞ — [Ability]": "As long as this permanent is harnessed, it has [ability]" (CR 702.186b).
     const infinity = /^∞ — (.+)$/.exec(line);
     if (infinity) {
@@ -5185,12 +5197,14 @@ export function compile(d: CardDef): CompiledCard {
     // Tattoo Ward: "Enchanted creature gets +1/+1 and has protection from enchantments. This effect doesn't remove ~.";
     // Spectra Ward: "... protection from each color. This effect doesn't remove Auras.": no Aura falls off for it, this
     // one or another (rulings), though one from elsewhere still does (CR 702.16c).
-    const spare = /^(Enchanted creature (?:gets [+-]\d+\/[+-]\d+ and )?has protection from .+?\.) This effect doesn't remove (~|Auras)\.$/.exec(line);
+    // Benevolent Blessing: "This effect doesn't remove Auras and Equipment you control that are already attached to it":
+    // those attached as it begins to apply, this one included (CR 702.16p).
+    const spare = /^(Enchanted creature (?:gets [+-]\d+\/[+-]\d+ and )?has protection from .+?\.) This effect doesn't remove (~|Auras|Auras and Equipment you control that are already attached to it)\.$/.exec(line);
     if (spare) {
       const st = parseStatic(spare[1]!);
       const prot = (m: Modification) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k));
       const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.some(prot) && st.mods.every((m) => prot(m) || m.kind === "modifyPT");
-      const spares = spare[2] === "Auras" ? ("auras" as const) : (true as const);
+      const spares = spare[2] === "Auras" ? ("auras" as const) : spare[2] === "~" ? (true as const) : ("attached" as const);
       if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => (prot(m) ? { ...m, spares } : m)) as typeof st.mods, text: line });
       else out.unsupported.push(raw);
       continue;

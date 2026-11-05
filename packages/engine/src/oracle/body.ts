@@ -2115,6 +2115,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Join Forces: "Untap up to two target creatures. They each get +2/+2 until end of turn.": each of them, as "they get".
   // Fancy Footwork: "Untap one or two target creatures. They each get ...": the same.
   text = text.replace(/((?:^|\. )(?:Untap|Tap) (?:up to |one or )?(?:two|three) target creatures\.) They each get /, "$1 They get ");
+  // March of Progress: "Choose target artifact creature you control. For each creature chosen this way, create a token
+  // that's a copy of it." (worded so overload can change "target" to "each", CR 702.96b): one copy of the target, or
+  // overloaded, one of each artifact creature you control, with no targets.
+  text = text.replace(/^Choose (target|each) (artifact creature you control)\. For each creature chosen this way, create a token that's a copy of it\.$/, (_, w: string, what: string) => (w === "target" ? `Create a token that's a copy of target ${what}.` : `For each ${what}, create a token that's a copy of it.`));
   // Balance of Power: "If target opponent has more cards in hand than you, draw cards equal to the difference.": with
   // fewer or as many, the difference is nothing to draw (handMoreThanYou).
   text = text.replace(/^If target opponent has more cards in hand than you, draw cards equal to the difference\.$/, "Draw X cards, where X is the number of cards in target opponent's hand minus the number of cards in your hand.");
@@ -7805,6 +7809,40 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Omnath, Locus of All: "look at the top card of your library. You may reveal that card if it has three or more colored
+    // mana symbols in its mana cost. If you do, add three mana in any combination of its colors and put it into your hand.
+    // If you don't reveal it, put it into your hand." It goes to your hand either way; revealing it, when it may be
+    // revealed, adds the mana first (not a mana ability: it uses the stack, rulings).
+    if (/^[Ll]ook at the top card of your library$/.test(s) && /^You may reveal that card if it has (three) or more colored mana symbols in its mana cost$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && sentences[si + 2]?.replace(/\.$/, "") === "If you do, add three mana in any combination of its colors and put it into your hand" && sentences[si + 3]?.replace(/\.$/, "") === "If you don't reveal it, put it into your hand") {
+      effects.push(
+        { type: "revealTop", look: true },
+        { type: "if", cond: { kind: "revealedColoredSymbols", atLeast: 3 }, effects: [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "addMana", times: 3, anyColors: true, revealedColors: true }], text: "reveal the revealed card and add three mana in any combination of its colors" }] },
+        { type: "bounce", what: { ref: "revealed" } },
+      );
+      si += 3;
+      continue;
+    }
+    // Manabond: "you may reveal your hand and put all land cards from it onto the battlefield. If you do, discard your hand."
+    // The lands are put onto the battlefield as it resolves (not played), then the rest of the hand is discarded (rulings).
+    if (/^[Yy]ou may reveal your hand and put all land cards from it onto the battlefield$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If you do, discard your hand") {
+      const land: TargetSpec = { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" };
+      effects.push({ type: "may", effects: [{ type: "lookAtHand", who: { ref: "you" }, reveal: true }, { type: "putFromHand", filter: land, may: false, all: true }, { type: "discard", who: { ref: "you" }, n: 0, hand: true }], text: "reveal your hand, put all land cards from it onto the battlefield, then discard your hand" });
+      si++;
+      continue;
+    }
+    // Tithe: "Search your library for a Plains card. If target opponent controls more lands than you, you may search your
+    // library for an additional Plains card. Reveal those cards, put them into your hand, then shuffle." The lands are
+    // counted as it resolves (rulings), after the first search; one shuffle at the end. A search for a card with a stated
+    // quality may find nothing (rulings, CR 701.23b), so the "you may" is that second search finding a card or not.
+    if (/^Search your library for a Plains card$/.test(s) && /^If target opponent controls more lands than you, you may search your library for an additional Plains card$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^Reveal those cards, put them into your hand, then shuffle$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const who = parsePlayer("target opponent", ctx);
+      if (!who) return null;
+      const plains: TargetSpec = { kind: "card", subtypes: ["Plains"], text: "Plains card" };
+      const one: Effect = { type: "search", filter: plains, n: 1, upTo: false, reveal: true, dest: { zone: "hand" }, noShuffle: true };
+      effects.push(one, { type: "if", cond: { kind: "playerMoreLifeThanYou", who, lands: true }, effects: [one] }, { type: "shuffle", who: { ref: "you" } });
+      si += 2;
+      continue;
+    }
     // Mission Briefing: "choose an instant or sorcery card in your graveyard. You may cast it this turn. If that spell would
     // be put into your graveyard, exile it instead." Chosen as it resolves, not targeted (a card just surveilled there
     // too, never this spell, still on the stack: rulings); then a permission at its normal timing (rulings).
@@ -8573,6 +8611,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!r) return null;
       effects.push({ type: "revealTop", ...(atRandom ? { randomFromHand: true as const } : {}) }, r.effect);
       si = r.next - 1;
+      // Druidic Satchel: "If it's a creature card, create a 1/1 green Saproling creature token. If it's a land card, put
+      // that card onto the battlefield under your control. If it's a noncreature, nonland card, you gain 2 life.": each
+      // check in turn, about the same card (a creature land does both, rulings).
+      while (!atRandom && r.effect.type === "if" && !r.effect.otherwise && /^If it's an? [^,]+?(?:, [a-z]+)? card, /.test(sentences[si + 1] ?? "")) {
+        const more = parseRevealedIf(sentences, si + 1, ctx);
+        if (!more || more.effect.type !== "if" || more.effect.otherwise) return null;
+        effects.push(more.effect);
+        si = more.next - 1;
+      }
       continue;
     }
     // Cait, Cage Brawler: "Whenever ~ attacks, you and defending player each draw a card, then discard a card": each draws,

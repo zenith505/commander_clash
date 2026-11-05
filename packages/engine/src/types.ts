@@ -509,6 +509,12 @@ export interface GameObject {
   zoneChanges?: number;
   /** An Aura with "enchant creature card in a graveyard" (Animate Dead): the card it's attached to there, as that object. */
   enchantsCard?: { id: ObjectId; zc: number };
+  /**
+   * Benevolent Blessing (CR 702.16p): the Auras and Equipment its controller controlled that were attached to the creature
+   * it enchants (itself included) when its protection began to apply, recorded by the state-based actions; the
+   * protection doesn't remove these. Made again when it's attached to another object (or is a new object).
+   */
+  sparesAttached?: { zc: number; host: ObjectId; hostZc: number; ids: ObjectId[] };
   /** The turn it was drawn, as this object (`zc`): "cards in your hand drawn this turn" (Sylvan Library). */
   drawn?: { turn: number; zc: number };
   /** How many times it has untapped as this object: "for as long as ~ remains tapped" ends at the next (CR 611.2b). */
@@ -2637,6 +2643,8 @@ export interface Resolving {
     /** Wand of Denial: the life for the cards a dig took is paid (Effect dig `payLife`). */
     digPaidLife?: true;
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
+    /** Display of Power: which of its target spells is being copied now (copySpell `many`). */
+    copyManyAt?: number;
     copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number; /** Copy "eachOther" (Zada): the permanent each copy still to make targets, in order; who controls them; whether the next one's has been chosen. */ each?: ObjectId[]; by?: PlayerId; picked?: true }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)

@@ -1680,7 +1680,7 @@ export type Modification =
    * creature card in your graveyard has flying. The same is true for ..." (Bleeding Effect): those a creature card in
    * its controller's graveyard has as it resolves.
    */
-  | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. */ spares?: true | "auras"; sharedAmongYours?: true | "graveyard" }
+  | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. "attached": "This effect doesn't remove Auras and Equipment you control that are already attached to it" (Benevolent Blessing, CR 702.16p): those attached as the effect began (GameObject.sparesAttached). */ spares?: true | "auras" | "attached"; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -2708,7 +2708,7 @@ export type Effect =
       /** "Do this only once each turn" (Emet-Selch, CR 603.2h): casting it is doing it; then the ability doesn't trigger again this turn. */
       once?: true;
     }
-  | { type: "putFromHand"; who?: PlayerRef; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
+  | { type: "putFromHand"; who?: PlayerRef; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
     /** "Onto the battlefield attached to ~" (Danitha, Benalia's Hope): an Aura only onto the source, if it could enchant it, or it stays where it is (CR 303.4f-g); an Equipment attached to it if it could be, else unattached (rulings, CR 301.5c). */ attachToSelf?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -3126,7 +3126,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
+  | { type: "copySpell"; spell: "cause" | "self" | { target: number; /** "Copy any number of target instant and/or sorcery spells" (Display of Power): the targets from `target` on, `n` of them once cast (expandMany), each copied in turn. */ many?: true; n?: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). "otherInstantSorcery": all the others its controller has cast this turn, counted as this resolves (Show of Confidence). "eachOther": see `eachOther`. */ n: Amount | "storm" | "kicked" | "stormInstantSorcery" | "otherInstantSorcery" | "eachOther"; newTargets: boolean;
     /**
      * Zada, Ink-Treader Nephilim, Precursor Golem: "copy that spell for each other creature (you control) that the spell
      * could target. Each copy targets a different one of those creatures": one copy for each permanent matching `among`
@@ -3734,6 +3734,8 @@ export type Effect =
        * in any combination of colors" (Manamorphose): `times` mana, each of any color (CR 106.1b), chosen as it resolves.
        */
       anyColors?: true;
+      /** With `anyColors`: "add three mana in any combination of its colors" (Omnath, Locus of All): only the colors of the card "look at the top card" looked at; none if it has none (CR 106.5). */
+      revealedColors?: true;
       /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
       markSource?: true;
       /** Squandered Resources: "Add one mana of any type the sacrificed land could produce": a type its cost's sacrificed land could make as it last existed (LastKnown.couldProduce, CR 106.7), chosen as it resolves; none if none (rulings). */
@@ -4640,8 +4642,8 @@ export type SpellCondition =
   | { kind: "subjectYours" }
   /** Silumgar Scavenger: "if it exploited that creature": the creature a dies trigger is about was sacrificed for this source's exploit, this object (CR 702.110a, 400.7). */
   | { kind: "subjectExploitedBySelf" }
-  /** Pulse of the Forge: "if that player or that planeswalker's controller has more life than you", as it resolves. */
-  | { kind: "playerMoreLifeThanYou"; who: PlayerRef }
+  /** Pulse of the Forge: "if that player or that planeswalker's controller has more life than you", as it resolves. `lands`: "if target opponent controls more lands than you" (Tithe), counted as it resolves. */
+  | { kind: "playerMoreLifeThanYou"; who: PlayerRef; lands?: true }
   /**
    * "If you controlled that permanent, draw a card" about target `index` (Geistwave, Kellan): you control it now, or did
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
@@ -4665,6 +4667,8 @@ export type SpellCondition =
   | { kind: "spellCountered" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** Omnath, Locus of All: "if it has three or more colored mana symbols in its mana cost": the card "look at the top card" looked at, its mana cost's colored symbols counted, hybrid and Phyrexian ones included (rulings), one each. */
+  | { kind: "revealedColoredSymbols"; atLeast: number }
   /** "If it has the same mana value as the revealed card" (Counterbalance): the revealed card's (X as 0 off the stack, CR 202.3e) is `mv`. */
   | { kind: "revealedMv"; mv: AmountExpr }
   /** "Put a card exiled with ~ into its owner's graveyard. If it's a land card, ..." (Currency Converter): the card moved. */

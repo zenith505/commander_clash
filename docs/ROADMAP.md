@@ -1,7 +1,7 @@
 # Roadmap
 
-29,855 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,571 of
+29,866 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,579 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -124,9 +124,9 @@ line blocks.
    of All (Shrine triggers that trigger an additional time), Master Warcraft (you declare everyone's attackers and
    blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
    separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
-   permanent and a spell), Karn, Living Legacy ("pay any amount of mana" as an effect), Benevolent Blessing (protection
+   permanent and a spell), Karn, Living Legacy ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
    that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (spells that gain evoke as
-   they're cast), Omnath, Locus of All ("three mana in any combination of its colors" from a trigger), Crypt Rats
+   they're cast), Omnath, Locus of All (done in round 277) ("three mana in any combination of its colors" from a trigger), Crypt Rats
    ("spend only black mana on X": a spend rule for part of a cost). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
    `npm run popular`.
    Out after round 169: Siren's Ruse ("if a Pirate
@@ -194,7 +194,7 @@ line blocks.
    the easy cards from there to about rank 8,880 (Risk Factor, What Must Be Done, Necklace of Girion, Savor the
    Moment, Uglúk, Midnight Tilling, Tax Collector, Over the Edge), plus Jadelight Ranger and Defossilize ("explores,
    then it explores again"); `npm run popular` from Detention Sphere on is still to go through.
-   Out after round 175: Detention Sphere (exiles every permanent with the same name, and returns them all: one exile
+   Out after round 175: Detention Sphere (done in round 277) (exiles every permanent with the same name, and returns them all: one exile
    linked to several cards), Tangle Wire (the upkeep player taps one permanent of their choice for each fade counter),
    Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
    ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
@@ -213,7 +213,7 @@ line blocks.
    lands"), Hunting Wilds and Overwhelming Splendor (done in round 275), Gandalf, Goblins' Bane
    (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
    Sisma Behemoth (an attack cost of its own), The Ancient One (a reflexive mill from a discard), Deathgorge Scavenger
-   ("you may exile" with two "if it's a" results), Tithe. Round 175 went down the list from Detention Sphere to
+   ("you may exile" with two "if it's a" results), Tithe (done in round 277). Round 175 went down the list from Detention Sphere to
    Capricopian (rank 8,592), then took the easy cards from there to about rank 9,100 (Plate Armor, Indebted Spirit,
    Subjugate the Hobbits, Biovisionary, Bower Passage, Karametra's Blessing, Zuko's Conviction and others), plus the
    cards that share their mechanics: "can't attack or block unless" any condition (Bontu the Glorified, Hazoret the
@@ -228,7 +228,7 @@ line blocks.
    Huntmaster of the Fells (two targets, one about the other's controller), Archelos, Lagoon Mystic (enters tapped or
    untapped by its own state), Venerable Warsinger (a target's X from the trigger's damage, unknown at targeting),
    Rushed Rebirth (a this-turn dies trigger with "lesser mana value" than that creature), Omarthis (manifest a counted number), Pull from Eternity (done in round
-   272), Wall of Shards (done in round 275), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
+   272), Wall of Shards (done in round 275), Rampaging War Mammoth (done in round 277) (cycling {X}), Pizza Face (an optional target that becomes a
    Mutant creature), the hybrid Mimics ("a spell that's both blue and red": no all-of-these-colors filter), Does
    Machines, Crown of Convergence ("share a color with that card"). Round 176 went down the list from Bristlebud Farmer to about rank
    9,240 (Kelsien, the five Runes, Great Hall of the Biblioplex, Questing Druid, Worldslayer, Progenitor Exarch,
@@ -290,7 +290,7 @@ line blocks.
    Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
    the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
    random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
-   stun counter on one of them), Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
+   stun counter on one of them), Stunning Reversal, Manabond (done in round 277), Glowcap Lantern (granting "look at
    the top card of your library any time"), Jinxed Choker, Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
    counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
    Vengeance, Shaile ("entered under your control this turn"). Round 180
@@ -448,7 +448,7 @@ line blocks.
    Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Faerie Fencing, Flame
    Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
    of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Mass
-   Diminish, Display of Power, Jason Bright, Blood for Bones, Quakebringer,
+   Diminish, Display of Power (done in round 277), Jason Bright, Blood for Bones, Quakebringer (done in round 277),
    Lorthos, Zidane, Discerning Financier (done in round 272), Eight-and-a-Half-Tails.
    Round 190 went on from the top: "that many plus one of each of those kinds of counters" on any permanent you control
    (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist, with Pir), "as long as it was cast" on a static
@@ -1507,8 +1507,8 @@ line blocks.
    from their graveyard" (Froghemoth: eventX); "creatures attacking your opponents and/or planeswalkers they control"
    (Roar of Resistance: combat filter attackingOpponentOrTheirPlaneswalker); "You may spend mana as though it were mana
    of any color to cast planeswalker spells" (Oath of Nissa, CR 609.4b). +15 (28,964 of 31,936 with B71-B74).
-   Out after round 239 (looked at, not done): Omnath, Locus of All ("If you would lose unspent mana, that mana becomes
-   black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (protection that doesn't
+   Out after round 239 (looked at, not done): Omnath, Locus of All (done in round 277) ("If you would lose unspent mana, that mana becomes
+   black instead", and a reveal by the count of colored mana symbols); Benevolent Blessing (done in round 277) (protection that doesn't
    remove your own Auras and Equipment already attached, an exception to CR 702.16); Scion of the Ur-Dragon (becomes a copy of a card in
    your graveyard until end of turn); Sidisi, Regent of the Mire (done in round
    266); Undead Alchemist (combat damage replaced by a mill, and a trigger that exiles the milled card).
@@ -2090,6 +2090,28 @@ line blocks.
    one wins or loses, rulings; Edgar's heads apply; with Krark's Thumb the heads coin is kept, not asked); "Remove any
    number of counters from target creature you control" (Rhys, the Evermore: one at a time, any kinds, none too; with a
    browser test). No new prompts (all of them reuse existing ones). +13, 29,829 of 31,936 with B106 to B108.
+   Round 277 went on with the skip lists' blockers. "When you cycle this card, destroy up to X target artifacts" (Rampaging
+   War Mammoth) and "... target artifact or enchantment with mana value X" (Webstrike Elite): the X of the cycling cost;
+   "If target opponent controls more lands than you, you may search your library for an additional Plains card" (Tithe,
+   counted as it resolves); "Choose target artifact creature you control. For each creature chosen this way, create a
+   token that's a copy of it" (March of Progress, and of each one overloaded, CR 702.96); "Copy any number of target
+   instant and/or sorcery spells" (Display of Power: one copy of each, in the order they were picked, each may get new
+   targets; with a browser test); "look at the top card of your library. You may reveal that card if it has three or
+   more colored mana symbols in its mana cost. If you do, add three mana in any combination of its colors" (Omnath, Locus
+   of All: hybrid and Phyrexian symbols count once each; the mana bar offers only the card's colors; bots reveal; with a
+   browser test); "nonland permanent not named ~" (Detention Sphere); "Auras and Equipment you control that are already
+   attached to it" (Benevolent Blessing: recorded as it's attached, CR 702.16p; protection from elsewhere still removes
+   them); "This ability triggers only if ~ is on the battlefield or if ~ is in your graveyard and you control a Giant"
+   (Quakebringer: checked when it would trigger, not again as it resolves, CR 603.2); three "If it's a ... card" checks
+   of one revealed card (Druidic Satchel: Dryad Arbor gets two); "You may reveal your hand and put all land cards from it
+   onto the battlefield. If you do, discard your hand" (Manabond: bots do it with at most one nonland card to lose; with
+   a browser test). +11, 29,853 of 31,936 with B109.
+   Out after round 277 (looked at, not done): World War Hulk ("The next red or green creature spell you cast this turn
+   can be cast without paying its mana cost": no such permission yet, and "double its power and toughness"); Tablet of
+   the Guilds ("choose two colors", then life for each chosen color a spell is); You Cannot Pass! (done in round B110) (whether a creature
+   blocked or was blocked by a legendary creature this turn isn't recorded); Myriad Construct (counters by the nonbasic
+   lands opponents control if kicked, and "becomes the target of a spell" with tokens by its power); Spell Queller
+   (exiling a spell from the stack, which its owner may cast for free when the Queller leaves).
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -2182,7 +2204,7 @@ line blocks.
    abilities); Nahiri, the Unforgiving ("attacks a player each combat if able" until your next turn); Cherished Hatchling
    (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic and Crashing Wave (tap creatures, or
    artifacts and creatures, to pay generic mana of an ability's or a waterbend cost).
-   Out after round 255 (looked at, not done): Benevolent Blessing (protection that doesn't remove Auras and Equipment
+   Out after round 255 (looked at, not done): Benevolent Blessing (done in round 277) (protection that doesn't remove Auras and Equipment
    already attached when the effect began: no record of what was attached then); Overgrown Zealot (mana spendable only to
    turn permanents face up: no ManaUse for a turn-face-up cost).
    Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
@@ -2205,7 +2227,7 @@ line blocks.
    look-at put "tapped and attacking that player"); Pact Weapon ("draw a card and reveal it", the X lost if the draw is
    replaced, rulings); Long River Lurker (a floating "whenever that creature deals combat damage this turn" on the
    target); Olivia, Crimson Bride (done in round 267);
-   Horrid Shadowspinner (done in round B105) (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (the X
+   Horrid Shadowspinner (done in round B105) (discard "that many", its power when you chose to draw, rulings); Rampaging War Mammoth (done in round 277) (the X
    from the cycling cost, as before); Soul Diviner (a counter of any kind removed as a cost); Ironscale Hydra (a
    prevention that puts a counter for each creature's damage prevented); Professor Hojo (the first activated ability that
    targets a creature you control).
@@ -2320,7 +2342,7 @@ line blocks.
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere (done in round 277), Tangle Wire,
    Steward of the Harvest, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Unstable Glyphbridge, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
@@ -2585,7 +2607,7 @@ line blocks.
    applies; Kambal copies only the tokens still on the battlefield as its trigger resolves; two grants of "Toxic 1" may
    count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
    order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
-   World; Webstrike Elite and Rampaging War Mammoth (an X from the cycling cost in their targets); the other "you may
+   World; Webstrike Elite and Rampaging War Mammoth (done in round 277) (an X from the cycling cost in their targets); the other "you may
    pay {X}. When you do" cards (Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
@@ -2897,9 +2919,9 @@ line blocks.
      Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
      "of the chosen type" (Bloodline Shaman), "it" meaning the source (Harsh Deceiver), amounts from the revealed card
      (Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
-     (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel).
+     (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel, done in round 277).
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
-     (Echoing Return, Rat King), "not named ~" (Detention Sphere), Legion's End's "exiles all cards with that name from
+     (Echoing Return, Rat King), "not named ~" (Detention Sphere, done in round 277), Legion's End's "exiles all cards with that name from
      their hand". (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End (done in round B104)
      is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
@@ -2915,7 +2937,7 @@ line blocks.
      (Hungering Puppetbeast) is out.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
-   - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity, Corporeal Projection, Bail
+   - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress (done in round 277), Winds of Abandon, Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity, Corporeal Projection, Bail
      Out (their "each" lines). Fall of the Titans' Surge {X}{R}. Bots never overload Counterflux.
    - Splice with a cost that isn't mana (Horobi's Whisper, Hundred-Talon Strike, Torrent of Stone, Veil of Secrecy,
      Roar of Jukai), a second splice line, and splice onto a spell with X, modes, kicker, buyback or another
@@ -3887,7 +3909,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
   round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
   Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
-  state trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
+  state trigger), Detention Sphere (left to Lane A, near the top; done in round 277). Known limit: a "*" creature card's power outside the
   battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
   the stack); characteristics() still shows it as 0 there.
 - Round B28 (harder skipped cards, least played first): "Remove X [kind] counters from ~" as a cost, X announced up
@@ -5502,7 +5524,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a trampler still deals all its damage, 702.19d; the whole band, 702.22i): Dazzling Beauty, Curtain of Light, Trap
   Runner, Fog Patch, Choking Vines; "blocked or was blocked by a Zombie / a legendary creature this turn" (what the other
   creature was as the block was declared, kept in the turn's block log, rulings): Time to Reflect, You Cannot Pass!. +13
-  (29,855 of 31,936 with round 276).
+  (29,866 of 31,936 with rounds 276 and 277).
 - Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
   Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
@@ -5764,7 +5786,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
   Equip reductions "that target enchanted creature" (Strong Back).
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
-- Protection from a player; protection that doesn't remove other Auras (Benevolent Blessing; Spectra Ward done in round B71).
+- Protection from a player; protection that doesn't remove other Auras (Benevolent Blessing done in round 277; Spectra Ward done in round B71).
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).

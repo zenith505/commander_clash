@@ -4478,7 +4478,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const cycled = /^When you cycle ~, (.+)$/.exec(line);
   if (cycled) {
     // Magmakin Artillerist: "it deals 1 damage to each opponent": the card is the source (CR 702.29c).
-    const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
+    // Rampaging War Mammoth: "destroy up to X target artifacts", the X of its cycling cost (rulings), known as the
+    // trigger is put on the stack and its targets chosen (CR 107.3a, 603.3d; compile checks the cost has an {X}).
+    const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true, ownX: true });
     return body ? { event: "selfCycled", body } : "fail";
   }
   // "When ~ becomes plotted" (CR 702.170a, 702.170c): the card in exile, "it" the card as the source (Longhorn

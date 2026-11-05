@@ -25,6 +25,14 @@ export interface ParsedCost {
 
 const isColor = (s: string): s is Color => (COLORS as readonly string[]).includes(s);
 
+/**
+ * How many colored mana symbols a mana cost has (CR 107.4, 105.2): {W}{U}{B}{R}{G}, hybrid ({R/G}, {2/W}) and Phyrexian
+ * ({B/P}) symbols, one each; generic, {C}, {X} and {S} aren't colored. (Omnath, Locus of All rulings: "{R/G}{G}{G/W}" has three.)
+ */
+export function coloredManaSymbols(cost: string | undefined): number {
+  return [...(cost ?? "").matchAll(/\{([^}]+)\}/g)].filter((m) => /[WUBRG]/.test(m[1]!)).length;
+}
+
 export function parseManaCost(cost: string): ParsedCost {
   const symbols: CostSymbol[] = [];
   for (const m of cost.matchAll(/\{([^}]+)\}/g)) {

@@ -250,3 +250,26 @@ export function runFlipClashEffect(s: GameState, e: Extract<Effect, { type: "fli
   }
   log(s, `${player(s, you).name} and ${player(s, them).name} flip coins for ${src} ${rounds + 1} time${rounds ? "s" : ""}: ${player(s, you).name} is dealt ${hurt[you]} damage, ${player(s, them).name} ${hurt[them]}.`);
 }
+
+/**
+ * Goblin Assassin: "Each player flips a coin. Each player whose coin comes up tails sacrifices a creature of their choice."
+ * One coin each, in turn order from the active player; no one calls them, so no one wins or loses them (rulings, CR 705.2),
+ * unless Edgar makes a player's first coins this turn come up heads and won (rulings on Edgar). With Krark's Thumb a
+ * player flips two and keeps the heads one (not asked: ROADMAP). Those with tails are kept for the next instruction.
+ */
+export function runEachPlayerFlipsEffect(s: GameState, _e: Extract<Effect, { type: "eachPlayerFlips" }>, _ctx: ResolveCtx, src: string): void {
+  const order = livingPlayers(s).sort((a, b) => turnRank(s, a) - turnRank(s, b));
+  const tails: PlayerId[] = [];
+  for (const pid of order) {
+    const rig = flipsRigged(s, pid);
+    noteFlipped(s, pid);
+    if (rig) {
+      fireEvent(s, { type: "coinFlipped", player: pid, won: true });
+      continue;
+    }
+    const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).flipTwo);
+    if (!(thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]).some((h) => h)) tails.push(pid);
+  }
+  s.resolving!.flippedTails = tails;
+  log(s, `Each player flips a coin for ${src}: ${tails.length ? `tails for ${tails.map((p) => player(s, p).name).join(", ")}` : "all heads"}.`);
+}

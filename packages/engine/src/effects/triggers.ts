@@ -2094,6 +2094,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && o.chosen?.player !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
+        // "Your commander" (Skyfire Phoenix): a commander you own (CR 903.3); a copy isn't one.
+        if (t.cast.commander && !(spell && !ev.copy && spell.isCommander && spell.owner === you)) return false;
         if (t.cast.mainPhase && s.step !== "main1" && s.step !== "main2") return false;
         if (t.cast.yourTurn && you !== s.activePlayer) return false;
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;

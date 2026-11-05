@@ -2269,6 +2269,8 @@ export interface Resolving {
   playersDamagedThisWay?: PlayerId[];
   /** "Each player may put ... onto the battlefield": those who did, for the instructions after it ("each opponent who didn't"). */
   choseThisWay?: PlayerId[];
+  /** Goblin Assassin: the players whose coin came up tails (Effect eachPlayerFlips). */
+  flippedTails?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
   /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */

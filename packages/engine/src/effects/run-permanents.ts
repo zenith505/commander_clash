@@ -1298,6 +1298,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         for (const [kind, n] of kinds) {
           from.counters[kind] = 0;
           countersRemoved(s, from, kind, n);
+          // Black Panther: "if one or more +1/+1 counters are moved this way, ... that much": those taken off to move.
+          if (e.only !== undefined && s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
         }
       for (const { kinds } of moved)
         for (const [kind, n] of kinds)

@@ -242,6 +242,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // Mirror Box: the name of the permanent it's applied to (copy effects are applied by now, layer 1); a face-down one has none (CR 708.2).
       const affectedName = affected && c.sameNameAsAffected ? (affected.faceDown ? undefined : view(affected)?.name) : undefined;
       if (c.sameNameAsAffected && !affectedName) return 0;
+      // Strata Scythe: the names of the cards its linked exile took that are still there, face up (CR 607.2a, 400.7).
+      const linkSrc = c.sameNameAsLinked && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const linkedNames = c.sameNameAsLinked ? (linkSrc ? (s.linkedExile?.[`${linkSrc.id}@${linkSrc.zoneChanges ?? 0}`] ?? []).flatMap((l) => { const x = s.objects[l.id]; return x && x.zone === "exile" && (x.zoneChanges ?? 0) === l.zc && !x.faceDown ? [defOf(s, x).name] : []; }) : []) : undefined;
+      if (linkedNames && !linkedNames.length) return 0;
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if ((c.other && id === ctx.sourceId) || id === notThis || (c.otherThanAffected && id === ctx.affected)) continue;
@@ -251,6 +255,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
+        if (linkedNames && (o.faceDown || !linkedNames.some((nm) => sameName(view(o)?.name, nm)))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (c.counterKinds) for (const [k, v] of Object.entries(o.counters)) (v ?? 0) > 0 && names.add(k);
@@ -379,7 +384,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "destroyedThisWay":
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
-      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).length;
+      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).reduce((n, x) => n + (c.kind === "destroyedThisWay" && c.totalMv ? x.ch.manaValue : 1), 0);
     case "opponentsVotedOtherwise": {
       const votes = ctx.event?.votes ?? [];
       const mine = new Set(votes.filter((v) => v.voter === ctx.controller).map((v) => v.choice));
@@ -1340,7 +1345,7 @@ function describeCount(c: Count): string {
     case "discoveredBelow":
       return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
-      return `#${c.filter.text} ${c.died ? "that died" : "destroyed"}`;
+      return c.totalMv ? "the total mana value of permanents destroyed" : `#${c.filter.text} ${c.died ? "that died" : "destroyed"}`;
     case "exiledThisWay":
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":

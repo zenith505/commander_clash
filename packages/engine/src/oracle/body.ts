@@ -6981,6 +6981,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "bouncedThisWayPower" } } });
       continue;
     }
+    // Black Panther, Wakandan King: "If one or more +1/+1 counters are moved this way, you gain that much life and draw a
+    // card": how many the move just before took off (none if a target was illegal, CR 608.2b).
+    const lastMove = effects.at(-1);
+    const movedSome = lastMove?.type === "moveAllCounters" && lastMove.only !== undefined ? /^If one or more (\S+) counters are moved this way, you gain that much life and draw a card$/.exec(s) : null;
+    if (movedSome && lastMove?.type === "moveAllCounters" && counterKind(movedSome[1]!) === lastMove.only) {
+      const moved: Amount = { count: { kind: "countersRemovedThisWay" } };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: moved, min: 1 }, effects: [{ type: "gainLife", who: { ref: "you" }, n: moved }, { type: "draw", who: { ref: "you" }, n: 1 }] });
+      continue;
+    }
     // Bounty of the Luxa: "remove all flood counters from ~. If no counters were removed this way, put a flood counter on ~
     // and draw a card. Otherwise, add {C}{G}{U}.": how many the removal took off as it resolved (none if ~ has left the
     // battlefield, rulings).
@@ -8124,6 +8133,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!options) return null;
       effects.push({ type: "revealTop", n: num(swordPoint[1]!) }, { type: "forEachRevealed", effects: [{ type: "punisher", who: { ref: "eachOpponent" }, options, effects: [{ type: "bounce", what: { ref: "revealed" } }], mode: "ifNone", thenText: "the card goes to their hand" }], rest: "exile" });
       si += 2;
+      continue;
+    }
+    // Quest for Ula's Temple: "you may look at the top card of your library. If it's a creature card, you may reveal it and
+    // put a quest counter on ~." Looking is only information, so it's always done; revealing is up to the controller, only
+    // a card that is one can be revealed this way, and the card stays on top (as with Kinship above).
+    const questReveal = /^(?:[Yy]ou may )?look at the top card of your library$/.test(s) ? /^If it's an? ([a-z]+) card, you may reveal it and (put an? [a-z]+ counter on ~)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (questReveal) {
+      const filter = parseSearchFilter(`${questReveal[1]} card`);
+      const before = ctx.targets.length;
+      const then = parseOne(capital(questReveal[2]!), ctx);
+      if (!filter || !then || ctx.targets.length !== before || then.length !== 1 || then[0]!.type !== "counters") return null;
+      effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "may", effects: [{ type: "revealRevealed" }, ...then], text: `reveal it and ${questReveal[2]}` }] });
+      si++;
       continue;
     }
     // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
@@ -11045,6 +11067,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
     }
+    // Hunting Wilds: "Search your library for up to two Forest cards, put them onto the battlefield tapped, then shuffle. If
+    // ~ was kicked, untap all Forests put onto the battlefield this way. They become 3/3 green creatures with haste that are
+    // still lands.": the lands found, from then on (rulings: permanently, CR 611.2a), each while it's the same object (CR
+    // 400.7); they're Forests by the search's filter.
+    const kickedLands = /^If ~ was kicked, untap all ([A-Z][a-z]+)s put onto the battlefield this way$/.exec(s);
+    const forestSearch = effects.at(-1);
+    const theyBecome = kickedLands ? /^They (become \d+\/\d+ [a-z ]+creatures(?: with [a-z]+)? that are still lands)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (kickedLands && theyBecome && ctx.spell && forestSearch?.type === "search" && forestSearch.dest.zone === "battlefield" && forestSearch.filter?.subtypes?.join() === kickedLands[1] && !forestSearch.others && !forestSearch.who && !forestSearch.library && !forestSearch.split && !forestSearch.condDest && !forestSearch.landTo && !forestSearch.cardTo && !forestSearch.mayInstead && !forestSearch.payDiff && !forestSearch.withHeld && !forestSearch.orGraveyard && !forestSearch.andGraveyard) {
+      const mods = parseChanges(theyBecome[1]!);
+      if (!mods) return null;
+      forestSearch.rememberAll = true;
+      effects.push({ type: "if", cond: { kind: "kicked" }, effects: [{ type: "untap", what: { ref: "created" } }, { type: "continuous", what: { ref: "created" }, mods, duration: "game" }] });
+      si++;
+      continue;
+    }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
@@ -13648,6 +13685,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mods = parseBecomes(`a ${theyAreAll[1]} ${theyAreAll[2]} in addition to its other colors and types`);
       if (prev?.type !== "returnAllFromGraveyard" || prev.toHand || !mods || prev.alsoMods) return null;
       prev.alsoMods = mods;
+      continue;
+    }
+    // Admiral Brass, Unsinkable: "you may return target Pirate creature card from your graveyard to the battlefield with a
+    // finality counter on it. It has base power and toughness 4/4.": the permanent it became, from then on (no duration, CR
+    // 611.2c), in layer 7b, so a later base-setting effect overwrites it (rulings).
+    const basePTAfter = /^It has base power and toughness (\d+)\/(\d+)$/.exec(s);
+    if (basePTAfter) {
+      const prev = effects.at(-1);
+      const put = prev?.type === "may" && prev.effects.length === 1 && !prev.otherwise && !prev.pay ? prev.effects[0] : prev;
+      if (put?.type !== "putOntoBattlefield" || put.what.ref !== "target" || put.what.n || put.alsoMods || put.faceDown || put.atNextEndStep) return null;
+      put.alsoMods = [{ kind: "setPT", power: Number(basePTAfter[1]), toughness: Number(basePTAfter[2]) }];
       continue;
     }
     // Tune Up: "Return target artifact card from your graveyard to the battlefield. If it's a Vehicle, it becomes an artifact

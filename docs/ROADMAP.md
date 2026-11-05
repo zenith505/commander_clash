@@ -1,7 +1,7 @@
 # Roadmap
 
-29,760 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,558 of
+29,772 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,570 of
 9,979 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -154,8 +154,7 @@ line blocks.
    doesn't remove Auras", done in round B71), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
    each of its colors), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
    Bones (a battlefield return then "another" to the hand), Urdnan, Dromoka Warrior (double strike
-   "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (a Pirate returned with
-   base power and toughness 4/4). Round 171 went down the list to Hunter's Blowgun (rank
+   "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (done in round 275). Round 171 went down the list to Hunter's Blowgun (rank
    7,721), skipping over the cards still listed by `npm run popular`.
    Out after round 172: Primal Growth ("Kicker—Sacrifice a creature": a kicker that isn't mana needs its own cast
    choice and prompt), Plague Reaver ("return it to the battlefield under that player's control at the
@@ -200,19 +199,18 @@ line blocks.
    Steward of the Harvest (gaining the activated abilities of exiled land cards), Agent's Toolkit (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
    ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
    Unstable Glyphbridge (a creature chosen for each player, then destroy the rest), From the Catacombs (a corpse counter, the initiative and an exile
-   replacement together), Loki, God of Mischief ("becomes the target of an ability you control"), Katsumasa, the
+   replacement together), Loki, God of Mischief (done in round 275), Katsumasa, the
    Animator (done in round 270), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
    trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
    creature cards with different powers, an opponent chooses two), Leader, Super-Genius (a connive replacement), This
    Is How It Ends (villainous choice after a shuffle), Azor's Gateway (counting mana values among cards exiled with
    it), Tamiyo, Collector of Tales, Anchor to Reality (done in round 270), Detective's
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
-   commander's mana value), Strata Scythe (imprint a land from the library), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
+   commander's mana value), Strata Scythe (done in round 275), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
    among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
    attacked player, activated by that player), Aggressive Mining ("you can't play
-   lands"), Hunting Wilds (Forests put onto the battlefield this way become
-   3/3), Overwhelming Splendor (a player can't activate abilities that aren't mana abilities), Gandalf, Goblins' Bane
+   lands"), Hunting Wilds and Overwhelming Splendor (done in round 275), Gandalf, Goblins' Bane
    (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
    Sisma Behemoth (an attack cost of its own), The Ancient One (a reflexive mill from a discard), Deathgorge Scavenger
    ("you may exile" with two "if it's a" results), Tithe. Round 175 went down the list from Detention Sphere to
@@ -223,15 +221,14 @@ line blocks.
    cost" (Zaxara, Nev, Owlin Spiralmancer, Lattice Library, Geometer's Arthropod), "enchanted creature or enchantment
    creature" (Feast of Dreams, Nyx Herald, Kestia, Temple Thief).
    Out after round 176: Extract Brain (an opponent chooses X cards from their hand for you to look at), Divergent Transformations and Chaos Mutation (each player's replacement
-   in APNAP order), Black Panther, Wakandan King ("move all +1/+1 counters ... if one or more are moved this way, that
-   much"), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
+   in APNAP order), Black Panther, Wakandan King (done in round 275), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
    replacement), Etrata, Deadly Fugitive (a granted turn-face-up ability and cloak), The Creation of Avacyn (turning
    the exiled card face up), Pawpatch Recruit ("target creature other than that
    creature" needs the trigger's subject at target choice), Jhoira's Timebug and Greater Gargadon (suspended cards),
    Huntmaster of the Fells (two targets, one about the other's controller), Archelos, Lagoon Mystic (enters tapped or
    untapped by its own state), Venerable Warsinger (a target's X from the trigger's damage, unknown at targeting),
    Rushed Rebirth (a this-turn dies trigger with "lesser mana value" than that creature), Omarthis (manifest a counted number), Pull from Eternity (done in round
-   272), Wall of Shards (cumulative upkeep "an opponent gains 1 life"), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
+   272), Wall of Shards (done in round 275), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
    Mutant creature), the hybrid Mimics ("a spell that's both blue and red": no all-of-these-colors filter), Does
    Machines, Crown of Convergence ("share a color with that card"). Round 176 went down the list from Bristlebud Farmer to about rank
    9,240 (Kelsien, the five Runes, Great Hall of the Biblioplex, Questing Druid, Worldslayer, Progenitor Exarch,
@@ -506,7 +503,7 @@ line blocks.
    Oath of Nissa, Sigurd, Dog Umbra, Call for Aid, Narset
    of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
    miracle), Coram, Brimaz, Mindleech Mass (done in round 273), Requiem Monolith, Behemoth of
-   Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
+   Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time (done in round 275), Tasigur, Hazezon, Corrupted
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
    graveyard"), Undead Alchemist, Auntie Ool (done in round 266),
    Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
@@ -664,8 +661,7 @@ line blocks.
    Pestilent Spirit). A browser test clicks through Let's Play a Game's mode menu with and without delirium.
    Out after round 200 (looked at, not done): Enchanter's Bane (a
    punisher whose option sacrifices the target), You Cannot Pass! (no record of which creatures blocked or were blocked by a legendary creature),
-   Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (total mana value of
-   the permanents destroyed this way), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower, Fishing
+   Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (done in round 275), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower, Fishing
    Gear, Phyrexian Dreadnought. Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
    Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
    Round 201 went on from the top: "is put into a graveyard from the battlefield or is put into exile from the
@@ -1128,7 +1124,7 @@ line blocks.
    only of cards put into a graveyard from a library); Reservoir Kraken ("any opponent may tap an untapped creature they
    control": each opponent's choice in turn); Marshland Bloodcaster (paying life equal to the next spell's mana value
    instead of its mana cost); Watcher of Hours (a trigger of a card in exile, "whenever you remove a time counter from
-   this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (a Tarmogoyf token isn't a predefined token);
+   this card while it's exiled"); Tarmogoyf Nest and Disa the Restless (done in round 275);
    Kethek, Crucible Goliath (reveal until a nonlegendary creature card with lesser mana value than the sacrificed
    creature); Yidris, Maelstrom Wielder (cascade on spells cast from hand for the turn); Animal Friend (a quoted
    ability that refers to its source); Hive Mind.
@@ -2057,6 +2053,25 @@ line blocks.
    abilities of Equipment you control that target ~ cost {1} less to activate" (Bladegraft Aspirant). Detention Vortex
    (only an opponent, as a sorcery) and Dregscape Sliver (unearth for Sliver creature cards) came with these. +10,
    29,760 of 31,936 with B105.
+   Round 275 took cards from the top of the skip lists that one line still blocked. "Create a Tarmogoyf token"
+   (Tarmogoyf Nest and Disa the Restless: a token that's a copy of the card Tarmogoyf, its name, {1}{G} mana cost,
+   color, Lhurgoyf type and power ability, rulings) and Disa's "Whenever a Lhurgoyf permanent card is put into your
+   graveyard from anywhere other than the battlefield, put it onto the battlefield"; "Enchanted player
+   can't activate abilities that aren't mana abilities or loyalty abilities" (Overwhelming Splendor); "+1/+1 for each
+   land on the battlefield with the same name as the exiled card" (Strata Scythe: the card its imprint search exiled,
+   CR 607.2a; bots exile the land whose name the most lands share); "Move all +1/+1 counters from target land you
+   control onto target creature. If one or more +1/+1 counters are moved this way, you gain that much life and draw a
+   card" (Black Panther, Wakandan King); "Whenever a player or permanent becomes the target of an ability you control"
+   (Loki, God of Mischief: not spells, once each turn); "It has base power and toughness 4/4" for the returned Pirate
+   (Admiral Brass, Unsinkable: counters still count on top, CR 613.4b, 613.4c); "you may look at the top card of your
+   library. If it's a creature card, you may reveal it and put a quest counter" (Quest for Ula's Temple); "If this
+   spell is the first spell you've cast this game, you may cast it without paying its mana cost" (Once Upon a Time);
+   "If ~ was kicked, untap all Forests put onto the battlefield this way. They become 3/3 green creatures with haste
+   that are still lands" (Hunting Wilds: for good, rulings); "X is the total mana value of permanents destroyed this
+   way" (Convert to Slime); "Cumulative upkeep—An opponent gains 1 life" (Wall of Shards: an opponent chosen for each
+   age counter, the same one more than once if you like, rulings; with no opponent able to gain life it can't be paid,
+   CR 118.3; with a browser test). +12, 29,772 of 31,936 with B105. Nothing new was skipped; the rest of the top of the list is
+   still in the skip lists below.
    Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (a graveyard card gaining
@@ -2191,8 +2206,7 @@ line blocks.
    artifact, creature, or land they control for each fade counter": that player's choice of that many).
    Out after round 247 (looked at, not done): Hushbringer (see round 156); Endless Detour ("target spell, nonland
    permanent, or card in a graveyard": one target across three zones); Jaws, Relentless Predator ("Whenever one or more
-   ... are sacrificed or destroyed": no event for that pair); Wall of Shards (cumulative upkeep "an opponent gains 1
-   life", an opponent chosen for each age counter); Night Soil ("Exile two creature cards
+   ... are sacrificed or destroyed": no event for that pair); Wall of Shards (done in round 275); Night Soil ("Exile two creature cards
    from a single graveyard": a cost that needs a picker over every graveyard); Pull from Eternity (done in round
    272).
    Out after round 246 (looked at, not done): Dauntless Bodyguard ("As ~ enters, choose another creature you control" and
@@ -2243,7 +2257,7 @@ line blocks.
    Out after round 238 (looked at, not done): Storm Cauldron (a land tapped for mana returns to hand mid-payment);
    Tomik, Distinguished Advokist (lands in graveyards can't be targeted by opponents, can't be played from graveyards);
    Monstrous Emergence (an additional cost of choosing a creature or revealing one); Rootweaver Druid (each opponent
-   searches, one land under your control); Quest for Ula's Temple (a may-reveal of a looked-at card); Arlinn, the
+   searches, one land under your control); Quest for Ula's Temple (done in round 275); Arlinn, the
    Pack's Hope (+1 "until your next turn" flash plus an extra counter on each creature entering); Rootcoil Creeper
    (done in round 272); Whiskervale Forerunner (put it
    onto the battlefield only on your turn); Deification (choose a planeswalker type, loyalty-damage replacement);
@@ -3165,7 +3179,7 @@ line blocks.
      permanents they control" for Curse of Bounty's "does the same", attaching a Curse to another player (Archnemesis,
      Maddening Hex), "when enchanted player loses the game" (Vengeance), Cruel Reality's "if the player can't",
      Curse of Oblivion's graveyard exile (done in round B105), decayed Zombie tokens (Restless Dead),
-     Overwhelming Splendor, Curse of Silence, Overencumbered, Paradox Haze, Shadow of the Second Sun, Tenuous Truce.
+     Overwhelming Splendor (done in round 275), Curse of Silence, Overencumbered, Paradox Haze, Shadow of the Second Sun, Tenuous Truce.
    - Spree modes that don't parse yet: "search for a basic land or Desert"
      and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
      "if no other creature has greater power" (Getaway Glamer), "choose target opponent. Whenever ..." (Great Train

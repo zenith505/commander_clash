@@ -306,6 +306,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Dina's Guidance: the creature card found goes into the hand, not the graveyard (bots don't plan reanimation).
     const searching = s.resolving?.body.effects[s.resolving.next];
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
+    // Omnath, Locus of All: revealing the card only adds mana (it goes to the hand either way).
+    const mayAt = (e: Effect | undefined): Effect[] => (e?.type === "may" ? e.effects : e?.type === "if" ? [...e.effects, ...(e.otherwise ?? [])].flatMap((x) => (x.type === "may" ? x.effects : [])) : []);
+    const mayFx = mayAt(searching);
+    if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "addMana" && x.revealedColors)) return [{ type: "chooseMay", player: pid, yes: true }];
+    // Manabond: put the lands in the hand onto the battlefield and discard the rest only when the rest is one card or none.
+    if (pend.kind === "chooseMay" && mayFx.some((x) => x.type === "putFromHand" && x.all)) {
+      const hand = player(s, pid).hand.map((id) => defOf(s, obj(s, id)));
+      const lands = hand.filter((d) => isType(d, "Land")).length;
+      return [{ type: "chooseMay", player: pid, yes: lands >= 1 && hand.length - lands <= 1 }];
+    }
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
     // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).

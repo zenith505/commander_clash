@@ -433,6 +433,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Copies of a spell go on the stack one at a time, each with its targets chosen first (CR 707.10, 707.10c).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
+      // Display of Power: each target spell copied in turn, in the order they were targeted (one copy of each, rulings).
+      if (typeof e.spell === "object" && "target" in e.spell && e.spell.many) {
+        const { target: first, n: many = 1 } = e.spell;
+        for (sc.copyManyAt ??= 0; sc.copyManyAt < many; sc.copyManyAt++) {
+          if (runSpellsEffect(s, { ...e, spell: { target: first + sc.copyManyAt } }, ctx, src) === "paused") return "paused";
+          sc.copies = undefined;
+        }
+        sc.copyManyAt = undefined;
+        return;
+      }
       if (!sc.copies) {
         const i = e.spell === "cause" || e.spell === "self" || "epic" in e.spell ? -1 : e.spell.target;
         const t = i >= 0 ? ctx.targets[i] : undefined;

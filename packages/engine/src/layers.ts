@@ -87,6 +87,25 @@ export interface PTPart {
 
 /** Characteristics.sparedBy: protection from "This effect doesn't remove Auras" (Spectra Ward), sparing every Aura. */
 export const SPARES_AURAS = "*auras" as const;
+/** Characteristics.sparedBy: protection that spares what was attached as it began (Benevolent Blessing), "*attached:<source id>". */
+export const SPARES_ATTACHED = "*attached:" as const;
+
+/**
+ * Whether the protection keyword `key` the host has (from `hc`) leaves the Aura or Equipment `o` attached to it: an effect
+ * that "doesn't remove" it gives that protection, and nothing else does (CR 702.16c-d, 702.16n, 702.16p).
+ */
+export function sparedFrom(s: GameState, hc: Characteristics, key: string, o: GameObject, isAura: boolean): boolean {
+  const v = hc.sparedBy?.[key.toLowerCase()];
+  if (v === undefined) return false;
+  if (v === SPARES_AURAS) return isAura;
+  if (v.startsWith(SPARES_ATTACHED)) {
+    const src = s.objects[v.slice(SPARES_ATTACHED.length)];
+    const rec = src?.sparesAttached;
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    return !!src && !!rec && !!host && rec.zc === (src.zoneChanges ?? 0) && rec.host === host.id && rec.hostZc === (host.zoneChanges ?? 0) && src.attachedTo === host.id && rec.ids.includes(o.id);
+  }
+  return v === o.id;
+}
 
 export interface Characteristics {
   name: string;
@@ -1597,13 +1616,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
-          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = m.spares === "auras" ? SPARES_AURAS : e.sourceId;
+          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = m.spares === "auras" ? SPARES_AURAS : m.spares === "attached" ? `${SPARES_ATTACHED}${e.sourceId}` : e.sourceId;
         } else if (c.sparedBy?.[key] !== undefined) {
           // It has it from elsewhere too: an Aura is spared only if every effect giving it spares that Aura (White Ward
-          // and Spectra Ward: White Ward stays, Spectra Ward goes, rulings).
+          // and Spectra Ward: White Ward stays, Spectra Ward goes, rulings). Benevolent Blessing's with another: only one
+          // it's the same as (CR 702.16p, "those instances affect attached permanents as normal").
           const was = c.sparedBy[key]!;
-          const now = m.spares && e.sourceId ? (m.spares === "auras" ? SPARES_AURAS : e.sourceId) : undefined;
-          const both = now === undefined ? undefined : was === now || now === SPARES_AURAS ? was : was === SPARES_AURAS ? now : undefined;
+          const now = m.spares && e.sourceId ? (m.spares === "auras" ? SPARES_AURAS : m.spares === "attached" ? `${SPARES_ATTACHED}${e.sourceId}` : e.sourceId) : undefined;
+          const plain = (v: string) => !v.startsWith("*");
+          const both = now === undefined ? undefined : was === now ? was : now === SPARES_AURAS && plain(was) ? was : was === SPARES_AURAS && plain(now) ? now : undefined;
           if (both === undefined) delete c.sparedBy[key];
           else c.sparedBy[key] = both;
         }

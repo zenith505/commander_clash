@@ -2347,11 +2347,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;
         if (!cards.length || upTo <= 0) return;
-        const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? (e.any || e.upTo !== undefined ? " from your hand and/or graveyard" : " from your hand or graveyard") : ""}`;
-        // Another player's hand: all of it shown, the cards that fit to choose from.
-        if (from !== p.id) s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: 1, hand: from, dig: { looked: [...player(s, from).hand], to: `from ${player(s, from).name}'s hand to put onto the battlefield under your control${e.tapped ? ", tapped" : ""}${e.attacking ? " and attacking" : ""}`, rest: `stay in ${player(s, from).name}'s hand` } };
-        else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}) };
-        return "paused";
+        // Manabond: "put all land cards from it onto the battlefield": each one, nothing chosen.
+        if (e.all) sc.found = cards;
+        else {
+          const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? (e.any || e.upTo !== undefined ? " from your hand and/or graveyard" : " from your hand or graveyard") : ""}`;
+          // Another player's hand: all of it shown, the cards that fit to choose from.
+          if (from !== p.id) s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: 1, hand: from, dig: { looked: [...player(s, from).hand], to: `from ${player(s, from).name}'s hand to put onto the battlefield under your control${e.tapped ? ", tapped" : ""}${e.attacking ? " and attacking" : ""}`, rest: `stay in ${player(s, from).name}'s hand` } };
+          else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}) };
+          return "paused";
+        }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === from);
       if (e.auraSwap) {

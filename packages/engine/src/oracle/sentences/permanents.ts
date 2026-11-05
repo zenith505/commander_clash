@@ -549,9 +549,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
   // the attacking creature (the trigger's subject). Tolsimir, Midnight's Light: "blocks that Wolf this combat if able".
-  if ((m = /^((?:[Uu]p to one )?[Tt]arget .+?) blocks (?:it|that [A-Z][a-z]+) this combat if able$/.exec(s)) && ctx.subjectIt && (/ blocks it /.test(s) || CREATURE_TYPES.has(/ blocks that ([A-Z][a-z]+) /.exec(s)?.[1] ?? ""))) {
+  // Grappling Hook: "Whenever equipped creature attacks, you may have target creature block it this turn if able": the
+  // creature equipped as it triggered (rulings), for the rest of the turn.
+  if ((m = /^((?:[Uu]p to one )?[Tt]arget .+?) blocks (?:it|that [A-Z][a-z]+) this (combat|turn) if able$/.exec(s)) && ctx.subjectIt && (/ blocks it /.test(s) || CREATURE_TYPES.has(/ blocks that ([A-Z][a-z]+) /.exec(s)?.[1] ?? ""))) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
+    return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" }, ...(m[2] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
   // "Target creature can't block ~ this turn" (Duct Crawler, Burning-Tree Bloodscale).
   if ((m = /^(target .+?) can't block (~|it) this turn$/i.exec(s)) && (m[2] === "~" || ctx.selfIt)) {

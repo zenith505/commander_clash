@@ -188,7 +188,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** Prismatic Ward: only from sources of these colors (the chosen one). */ fromColors?: string[]; plusOnes?: true; thatMany?: true; oneEach?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -1987,8 +1987,16 @@ const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addType
  */
 function readsKeywords(e: Inst): boolean {
   const c = e.condition;
-  return (c?.kind === "selfIs" || c?.kind === "attachedIs") && !!c.filter.keywords?.length;
+  return ((c?.kind === "selfIs" || c?.kind === "attachedIs") && !!c.filter.keywords?.length) || readsAbilities(e);
 }
+
+/**
+ * Ruxa, Patient Professor's "for each creature you control with no abilities, you may have that creature assign its combat
+ * damage as though it weren't blocked" applies in layer 6 to what has no abilities, so it depends on the effects there that
+ * give or take abilities (CR 613.8a).
+ */
+const readsAbilities = (e: Inst) => e.affects?.kind === "filter" && !!e.affects.spec?.noAbilities;
+const GIVES_ABILITIES = new Set<Modification["kind"]>(["addAbility", "enchantCreature", "cantHaveKeywords"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";
@@ -2002,7 +2010,7 @@ function signature(s: GameState, e: Inst, chars: CharMap): string {
  */
 function dependsOn(s: GameState, a: Inst, b: Inst, layer: Layer, chars: CharMap): boolean {
   if (a.locked || a.fixed) return false;
-  if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind) || ((m.kind === "addKeywords" || m.kind === "removeKeywords") && readsKeywords(a)))) return false;
+  if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind) || ((m.kind === "addKeywords" || m.kind === "removeKeywords") && readsKeywords(a)) || (GIVES_ABILITIES.has(m.kind) && readsAbilities(a)))) return false;
   if (!b.locked && !exists(s, b, chars)) return false;
   const trial: CharMap = new Map(chars);
   for (const id of appliesTo(s, b, chars)) trial.set(id, copyChars(chars.get(id)!));

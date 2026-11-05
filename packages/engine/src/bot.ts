@@ -4209,6 +4209,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const score = (ty: string) => s.players[pid]!.graveyard.reduce((n, id) => (defOf(s, obj(s, id)).types.includes(ty) ? n + (ty === "Land" ? 0.5 : 1) : n), 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
+  // Archon of Valor's Reach: no one can cast spells of the chosen type, so the type of the fewest of our own cards still to
+  // cast (in hand, library and command zone).
+  if (what === "cardType" && c?.cantBeCast?.some((b) => b.filter.chosen === "cardType")) {
+    const mine = [...player(s, pid).hand, ...player(s, pid).library, ...player(s, pid).command].map((id) => defOf(s, obj(s, id)));
+    const score = (ty: string) => mine.filter((d) => d.types.includes(ty)).length;
+    return [...options].sort((a, b) => score(a) - score(b))[0]!;
+  }
   if (what === "cardType" && edictsChosenType(s)) return [...options].sort((a, b) => edictTypeScore(s, pid, b) - edictTypeScore(s, pid, a))[0]!;
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.

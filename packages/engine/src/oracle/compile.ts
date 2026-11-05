@@ -1627,6 +1627,12 @@ export function compile(d: CardDef): CompiledCard {
       else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.startsWith("a card type") ? Object.keys(CARD_TYPE_PLURAL).filter((t) => !not.includes(t)) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
+    // Archon of Valor's Reach: "Players can't cast spells of the chosen type.": anyone's spell with the card type chosen as
+    // it entered (CR 614.12), checked as the spell is proposed, before costs are paid (rulings, CR 601.3).
+    if (line === "Players can't cast spells of the chosen type." && out.entersChoose?.some((c) => c.what === "cardType")) {
+      (out.cantBeCast ??= []).push({ filter: { kind: "spell", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "spell of the chosen type" }, text: line });
+      continue;
+    }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
     // as Chosen.number (CR 614.12; CR 107.1: the game uses only integers, and no mana value is negative, so 0 or more).
     // "As ~ enters, choose odd or even." (Gollum, Riddle Master), kept as Chosen.parity (CR 614.12).

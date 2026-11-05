@@ -807,10 +807,13 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}) });
       if (!prev(e)) for (const r of allRules.filter((r) => r.counterOn && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "counterOn", id: r.counterOn!.id, counter: r.counterOn!.kind, by: r.controller, card: cardName(s, r) });
       // Anti-Venom: "prevent that damage and put that many +1/+1 counters on ~": the counters even so (CR 615.12).
-      const thatMany = !prev(e) && "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.thatMany && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
+      // Ironscale Hydra: "prevent that damage and put a +1/+1 counter on ~": one counter for this source's damage, even so
+      // (rulings).
+      const fromOk = (p: { fromTypes?: string[] }) => !p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t));
+      const thatMany = !prev(e) && "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && (p.thatMany || p.oneEach) && p.to && fromOk(p) && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
       if (thatMany && "object" in to) {
         const src = thatMany.from ? s.objects[thatMany.from] : undefined;
-        ops.push({ kind: "plusOnes", id: to.object, n: e.n, by: thatMany.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" });
+        ops.push({ kind: "plusOnes", id: to.object, n: thatMany.oneEach ? 1 : e.n, by: thatMany.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" });
       }
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
@@ -831,8 +834,12 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       if (prev(e) && preventedAll(s, e)) {
         // Vigor: a +1/+1 counter for each 1 damage prevented (CR 615.5). The creature's controller (the one choosing,
         // CR 616.1) applies the amount replacements first, as the most it can be.
-        const vigor = "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
-        if (vigor && "object" in to) {
+        const vigor = "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.to && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))) && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
+        if (vigor?.oneEach && "object" in to) {
+          // Ironscale Hydra: one counter for each source whose damage is prevented, however much it was (rulings).
+          const src = vigor.from ? s.objects[vigor.from] : undefined;
+          ops.push({ kind: "preventAll", srcName: e.src.name, toName, plusOnes: { id: to.object, n: 1, by: vigor.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" } });
+        } else if (vigor && "object" in to) {
           let n = e.n;
           const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
           if (boost.length && boost.length <= 6 && vigor.you === chooserOf(to))

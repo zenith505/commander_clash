@@ -1872,6 +1872,10 @@ export function parseAffected(subject: string): Affects | null {
   }
   // Darksteel Garrison: "Fortified land" (CR 301.6), the land a Fortification is attached to.
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land|planeswalker)$|^Fortified land$/.test(x)) return { kind: "attached" };
+  // Muraganda Petroglyphs: "Creatures with no abilities"; Ruxa, Patient Professor: "Creatures you control with no
+  // abilities": no rules text, keywords or granted abilities as the effect applies (TargetSpec.noAbilities, rulings).
+  const noAbilities = /^Creatures( you control)? with no abilities$/.exec(x);
+  if (noAbilities) return { kind: "filter", types: ["Creature"], ...(noAbilities[1] ? { controller: "you" as const } : {}), spec: { kind: "object", noAbilities: true, text: "creature with no abilities" } };
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
   // "Creatures attacking your opponents", the same (rulings).
@@ -3010,6 +3014,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (vigor) return { affects: { kind: "filter", types: ["Creature"], controller: "you", other: true }, mods: [{ kind: "preventDamage", to: true, plusOnes: true }], text: line };
   // Anti-Venom, Horrifying Healer: "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on
   // ~": that damage's amount, so also when it can't be prevented (then it's dealt too, CR 615.12).
+  // Ironscale Hydra: "If a creature would deal combat damage to ~, prevent that damage and put a +1/+1 counter on ~": one
+  // counter for each creature whose combat damage is prevented (rulings).
+  if (text === "If a creature would deal combat damage to ~, prevent that damage and put a +1/+1 counter on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, combat: "only", fromTypes: ["Creature"], plusOnes: true, oneEach: true }], text: line };
   if (text === "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
   // Jared Carthalion, True Heir: "If damage would be dealt to ~ while you're the monarch, prevent that damage and put that
   // many +1/+1 counters on it": the same, only while you're the monarch (CR 724).
@@ -3115,6 +3122,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const affects = parseAffected(`${capital(forEachUnblocked[1]!)}s you control`);
     return affects?.kind === "filter" ? { affects, mods: [...unblocked], text: line } : null;
   }
+  // Ruxa, Patient Professor: "For each creature you control with no abilities, you may have that creature assign its
+  // combat damage as though it weren't blocked": a layer 6 effect that gives no ability (rulings), applied after the
+  // effects that give abilities, which change what it applies to (CR 613.8a).
+  if (/^For each creature you control with no abilities, you may have that creature assign its combat damage as though it weren't blocked$/.test(text))
+    return { affects: parseAffected("Creatures you control with no abilities")!, mods: [...unblocked], text: line };
   const grantsUnblocked = /^(.+) have "You may have ~ assign its combat damage as though it weren't blocked\."$/.exec(text);
   if (grantsUnblocked) {
     const affects = parseAffected(grantsUnblocked[1]!);

@@ -15,7 +15,7 @@ import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runCoinEffect, runDiceEffect } from "./run-dice";
+import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -1454,6 +1454,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runFlipClashEffect(s, e, ctx, src);
     case "eachPlayerFlips":
       return runEachPlayerFlipsEffect(s, e, ctx, src);
+    case "flipEachOpponent":
+      return runFlipEachOpponentEffect(s, e, ctx, src);
     case "vote":
     case "eachChooses":
     case "controlFromEach":

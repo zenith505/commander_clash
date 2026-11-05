@@ -2009,7 +2009,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
   if (player(s, pid).lifeCantChange || player(s, pid).lifeCantChangeTurn === s.turn || player(s, pid).cantGainLifeForGame || lifeLocked(s, pid)) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
-  if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
+  if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && (e.who === "player" ? e.player === pid : stops(e.who, e.controller)))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
 }
 

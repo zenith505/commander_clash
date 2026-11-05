@@ -1455,6 +1455,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "noLifeGainForGame", who }] : null;
   }
+  // Flames of the Blood Hand: "If that player or that planeswalker's controller would gain life this turn, that player gains
+  // no life instead": the damaged player, or the planeswalker's controller as this resolves (CR 119.7; the life gain
+  // replaced with nothing, which is that player not gaining life).
+  if ((m = /^If (that player or that planeswalker's controller|that player) would gain life this turn, that player gains no life instead$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "noLifeGain", players: "player", who }] : null;
+  }
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // Pale Moon: "Until end of turn, if a player taps a nonbasic land for mana, it produces colorless mana instead of any other

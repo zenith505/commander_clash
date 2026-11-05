@@ -421,6 +421,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "noLifeGain":
+      // Flames of the Blood Hand: "If that player ... would gain life this turn, that player gains no life instead": that one
+      // player's life gain this turn does nothing (CR 119.7; rulings: not a player the damage was redirected to).
+      if (e.players === "player") {
+        for (const pid of e.who ? players(s, e.who, ctx) : []) {
+          (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: "player", player: pid });
+          log(s, `${src}: ${player(s, pid).name} gains no life this turn.`);
+        }
+        return;
+      }
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);
       return;

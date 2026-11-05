@@ -1,6 +1,6 @@
 # Roadmap
 
-29,896 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,909 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
 9,979 (96%).
 
@@ -4083,7 +4083,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counting its controller's graveyard), Volcanic Eruption ("the number of Mountains put into a graveyard this way"),
   Horn of Plenty (the casting player's may-pay and their delayed draw), Lavabrink Venturer (protection from odd or
   even mana values), Reviving Vapors (life equal to the chosen card's mana value), Mind Maggots (counters per card
-  discarded this way), Empty-Shrine Kannushi (protection from colors among your permanents), Dance of the Skywise
+  discarded this way), Empty-Shrine Kannushi (done in round B112) (protection from colors among your permanents), Dance of the Skywise
   (becomes a Dragon Illusion that loses all abilities), Chlorophant (threshold granting a second upkeep trigger),
   Thrasta (trample over planeswalkers; its cost reduction compiles now).
 - Round B35 (harder skipped cards, least played first): "That creature gets -4/-4 instead if you control a creature
@@ -4472,7 +4472,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   you), Equal Treatment and Well-Laid Plans (damage replacement and prevention between sources), Spin into Myth
   (fateseal), Elderwood Scion (spells that target it cost less), Tidal Control and Quicksilver Dragon (any player may
   activate; changing a spell's only target), Necromancer's Magemark (a replacement for enchanted creatures you control),
-  Selective Snare (X targets of a chosen type), Roving Keep, Slab Hammer, Leonin Bola, Apathy, Death Match (done in round B110), Display of
+  Selective Snare (X targets of a chosen type), Roving Keep, Slab Hammer, Leonin Bola, Apathy (done in round B112), Death Match (done in round B110), Display of
   Dominance, Addle, Soul Search, Thought Prison, Spara's Adjudicators and Masked Bandits (until cast from exile), plus
   the many multi-line or new-mechanic cards in the same range.
 - Round B52 (cards no earlier round wrote down, least played first, EDHREC rank about 23,250 to 22,000):
@@ -4502,7 +4502,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "Whenever you activate a loyalty ability"; once it merges, Gideon only needs "an opponent activates" on that
   template), Dismantle (a choice of counter kind), Price of Betrayal (counters removed divided among objects),
   Watchers of the Dead (each opponent keeps two cards), Mire's Toll (reveal N chosen cards), Dead Reckoning, Victor
-  Mancha, Encumbered Reejerey ("while" trigger conditions), Entrails Feaster, Ichorid, Nether Shadow, Cursed Rack (done in round B104),
+  Mancha, Encumbered Reejerey (done in round B112) ("while" trigger conditions), Entrails Feaster (done in round B112), Ichorid, Nether Shadow, Cursed Rack (done in round B104),
   Celestial Kirin, Skyfire Kirin, Lumaret's Favor, Definitely Not a Turtle, Advice from the Fae, Petals of Insight,
   Rowdy Crew, Thijarian Witness, Riptide Replicator, Teferi's Response, Dawn Evangel, Earthbind, plus the multi-line
   or new-mechanic cards in the same range (Oath of Scholars, Oath of Ghouls, Soul of Shandalar, Kenku Artificer, Harsh
@@ -4528,14 +4528,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "at least two creatures that share a creature type" (Synchronized Eviction), "as long as it's blocking and you
   control a snow land" (Snow Devil). +34 (28,381 of 31,936 with round 222).
 - Out after round B53 (looked at, not done): Clear the Land (each player reveals), Ninja's Kunai and Blazing Torch
-  (granted abilities that sacrifice or name the Equipment), Artificer's Hex (the creature the enchanted Equipment is
+  (granted abilities that sacrifice or name the Equipment), Artificer's Hex (done in round B112) (the creature the enchanted Equipment is
   attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure
-  (prevention for a target opponent's creatures), Ancient Hellkite (a defending-player target), Alluring Siren
-  ("attacks you if able"), Warren Weirding (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo
+  (prevention for a target opponent's creatures), Ancient Hellkite (done in round B112) (a defending-player target), Alluring Siren
+  ("attacks you if able"), Warren Weirding (done in round B112) (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo
   ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar (done in round B105)
   ("sacrifice a token or a land"), Guul Draz Overseer ("If that land is a Swamp ... instead"), Unnatural Aggression
   (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix (done in round B106) and Voltage Surge (what the
-  sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane (done in round B108), Thieving Sprite, Serene Sunset, plus the
+  sacrificed permanent was, an optional sacrifice cost), Cathedral Membrane (done in round B108), Thieving Sprite, Serene Sunset (done in round B112), plus the
   multi-line or new-mechanic cards in the same range.
 - Round B54 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 17,000, the easier
   ones): spell mastery "If there are two or more instant and/or sorcery cards in your graveyard, ~ can't be countered"
@@ -5565,6 +5565,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   its static abilities until end of turn, any player may activate it, CR 602.2; a browser test activates Ana's Lion). Bots
   answering a forced trigger whose targets all fail their guard now still pick a target. No new prompts. +13 (29,896 of
   31,936 with B110 and rounds 278 and 279).
+- Round B112 (single-line blockers from the skip lists, least played first): Ancient Hellkite ("target creature defending
+  player controls" in an activated ability usable only while it attacks: the player it attacks, CR 506.2), Encumbered
+  Reejerey ("becomes tapped while it has a -1/-1 counter on it": checked as it triggers, not again on resolution), Warren
+  Weirding (if a Goblin is sacrificed this way, a changeling too, CR 702.73a), Bloodfire Infusion and Betrothed of Fire
+  ("Sacrifice enchanted creature" as a cost, only the creature the Aura is attached to can pay it, with a browser test),
+  Artificer's Hex (the creature the enchanted Equipment is attached to, checked on resolution too, CR 603.4), Mind Roots
+  (up to one land card among the cards that player discarded, still in their graveyard), Serene Sunset (X target
+  creatures), Apathy (that player may discard a card at random; untapped only if they did), Entrails Feaster ("a creature
+  card from a graveyard"), Lurebound Scarecrow ("no permanents of the chosen color"), Empty-Shrine Kannushi and Pledge of
+  Loyalty (protection from each color among permanents you control, rechecked as they change, CR 702.16a). No new
+  prompts. +13 (29,909 of 31,936 with B111 and round 279).
+- Out after round B112 (looked at, not done): Matopi Golem, Skeleton Scavengers and Soldevi Sentry (a rider on a
+  regeneration shield: when several shields could apply, its controller picks which one is used, CR 616.1, which isn't
+  tracked per shield yet).
 - Out after round B111 (looked at, not done): Roar of Jukai, Torrent of Stone, Horobi's Whisper and Hundred-Talon Strike
   (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (attaching the
   Equipment to the Germ just created), Anti-Magic Aura ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
@@ -5601,7 +5615,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B103 (looked at, not done): The Three Seasons ("Choose three cards in each graveyard": a pick in every
   graveyard, not targeted), Pursuit of Knowledge (an optional draw replacement beside dredge and Abundance), Dralnu, Lich
   Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its
-  exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite ("defending player" in an
+  exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite (done in round B112) ("defending player" in an
   activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (a random creature it
   could enchant), Ms. Marvel, Kamala Khan (a gained "base power is equal to" ability that keeps counting, not locked in),
   Araumi of the Dead Tide (encore granted until end of turn).
@@ -5615,7 +5629,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of Littjara (damage from each creature with power 4 or greater), Founding the Third Path and Helmut Zemo (casting with mana
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik,
   Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
-  Ancient Hellkite ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
+  Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
   Steel and Oil (the chosen cards exiled at once), Jester's Mask, The Ruinous Wrecking Crew (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (a target chosen by the dead creature's controller, not the
   ability's), Nyla, Shirshu Sleuth and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
@@ -5739,15 +5753,15 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   changed to you; a non-mana echo cost (Echo—discard) doesn't count as "echo cost is paid".
 - Out after round B78 (looked at, not done): Master of Barbs ("one or more opponents are dealt noncombat damage": no
   batch event for damage), Cellar Door ("the bottom card of their library into their graveyard"), Swallow Whole (the
-  creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion ("Sacrifice enchanted creature" as
+  creature tapped for the additional cost), Betrothed of Fire and Bloodfire Infusion (done in round B112) ("Sacrifice enchanted creature" as
   a cost), Rasputin, the Oneiromancer (a mana ability whose X is the counters removed), Arcee, Sharpshooter (the back
-  face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (a state trigger bound
+  face's "that many" targets), Lavabrink Floodgates (each player's own may), Lurebound Scarecrow (done in round B112) (a state trigger bound
   to the chosen color), Grim Contest (each deals damage equal to its toughness to the other: a fight by toughness).
 - Out after round B77 (looked at, not done): Consecrate Land ("can't be enchanted by other Auras": no rule for it yet),
   Corpseweft ("Exile one or more creature cards from your graveyard" as a cost, X from how many), Ruin in Their Wake
   (where a found card goes depends on controlling a land named Wastes, with a "may"), Evangelize ("target creature of an
   opponent's choice": an opponent picks the target).
-- Out after round B76 (looked at, not done): Mind Roots (a land card discarded this way onto the battlefield: no
+- Out after round B76 (looked at, not done): Mind Roots (done in round B112) (a land card discarded this way onto the battlefield: no
   effect for cards a discard just moved yet), Mark for Death ("Other creatures that player controls can't block this
   turn": a can't-block rule for one player's creatures except the target), Ashnod's Cylix (the target player looks at
   the top three and chooses which one goes back), Bullseye, Death Dealer and Ion Storm (costs with "or": "sacrifice an
@@ -5762,7 +5776,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   as a player), Heliod's Punishment ("Then if it has no task counters on it, destroy Heliod's Punishment"), Shuriken
   (its controller gains control of it unless it was unattached from a Ninja), Nettlevine Blight, Animal Friend and
   The Dominion Bracelet (granted abilities that move or recount the source), Gutter Grime and Saproling Burst (token
-  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (Lane A's round 236, now
+  abilities naming the permanent that made them), Earnest Fellowship and Pledge of Loyalty (done in round B112) (Lane A's round 236, now
   merged, changed the same keyword-binding code: next).
 - Out after round B73 (looked at, not done): Nafs Asp and Glass Asp ("unless they pay {1} before that draw step": a
   payment the player may make any time before then, not as the trigger resolves), Illusionary Terrain (two basic land

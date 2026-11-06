@@ -109,6 +109,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
     return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
   }
+  // Rod of Absorption: "You may cast any number of spells from among cards exiled with ~ with total mana value X or less
+  // without paying their mana costs": as this resolves, in any order (rulings), each one's mana value counted against X;
+  // those not cast stay exiled.
+  if (/^[Yy]ou may cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, totalMv: { count: { kind: "x" } } }];
+  // Goliath Daydreamer: "you may cast a spell from among cards you own in exile with dream counters on them without paying
+  // its mana cost": one now, as this resolves (rulings), from every card you own in exile with one (not only those it
+  // exiled), timing ignored.
+  if (/^[Yy]ou may cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, ownExileCounter: "dream", max: 1 }];
   // Amy Pond: "choose a suspended card you own and remove that many time counters from it" ("that many" read as X by the
   // trigger): one chosen as it resolves, not targeted (CR 702.62b: in exile, with suspend and a time counter); the last
   // one removed, its suspend casts it (rulings).

@@ -682,6 +682,12 @@ export interface GameObject {
   exileIfLeaves?: ZoneName;
   /** A spell: "if that spell would be put into your graveyard, exile it instead" (Torrential Gearhulk, CR 614.1a). */
   exileIfToGraveyard?: true;
+  /**
+   * A spell: "exile that card instead of putting it into your graveyard as it resolves" (Effect exileAsResolves), each
+   * one applied as it finishes resolving (CR 608.2n), the first one created first. `by`: whose ability made it; `zc`:
+   * the spell as it was then (CR 400.7); `link`: the linkedExile key of the source it's exiled with.
+   */
+  exileAsResolves?: { by: PlayerId; zc: number; src: string; then?: "returnEndStep" | "plot"; suspend?: number; link?: string; anyGraveyard?: true; counters?: Record<string, number> }[];
   /** Serra Paragon: the permanent this land or spell becomes gains this ability (as an ability text) for good. */
   entersGaining?: string;
   /** Edgar, Master Machinist: a spell cast with a once-each-turn permission whose "that artifact enters tapped" applies to the permanent it becomes. */
@@ -1822,7 +1828,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made

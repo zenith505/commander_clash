@@ -858,6 +858,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "suspendCard":
       for (const o of objects(s, e.what, ctx)) if (!o.isToken) suspendExiled(s, o, e.n);
       return;
+    case "suspendImpulsed":
+      for (const id of s.resolving?.impulsed ?? []) {
+        const o = s.objects[id];
+        if (o?.zone === "exile" && hasSuspend(s, o)) suspendExiled(s, o, e.n);
+      }
+      return;
     case "secretChoose": {
       // Malik, Grim Manipulator: you choose first, then that player; neither choice is logged until both are made.
       const them = players(s, e.who, ctx)[0];
@@ -1280,7 +1286,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       if (!sc.castAmong && e.fromLinked) {
         // Kaho, Jeleva, Shell of the Last Kappa: the cards exiled with this object (CR 607.2a), still in exile (CR 400.7).
-        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [], ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}) };
+        let ids = linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0);
+        // River Song's Diary: one of them chosen at random, the only one that may be cast.
+        if (e.randomOne && ids.length) {
+          const one = ids[Math.floor(nextRandom(s) * ids.length)]!;
+          log(s, `${src}: ${defOf(s, obj(s, one.id)).name} is chosen at random from among the cards exiled with it.`);
+          ids = [one];
+        }
+        // Rod of Absorption: "with total mana value X or less", what's left of X as each is cast.
+        sc.castAmong = { ids, declined: [], ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}), ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
+      }
+      if (!sc.castAmong && e.ownExileCounter) {
+        // Goliath Daydreamer: every card you own in exile with that kind of counter on it, whatever put it there (rulings).
+        const k = e.ownExileCounter;
+        sc.castAmong = { ids: you.exile.filter((id) => (obj(s, id).counters[k] ?? 0) > 0 && obj(s, id).owner === you.id && !obj(s, id).faceDown).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.

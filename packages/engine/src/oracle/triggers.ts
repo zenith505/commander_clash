@@ -1857,6 +1857,13 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`When you cast ~, ${castHand[1]!}`);
     return t && t !== "fail" && t.event === "selfCast" ? { ...t, castFromHand: true } : "fail";
   }
+  // Rory Williams: "When you cast this spell from anywhere other than exile, ...": not when it's cast from exile (its
+  // suspend's cast, rulings).
+  const castNotExile = /^When you cast (?:this spell|~) from anywhere other than exile, (.+)$/.exec(line);
+  if (castNotExile) {
+    const t = parseTrigger(`When you cast ~, ${castNotExile[1]!}`);
+    return t && t !== "fail" && t.event === "selfCast" && !t.castFromHand ? { ...t, castNotFromExile: true } : "fail";
+  }
   // Agent Maria Hill: "Whenever ~ becomes tapped to pay a teamwork cost": tapped as a spell's teamwork cost is paid (CR
   // 601.2h), not any other tap.
   const teamworkTap = /^Whenever ~ becomes tapped to pay a teamwork cost, (.+)$/.exec(line);
@@ -3131,8 +3138,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Quirion Dryad: "Whenever you cast a spell that's white, blue, black, or red": a spell of any of those colors.
   const castThats = /^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )+or (?:white|blue|black|red|green)), (.+)$/.exec(line);
   if (castThats) return parseTrigger(`Whenever you cast a ${castThats[1]} spell, ${castThats[2]}`);
-  // Breath of the Sleepless: "Whenever you cast a creature spell during an opponent's turn", the same.
-  const castTheirTurn = /^Whenever you cast (an? (?:(?:creature|noncreature|artifact|enchantment|instant|sorcery) )?spell) during an opponent's turn, (.+)$/.exec(line);
+  // Breath of the Sleepless: "Whenever you cast a creature spell during an opponent's turn", the same. Gandalf of the
+  // Secret Fire: "an instant or sorcery spell from your hand during an opponent's turn".
+  const castTheirTurn = /^Whenever you cast (an? (?:(?:creature|noncreature|artifact|enchantment|instant|sorcery|instant or sorcery) )?spell(?: from your hand)?) during an opponent's turn, (.+)$/.exec(line);
   if (castTheirTurn) {
     const t = parseTrigger(`Whenever you cast ${castTheirTurn[1]}, ${castTheirTurn[2]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";

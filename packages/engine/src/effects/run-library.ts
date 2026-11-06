@@ -542,6 +542,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand.`);
             moveObject(s, id, "exile");
             const o = obj(s, id);
+            // The Eleventh Doctor: its mana value in time counters, and suspend; one with mana value 0 gets none, so it isn't
+            // suspended (CR 702.62b, rulings on The Wedding of River Song).
+            if (o.zone === "exile" && e.suspendMv) suspendExiled(s, o, defMv(defOf(s, o)));
             // Linked to the source as it was when the ability was put on the stack (CR 607.2a).
             if (o.zone === "exile" && e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           }

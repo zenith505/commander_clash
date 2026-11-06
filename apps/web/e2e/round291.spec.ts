@@ -6,7 +6,7 @@ import { card, menu, modal, resolveUntil } from "./ui";
 
 test("Queen Kayla bin-Kroog: pick discarded artifact or creature cards with different mana values 1 to 3", async ({ page }) => {
   const s = scene({ hand: ["Sol Ring", "Mind Stone", "Grizzly Bears", "Hill Giant", "Shock"], board: ["Queen Kayla bin-Kroog", ...LANDS] });
-  const [ring, stone, bears, giant, shock] = ["Sol Ring", "Mind Stone", "Grizzly Bears", "Hill Giant", "Shock"].map((n) => one(s, n));
+  const [ring, stone, bears, giant, shock] = [one(s, "Sol Ring"), one(s, "Mind Stone"), one(s, "Grizzly Bears"), one(s, "Hill Giant"), one(s, "Shock")];
   await open(page, s);
   await card(page, "Queen Kayla bin-Kroog", s).click();
   await menu(page).locator("button", { hasText: "Discard all the cards in your hand" }).click();

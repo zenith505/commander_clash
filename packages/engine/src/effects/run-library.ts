@@ -17,7 +17,7 @@ import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
 import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
-import { CREATURE_TYPES } from "../keywords";
+import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { dealDamage, objectSource } from "../damage";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
@@ -1182,7 +1182,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
       const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
-      const filter3 = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
+      const filter3a = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
+      // Hiveheart Shaman: "a basic land card that doesn't share a land type with a land you control": none of the land types
+      // among the searching player's lands as it resolves (CR 205.3i).
+      const filter3 = filter3a?.noLandTypeOfYours ? (({ noLandTypeOfYours: _, ...rest }) => ({ ...rest, notSubtypes: [...(rest.notSubtypes ?? []), ...new Set(s.battlefield.map((id) => s.objects[id]!).filter((o) => controllerOf(s, o) === ctx.controller && objIsType(s, o, "Land")).flatMap((o) => characteristics(s, o).subtypes.filter((t) => LAND_TYPES.has(t))))] }))(filter3a) : filter3a;
       // "With the same name as target nontoken creature" (Bifurcate), "as that creature" (Remembrance), "as the revealed
       // card" (Assembly Hall: the chosen name): the name or names as it resolves (CR 201.2); with none, nothing fits.
       const filter4 = filter3?.chosen === "name" ? bindChosen(filter3, ctx.chosen) : filter3;

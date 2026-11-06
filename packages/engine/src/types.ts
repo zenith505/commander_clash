@@ -423,6 +423,10 @@ export interface GameObject {
     attackedWithCommander?: true;
     /** "During any turn you attacked with a Rogue" (Robber of the Rich): only in a turn its player declared an attacker with this creature type as it attacked (Player.attackedWith.kinds). */
     attackedWithType?: string;
+    /** "During any turn you attacked with ~" (Goblin Researcher): only in a turn its player declared this object as an attacker (Player.attackedWith.keys, CR 400.7). */
+    attackedWithSource?: { id: ObjectId; zc: number };
+    /** "During any turn you attacked with three or more creatures" (Boros Strike-Captain): only in a turn its player declared at least this many creatures as attackers (Player.attackedWith.keys). */
+    attackedWithAtLeast?: number;
     /** "During any turn you put a lore counter on ~" (Summon: Brynhildr): only in a turn its player put a lore counter on this object (TurnLog.lorePut). */
     loreOn?: { id: ObjectId; zc: number };
     /** "If you control a Kavu" (Possibility Technician): only while `player` controls a permanent like this. */

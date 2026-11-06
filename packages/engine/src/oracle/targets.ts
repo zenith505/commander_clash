@@ -175,6 +175,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Gremlin Infestation: "enchanted artifact's controller", in a permanent's own ability.
   if (/^enchanted (?:artifact|creature|enchantment|land|permanent)'s controller$/.test(x) && !ctx.spell) return { ref: "hostController" };
   if (x === "each opponent") return { ref: "eachOpponent" };
+  // Imperial Mask: "each of your teammates": nobody in a game that isn't between teams (CR 102.3).
+  if (x === "each of your teammates") return { ref: "teammates" };
   // Friendly Fire: "Target creature's controller reveals ...": the creature is the target, and "that player" after it is
   // its controller as it is as the spell resolves (or as it last existed, CR 608.2h).
   if (x === "target creature's controller") {

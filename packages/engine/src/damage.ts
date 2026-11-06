@@ -241,6 +241,16 @@ export function dealDamage(
       spellDealt(s, src, { battle: o.id });
     }
     if ((!walker && !battle) || c.types.includes("Creature")) {
+      // Wolverine, Fierce Fighter: the damage already marked on it is healed as this is dealt; combat damage is one event
+      // (CR 510.2), so not the damage another source deals at the same time.
+      if (abilitiesOf(s, o).healsBeforeDamage) {
+        const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
+        if ((!event || o.healEvent !== event) && o.damage > 0) {
+          log(s, `The damage already dealt to ${c.name} is healed.`);
+          o.damage = 0;
+        }
+        o.healEvent = event;
+      }
       // Everlasting Torment: as though every source had wither (CR 702.80a).
       if (has(src, "Infect") || has(src, "Wither") || s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).allDamageWither)) {
         // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt. They're put on with

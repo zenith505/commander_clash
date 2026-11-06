@@ -464,6 +464,8 @@ export interface GameObject {
     life?: true;
     /** "You may cast it from your graveyard as an Adventure" (Mosswood Dreadknight): only as this face (CR 715.3). */
     face?: number;
+    /** Kaldring, the Rimestaff: "If you do, it enters tapped": played or cast with this permission, the land or permanent enters tapped (CR 614.1c). */
+    tapped?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -560,6 +562,8 @@ export interface GameObject {
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
   spent?: SpentMana;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
+  /** Wolverine, Fierce Fighter: the combat damage event that last healed it (abilities healsBeforeDamage), so that event heals once. */
+  healEvent?: string;
   phantomEvent?: string;
   /**
    * Phased out (CR 702.26b): `zone` is "phasedOut", but it hasn't changed zones (CR 702.26d), so it keeps its
@@ -1940,7 +1944,7 @@ export interface GameState {
   linkedPlays?: { player: PlayerId; source: string; turn: number; sourceName: string; filter?: TargetSpec; castOnly?: true; all?: true; owned?: true }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
-  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Irencrag Feat: only once they've cast this many spells this turn (s.castThisTurn). */ afterCasts?: number; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
+  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Irencrag Feat: only once they've cast this many spells this turn (s.castThisTurn). */ afterCasts?: number; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true; /** Living Breakthrough: only spells with this mana value (X included, CR 202.3e). */ mv?: number }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** War Cadence: generic mana to pay for each blocking creature, for blocks declared the rest of turn `turn` (CR 509.1d). */
@@ -1986,7 +1990,7 @@ export interface GameState {
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
-  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[] }[];
+  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[]; /** Whispersteel Dagger: from this player's graveyard (not `player`'s own). */ fromYardOf?: PlayerId; /** Whispersteel Dagger: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b). */ anyType?: true }[];
   /**
    * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
@@ -2309,6 +2313,8 @@ export interface Resolving {
   affected?: { id: ObjectId; zc: number }[];
   /** Inferno of the Star Mounts: ~'s power just before a continuous effect with `notePower` applied (undefined if it wasn't on the battlefield). */
   powerBefore?: number;
+  /** Cyclonus, Cybertronian Fighter: "convert it. If you do, ...": a transform effect turned a permanent over this resolution. */
+  transformedThisWay?: true;
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
   /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */
@@ -2397,6 +2403,8 @@ export interface Resolving {
   /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */
   revealedUntilCount?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
+  /** Megatron, Destructive Force: excess damage a damage effect with `excessToController` sent to the creature's controller instead, this resolution. */
+  excessRedirected?: number;
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */
   damageThisWay?: number;

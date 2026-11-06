@@ -2161,7 +2161,7 @@ function exileOptions(s: GameState, id: string): boolean {
 }
 
 /** You may cast spells from other players' graveyards this turn (The Great Work; Locke, Treasure Hunter's milled cards). */
-const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => g.cards && g.player === HUMAN && g.turn === s.turn);
+const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => (g.cards || g.fromYardOf !== undefined) && g.player === HUMAN && g.turn === s.turn);
 
 /** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {

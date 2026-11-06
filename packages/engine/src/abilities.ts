@@ -2715,7 +2715,7 @@ export type Effect =
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
-  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Without paying its mana cost" (Sins of the Past): MayPlay.free. */ free?: true; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true; /** "You may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight): until then, and only as its Adventure (face 1, CR 715.3). */ asAdventure?: true; /** Synth Eradicator: "If you don't, you may play that card this turn": a card in exile (the one just exiled from the top). */ inExile?: true; /** Reno and Rude: "and mana of any type can be spent to cast it" (CR 609.4b). */ anyType?: true }
+  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Without paying its mana cost" (Sins of the Past): MayPlay.free. */ free?: true; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true; /** "You may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight): until then, and only as its Adventure (face 1, CR 715.3). */ asAdventure?: true; /** Synth Eradicator: "If you don't, you may play that card this turn": a card in exile (the one just exiled from the top). */ inExile?: true; /** Reno and Rude: "and mana of any type can be spent to cast it" (CR 609.4b). */ anyType?: true; /** Kaldring, the Rimestaff: "If you do, it enters tapped": MayPlay.tapped. */ tapped?: true }
   /**
    * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
    * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
@@ -3922,6 +3922,8 @@ export type Effect =
   | {
       type: "newTargets";
       index: number;
+      /** Speedball, New Warrior: "You may choose new targets for that spell": the spell whose casting triggered this (the trigger's cause), not a target; `index` is ignored. */
+      cause?: true;
       /**
        * Goblin Flectomancer: "You may change the targets of target instant or sorcery spell" (CR 115.7a): every target
        * changes to another legal one, or none does; if one can't change, none can (rulings).
@@ -4221,7 +4223,7 @@ export type Effect =
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
-  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider; /** Locke: only the cards the mill before put into graveyards, any player's (GameState.graveGrants `cards`). */ milled?: true }
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider; /** Locke: only the cards the mill before put into graveyards, any player's (GameState.graveGrants `cards`). */ milled?: true; /** Whispersteel Dagger: "from that player's graveyard": the trigger's player's, not yours. */ fromYardOf?: PlayerRef; /** Whispersteel Dagger: "and you may spend mana as though it were mana of any color to cast that spell". */ anyType?: true }
   /**
    * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
    * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
@@ -4238,7 +4240,7 @@ export type Effect =
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
    * is the kind of spell.
    */
-  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** Irencrag Feat: "You can cast only one more spell this turn": the ban starts once they've cast one more spell this turn, however many they cast before (rulings). */ oneMore?: true; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true; /** "Until your next turn" (Hope of Ghirapur). */ untilYourNextTurn?: true; /** "During that player's next turn" (Azor, the Lawbringer): only in each such player's next turn. */ duringTheirNextTurn?: true }
+  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** Irencrag Feat: "You can cast only one more spell this turn": the ban starts once they've cast one more spell this turn, however many they cast before (rulings). */ oneMore?: true; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true; /** "Until your next turn" (Hope of Ghirapur). */ untilYourNextTurn?: true; /** "During that player's next turn" (Azor, the Lawbringer): only in each such player's next turn. */ duringTheirNextTurn?: true; /** Living Breakthrough: "spells with the same mana value as that spell": only spells with this mana value, worked out as it resolves. */ mvIs?: Amount }
   /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
   | { type: "cantPlayLands"; who: PlayerRef }
   /** War Cadence: "This turn, creatures can't block unless their controller pays {X} for each blocking creature they control" (GameState.blockTaxes). */
@@ -4646,7 +4648,7 @@ export type SpellCondition =
   /** "Search your library for a card, put it into your graveyard, then shuffle. If it's an instant or sorcery card, ..." (Oriq Loremage): the card its last search found is this. */
   | { kind: "searchFound"; filter: TargetSpec }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
-  | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number }
+  | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number; /** Megatron, Destructive Force: excess damage that "would be dealt" and went to the creature's controller instead (Effect damage `excessToController`). */ redirected?: true }
   /**
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
@@ -4721,6 +4723,8 @@ export type SpellCondition =
    * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
    */
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
+  /** Cyclonus, Cybertronian Fighter: "convert it. If you do, ...": the transform just before turned it over (CR 701.27, 701.28). */
+  | { kind: "transformedThisWay" }
   /** Inferno of the Star Mounts: "When its power becomes 20 this way": the continuous effect before (with `notePower`) changed ~'s power from something else to exactly `n` (rulings: not 21 or more, not another way). */
   | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
@@ -5322,6 +5326,8 @@ export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn"
 export interface TriggeredAbility {
   /** Druid of Horns: "Whenever you cast an Aura spell that targets ~": heroic for spells like this only. */
   heroicSpell?: TargetSpec;
+  /** Speedball, New Warrior: "Whenever a player casts a spell that targets ~": heroic for any player's spell, not only its controller's. */
+  heroicAnyCaster?: true;
   event: TriggerEvent;
   body: AbilityBody;
   /** Soul Scourge: the player this enters ability targets is "that player" of its leaves ability, even if it's still on the stack or never resolves (rulings on Laquatus's Champion). */
@@ -6445,6 +6451,8 @@ export interface CastFromGraveyard {
   more?: Amount;
   /** "If you do, ~ enters with a +1/+1 counter on it" (Undead Sprinter): counters the spell cast this way enters with (CR 614.1c). */
   entersWith?: { counter: CounterKind; n: number };
+  /** Kaldring, the Rimestaff: "If you do, it enters tapped": the permanent the spell cast this way becomes (CR 614.1c). */
+  entersTapped?: true;
 }
 
 /**
@@ -6851,6 +6859,12 @@ export interface CompiledCard {
   damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec };
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
   keepsDamage?: true;
+  /**
+   * Wolverine, Fierce Fighter: "If damage would be dealt to ~, instead that damage is dealt, but all other damage already
+   * dealt to ~ is healed" (CR 614.1a): the damage marked on it before the event is removed as the new damage is dealt;
+   * combat damage is one event (CR 510.2), so the damage of each source dealt at once stays.
+   */
+  healsBeforeDamage?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /** Banefire: "If X is 5 or more, ~ can't be countered": while its X is at least this (CR 101.2). */
@@ -7406,6 +7420,8 @@ export interface CompiledCard {
    * to less than one mana." (Training Grounds, CR 602.2b applies 601.2f): only generic mana, X's too (rulings), of
    * permanents like `filter` on the battlefield from the source's controller's view; `atLeastOne`, never below one mana.
    */
+  /** Convergence of Dominion: "As long as you control your commander, activated abilities of cards in your graveyard cost {2} less to activate. This effect can't reduce the mana in that ability's activation cost to less than one mana." (CR 602.2b, 601.2f): generic mana only. */
+  graveyardActivationLess?: { n: number; if?: StaticCondition; atLeastOne?: true };
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true; /** Agatha of the Vile Cauldron: "cost {X} less ..., where X is ~'s power": that much more, its power as the cost is worked out (none while it's 0 or less). */ selfPower?: true; /** "Enchanted artifact's activated abilities cost {2} less to activate" (Power Artifact): only the permanent this Aura is attached to. */ enchanted?: true }[];
   /**
    * Zirda, the Dawnwaker: "Abilities you activate that aren't mana abilities cost {2} less to activate. This effect can't

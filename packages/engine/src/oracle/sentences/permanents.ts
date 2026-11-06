@@ -13,6 +13,13 @@ import { parseGrants } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+  // Autumn Willow: "Until end of turn, ~ can be the target of spells and abilities controlled by target player as though it
+  // didn't have shroud" (CR 702.18a): that player's, until the cleanup step (CR 514.2).
+  // (The sentence comes here with "until end of turn" moved to its end.)
+  if (/^~ can be the target of spells and abilities controlled by target player as though it didn't have shroud until end of turn$/.test(s) && ctx.activated) {
+    const who = parsePlayer("target player", ctx);
+    return who ? [{ type: "waiveShroud", who }] : null;
+  }
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
   let m: RegExpExecArray | null;
   // Kolodin, Triumph Caster: "Whenever a Mount you control enters, it becomes saddled until end of turn": the designation
@@ -1549,6 +1556,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.toLowerCase(), ctx);
     const mods = what?.ref === "target" ? parseChanges(`gains ${m[2]} and ${m[3]}`) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Giant Albatross: "for each creature that dealt damage to ~ this turn, destroy that creature unless its controller pays
+  // 2 life" (after "If you do,").
+  if ((m = /^For each creature that dealt damage to ~ this turn, destroy that creature unless its controller pays (\d+) life$/.exec(s)) && !ctx.spell)
+    return [{ type: "destroyEachUnlessLife", what: { ref: "damagedSelfThisTurn" }, life: Number(m[1]) }];
+  // Brine Hag: "the base power and toughness of each creature that dealt damage to it this turn become 0/2" (its dies
+  // trigger; "This effect lasts indefinitely"): those creatures as it resolves (CR 611.2c), for as long as each is that
+  // permanent (CR 611.2a), in layer 7b (CR 613.4b).
+  if ((m = /^[Tt]he base power and toughness of each creature that dealt damage to (?:it|~) this turn become (\d+)\/(\d+)$/.exec(s)) && !ctx.spell) {
+    const mods = parseChanges(`has base power and toughness ${m[1]}/${m[2]}`);
+    return mods ? [{ type: "continuous", what: { ref: "damagedSelfThisTurn" }, mods, duration: "game" }] : null;
   }
   // The Bears of Littjara: "Any number of target Shapeshifter creatures you control have base power and toughness 4/4":
   // with no duration, for as long as each is that permanent (CR 611.2a), in layer 7b (CR 613.4b).

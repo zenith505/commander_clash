@@ -200,14 +200,39 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       setUnlocked(s, o, [...(o.unlocked ?? []), pick.door]);
       return;
     }
+    case "waiveShroud": {
+      const me = objects(s, { ref: "self" }, ctx)[0];
+      if (!me || me.zone !== "battlefield") return;
+      for (const pid of players(s, e.who, ctx)) {
+        if (me.shroudWaivedFor?.includes(pid)) continue;
+        (me.shroudWaivedFor ??= []).push(pid);
+        log(s, `${src} can be the target of ${player(s, pid).name}'s spells and abilities this turn as though it didn't have shroud.`);
+      }
+      return;
+    }
     case "removeFromCombat": {
       const removed: ObjectId[] = [];
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || (o.attacking === undefined && o.blocking === undefined)) continue;
+        const was = e.unblockOnly ? [...(o.blocking ?? [])] : [];
         removeFromCombat(s, o);
         clearCombat(o);
         removed.push(o.id);
         log(s, `${src} removes ${defOf(s, o).name} from combat.`);
+        // Ydwen Efreet: an attacker it was blocking that no other creature had blocked this combat (TurnLog.blocks) is
+        // unblocked again, so it deals combat damage as an unblocked creature (CR 510.1a); one another creature had
+        // blocked stays blocked (CR 506.4, 509.1h).
+        const me = `${o.id}@${o.zoneChanges ?? 0}`;
+        for (const a of was) {
+          const att = s.objects[a];
+          if (!att || att.zone !== "battlefield" || att.attacking === undefined || !att.blockedBy || att.blockedBy.length) continue;
+          const key = `${att.id}@${att.zoneChanges ?? 0}`;
+          const by = (s.turnLog?.blocks ?? []).filter((b) => b.attacker === key && b.combat === (s.combatsThisTurn ?? 0)).map((b) => b.blocker);
+          if (by.length && by.every((b) => b === me)) {
+            att.blockedBy = undefined;
+            log(s, `${defOf(s, att).name} becomes unblocked (${src}).`);
+          }
+        }
       }
       if (e.remember && s.resolving) s.resolving.created = removed;
       return;

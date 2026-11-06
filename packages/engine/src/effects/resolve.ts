@@ -308,6 +308,18 @@ function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
  * gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h). `here`: that
  * permanent is still on the battlefield as the same object.
  */
+/**
+ * The source as the permanent it is, "id@zoneChanges"; gone (a dies trigger's source is the card in its new zone, CR
+ * 400.7), the permanent it was as it last existed on the battlefield (CR 603.10a, 608.2h).
+ */
+export function selfKeyThisTurn(s: GameState, ctx: ResolveCtx): string | undefined {
+  const self = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+  if (!self) return undefined;
+  if (self.zone === "battlefield" && (ctx.sourceZc === undefined || (self.zoneChanges ?? 0) === ctx.sourceZc)) return `${self.id}@${self.zoneChanges ?? 0}`;
+  const lk = ctx.sourceZc !== undefined ? s.lastKnown?.[self.id] : undefined;
+  return lk && (lk.zc === ctx.sourceZc! - 1 || lk.zc === ctx.sourceZc) ? `${self.id}@${lk.zc}` : undefined;
+}
+
 /** Whose blocks a "blockHistory" ref is about: the object it remembers, or the source or target as it is now. */
 export function blockHistoryAt(s: GameState, ref: Extract<ObjRef, { ref: "blockHistory" }>, ctx: ResolveCtx): { id: ObjectId; zc: number } | undefined {
   if (ref.at) return ref.at;
@@ -542,6 +554,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (!me || me.attacking === undefined) return [];
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((o) => o.blocking?.includes(me.id));
     return ref.filter ? blockers.filter((o) => objectMatches(s, ref.filter!, o, ctx.controller, false)) : blockers;
+  }
+  if (ref.ref === "damagedSelfThisTurn") {
+    const key = selfKeyThisTurn(s, ctx);
+    const by = new Set((key ? s.turnLog?.damageDealtTo?.[key] ?? [] : []).flatMap((d) => (d.src ? [d.src] : [])));
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => by.has(`${o.id}@${o.zoneChanges ?? 0}`) && objIsType(s, o, "Creature"));
   }
   if (ref.ref === "diedDamagedBySelf") {
     const out: GameObject[] = [];
@@ -1240,6 +1257,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castNow":
     case "predicament":
     case "alternatePicks":
+    case "struggleForHand":
+    case "destroyEachUnlessLife":
     case "putInLibrary":
     case "exiledCardToGraveyard":
     case "putInGraveyard":
@@ -1325,6 +1344,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomePrepared":
     case "flip":
     case "removeFromCombat":
+    case "waiveShroud":
     case "becomeBlocked":
     case "reselectAttack":
     case "earthbend":
@@ -1462,6 +1482,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealTopToHand":
     case "duelReveal":
     case "revealTop":
+    case "revealedToGraveyardCopySelf":
     case "revealedUntilToBottom":
     case "forEachRevealed":
     case "parleyReveal":

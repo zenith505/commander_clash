@@ -1,6 +1,6 @@
 # Roadmap
 
-29,921 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,932 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
 9,979 (96%).
 
@@ -2131,6 +2131,24 @@ line blocks.
    damage to each other creature (Thunderwave); "That creature's controller may have ~ deal 1 damage to it" (Requiem
    Monolith); a revealed card any opponent may have you put into your graveyard, asked in turn order, the first yes
    stops (Sin Prodder). +7, 29,870 of 31,936; 29,883 with B110.
+   Round 280 took the most played names no round had looked at yet (from rank 9,128 down). Life bidding (Illicit
+   Auction, Mages' Contest, Pain's Reward: you open, the others top it in turn order, around until all but the high
+   bidder decline; a loss of life, so more than your life can be bid; the UI's "Bid N life" and "Don't bid"); piles of
+   your top cards with one card taken from the chosen pile, the opponent of your choice picked once the piles are made
+   (Truth or Tale, as its rulings order it; Steam Augury still chooses the opponent first, as before); a
+   face-down and a face-up pile made by the target opponent, the face-down one shown as card backs (Atris, Oracle of
+   Half-Truths; Fortune's Favor); the exiled creature cards in piles, yours onto the battlefield (Boneyard Parley); hands
+   and permanents shuffled in, that many drawn, tokens counted (The Great Aurora); creatures shuffled in and one creature
+   revealed for each player who shuffled a nontoken one (Collision of Realms); "a creature they control with equal or
+   lesser power", the rest exiled (Sculpted Sunburst); two targets left in your graveyard by an opponent unless you
+   control a Bolas planeswalker (Deliver Unto Evil). +11, 29,920 of 31,936 (with B110-B112).
+   Out after round 280 (looked at, not done): Wild Evocation (a random card from hand cast "if able" as the trigger
+   resolves); Oath of Druids (a target chosen by the upkeep player among opponents with more creatures, then reveal until
+   a creature); Fraying Line (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
+   piles of permanents and one chosen at random); Glimpse of Tomorrow (non-Aura permanents first, then Auras attached as
+   they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
+   Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (a draw replacement that depends on which
+   draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (each next flip's stakes double and the winner or loser
    decides whether to flip again); Grothama, All-Devouring (damage dealt to it by each player's sources this turn);
    Lich's Mastery (exile a permanent or a card from hand or graveyard for each 1 life lost); Karn, Living Legacy ("pay
@@ -5587,7 +5605,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   +2/+2"), Primordial Ooze (pay {1} for each of its counters, or it's tapped and deals that much damage to you), Dead
   Reckoning (the card on top of your library is a may of its own; the damage is its power as it was in the graveyard),
   Not Forgotten (top or bottom of its owner's library, the caster's choice), Grim Contest (each deals damage equal to its
-  toughness to the other, not a fight). No new prompts. +12 (29,921 of 31,936 with B112).
+  toughness to the other, not a fight). No new prompts. +12 (29,932 of 31,936 with B112 and round 280).
 - Out after round B113 (looked at, not done): Kaervek's Spite (sacrificing all permanents you control as an additional
   cost: whether it can be paid while one of them can't be sacrificed), Ruin in Their Wake (a "may" between the battlefield
   and your hand only while you control a land named Wastes), Bargaining Table (an opponent chosen as it's activated sets X).

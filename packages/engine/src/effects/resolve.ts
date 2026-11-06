@@ -1263,6 +1263,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "commanderToBattlefield":
     case "toCommandZone":
     case "suspendCard":
+    case "sunburstChoose":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "turnFaceUp":
@@ -1443,6 +1444,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealPick":
     case "opponentSplitsTargets":
     case "piles":
+    case "exiledPiles":
+    case "shuffleCreaturesReveal":
     case "dig":
     case "vault":
     case "nextDrawExile":
@@ -1475,6 +1478,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chooseVotes":
     case "chooseBlocks":
     case "secretNumbers":
+    case "bidLife":
       return runVotesEffect(s, e, ctx, src);
     case "may":
     case "repeatMay":

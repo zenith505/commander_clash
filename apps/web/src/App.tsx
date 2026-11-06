@@ -2528,7 +2528,7 @@ function CardChoice({
   );
 }
 
-/** A number to choose secretly (Wheel of Misfortune), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters): any whole number in the range the decision allows. */
+/** A number to choose secretly (Wheel of Misfortune), a bid of life (Illicit Auction: "Don't bid" passes), or how much life or energy to pay (Necrodominance, Galvanic Discharge, Minion of the Wastes as it enters): any whole number in the range the decision allows. */
 function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
   const range = pending.numberRange ?? { min: 0, max: 999 };
   const [n, setN] = useState(range.min);
@@ -2546,7 +2546,12 @@ function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<Game
       <button className="ghost" disabled={n >= range.max} onClick={() => set(n + 1)} aria-label="Number plus one">
         +
       </button>
-      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : `Choose ${n}`}</button>
+      <button onClick={done}>{pending.what === "payLife" || pending.what === "lifeAsEnters" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : pending.what === "bid" ? `Bid ${n} life` : `Choose ${n}`}</button>
+      {pending.what === "bid" && pending.options.includes("pass") && (
+        <button className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: "pass" }])}>
+          Don't bid
+        </button>
+      )}
     </div>
   );
 }
@@ -3922,6 +3927,7 @@ function PilePicker({
   onDone: (choice: string) => void;
 }) {
   const whose = pending.of === HUMAN ? "your" : `${s.players[pending.of ?? 0]!.name}'s`;
+  const faceDown = pending.pileMode === "faceDown";
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -3932,12 +3938,14 @@ function PilePicker({
           {(pending.piles ?? [[], []]).map((pile, i) => (
             <div key={i} data-pile={i}>
               <h4>
-                Pile {i + 1} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
-                <button onClick={() => onDone(String(i))}>{pending.sacrificePile ? `Sacrifice pile ${i + 1}` : `Put pile ${i + 1} into ${whose} hand`}</button>
+                {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
+                <button onClick={() => onDone(String(i))}>{pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
                 {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
-                {pile.map((id) => {
+                {/* Atris: the face-down pile's cards stay hidden from the player choosing (rulings). */}
+                {faceDown && i === 0 && pile.map((id) => <CardBack key={id} label="Face down" />)}
+                {!(faceDown && i === 0) && pile.map((id) => {
                   const d = cardOf(s, id);
                   return (
                     <div key={id} className="card big" {...hoverProps(d, onHover)}>
@@ -4999,7 +5007,7 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // the legend rule's "keep which one?" (CR 704.5j); Gilgamesh's "attach one of them": hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "attachWhich" || pending.what === "predicamentCard" || pending.what === "alternatePick") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "attachWhich" || pending.what === "predicamentCard" || pending.what === "alternatePick") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -5012,7 +5020,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
+  if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "form" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser") && pending.player === HUMAN)
     return (
       <div className="controls">

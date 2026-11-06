@@ -375,6 +375,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Separating cards into two piles (Fact or Fiction): as even as can be, by what the cards are worth in that player's
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
+    // Truth or Tale (we separate, an opponent chooses the pile we take one card from): the best card alone, so the worse
+    // pile still holds the second best, the most an opponent can be made to give.
+    const pickOnePiles = pend.kind === "searchLibrary" && pend.piles && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "piles" && !!x.pickOne);
+    if (pend.kind === "searchLibrary" && pend.piles && pickOnePiles && pend.cards.length) return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
@@ -691,6 +695,25 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // A secret number, without looking at the others' (Wheel of Misfortune): 1 to get a new hand when ours is nearly empty
     // and we can take the damage, otherwise 0 (no damage, keep our hand). Menacing Ogre: its controller with plenty of
     // life goes for the counters.
+    // Life bidding (Illicit Auction, Mages' Contest, Pain's Reward): start at 0, then top by one while the bid stays under
+    // what the prize is roughly worth to us, never bidding our life below 11.
+    if (pend.kind === "chooseOption" && pend.what === "bid") {
+      const bl = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "bidLife") : undefined;
+      const me = player(s, pid);
+      const t = s.resolving?.item.targets?.[0];
+      const it = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const spell = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+      const spellCard = spell?.kind === "spell" && spell.objectId ? s.objects[spell.objectId] : undefined;
+      const prize = bl?.type === "bidLife" ? bl.prize : "draw";
+      const worth =
+        prize === "draw" ? 4
+        : prize === "control" ? (it?.zone === "battlefield" ? 1 + defMv(defOf(s, it)) + Math.max(0, power(s, it)) : 0)
+        : spell && spellCard ? (spell.controller === pid ? 2 : 1) + defMv(defOf(s, spellCard)) : 0;
+      const most = Math.min(Math.max(0, me.life - 11), Math.round(worth));
+      const next = pend.numberRange?.min ?? 0;
+      if (!pend.options.includes("pass")) return [{ type: "chooseOption", player: pid, choice: "0" }];
+      return [{ type: "chooseOption", player: pid, choice: next <= most ? String(next) : "pass" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "secretNumber") {
       const sn = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "secretNumbers") : undefined;
       const me = player(s, pid);
@@ -906,6 +929,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lord of the Void: the costliest card to put onto the battlefield.
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && /onto the battlefield/.test(pend.prompt ?? ""))
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
+    // Truth or Tale: the best card of the chosen pile.
+    if (pend.kind === "chooseOption" && pend.what === "pileCard") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => handWorth(s, b) - handWorth(s, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
       const p = player(s, pid);
       const land = pend.options.find((o) => isType(defOf(s, obj(s, o)), "Land"));
@@ -977,8 +1002,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
       // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
-      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : (id: string) => handWorth(s, id);
-      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + worth(id), 0));
+      // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value.
+      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
+      // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
+      const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
       const mine = pend.of === pid && !pend.sacrificePile;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }

@@ -793,6 +793,46 @@ const commanderMv = (s: GameState, o: GameObject) => (o.zone === "battlefield" ?
 
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "sunburstChoose": {
+      // Sculpted Sunburst: you choose first, then each opponent in turn order, one with power no greater than the power of
+      // yours as they choose (rulings: chosen as it resolves, nothing targeted). Then, if you chose one, every creature no
+      // player chose is exiled, all at once.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      if (!sc.queue) {
+        const from = s.turnOrder.indexOf(ctx.controller);
+        sc.queue = [...s.turnOrder.slice(from), ...s.turnOrder.slice(0, from)].filter((pid) => !player(s, pid).lost);
+        sc.chosen = {};
+      }
+      const chosen = sc.chosen!;
+      while (sc.queue.length) {
+        const pid = sc.queue[0]!;
+        const mine = chosen[ctx.controller]?.[0];
+        const yours = mine && s.objects[mine]?.zone === "battlefield" ? s.objects[mine] : undefined;
+        if (player(s, pid).lost || (pid !== ctx.controller && !yours)) {
+          sc.queue.shift();
+          continue;
+        }
+        const options = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid && (!yours || power(s, obj(s, id)) <= power(s, yours)));
+        if (!options.length) {
+          chosen[pid] = [];
+          sc.queue.shift();
+          continue;
+        }
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: "creature", options, count: 1, prompt: pid === ctx.controller ? "choose a creature you control" : `choose a creature you control with power ${yours ? power(s, yours) : 0} or less` };
+        return "paused";
+      }
+      const kept = Object.values(chosen).flat();
+      if (!sc.done) {
+        sc.done = true;
+        const names = apnap(s, Object.keys(chosen).map(Number) as PlayerId[]).filter((pid) => chosen[pid]?.length).map((pid) => `${player(s, pid).name}: ${characteristics(s, obj(s, chosen[pid]![0]!)).name}`);
+        log(s, names.length ? `Chosen (${src}): ${names.join("; ")}.` : `No creature is chosen (${src}).`);
+      }
+      if (!chosen[ctx.controller]?.length) return;
+      r.created = kept;
+      return runEffect(s, { type: "exile", what: { ref: "each", filter: creature, notCreated: true } }, ctx);
+    }
     case "suspendCard":
       for (const o of objects(s, e.what, ctx)) if (!o.isToken) suspendExiled(s, o, e.n);
       return;

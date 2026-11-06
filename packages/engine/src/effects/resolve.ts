@@ -17,7 +17,7 @@ import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
-import { runZonesEffect } from "./run-zones";
+import { runZonesEffect, suspendExiled } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
 import { runTextEffect } from "./run-text";
 import { runTokensEffect, createToken } from "./run-tokens";
@@ -1281,6 +1281,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "commanderToBattlefield":
     case "toCommandZone":
     case "suspendCard":
+    case "suspendImpulsed":
     case "sunburstChoose":
       return runZonesEffect(s, e, ctx, src);
     case "changeText":
@@ -1416,6 +1417,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterCause":
     case "causeToBottom":
     case "counterSpell":
+    case "exileAsResolves":
     case "spellUncounterable":
     case "spellEntersWith":
     case "spellGains":
@@ -1557,6 +1559,34 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
   if (compileCard(d).exileSelfOnResolve) {
     moveObject(s, id, "exile");
     if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled.`);
+    return;
+  }
+  // "Exile that card instead of putting it into your graveyard as it resolves" (Feather, the Redeemed; Lilah; Gandalf of the
+  // Secret Fire; River Song's Diary): a replacement of its move to the graveyard (CR 614.1a, 608.2n), the first one made.
+  // With buyback, rebound or an Adventure's exile as well, its controller would choose which applies (CR 616.1): this one
+  // is applied. Flashback's exile is applied after it, so the card comes back as Feather says (rulings).
+  const asRes = o.exileAsResolves?.find((x) => x.zc === (o.zoneChanges ?? 0) && (x.anyGraveyard || o.owner === x.by));
+  if (asRes) {
+    o.exileAsResolves = undefined;
+    moveObject(s, id, "exile");
+    const card = s.objects[id];
+    if (card?.zone !== "exile") return;
+    const zc = card.zoneChanges ?? 0;
+    if (asRes.link) (s.linkedExile ??= {})[asRes.link] = [...(s.linkedExile?.[asRes.link] ?? []), { id, zc }];
+    // Goliath Daydreamer: "with a dream counter on it", on the card in exile (CR 122.1).
+    for (const [k, n] of Object.entries(asRes.counters ?? {})) card.counters[k] = (card.counters[k] ?? 0) + n;
+    if (asRes.suspend) {
+      log(s, `${asRes.src}: ${d.name} is exiled instead of going to the graveyard.`);
+      suspendExiled(s, card, asRes.suspend);
+    } else if (asRes.then === "plot") {
+      card.mayPlay = { player: card.owner, zc, until: "plot", turn: s.turn };
+      log(s, `${asRes.src}: ${d.name} is exiled instead of going to the graveyard and becomes plotted: ${player(s, card.owner).name} may cast it without paying its mana cost on a later turn.`);
+      fireEvent(s, { type: "plotted", id });
+    } else {
+      const cs = Object.entries(asRes.counters ?? {}).map(([k, n]) => `${n === 1 ? "a" : n} ${k} counter${n === 1 ? "" : "s"}`);
+      log(s, `${asRes.src}: ${d.name} is exiled${cs.length ? ` with ${cs.join(" and ")} on it` : ""} instead of going to the graveyard${asRes.then === "returnEndStep" ? "; it returns to its owner's hand at the beginning of the next end step" : ""}.`);
+      if (asRes.then === "returnEndStep") addDelayed(s, "nextEndStep", asRes.by, card, { targets: [], effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "public" } }], text: `Return ${d.name} to your hand.` });
+    }
     return;
   }
   // Cast Through Time: rebound from a permanent its controller controls as the spell finishes resolving (rulings). Buyback

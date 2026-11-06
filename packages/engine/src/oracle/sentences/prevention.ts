@@ -191,6 +191,14 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (i === undefined || t?.kind !== "object" || t.many || t.optional || !t.types?.includes("Creature")) return null;
     return rule({ by: { target: { ref: "target", index: i } }, nextTime: true });
   }
+  // Feint: "Tap all creatures blocking target attacking creature. Prevent all combat damage that would be dealt this turn by
+  // that creature and each creature blocking it.": the target and the creatures blocking it as this resolves (CR 611.2c),
+  // whose combat damage this turn is prevented (CR 615.1a); tapped blockers still deal combat damage (CR 510.1).
+  if (/^Prevent all combat damage that would be dealt this turn by that creature and each creature blocking it$/.test(s)) {
+    const i = ctx.lastObjectTarget;
+    if (i === undefined || ctx.targets[i]?.kind !== "object" || (ctx.targets[i] as { combat?: string }).combat !== "attacking" || ctx.targets[i]?.many) return null;
+    return [{ type: "continuous", what: { ref: "inCombatWithSelf", ofTarget: i, andSelf: true }, mods: [{ kind: "preventDamage", by: true, combat: "only" }], duration: "endOfTurn" }];
+  }
   // Terrifying Presence: "Prevent all combat damage that would be dealt by creatures other than target creature this
   // turn": a rule until the turn ends, for creatures that arrive later too (CR 611.2c), but not that creature's.
   if (/^Prevent all combat damage that would be dealt by creatures other than target creature this turn$/.test(s)) {

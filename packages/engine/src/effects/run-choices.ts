@@ -755,6 +755,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? player(s, ctx.controller).library.length >= e.cond.n
           : e.cond.kind === "resolvedNth"
           ? e.cond.n.includes(s.resolving!.nth ?? 0) !== !!e.cond.not
+          : e.cond.kind === "putOnTopThisWay"
+          ? !!s.resolving!.putOnTop
           : e.cond.kind === "wonClash"
             ? !!(s.resolving!.wonClash ?? ctx.event?.wonClash)
             : e.cond.kind === "wonBidding"

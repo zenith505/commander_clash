@@ -387,15 +387,20 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "parleyReveal": {
       // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
       const counts = { land: 0, nonland: 0 };
+      const revealed: ObjectId[] = [];
       for (const pid of apnap(s, s.turnOrder.filter((p) => !player(s, p).lost))) {
         const p = player(s, pid);
         const id = p.library[0];
         if (!id) continue;
         const d = defOf(s, obj(s, id));
         counts[isType(d, "Land") ? "land" : "nonland"]++;
+        revealed.push(id);
         log(s, `${p.name} reveals ${d.name} from the top of their library.`);
       }
       s.resolving!.parley = counts;
+      // Game Preserve: every card revealed a creature card, they all enter together under their owners' control.
+      if (e.allCreaturesEnter && revealed.length && revealed.every((id) => isType(defOf(s, obj(s, id)), "Creature")))
+        enterTogether(s, () => revealed.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
       return;
     }
     case "spellToHand": {

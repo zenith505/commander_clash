@@ -3667,7 +3667,7 @@ export type Effect =
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
-  | { type: "parleyReveal" }
+  | { type: "parleyReveal"; /** Game Preserve: "If all cards revealed this way are creature cards, put those cards onto the battlefield under their owners' control": together (CR 608.2f), only if every card revealed is a creature card. */ allCreaturesEnter?: true }
   /**
    * "Put the revealed cards on the bottom of your library in any order" after an exileUntilNonland "keep" (Erratic
    * Explosion): those still in the library, ordered by their owner (CR 401.4). `hand`: "Put the nonland card into your
@@ -4704,6 +4704,8 @@ export type SpellCondition =
   | { kind: "resolvedNth"; n: number[]; not?: true }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** Clash of Elements: "If they do" after "Its owner may put it on top of their library": its owner chose the top (ResolvingState.putOnTop). */
+  | { kind: "putOnTopThisWay" }
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
   | { kind: "wonFlip"; lost?: true }
   /** "If you win the bidding" (Mages' Contest): you're the high bidder of Effect "bidLife". */

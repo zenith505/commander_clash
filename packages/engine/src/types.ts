@@ -2533,6 +2533,8 @@ export interface Resolving {
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */
   amassed?: { id: ObjectId; zc: number };
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
+  /** Clash of Elements: the owner chose to put it on top of their library (putInLibrary "ownersChoice"). */
+  putOnTop?: true;
   wonClash?: boolean;
   /** A draw of this resolution was replaced (dredge, Alhammarret's Archive): Sindbad's "reveal it" then does nothing (rulings). */
   drawReplaced?: true;

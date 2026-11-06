@@ -3369,6 +3369,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
           position = sc.topOrBottom as "top" | "bottom" | "second";
           sc.topOrBottom = undefined;
+          if (position === "top" && e.position === "ownersChoice") s.resolving!.putOnTop = true;
         }
         if (position === "second" || position === "third" || position === "fourth" || position === "fifth") {
           log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library ${position} from the top.`);

@@ -1,6 +1,6 @@
 # Roadmap
 
-29,953 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,961 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2169,7 +2169,7 @@ line blocks.
    you control", "untap all Plains", Leviathan's cost), "All Mountains are Mountains" sets their land types (CR 305.7),
    and the 127 swaps that still leave a line the engine can't read (30 cards; repeated words such as "both red and red"
    or "a Plains or a Plains", Defiler of Faith's cost line, Hazezon Tamar's token colors, card-specific wordings such as
-   Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,953 of 31,936 with B113.
+   Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,961 of 31,936 with B113 and B114.
    Out after round 282 (looked at, not done): Arena (an activated ability's second target chosen by an opponent);
    Jinxed Choker (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
    read).

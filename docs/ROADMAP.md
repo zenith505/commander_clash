@@ -1,7 +1,7 @@
 # Roadmap
 
-30,052 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,602 of
+30,060 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,961 of 4,988 (99%), top 10,000: 9,607 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -5823,7 +5823,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (its next damage to whoever activated it prevented, CR 602.2), Gloom Surgeon (combat damage to it prevented and that many
   cards exiled from the top of its controller's library, even damage that can't be prevented, rulings, CR 615.12). Bots
   answer threats with Turn the Tables (at their biggest attacker), Aegis of Honor and Reverberation. No new prompts. +10
-  (30,052 of 31,936 with B119).
+  (30,060 of 31,936 with B119 and round 286).
 - Out after round B120 (looked at, not done): Nova Pentacle (a target creature an opponent of your choice chooses, rulings),
   Lichenthrope, Force Bubble and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules

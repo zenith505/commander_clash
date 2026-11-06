@@ -1687,11 +1687,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
           ...(e.whileEnchanted ? { whileEnchanted: true as const } : {}),
           ...(untilCast ? { untilCast } : {}),
+          ...(e.untilCreatureSpellCast ? { untilCreatureSpell: true as const } : {}),
           affected: group,
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : untilCast ? ` until ${src} is cast from exile` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
       }
       if (e.setsDid && giveTo !== undefined && s.resolving) {
         invalidateCharacteristics(s);
@@ -1795,6 +1796,99 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${player(s, owner).name} gains control of ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       }
       if (!byOwner.size) log(s, `${src}: everyone already controls what they own.`);
+      invalidateCharacteristics(s);
+      return;
+    }
+    case "counterOfKindEach": {
+      const you = ctx.controller;
+      const sc = (s.resolving!.scratch ??= {});
+      const kindsOn = (o: GameObject) => Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
+      if (!sc.counterEach) {
+        if (!sc.queue) {
+          const options = s.battlefield.filter((id) => !s.phasedOut?.includes(id) && !characteristics(s, obj(s, id)).subtypes.includes("Saga") && kindsOn(obj(s, id)).length > 0);
+          if (!options.length) {
+            log(s, `${src}: no non-Saga permanent has a counter on it.`);
+            return;
+          }
+          sc.queue = [you];
+          sc.chosen = {};
+          s.pending = { kind: "pickPermanents", player: you, source: src, action: "choose", what: "non-Saga permanent with a counter", options, count: options.length, min: 0, anyNumber: true, prompt: "choose any number of non-Saga permanents: each gets another counter of a kind already on it (you choose the kind)." };
+          return "paused";
+        }
+        const picked = (sc.chosen?.[you] ?? []).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
+        sc.queue = undefined;
+        sc.chosen = undefined;
+        sc.counterEach = { picked, kinds: {} };
+      }
+      const st = sc.counterEach;
+      const here = (p: { id: ObjectId; zc: number }) => s.objects[p.id]?.zone === "battlefield" && (obj(s, p.id).zoneChanges ?? 0) === p.zc;
+      if (sc.counterKind !== undefined) {
+        const next = st.picked.find((p) => here(p) && st.kinds[p.id] === undefined && kindsOn(obj(s, p.id)).length > 1);
+        if (next) st.kinds[next.id] = sc.counterKind;
+        sc.counterKind = undefined;
+      }
+      for (const p of st.picked) {
+        if (!here(p) || st.kinds[p.id] !== undefined) continue;
+        const o = obj(s, p.id);
+        const kinds = kindsOn(o);
+        if (kinds.length === 1) {
+          st.kinds[p.id] = kinds[0]!;
+          continue;
+        }
+        if (!kinds.length) continue;
+        s.pending = { kind: "chooseOption", player: you, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), about: o.id, prompt: `choose a counter on ${characteristics(s, o).name}: another of that kind is put on it` };
+        return "paused";
+      }
+      sc.counterEach = undefined;
+      invalidateCharacteristics(s);
+      for (const p of st.picked) {
+        const k = st.kinds[p.id];
+        if (!here(p) || k === undefined) continue;
+        const o = obj(s, p.id);
+        const put = putCounters(s, o, k, 1);
+        if (put) log(s, `${player(s, you).name} puts another ${k} counter on ${defOf(s, o).name} (${src}).`);
+      }
+      return;
+    }
+    case "successionControl": {
+      const r = s.resolving!;
+      const side = r.chosen?.direction;
+      if (!side) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "direction", options: ["left", "right"], labels: ["Left", "Right"], prompt: "choose left or right: starting with you, each player chooses a creature controlled by the next player that way and gains control of it." };
+        return "paused";
+      }
+      // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
+      const seats = s.turnOrder.filter((p) => !player(s, p).lost);
+      const next = (pid: PlayerId) => seats[(seats.indexOf(pid) + (side === "left" ? 1 : seats.length - 1)) % seats.length]!;
+      const sc = (r.scratch ??= {});
+      if (!sc.queue) {
+        const order: PlayerId[] = [];
+        for (let p = ctx.controller, i = 0; seats.includes(p) && i < seats.length; p = next(p), i++) order.push(p);
+        sc.queue = order;
+        sc.chosen = {};
+      }
+      while (sc.queue.length) {
+        const pid = sc.queue[0]!;
+        const them = next(pid);
+        const opts = them === pid ? [] : s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === them);
+        // With only one, that one; with none, nothing (rulings).
+        if (opts.length <= 1) {
+          sc.chosen![pid] = opts;
+          sc.queue.shift();
+          continue;
+        }
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: "creature", options: opts, count: 1, of: them, prompt: `choose a creature ${player(s, them).name} controls: you gain control of it.` };
+        return "paused";
+      }
+      const got: [PlayerId, ObjectId][] = Object.entries(sc.chosen ?? {}).flatMap(([pid, ids]) => (ids as ObjectId[]).map((id) => [Number(pid) as PlayerId, id] as [PlayerId, ObjectId]));
+      sc.queue = undefined;
+      sc.chosen = undefined;
+      for (const [to, id] of got) {
+        if (s.objects[id]?.zone !== "battlefield") continue;
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [id], mods: [{ kind: "control" }] });
+        log(s, `${player(s, to).name} gains control of ${defOf(s, obj(s, id)).name}.`);
+      }
+      if (!got.length) log(s, `${src}: nobody chose a creature.`);
       invalidateCharacteristics(s);
       return;
     }

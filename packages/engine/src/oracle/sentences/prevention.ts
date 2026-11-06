@@ -330,6 +330,14 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (redirect === null) return null;
     return rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { target: { ref: "self" } }, to: { players: m[2] === "you" ? "you" : "opponents" }, nextTime: true, ...(redirect ? { redirect } : {}) });
   }
+  // Goblin Psychopath: "the next time it would deal combat damage this turn, it deals that damage to you instead": all the
+  // combat damage it deals in that one damage event, whatever it would be dealt to, to the ability's controller (CR 614.9,
+  // 615.8); none if it has left the battlefield.
+  if (/^The next time ~ would deal combat damage this turn, it deals that damage to you instead$/.test(s)) {
+    const redirect = destination("you", ctx);
+    if (!redirect) return null;
+    return rule({ combat: "only", by: { target: { ref: "self" } }, nextTime: true, redirect });
+  }
   // Kjeldoran Royal Guard: "All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~
   // instead": not if ~ has left the battlefield by then (rulings, CR 614.9).
   if (/^All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~ instead$/.test(s))

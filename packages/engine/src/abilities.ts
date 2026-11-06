@@ -3102,6 +3102,11 @@ export type Effect =
    * both have chosen; the ones chosen (one or two) are remembered (ObjRef "created") for what comes next.
    */
   | { type: "secretChoose"; who: PlayerRef; filter: TargetSpec }
+  /**
+   * Call to the Void: "Each player secretly chooses a creature they control and a creature they don't control. Then those
+   * choices are revealed.": in turn order, none logged until all are made; the creatures chosen become `created`.
+   */
+  | { type: "secretChooseEach" }
   /** "Choose a creature at random that attacked this turn. Destroy that creature." (Metzali, Tower of Triumph): one of those matching `filter` as it resolves, not targeted. */
   | { type: "destroyRandom"; filter: TargetSpec }
   /** "A creature an opponent controls chosen at random" (Cinderheart Giant): one permanent matching `filter` as it resolves, not targeted, remembered as ObjRef "created" for the next instruction. */
@@ -3450,6 +3455,25 @@ export type Effect =
    */
   | { type: "scrambleControl"; filter: TargetSpec }
   /**
+   * Order of Succession: "Choose left or right. Starting with you and proceeding in the chosen direction, each player
+   * chooses a creature controlled by the next player in that direction. Each player gains control of the creature they
+   * chose.": no targets (rulings); the choices in seat order from you, then all the control changes at once (rulings,
+   * layer 2, CR 613.1b).
+   */
+  | { type: "successionControl" }
+  /**
+   * The Caves of Androzani: "For each non-Saga permanent, choose a counter on it. You may put an additional counter of that
+   * kind on that permanent.": the permanents to get one picked first (any number), then for each with more than one
+   * kind, which kind (CR 122.1); all put at once.
+   */
+  | { type: "counterOfKindEach" }
+  /**
+   * Descent into Madness: "each player exiles X permanents they control and/or cards from their hand": you choose first,
+   * then each other player in turn order, each seeing what the earlier ones chose (only how many hand cards); then all
+   * the chosen ones are exiled at once (rulings). With X or fewer, all of them.
+   */
+  | { type: "eachExilesPermanentsOrHand"; n: Amount }
+  /**
    * Reins of Power: "Untap all creatures you control and all creatures target opponent controls. You and that opponent
    * each gain control of all creatures the other controls until end of turn. Those creatures gain haste until end of
    * turn." Both groups are the creatures each controls as it resolves, exchanged at once (CR 701.12b, 611.2c).
@@ -3464,7 +3488,7 @@ export type Effect =
    * though it were goaded" (not goaded, Kardur).
    */
   | { type: "ungoad"; what: ObjRef }
-  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** With `giveTo`: "If they do, ..." after it (Stiltzkin, Moogle Merchant): whether that player gained control of it is what "if you do" asks. */ setsDid?: true; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
+  | { type: "continuous"; /** With duration "game": "until ~ is cast from exile" (Shattered Seraph), the card this ability's cost exiled (ContinuousEffect.untilCast). */ untilCastFromExile?: true; /** With duration "game": "until a player casts a creature spell" (Soul Sculptor, ContinuousEffect.untilCreatureSpell). */ untilCreatureSpellCast?: true; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** With `giveTo`: "If they do, ..." after it (Stiltzkin, Moogle Merchant): whether that player gained control of it is what "if you do" asks. */ setsDid?: true; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind; /** "For as long as that creature is enchanted" (Rootwater Matriarch): only to those enchanted now, each until it has no Aura attached (rulings). */ whileEnchanted?: true; /** Inferno of the Star Mounts: note ~'s power just before this applies (ResolvingState.powerBefore), for a "powerBecame" condition after it. */ notePower?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).

@@ -2200,6 +2200,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter("creature");
     return who && filter?.kind === "object" ? [{ type: "secretChoose", who, filter: { ...filter, text: "creature" } }, { type: "sacrifice", what: { ref: "created" }, byController: true }] : null;
   }
+  // Call to the Void (as parseBody joins it): every choice made before any is revealed (rulings), then each creature
+  // chosen is destroyed, once however often it was chosen (rulings).
+  if (/^Each player secretly chooses a creature they control and a creature they don't control for those creatures to be destroyed$/.test(s)) return [{ type: "secretChooseEach" }, { type: "destroy", what: { ref: "created" } }];
   // Gut, True Soul Zealot: "you may sacrifice another creature or an artifact": an artifact or a creature other than the
   // source, and the source too while it's an artifact (rulings).
   if ((m = /^[Ss]acrifice another creature or an artifact$/.exec(s)) && !ctx.spell) {

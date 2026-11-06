@@ -2064,7 +2064,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromGraveyards((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
-    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && ((t.dealer.orSelf && src.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
+    // The Sea Devils: "Until end of turn, whenever a Salamander deals combat damage to a player": anyone's (dealer.anyone).
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && (ctrl === dealerBy || !!t.dealer.anyone) && !(t.dealer.other && src.id === o.id) && ((t.dealer.orSelf && src.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
     causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);

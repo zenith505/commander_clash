@@ -171,6 +171,8 @@ export type Count =
   | { kind: "yardChosenMv" }
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef; /** "For each land card discarded this way" (Gerrard's Verdict): only cards like this. */ filter?: TargetSpec }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
+  /** "The exiled card's mana value" after "Search target opponent's library for a card and exile it" (Seek): the card that search found, where it is now (0 with none, CR 202.3; X is 0, 107.3b). */
+  | { kind: "searchFoundMv" }
   | { kind: "milledManaValue"; /** "The greatest mana value among the milled cards" (Heretic's Punishment): the greatest, 0 with none. */ greatest?: true }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue"; /** Ill-Timed Explosion: "the greatest mana value among cards discarded this way", not their total. */ greatest?: true }
@@ -809,6 +811,8 @@ export interface TargetSpec {
    * the source sacrificed to pay the cost (Urborg Panther), as it last existed (CR 608.2h).
    */
   blockingSource?: "blocking" | "either";
+  /** "Another target creature attacking the same player or planeswalker" (Kitesail Skirmisher): attacking what the source is attacking, a player or a planeswalker (not a battle), the source as it is or last existed. */
+  attackingSameAsSource?: true;
   /**
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
@@ -1378,7 +1382,7 @@ export type ObjRef =
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true; /** Trial: "all creatures blocking or blocked by target creature": in combat with that target instead of the source. */ ofTarget?: number; /** Abu Ja'far: "When ~ dies, destroy all creatures blocking or blocked by it": in combat with the source as it last existed on the battlefield (CR 603.10a, 608.2h), and still blocking or attacking. */ lastKnown?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
-  | { ref: "blockingIt"; subject?: true; /** "All creatures blocked by ~" (Wall of Nets): the attackers it's blocking, while it's blocking (CR 509.1h, 506.4). */ blocked?: true }
+  | { ref: "blockingIt"; subject?: true; /** "All creatures blocked by ~" (Wall of Nets): the attackers it's blocking, while it's blocking (CR 509.1h, 506.4). */ blocked?: true; /** "Each creature without flanking blocking ~" (Knight of Valor): only the blockers that match, as this resolves. */ filter?: TargetSpec }
   /**
    * "All creatures that blocked ~ this turn" (Joven's Ferrets, `blockers`), "that were blocked by that creature this turn"
    * (Glyph of Doom, `blocked`), "that blocked or were blocked by it this turn" (Venomous Breath, both): declared blocks this
@@ -2907,6 +2911,11 @@ export type Effect =
   | { type: "removeTimeSuspended"; n: Amount }
   /** Time travel (CR 701.56a): for each permanent you control with a time counter and suspended card you own, you may put a time counter on it or remove one. */
   | { type: "timeTravel" }
+  /**
+   * "For each kind of counter on target permanent, put another counter of that kind on it or remove one from it" (Quarry
+   * Hauler): each kind it has as this resolves, add or remove chosen kind by kind (rulings), then all at once.
+   */
+  | { type: "counterKindsAddOrRemove"; what: ObjRef }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
@@ -3980,7 +3989,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; /** The payment is ~'s cumulative upkeep (CR 702.24a), for mana spent "only to pay cumulative upkeep costs". */ cumulativeUpkeep?: true; /** The payment is ~'s echo cost (CR 702.30a): Thick-Skinned Goblin lets {0} be paid instead. */ echo?: true; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true; /** "You may pay one or more {E}. If you do" (Localized Destruction): paying none is not paying. */ atLeastOne?: true; /** "You may pay {1}{W} any number of times" (Intrepid Adversary): `pay` X times, X chosen first (none is not paying), at most as many times as the player could pay. */ times?: true }; /** "Pay {E}{E}. If you can't, ..." (Greenbelt Rampager): energy paid whenever it can be, with no choice (rulings). */ must?: true; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -5881,7 +5890,8 @@ export interface ActivatedAbility {
   /** "This ability costs {1} more to activate for each card in your hand" (Loreseeker's Stone): counted as it's activated (CR 602.2b, 601.2f). */
   costMore?: Amount;
   /** "This ability costs {1} less to activate during your turn" (Hylda's Crown of Winter): `n` less while `cond` holds, generic mana only. */
-  costLessIf?: { n: number; cond: StaticCondition };
+  /** With `mana` (Kami of Jealous Thirst: "costs {4}{B} less ... if you've drawn three or more cards this turn"): those symbols come off, colored ones too (CR 601.2f, 118.7). */
+  costLessIf?: { n: number; cond: StaticCondition; mana?: string };
   /** "This ability costs {1} less to activate if it targets a creature with power 3 or less" (Raft Security Officer): `n` less once its target is chosen and matches (CR 602.2b, 601.2f), generic mana only. */
   costLessIfTarget?: { n: number; filter: TargetSpec };
   /**
@@ -6584,6 +6594,8 @@ export interface CompiledCard {
    * replacement effect (CR 614.1a).
    */
   libraryInsteadOfDying?: "top" | "bottom";
+  /** Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead" (CR 614.1a). */
+  handInsteadOfDying?: TargetSpec;
   /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
   regeneratesInsteadOfDestroyed?: true;
   /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */
@@ -6880,6 +6892,8 @@ export interface CompiledCard {
    * Giant); `untapped`: "as long as ~ is untapped"; `by`: only damage from such sources ("by artifacts").
    */
   damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec };
+  /** "All damage that would be dealt to enchanted creature is dealt to its controller instead" (Treacherous Link, CR 614.9). */
+  attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
   keepsDamage?: true;
   /**
@@ -7323,6 +7337,12 @@ export interface CompiledCard {
   yardCreatureAbilityLess?: number;
   /** Catalyst Stone: "Flashback costs you pay cost {2} less" (CR 601.2f). */
   flashbackLess?: number;
+  /** Warbringer: "Dash costs you pay cost {2} less": the generic mana of a dash cost its controller pays (CR 601.2f, rulings). */
+  dashLess?: number;
+  /** Thick-Skinned Goblin: "You may pay {0} rather than pay the echo cost for permanents you control" (CR 118.9). */
+  echoZero?: true;
+  /** Memory Crystal: "Buyback costs cost {2} less": the generic mana of any player's buyback cost (CR 601.2f, rulings). */
+  buybackLess?: number;
   /** Catalyst Stone: "Flashback costs your opponents pay cost {2} more" (CR 601.2f). */
   flashbackTax?: number;
   /** Inquisitive Glimmer: "Unlock costs you pay cost {1} less" (CR 709.5e, 601.2f): less generic mana, for its controller's Rooms. */
@@ -7764,6 +7784,8 @@ export interface CompiledCard {
   targetDiscount?: number;
   /** "Spells that target ~ cost {2} less to cast" (Spellwild Ouphe): any player's spells, generic mana, once per spell however often it's targeted (rulings). */
   targetDiscountAny?: number;
+  /** "Spells you cast that target ~ cost {2} less to cast" (Elderwood Scion): its controller's spells, generic mana, once per spell however often it's targeted (rulings). */
+  targetDiscountYou?: number;
   /** "Spells you cast that target enchanted player cost {1} less to cast" (Infectious Curse): generic mana, once per spell (rulings). */
   castTargetEnchantedPlayerLess?: number;
   /** "Spells you cast that target a creature cost {2} less to cast" (Killian, Ink Duelist): generic mana only (CR 601.2f). */

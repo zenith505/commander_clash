@@ -2273,6 +2273,13 @@ export function compile(d: CardDef): CompiledCard {
       out.sacrificeInsteadOfEnchantedDestroyed = true;
       continue;
     }
+    // Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead."
+    if (line === "If a creature you control that's enchanted would die, return it to its owner's hand instead.") {
+      const filter = parseTargetPhrase("creature you control that's enchanted");
+      if (filter?.kind === "object") out.handInsteadOfDying = { ...filter, text: "creature you control that's enchanted" };
+      else out.unsupported.push(raw);
+      continue;
+    }
     const libraryDies = /^If ~ would die, put it on (top|the bottom) of its owner's library instead\.$/.exec(line);
     if (libraryDies) {
       out.libraryInsteadOfDying = libraryDies[1] === "top" ? "top" : "bottom";
@@ -3902,6 +3909,22 @@ export function compile(d: CardDef): CompiledCard {
       else out.flashbackTax = (out.flashbackTax ?? 0) + Number(flashbackMod[2]);
       continue;
     }
+    // Thick-Skinned Goblin: see Effect "may" `echo` (run-choices.ts).
+    if (line === "You may pay {0} rather than pay the echo cost for permanents you control.") {
+      out.echoZero = true;
+      continue;
+    }
+    // Warbringer: "Dash costs you pay cost {2} less"; Memory Crystal: "Buyback costs cost {2} less" (CR 601.2f).
+    const dashLess = /^Dash costs you pay cost \{(\d+)\} less\.$/.exec(line);
+    if (dashLess) {
+      out.dashLess = (out.dashLess ?? 0) + Number(dashLess[1]);
+      continue;
+    }
+    const buybackLess = /^Buyback costs cost \{(\d+)\} less\.$/.exec(line);
+    if (buybackLess) {
+      out.buybackLess = (out.buybackLess ?? 0) + Number(buybackLess[1]);
+      continue;
+    }
     const morphTax = /^All morph costs cost \{(\d+)\} more\.$/.exec(line);
     if (morphTax) {
       out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
@@ -4415,6 +4438,11 @@ export function compile(d: CardDef): CompiledCard {
         ...(line.startsWith("As long as") ? { untapped: true as const } : {}),
         ...(redirect[2] ? { by: { kind: "object" as const, types: ["Artifact"], text: "artifact" } } : {}),
       };
+      continue;
+    }
+    // Treacherous Link: see staticRules in damage.ts.
+    if (line === "All damage that would be dealt to enchanted creature is dealt to its controller instead.") {
+      out.attachedDamageToController = true;
       continue;
     }
     if (line === "If damage would be dealt to ~, instead that damage is dealt, but all other damage already dealt to ~ is healed.") {
@@ -5259,6 +5287,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
       else if ("targetDiscountAny" in cost) out.targetDiscountAny = (out.targetDiscountAny ?? 0) + cost.targetDiscountAny;
+      else if ("targetDiscountYou" in cost) out.targetDiscountYou = (out.targetDiscountYou ?? 0) + cost.targetDiscountYou;
       else if ("castTargetEnchantedPlayerLess" in cost) out.castTargetEnchantedPlayerLess = (out.castTargetEnchantedPlayerLess ?? 0) + cost.castTargetEnchantedPlayerLess;
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;

@@ -934,6 +934,16 @@ export function moveObject(
     opts = { ...opts, top: libraryDies === "top" };
     log(s, `${defOf(s, o).name} is put on ${libraryDies === "top" ? "top" : "the bottom"} of its owner's library instead of dying.`);
   }
+  // Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead"
+  // (CR 614.1a): enchanted as it would die, by any Aura; from a Magemark on the battlefield or leaving it at the same time.
+  // Its Auras still go to the graveyard (rulings), and it never reaches one, so nothing triggers on its dying.
+  if (to === "graveyard" && fromZone === "battlefield" && objIsType(s, o, "Creature")) {
+    const by = handInsteadOfDying(s, o);
+    if (by) {
+      to = "hand";
+      log(s, `${defOf(s, o).name} is returned to its owner's hand instead of dying (${by}).`);
+    }
+  }
   // A merged permanent's components all go where it goes (CR 730.3, 730.3d), but the commander redirect below is the
   // commander card's alone (903.9c).
   const merged = fromZone === "battlefield" ? o.merged : undefined;
@@ -2154,6 +2164,19 @@ function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; cont
     if (applies(l.id, x, l.controller)) return { id: l.id, controller: l.controller, x: x! };
   }
   return null;
+}
+
+/** Necromancer's Magemark: the name of a permanent whose "return it to its owner's hand instead" applies to `o` dying. */
+function handInsteadOfDying(s: GameState, o: GameObject): string | undefined {
+  for (const id of s.battlefield) {
+    const f = abilitiesOf(s, obj(s, id)).handInsteadOfDying;
+    if (f && objectMatches(s, f, o, controllerOf(s, obj(s, id)), false)) return characteristics(s, obj(s, id)).name;
+  }
+  for (const l of s.leftTogether ?? []) {
+    const f = l.hadAbilities ? withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).handInsteadOfDying : undefined;
+    if (f && objectMatches(s, f, o, l.controller, false)) return defOf(s, obj(s, l.id)).name;
+  }
+  return undefined;
 }
 
 /** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
@@ -5474,6 +5497,13 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
+  // Memory Crystal (anyone's): "Buyback costs cost {2} less"; Warbringer (yours): "Dash costs you pay cost {2} less". Only
+  // the generic mana in that buyback or dash cost comes off, never more (rulings).
+  if (!how.faceDown && (how.buyback || how.alt === "dash")) {
+    const generic = (cost: string) => parseManaCost(cost).symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0);
+    if (how.buyback) mods.less += Math.min(generic(compileCard(d).buyback ?? ""), s.battlefield.reduce((n, id) => n + (abilitiesOf(s, obj(s, id)).buybackLess ?? 0), 0));
+    if (how.alt === "dash") mods.less += Math.min(generic(altCost(d, "dash", s, pid, o)?.mana ?? ""), s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).dashLess ?? 0) : 0), 0));
+  }
   // Colored increases (Ruby Leech) are added to the total cost like an additional cost, also when it's cast without
   // paying its mana cost (CR 601.2f, 118.9d).
   const moreMana = mods.moreColored.map((c) => `{${c}}`).join("");
@@ -5510,6 +5540,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
     // Spellwild Ouphe: "Spells that target ~ cost {2} less to cast", whoever casts them.
     if (t?.zone === "battlefield" && !how.faceDown) mods.less += abilitiesOf(s, t).targetDiscountAny ?? 0;
+    // Elderwood Scion: "Spells you cast that target ~ cost {2} less to cast": its controller's own spells.
+    if (t?.zone === "battlefield" && !how.faceDown && controllerOf(s, t) === pid) mods.less += abilitiesOf(s, t).targetDiscountYou ?? 0;
   }
   // Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast": each such spell once.
   for (const sid of new Set((how.targets ?? []).flatMap((t) => (t.kind === "stack" ? [t.id] : [])))) {
@@ -8228,7 +8260,9 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
-  const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
+  const cost2 = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
+  // Kami of Jealous Thirst: "costs {4}{B} less ... if ...": colored symbols come off too (CR 601.2f, 118.7).
+  const cost = ab.costLessIf?.mana && staticConditionNow(s, ab.costLessIf.cond, o.id, pid) ? reduceByManaCost(cost2, parseManaCost(ab.costLessIf.mana)) : cost2;
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
@@ -9361,6 +9395,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "addOrRemoveCounter") {
+    const st = r.scratch?.addOrRemove;
+    if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("put another counter of that kind on it or remove one");
+    st.picks[pend.counterKind] = choice;
+    log(s, `${p.name} chooses to ${choice === "add" ? "put another" : "remove a"} ${pend.counterKind} counter (${pend.source}).`);
     continueResolution(s);
     return;
   }

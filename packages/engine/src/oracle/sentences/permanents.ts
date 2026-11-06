@@ -1316,6 +1316,150 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: m[2] ? "+1/+1" : counterKind(m[1]!), n: 1, double: true, ...(m[2] ? { everyKind: true as const } : {}) }] : null;
   }
+  // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
+  // Buzzard-Wasp Colony: "Whenever another creature you control dies, if it had counters on it, put its counters on ~": the
+  // same ("its" is the creature that died).
+  // Ambitious Augmenter: "When ~ dies, if it had one or more counters on it, create a ... token, then put ~'s counters on
+  // that token": every kind it had as it died, on each token created (rulings).
+  if ((m = /^Put (?:those|its) counters on (~|that token|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft && (/^Put those/i.test(s) || !ctx.selfCard)) {
+    const what = m[1] === "~" ? ({ ref: "self" } as const) : /^that token$/i.test(m[1]!) ? ({ ref: "created" } as const) : parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
+  }
+  // Mari's granted trigger: "you may remove a hit counter from a card that player owns in exile".
+  if ((m = new RegExp(`^Remove an? ${COUNTER} counter from a card (that player) owns in exile$`, "i").exec(s)) && ctx.eventPlayer) {
+    const owner = parsePlayer(m[2]!, ctx);
+    return owner ? [{ type: "removeExiledCounter", owner, counter: counterKind(m[1]!) }] : null;
+  }
+  // Mari, the Killing Quill: "Whenever a creature an opponent controls dies, exile it with a hit counter on it": the card,
+  // if it's still in the graveyard it went to (CR 400.7), with the counter on it in exile (CR 122.1).
+  if ((m = new RegExp(`^Exile (it|that card) with an? ${COUNTER} counter on it$`, "i").exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "exile", what, counters: { [counterKind(m[2]!)]: 1 } }] : null;
+  }
+  // Zack Fair, after "{1}, Sacrifice ~: Target creature you control gains indestructible until end of turn.": "Put ~'s
+  // counters on that creature and attach an Equipment that was attached to ~ to that creature": as many of each kind as
+  // it had as it was sacrificed, put on, not moved (rulings); one of the Equipment that was attached to it.
+  if ((m = /^Put ~'s counters on (that creature)(?: and attach an Equipment that was attached to ~ to that creature)?$/i.exec(s)) && ctx.activated) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }, ...(/attach/.test(s) ? [{ type: "attachLastKnown" as const, what }] : [])] : null;
+  }
+  // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
+  // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
+  if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {
+    const what = parseObject(m[2]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what, ...(m[1] ? { only: counterKind(m[1]) } : {}) }] : null;
+  }
+  // Orzhov Advokist (the two sentences joined in body.ts).
+  if ((m = new RegExp(`^[Ee]ach player may put (two|three) ${COUNTER} counters on a creature they control; if a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn$`).exec(s)))
+    return [{ type: "eachMayCounter", n: num(m[1]!), counter: counterKind(m[2]!), attackBan: true }];
+  // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
+  // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
+  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
+    const total = num(m[1]!);
+    const upTo = /^up to /.test(m[3]!);
+    const n = m[3] === "one or two" ? 2 : m[3] === "one, two, or three" ? 3 : upTo ? num(m[3]!.slice(6)) : total;
+    const words = m[4]!.replace(/^(other )?target /, "$1").replace(/ and\/or /g, " or ");
+    const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bVehicles\b/g, "Vehicle").replace(/\bElves\b/g, "Elf");
+    // Cloudspire Skycycle: "other target Vehicles and/or creatures you control": other than the source (a Vehicle itself),
+    // each a creature or a Vehicle.
+    const other = /^other /.test(one) && !ctx.spell;
+    const phrase = other ? one.slice(6).replace(/^Vehicle or creature /, "creature or Vehicle ") : one;
+    const spec = one === words ? null : parseTargetPhrase(phrase);
+    if (spec?.kind !== "object") return null;
+    const first = ctx.targets.length;
+    const divided = { first, n, total, counter: counterKind(m[2]!), ...(upTo ? { upTo: true as const } : {}) };
+    for (let k = 0; k < n; k++)
+      addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(other ? { notSource: true as const } : {}), ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    ctx.lastTargets = { index: first, n };
+    return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
+  }
+  // "Distribute up to X +1/+1 counters among any number of other target creatures, where X is ..." (Lathiel, rewritten in
+  // triggers.ts): X worked out as the targets are chosen, then any number of them each getting at least 1, X in all at
+  // most (rulings; CR 601.2d).
+  // Quirion Beastcaller: "When ~ dies, distribute X +1/+1 counters among any number of target creatures you control, where X
+  // is the number of +1/+1 counters on ~": all X, each target getting at least one, divided as it's put on the stack
+  // (rulings), X counted then (as ~ last existed).
+  if ((m = /^[Dd]istribute (up to )?X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures(?: you control)?)$/.exec(s)) && ctx.whereX) {
+    const upTo = !!m[1];
+    m.splice(1, 1);
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), ...(upTo ? { atMost: true as const } : {}) }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
+  }
+  // Grove's Bounty: "Distribute X +1/+1 counters among any number of target creatures you control": the spell's X, all of
+  // it, chosen with the targets, each getting at least one (rulings, CR 601.2d).
+  // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
+  // was cast with, divided as the ability is put on the stack (rulings).
+  // Numa, Joraga Chieftain: "among any number of target Elves" after "you may pay {X}{X}. When you do": any Elves, the X paid.
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target (?:creatures you control|[A-Z][a-z]+))$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+    const tribe = /target ([A-Z][a-z]+)$/.exec(m[2]!)?.[1];
+    if (tribe && !CREATURE_TYPES.has(singular(tribe))) return null;
+    const spec = parseTargetPhrase(tribe ? singular(tribe) : m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: tribe ? `target ${singular(tribe)}` : m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!) }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
+  }
+  // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
+  // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it
+  // resolves (CR 608.2d).
+  // "Among one, two, or three creatures you control" with three counters (Awaken the Maelstrom) is the same: each chosen
+  // one gets at least one.
+  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among (any number of|one or two|one, two, or three) (.+?) you control$`, "i").exec(s))) {
+    if (!m[1] === !m[3]) return null;
+    if (m[4] !== "any number of" && m[1] !== (m[4] === "one or two" ? "two" : "three")) return null;
+    m.splice(4, 1);
+    const filter = pickFilter(m[4]!);
+    const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
+    return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;
+  }
+  // Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature" (see Effect
+  // "gatherCounters").
+  if (/^(?:Then )?[Mm]ove any number of counters from among creatures you control onto that creature$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object")
+    return [{ type: "gatherCounters", onto: { ref: "target", index: ctx.lastObjectTarget }, from: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" } }];
+  // Forgotten Ancient: "you may move any number of +1/+1 counters from ~ onto other creatures". Chosen as it resolves, not
+  // targeted (rulings); any creatures but ~, whoever controls them.
+  if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto other creatures$`).exec(s)))
+    return [{ type: "distribute", counter: counterKind(m[1]!), n: { count: { kind: "counters", counter: counterKind(m[1]!), of: { ref: "self" } } }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creatures" }, move: true }];
+  // Conformer Shuriken: "If that creature has greater power than this creature, put a number of +1/+1 counters on this
+  // creature equal to the difference": both as they are as it resolves.
+  if ((m = new RegExp(`^If (that creature) has greater power than ~, put a number of ${COUNTER} counters on ~ equal to the difference$`).exec(s))) {
+    const of = parseObject(m[1]!, ctx);
+    if (!of || isGroup(of)) return null;
+    const theirs: Count = { kind: "power", of };
+    const mine: Count = { kind: "power", of: { ref: "self" } };
+    return [{ type: "if", cond: { kind: "amountsCompare", a: { count: theirs }, atLeast: { count: mine, plus: 1 } }, effects: [{ type: "counters", what: { ref: "self" }, counter: counterKind(m[2]!), n: { count: { kind: "difference", of: [theirs, mine] } } }] }];
+  }
+  // Sovereign Okinec Ahau: "for each creature you control with power greater than that creature's base power, put a number
+  // of +1/+1 counters on that creature equal to the difference": each its own number, all worked out first.
+  if (/^[Ff]or each creature you control with power greater than that creature's base power, put a number of \+1\/\+1 counters on that creature equal to the difference$/.test(s))
+    return [{ type: "counters", what: { ref: "each", filter: { kind: "object", types: ["Creature"], controller: "you", powerAboveBase: true, text: "each creature you control with power greater than its base power" } }, counter: "+1/+1", n: 1, aboveBase: true }];
+  // Canopy Gargantuan: "put a number of +1/+1 counters on each other creature you control equal to that creature's
+  // toughness": each its own number, all worked out first.
+  if ((m = new RegExp(`^[Pp]ut a number of ${COUNTER} counters on (each (?:other )?creature you control) equal to (?:that creature's|its) (power|toughness)$`).exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    return what?.ref === "each" ? [{ type: "counters", what, counter: counterKind(m[1]!), n: 1, perOwn: m[3] as "power" | "toughness" }] : null;
+  }
+  // "Double the number of +1/+1 counters on each creature you control" (Kalonian Hydra), "... of each kind of counter on
+  // any number of target permanents" (Deepglow Skate): as many more as each has as it resolves (CR 701.10e), put on it.
+  if ((m = new RegExp(`^Double the number of (?:${COUNTER} counters|(each kind of) counter) on (.+)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what ? [{ type: "counters", what, counter: m[2] ? "+1/+1" : counterKind(m[1]!), n: 1, double: true, ...(m[2] ? { everyKind: true as const } : {}) }] : null;
+  }
+  // Quarry Hauler, Dramatist's Puppet: "for each kind of counter on target permanent, put another counter of that kind on
+  // it or remove one from it": each kind it has as this resolves, chosen separately (rulings).
+  if ((m = /^[Ff]or each kind of counter on target (permanent), put another counter of that kind on it or remove one from it$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "object" ? [{ type: "counterKindsAddOrRemove", what: { ref: "target", index: addTarget(ctx, spec) } }] : null;
+  }
   // Reluctant Role Model: "put a flying, lifelink, or +1/+1 counter on it": one of the three kinds, chosen as it resolves.
   if ((m = new RegExp(`^[Pp]ut an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on (.+)$`).exec(s)) && new Set([m[1], m[2], m[3]]).size === 3) {
     const what = parseObject(m[4]!, ctx);
@@ -1796,8 +1940,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // base power and base toughness each equal to its mana value": no duration either (rulings).
   // Tatyova, Steward of Tides: "up to one target land you control becomes a 3/3 Elemental creature with haste": the same.
   // Wall of Resurgence: "that land becomes a 0/0 Elemental creature with haste that's still a land": the land targeted.
-  if ((m = /^((?:up to one )?target .+?|It|[Tt]hat land|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
-    const what = parseObject(m[1]!, ctx);
+  // Kenku Artificer: "put three +1/+1 counters on up to one target noncreature artifact. That artifact becomes a 0/0
+  // Homunculus artifact creature with flying": the one target, keeping its other types and subtypes (CR 205.1b, rulings).
+  if ((m = /^((?:up to one )?target .+?|It|[Tt]hat land|[Tt]hat artifact|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^That artifact$/, "that artifact"), ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }

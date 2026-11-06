@@ -3705,7 +3705,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
   // Akuta, Born of Ash: "you may sacrifice a Swamp. If you do, return ~ from your graveyard to the battlefield".
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
+  // Wolfbat: "... to the battlefield with a finality counter on it": it enters with it (CR 122.6).
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature| with a finality counter on it)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {
@@ -4763,6 +4764,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (othersFromYard) {
     const t = parseTrigger(`Whenever ${othersFromYard[1]} enters, ${othersFromYard[2]}`);
     return !t || t === "fail" || t.event !== "permanentEnters" ? "fail" : { ...t, ifFromGraveyard: "any" };
+  }
+  // Dredging Claw: "Whenever a creature enters from your graveyard": a card you own (only ever in its owner's graveyard, CR
+  // 404.2) put onto the battlefield from there, under anyone's control.
+  const othersFromYours = /^Whenever (?!~ )(an? [a-z]+) enters from your graveyard, (.+)$/.exec(line);
+  if (othersFromYours) {
+    const t = parseTrigger(`Whenever ${othersFromYours[1]} enters, ${othersFromYours[2]}`);
+    return !t || t === "fail" || t.event !== "permanentEnters" || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "yours" };
   }
   const howEnters = /^Whenever (?!~ )(.+?) enters (tapped|untapped), (.+)$/.exec(line);
   if (howEnters) {

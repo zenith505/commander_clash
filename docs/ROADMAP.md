@@ -1,6 +1,6 @@
 # Roadmap
 
-30,043 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,063 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,961 of 4,988 (99%), top 10,000: 9,611 of
 9,979 (96%).
 
@@ -2225,7 +2225,7 @@ line blocks.
    this way to any target. If the revealed land card was a Mountain, ~ deals double that damage instead" (Goblin
    Charbelcher: with no land card, all the cards revealed count, rulings); "until you reveal a Doctor card, a card with
    doctor's companion, or a Vehicle card" (An Unearthly Child). Also fixed: a "you may search" answer was cleared by the
-   search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,030 of 31,936.
+   search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,050 of 31,936 with B118 and B119.
    Round 287 took the first names from the top that no earlier round looked at, and cards on the same pieces: "exile that
    card instead of putting it into your graveyard as it resolves. If you do, return it to your hand at the beginning of the
    next end step" (Feather, the Redeemed: a replacement on that spell made as the trigger resolves, kept with Feather gone,
@@ -2244,7 +2244,7 @@ line blocks.
    "you may exile it and put three time counters on it. If you do, exile up to one target creature ..." (Sinister
    Concierge: only if the dead card was still in the graveyard to exile); "sacrifice all other permanents you control and
    discard your hand" (Hellcarver Demon); "Put four time counters on each of those cards that has suspend" after an
-   impulse (Ecstatic Beauty). +13, 30,043 of 31,936.
+   impulse (Ecstatic Beauty). +13, 30,063 of 31,936 with B118 and B119.
    Known gap from round 287: when a spell exiled as it resolves (Feather, Lilah, Gandalf, River Song's Diary, Rod of
    Absorption, Goliath Daydreamer) also has buyback, rebound or an Adventure's exile, its controller would choose which
    replacement applies (CR 616.1); the engine applies the exile (with flashback's exile, Feather's goes first, which is the
@@ -5816,6 +5816,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard, then all the others are exiled at once, rulings; a new "keep" picker over your graveyard, with a browser test,
   and a bot that keeps what it can use there), Samite Elder (protection from each of the target permanent's colors as it
   resolves, rulings). Mire's Toll and Riptide Replicator were already supported. +8 (30,012 of 31,936 with round 284).
+- Round B118 (single-line blockers from the skip lists, least played first): Knight of Valor ("each creature without flanking
+  blocking ~": the blockers as it resolves, flanking granted or not; not flanking itself, rulings), Dredging Claw ("Whenever
+  a creature enters from your graveyard": a card you own, under anyone's control, CR 404.2), Elderwood Scion ("Spells you
+  cast that target ~ cost {2} less": generic mana, once per spell, Aura spells too, rulings), Wolfbat ("return this card from
+  your graveyard to the battlefield with a finality counter on it" after your second draw each turn, once, rulings), Lethal
+  Exploit ("for each modified creature you controlled as you cast this spell", counted as it's cast, CR 601.2i), Soul Search
+  (a Spirit if the exiled card's mana value is 1 or less, X being 0, rulings), Kami of Jealous Thirst ("costs {4}{B} less
+  ... if you've drawn three or more cards this turn": the colored symbol off too, CR 118.7), Hide // Seek ("you gain life
+  equal to its mana value", the card the search exiled), Kitesail Skirmisher ("another target creature attacking the same
+  player or planeswalker", not a battle, CR 506.2), Vhati il-Dal (base power 1 or base toughness 1, chosen as it resolves,
+  rulings; the choice prompt has a browser test, and a bot takes an opponent's creature's greater stat down). +10 (30,032 of
+  31,936 with rounds 284 and 285).
+- Round B119 (single-line blockers from the skip lists, least played first): Sivvi's Valor ("All damage that would be
+  dealt to target creature this turn is dealt to you instead") and Treacherous Link (all damage to the enchanted creature
+  is dealt to its controller instead), both redirections, CR 614.9, Quarry Hauler and Dramatist's Puppet ("for each
+  kind of counter on target permanent, put another counter of that kind on it or remove one from it": each kind chosen
+  in turn, then all at once, rulings; a new add-or-remove prompt with a browser test, and a bot that adds helpful kinds to
+  its own permanents and harmful ones to an opponent's), Necromancer's Magemark (an enchanted creature you control that
+  would die returns to its owner's hand instead, CR 614.6), Earnest Fellowship (protection from each of its own colors,
+  layer 6; a colorless creature has none), Memory Crystal and Warbringer (buyback and dash cost {2} less, generic
+  mana only, CR 118.7a), Thick-Skinned Goblin (pay {0} rather than the echo cost, mana or not; the echo trigger's "may"
+  now carries an echo flag, so every echo card's compiled form changes, nothing else), Kenku Artificer ("That artifact
+  becomes ..." after its counters). +10 (30,042 of 31,936 with round 285 and B118).
+- Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
+  abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
+  goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
+- Out after round B118 (looked at, not done): Flying Drone ("another creature with flying entered the battlefield under your
+  control this turn": the turn's enter log doesn't keep keywords), Cellar Door ("puts the bottom card of their library into
+  their graveyard": not a mill, CR 701.17a, so it needs a move of its own), Relive the Past (three "up to one" graveyard
+  targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (an enters choice of a creature to enter
+  attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (counters removed from a target that may be a player: no
   player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
   Pit Automaton (a delayed trigger on the next exhaust ability activated).

@@ -540,7 +540,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.blocked) return me && me.zone === "battlefield" && me.blocking ? me.blocking.flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [obj(s, id)] : [])) : [];
     // Blocking it (CR 509.1h) while it's attacking.
     if (!me || me.attacking === undefined) return [];
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.blocking?.includes(me.id));
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((o) => o.blocking?.includes(me.id));
+    return ref.filter ? blockers.filter((o) => objectMatches(s, ref.filter!, o, ctx.controller, false)) : blockers;
   }
   if (ref.ref === "diedDamagedBySelf") {
     const out: GameObject[] = [];
@@ -1317,6 +1318,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "toggleTapped":
     case "proliferate":
     case "timeTravel":
+    case "counterKindsAddOrRemove":
     case "removeTimeSuspended":
     case "amass":
     case "connive":

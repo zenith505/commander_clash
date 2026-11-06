@@ -738,6 +738,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Time travel (CR 701.56a): a suspended card or an impending permanent comes sooner with one fewer; a permanent with
     // vanishing lasts longer, and one whose mana or power counts its time counters grows, with one more. Anything else
     // stays as it is.
+    // Quarry Hauler: on our own permanent, more of what helps it and less of what doesn't (proliferate's sense); on an
+    // opponent's, the other way round.
+    if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const k = pend.counterKind ?? "";
+      const helpful = k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
+      const mine = !!o && controllerOf(s, o) === pid;
+      return [{ type: "chooseOption", player: pid, choice: (mine ? helpful : harmfulCounter(k)) ? "add" : "remove" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const mine = o?.zone === "battlefield" && controllerOf(s, o) === pid;
@@ -1086,6 +1095,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       };
       const mine = !!c && controllerOf(s, c) === pid;
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => has(o) !== mine) ?? pend.options[0]! }];
+    }
+    // Vhati il-Dal: "base power 1 or base toughness 1": an opponent's creature loses the more of the two (toughness on a
+    // tie, it may die to damage); our own gets whichever raises it, else the power (keeps it alive).
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.length === 2 && either.options.every((o) => o.length === 1 && o[0]!.type === "continuous" && o[0]!.what.ref === "target" && o[0]!.mods.length === 1 && (o[0]!.mods[0]!.kind === "setPower" || o[0]!.mods[0]!.kind === "setToughness"))) {
+      const t = s.resolving?.item.targets?.[0];
+      const c = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const at = (k: "setPower" | "setToughness") => String(either.options.findIndex((o) => o[0]!.type === "continuous" && o[0]!.mods[0]!.kind === k));
+      if (!c || c.zone !== "battlefield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+      const p = power(s, c);
+      const tt = toughness(s, c);
+      const pick = controllerOf(s, c) === pid ? (tt < 1 ? "setToughness" : "setPower") : p - 1 > tt - 1 ? "setPower" : "setToughness";
+      return [{ type: "chooseOption", player: pid, choice: pend.options.includes(at(pick)) ? at(pick) : pend.options[0]! }];
     }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;

@@ -682,6 +682,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // the targeted player's next spell (rulings: the effect applies to it as they start casting it).
   // Crackling Spellslinger: "the next instant or sorcery spell you cast this turn has storm": its own storm ability, the
   // same way (CR 702.40a).
+  // Soulfire Grand Master: "The next time you cast an instant or sorcery spell from your hand this turn, put that card into
+  // your hand instead of into your graveyard as it resolves": a replacement for that spell (CR 614.1a), not a trigger,
+  // used up by the next one cast from your hand even if it doesn't resolve (rulings).
+  if ((m = /^[Tt]he next time you cast an (instant or sorcery spell) from your hand this turn, put that card into your hand instead of into your graveyard as it resolves$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: "the next instant or sorcery spell you cast from your hand this turn returns to your hand as it resolves", fromHand: true, toHand: true }] : null;
+  }
   if ((m = /^[Tt]he next (instant or sorcery spell|(?:[a-z]+ )?spell) you cast this turn has storm$/.exec(s))) {
     const filter = parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn has storm`, storm: true }] : null;

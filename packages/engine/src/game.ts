@@ -975,6 +975,7 @@ export function moveObject(
     o.castVia = undefined;
     o.buyback = undefined;
     o.toHandOnResolve = undefined;
+    o.exileAsResolves = undefined;
   }
   // Last known information, for leaves-the-battlefield triggers (CR 603.10a, 608.2h).
   const last = characteristics(s, o);

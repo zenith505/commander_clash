@@ -1174,7 +1174,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (e.type === "loseLife" && e.who.ref === "you" && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "dugToHand" && dig?.type === "dig") dig.lifeEach = e.n.times ?? 1;
   });
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
-  if (body && text.includes("each of that creature's colors") && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
+  // Samite Elder: "each of that permanent's colors" likewise.
+  if (body && /each of that (?:creature|permanent)'s colors/.test(text) && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
   return body;
 }
 
@@ -1897,6 +1898,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
   // second pump on top of the first.
   text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
+  // Addle: "Choose a color. Target player reveals their hand and you choose a card of that color from it. That player
+  // discards that card.": the color chosen as it resolves, then the card you choose (CR 608.2c).
+  text = text.replace(/^Choose a color\. (Target player|Target opponent) reveals their hand and you choose a card of that color from it\. (?=That player discards that card\.$)/, "Choose a color. $1 reveals their hand. You choose a card of the chosen color from it. ");
   // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the chosen one.
   text = text.replace(/^(Choose a color\. (?:Target player|Target opponent) reveals their hand and discards all cards of) that color\.$/, "$1 the chosen color.");
   // Undergrowth: "Prevent all combat damage that would be dealt this turn. If this spell's additional cost was paid (read as
@@ -3042,7 +3046,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(\bcounters? on ~\. Then if) there are (\w+ or more [a-z]+ counters) on (?:it|~), sacrifice it\./g, "$1 ~ has $2 on it, sacrifice ~.");
   // Mentor's Guidance: "When you cast this spell, copy it if you control a planeswalker, Cleric, ...": checked as the
   // ability resolves, not as it triggers (rulings), the same as "If you control ..., copy it".
-  text = text.replace(/^copy it if (you control [^.]+)\.$/, "If $1, copy it.");
+  // Lumaret's Favor: "copy it if you gained life this turn. You may choose new targets for the copy.": the same, checked as
+  // the ability resolves (rulings).
+  text = text.replace(/^copy it if (you control [^.]+|you gained life this turn)\.(?=$| You may choose new targets for the copy\.$)/, "If $1, copy it.");
   // Banish into Fable: "copy it if you control an artifact, then copy it if you control an enchantment": each checked as the
   // ability resolves (rulings), one copy for each.
   text = text.replace(/^copy it if (you control an? [a-z]+), then copy it if (you control an? [a-z]+)\. (?=You may choose new targets for the copies\.$)/, "If $1, copy it. If $2, copy it. ");
@@ -10605,7 +10611,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter, CR 610.3): only an ability of a permanent.
       const until = typeof then !== "string" && !!then[1];
       if (until && opts.spell) return null;
-      const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`, (t) => (t === "X" ? X : null));
+      // Addle: "a card of the chosen color" after "Choose a color." (body.ts's rewrite): the color chosen as it resolved.
+      const chosenColor = choose[1] === "card of the chosen color" && !choose[2] && effects.some((x) => x.type === "choose" && x.choice === "color");
+      const filter = chosenColor ? ({ kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } as TargetSpec) : parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`, (t) => (t === "X" ? X : null));
       if (filter === null) return null;
       effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : typeof then !== "string" && /shuffles/.test(then[0]) ? "shuffleIn" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}), ...(gainToughness ? { gainToughness: true as const } : {}) });
       if (!choose[3]) si++;
@@ -10709,6 +10717,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const look: Effect[] = [{ type: "dig", n: 2, count: 1, upTo: true, into: "exile", rest: "keep", reveal: false, library: who }, { type: "orderTop", who, n: 2, digRest: true }];
       effects.push(surgery[1] ? { type: "may", effects: look, text: s.replace(/^[Yy]ou may /, "") } : look[0]!, ...(surgery[1] ? [] : [look[1]!]));
       si += 2;
+      continue;
+    }
+    // Ashnod's Cylix: "Target player looks at the top three cards of their library, puts one of them back on top of their
+    // library, then exiles the rest": that player looks and chooses (as many as there are, rulings).
+    const theyLook = !dig ? new RegExp(`^(Target player|Target opponent) looks at the top ${NUM} cards of their library, puts one of them back on top of their library$`).exec(s) : null;
+    if (theyLook && /^[Ee]xiles the rest\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: theyLook[1] === "Target opponent", text: theyLook[1]!.toLowerCase() });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: num(theyLook[2]!), count: 1, upTo: false, required: true, into: "libraryTop", rest: "exile", reveal: false, who: { ref: "target", index } });
+      si++;
       continue;
     }
     // Wu Spy: "Look at the top two cards of target player's library. Put one of them into their graveyard."; Cruel Fate:
@@ -12720,7 +12738,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."; Firebender
       // Ascension: "Then if it has four or more quest counters on it, you may copy that ability. ..."
       // Alania: "You may have target opponent draw a card. If you do, copy that spell. You may choose new targets for the copy."
-      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : both.length === 1 && prev?.type === "if" && prev.cond.kind === "youDid" && !prev.otherwise ? both[0] : undefined;
+      // Lumaret's Favor: "If you gained life this turn, copy it. You may choose new targets for the copy." (body.ts's rewrite).
+      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : both.length === 1 && prev?.type === "if" && !prev.otherwise ? both[0] : undefined;
       if (only?.type === "copySpell" && prev?.type === "if") {
         only.newTargets = true;
         continue;

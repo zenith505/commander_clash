@@ -66,6 +66,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Wall of Deceit, Mischievous Quanar, Obscuring Aether: "Turn ~ face down" (an activated ability of its own): a 2/2 with
   // no text (CR 708.2a).
   if (/^[Tt]urn ~ face down$/.test(s)) return [{ type: "turnFaceDown", what: { ref: "self" }, as: "morph" }];
+  // Master of the Veil: "turn target creature with a morph ability face down"; Weaver of Lies: "turn any number of target
+  // creatures with morph abilities other than ~ face down": each a face-down 2/2 its controller may turn face up again
+  // for its morph cost (CR 702.37e, 708.2), still the same object (708.8 for the other way).
+  if ((fu = /^[Tt]urn ((?:any number of )?target creatures? with (?:a morph ability|morph abilities)(?: other than ~)?) face down$/.exec(s))) {
+    const what = parseObject(fu[1]!.replace(/^any number of target (.+) other than ~$/, "any number of other target $1"), ctx);
+    return what?.ref === "target" ? [{ type: "turnFaceDown", what, as: "morph" }] : null;
+  }
   if ((fu = /^[Tt]urn (target face-down .+?) face up$/.exec(s))) {
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;

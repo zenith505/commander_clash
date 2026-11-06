@@ -1122,7 +1122,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // control onto the battlefield from your hand or graveyard with two +1/+1 counters on it": the same, worded the other
   // way round, entering with those counters (CR 122.6); the mana value checked where the card is (rulings).
   const reordered = /^(You may )?([Pp])ut (a|an) (.+?) onto the battlefield from your hand( or graveyard)?( with (?:a|two|three) (?:finality|\+1\/\+1) counters? on it)?$/.exec(s);
-  const sx = reordered ? `${reordered[1] ?? ""}${reordered[2]}ut ${reordered[3]} ${reordered[4]} from your hand${reordered[5] ?? ""} onto the battlefield${reordered[6] ?? ""}` : s;
+  // Dermoplasm: "... from your hand onto the battlefield face up": as any permanent enters unless told otherwise (CR 110.5b).
+  const sx = reordered ? `${reordered[1] ?? ""}${reordered[2]}ut ${reordered[3]} ${reordered[4]} from your hand${reordered[5] ?? ""} onto the battlefield${reordered[6] ?? ""}` : s.replace(/ from your hand onto the battlefield face up$/, " from your hand onto the battlefield");
   const withCounters = / with (a|two|three) (finality|\+1\/\+1) counters? on it$/.exec(sx);
   const finality = !!withCounters;
   // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
@@ -1855,6 +1856,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }, { kind: "mustBlock" }], duration: "endOfTurn" }] : null;
   }
+  // Siren's Call: "Creatures the active player controls attack this turn if able": the ones that player controls as it
+  // resolves (CR 611.2c), in each combat this turn (CR 508.1d).
+  if (/^Creatures the active player controls attack this turn if able$/.test(s))
+    return [{ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures the active player controls" }, of: { ref: "activePlayer" } }, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }];
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);

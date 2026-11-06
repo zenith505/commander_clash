@@ -372,6 +372,8 @@ function diesMatches(
 function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>, o: GameObject, entering: GameObject, you: PlayerId): boolean {
   if (en.ifCast && !entering.wasCast) return false;
   if (en.notFromHand && entering.castFromHand) return false;
+  // Invader Parasite: named as a card exiled with the watcher is (a face-down permanent has no name, CR 708.2).
+  if (en.nameExiledWithSelf && (entering.faceDown || !exiledWithNamed(s, o, characteristics(s, entering).name))) return false;
   if (o.id === entering.id) {
     if (en.orSelf) return true;
     if (en.other) return false;

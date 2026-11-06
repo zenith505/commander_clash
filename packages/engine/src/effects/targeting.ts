@@ -134,6 +134,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   // Keldon Twilight: "that they controlled since the beginning of the turn": under its controller since before this turn.
   if (spec.controlledSinceTurnBegan && !(o.zone === "battlefield" && o.controlledSinceTurn < s.turn)) return false;
+  if (spec.activeController && c.controller !== s.activePlayer) return false;
   if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;

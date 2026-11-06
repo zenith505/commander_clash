@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { Modification, FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_KEYWORDS, CHOSEN_LAND_TYPE, CHOSEN_LANDWALK, CHOSEN_SNOW_LANDWALK, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, creatureTypeOfPlural, isEveryCreatureTypeText, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -2693,11 +2693,16 @@ export function compile(d: CardDef): CompiledCard {
     const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
     // Thundermane Dragon: "... If you cast a creature spell this way, it gains haste until end of turn."
     const hasteTop = !lifeTop && /^(.+?)\. If you cast a creature spell this way, it gains haste until end of turn\.$/.exec(line);
+    // Mikey & Don, Party Planners: "... If you cast a creature spell this way, that creature enters with an additional
+    // +1/+1 counter on it."
+    const counterTop = !lifeTop && !hasteTop && /^(.+?)\. If you cast a creature spell this way, that creature enters with an additional \+1\/\+1 counter on it\.$/.exec(line);
     const top = lifeTop
       ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!))
       : hasteTop
         ? ((t) => (t?.spells && !t.lands && !t.once ? { ...t, haste: "endOfTurn" as const } : t && null))(parseFromTop(hasteTop[1]!))
-        : parseFromTop(line.replace(/\.$/, ""));
+        : counterTop
+          ? ((t) => (t?.spells && !t.once ? { ...t, creatureCounter: true as const } : t && null))(parseFromTop(counterTop[1]!))
+          : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);
@@ -3498,17 +3503,29 @@ export function compile(d: CardDef): CompiledCard {
     // Doomguide): activated abilities of each of those cards, not of the source (rulings; CR 113.6, 702.84a). "Each
     // outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's Fixer, CR 702.141a):
     // each card's own cost, X counted as 0 (CR 202.3e, rulings). "Each Sliver creature card in your graveyard has encore
-    // {X}, where X is its mana value" (Sliver Gravemother): the same, for Sliver creature cards.
-    const yardGrant = /^Each (artifact|creature|outlaw creature|Sliver creature) card in your graveyard( that's a ((?:[A-Z][a-z]+, )+)and\/or ([A-Z][a-z]+))? has (unearth (?:\{[^}]+\})+|encore \{X\}, where X is its mana value)\.$/.exec(line);
+    // {X}, where X is its mana value" (Sliver Gravemother): the same, for Sliver creature cards. "Each artifact creature
+    // card in your graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons): each card's own mana
+    // cost, colored symbols and any {X} too; a card with no mana cost gets none to pay (CR 118.6).
+    const yardGrant = /^Each (artifact|creature|artifact creature|outlaw creature|Sliver creature) card in your graveyard( that's a ((?:[A-Z][a-z]+, )+)and\/or ([A-Z][a-z]+))? has (unearth (?:\{[^}]+\})+|encore \{X\}, where X is its mana value|encore\. Its encore cost is equal to its mana cost)\.$/.exec(line);
     if (yardGrant) {
       const f = parseTargetPhrase(`${yardGrant[1]} card from a graveyard`);
       const types = yardGrant[2] ? [...yardGrant[3]!.split(", ").filter(Boolean), yardGrant[4]!] : [];
-      const mv = /^encore/.test(yardGrant[5]!);
-      const encore = mv ? parseCostKeyword("Encore {1}", d) : undefined;
+      const own = /^encore\. /.test(yardGrant[5]!);
+      const mv = /^encore/.test(yardGrant[5]!) && !own;
+      const encore = mv || own ? parseCostKeyword("Encore {1}", d) : undefined;
       const unearth = mv ? undefined : parseGraveyardKeyword(yardGrant[5]!.replace(/^./, (c) => c.toUpperCase()), d);
       const ab = encore && typeof encore === "object" ? encore.activated : unearth && typeof unearth === "object" && "unearth" in unearth ? unearth.unearth : undefined;
       if (f?.kind !== "card" || f.subtypes?.length && types.length || !types.every((t) => CREATURE_TYPES.has(t)) || ab?.zone !== "graveyard") out.unsupported.push(raw);
-      else (out.yardGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), ...(types.length ? { subtypes: types } : {}), text: `${yardGrant[1]} cards${yardGrant[2] ?? ""} in your graveyard` }, activated: ab, ...(mv ? { manaValueCost: true as const } : {}) });
+      else (out.yardGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), ...(types.length ? { subtypes: types } : {}), text: `${yardGrant[1]} cards${yardGrant[2] ?? ""} in your graveyard` }, activated: ab, ...(mv ? { manaValueCost: true as const } : {}), ...(own ? { manaCostCost: true as const } : {}) });
+      continue;
+    }
+    // Urborg Scavengers: "~ has flying as long as a card exiled with it has flying. The same is true for first strike, ...":
+    // each keyword while a card exiled with it has that one (linked to its one exile ability below, CR 607.2a), layer 6.
+    const linkedKw = /^~ has ([a-z ]+) as long as a card exiled with it has \1\. The same is true for ((?:[a-z ]+, )+)and ([a-z ]+)\.$/.exec(line);
+    if (linkedKw) {
+      const kws = [linkedKw[1]!, ...linkedKw[2]!.split(", ").filter(Boolean), linkedKw[3]!].map((k) => canonicalKeyword(k));
+      if (kws.some((k) => !k || !/^[A-Z][a-z]+(?: [a-z]+)?$/.test(k))) out.unsupported.push(raw);
+      else out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: kws.map((k) => `${LINKED_CARD_KEYWORD}${k}`) }], text: line });
       continue;
     }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
@@ -5779,6 +5796,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Battle Cry: "Untap all white creatures you control.\nWhenever a creature blocks this turn, ...": a delayed trigger
     // the spell sets up (CR 603.7a), its own paragraph part of the spell's text.
+    // Siren's Call: "At the beginning of the next end step, ..." in a paragraph of its own: a delayed trigger the spell sets
+    // up as it resolves (CR 603.7a).
+    if (isSpell && spellLines.length && /^At the beginning of the next end step, /.test(line)) {
+      spellLines.push(line);
+      continue;
+    }
     if (isSpell && spellLines.length && /^Whenever [^,]+ this turn, /.test(line)) {
       spellLines.push(line);
       continue;
@@ -6191,6 +6214,25 @@ function linkExile(out: CompiledCard) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard");
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its protection can't be linked to one imprint ability)");
+    else imprints[0]!.linked = true;
+  }
+  // Urborg Scavengers: "a card exiled with it" is one its one exile ability exiled (CR 607.2a): "Whenever ~ enters or
+  // attacks, exile ..." is one ability, compiled as one trigger for each event with the same body.
+  if (out.statics.some((st) => st.mods.some((m) => m.kind === "addKeywords" && m.keywords.some((k) => k.startsWith(LINKED_CARD_KEYWORD))))) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || e.type === "chooseFromGraveyard" || (e.type === "discard" && !!e.exile));
+    const holders = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => exiles.includes(e as Extract<Effect, { type: "exile" }>)));
+    const oneAbility = exiles.length >= 1 && new Set(holders.map((t) => JSON.stringify(t.body))).size === 1 && holders.length === exiles.length;
+    if (others || out.spell || !oneAbility || exiles.some((e) => e.until)) out.unsupported.push("(has keywords of exiled cards it can't link to one exile ability)");
+    else for (const e of exiles) e.linked = true;
+  }
+  // Invader Parasite: "the exiled card" its enters trigger watches for is the one its imprint ability exiled as it entered,
+  // its only exile (CR 607.2a).
+  if (out.triggers.some((t) => t.enters?.nameExiledWithSelf)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileGraveyard" || e.type === "chooseFromGraveyard" || e.type === "exileTop");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(watches for the name of an exiled card it can't link to one imprint ability)");
     else imprints[0]!.linked = true;
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.

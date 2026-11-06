@@ -237,6 +237,12 @@ export const YOURS_COLORS_PROTECTION = "Protection from each color among permane
  * ability exiled (CR 607.2a) that are still in exile, as the layers apply it.
  */
 export const LINKED_TYPES_PROTECTION = "Protection from each of the exiled card's card types";
+/**
+ * Urborg Scavengers: "~ has flying as long as a card exiled with it has flying. The same is true for ...": each keyword
+ * written after this prefix is had only while a card its exile ability exiled (CR 607.2a), still in exile and face up,
+ * has that keyword itself, as the layers apply it.
+ */
+export const LINKED_CARD_KEYWORD = "As long as a card exiled with it has it: ";
 /** "Protection from creatures" and the like for each of these card types (CR 205.2a, 702.16a). */
 export function protectionFromCardTypes(types: readonly string[]): string[] {
   return Object.entries(PROTECTION_TYPES).filter(([, t]) => types.includes(t)).map(([q]) => `Protection from ${q}`);

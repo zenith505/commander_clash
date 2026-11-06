@@ -1482,6 +1482,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "shuffleZones":
     case "search":
     case "revealPick":
+    case "guildFeud":
     case "opponentSplitsTargets":
     case "piles":
     case "exiledPiles":

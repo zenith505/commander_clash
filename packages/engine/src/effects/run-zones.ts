@@ -1518,6 +1518,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (st.budget !== undefined) st.budget -= cast ? spellManaValue(s, cast) : mvOf(st.casting);
           if (e.exileCast && s.objects[st.casting]?.zone === "stack") s.objects[st.casting]!.exileIfToGraveyard = true;
           st.cast = (st.cast ?? 0) + 1;
+          // Jetsam: one spell from each graveyard, so none more from this one's owner's.
+          if (e.onePerOwner) (st.ownersCast ??= []).push(obj(s, st.casting).owner);
           if (e.ownersLoseLife) {
             const item = s.stack.find((x) => x.objectId === st.casting);
             if (item) (st.castSpells ??= []).push({ owner: obj(s, st.casting).owner, mv: spellManaValue(s, item) });
@@ -1610,7 +1612,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const options = st.ids
         .map((x) => x.id)
         .filter((id) => !copiedOne.length || copiedOne.includes(id))
-        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && !st.ownersCast?.includes(obj(s, id).owner) && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || e.asSpell || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (maxCast !== undefined && (st.cast ?? 0) >= maxCast)) return finish();
       if (e.look && options.length === 1) {
         // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
@@ -1618,7 +1620,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : e.anyYard ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : "")), "Done"], prompt: e.anyYard ? `cast ${e.filter ? `${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from ${e.onePerOwner ? "each opponent's graveyard (one from each)" : e.yardOf && options[0] ? `${player(s, obj(s, options[0]).owner).name}'s graveyard` : "a graveyard"} without paying its mana cost${st.maxMv !== undefined ? ` (mana value ${st.maxMv} or less)` : ""}?` : e.handAndYard ? `cast a${e.filter?.supertypes?.includes("Legendary") ? " legendary" : ""} spell from your hand${e.andExile ? ", graveyard or exile" : " or graveyard"} without paying its mana cost${left}?` : e.yourYard ? `cast ${e.filter ? `a ${e.filter.text.replace(/ cards?$/, "")}` : "a"} spell from your graveyard without paying its mana cost?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`}${e.paid ? "" : " without paying its mana cost"}${left}?` };
       return "paused";
     }
     case "exileCastEachType": {

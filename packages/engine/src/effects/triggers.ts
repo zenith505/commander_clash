@@ -2898,10 +2898,17 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   const who = t.event?.player;
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
   if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
+    // Harness the Storm: the name the spell had as it was cast (none face down, CR 708.2a, so nothing matches then).
+    if (x.sameNameAsCause) {
+      const name = t.cause !== undefined ? s.castItems?.[t.cause]?.castName : undefined;
+      if (name === undefined) return x;
+      const { sameNameAsCause: _, ...rest } = x;
+      return fix({ ...rest, named: name });
+    }
     if (x.notEventPlayer && who !== undefined) {
       const { notEventPlayer: _, ...rest } = x;
       return { ...rest, notPlayer: who };

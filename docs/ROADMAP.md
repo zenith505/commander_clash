@@ -1,6 +1,6 @@
 # Roadmap
 
-30,140 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,150 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2316,6 +2316,33 @@ line blocks.
    with total mana value 6 or less from among the copies" (Uldaros Theorix, "if you cast him"); "Whenever you cast a modal
    spell, choose up to X, where X is the number of times you chose a mode for that spell" (Riku of Many Paths, spree too).
    +10, 30,140 of 31,936 with B122.
+   Round 292 took the next names from the top no earlier round looked at (rank 14,700 to 20,200): "you may cast target
+   instant or sorcery card with mana value less than or equal to his power from your graveyard ... If you cast a spell this
+   way, put a +1/+1 counter on ~" (Helmut Zemo, Mastermind); "you may cast target card with the same name as that spell from
+   your graveyard", paid for (Harness the Storm: the name as cast, TargetSpec.sameNameAsCause); "target opponent reveals
+   cards ... until they reveal a creature card. ~ becomes a copy of that card until end of turn", all of them on the bottom
+   (Nascent Metamorph); "sacrifice any number of other creatures, then exile the top X cards of your library, where X is
+   their total power. You may cast any number of instant and/or sorcery spells from among the exiled cards" (Kylox,
+   Visionary Inventor); "you may cast a spell from each opponent's graveyard", one from each (Jetsam, with a browser test);
+   control "until the end of your next turn" and a granted "can't be sacrificed" (Stilt-Man, Towering Terror); "When ~
+   enter and whenever you cast a spell with power, toughness, or mana value 4, choose one that hasn't been chosen this turn"
+   (The Fantastic Four); "Whenever you exert a creature, reveal ... until you reveal an Equipment card. Put that card onto
+   the battlefield attached to that creature" (Rohirrim Chargers); "gain control of that creature until end of turn" for a
+   spell targeting only it (Loki, God of Lies); each player's top three, a creature put from each, then a fight (Guild Feud,
+   with a browser test of the pick). +10, 30,150 of 31,936 with B122.
+   Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
+   combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
+   into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
+   combat, attacking for them); Ertai's Meddling (delay counters, then put onto the stack as a copy); Expose the Culprit
+   (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (hatching
+   counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
+   for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
+   Ogre Battlecaster ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (spells
+   from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
+   there); Dubious Challenge; Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
+   attached, exiled if they'd leave); Livio, Oathsworn Sentinel (aegis counters); Vision Charm (land type changes);
+   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
+   Sanar, Innovative First-Year; Mairsil, the Pretender (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for

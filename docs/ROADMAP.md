@@ -1,6 +1,6 @@
 # Roadmap
 
-30,087 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,096 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2266,6 +2266,28 @@ line blocks.
    enchantment for each creature that phased out this way" (Out of Time: they phase in untapped, and the count is only the
    creatures phased out directly, not their attachments, CR 702.26). Also fixed: a lone "unless pays life equal to ..."
    (Essence Vortex) keeps checking the amount as it asks. +14, 30,087 of 31,936 with B120.
+   Round 289 took the next names from the top: "If you control an artifact and an enchantment as you cast this spell, you
+   may choose both instead" (Soul Transfer: one artifact enchantment counts for both, rulings); a secret number of at
+   least one hidden item, each player losing that much life and the fewest losing half their life rounded up, ties each
+   (Goblin Game: half of a negative total is 0, rulings); "target opponent exiles the top five cards of their library. You
+   may cast up to two spells from among the exiled cards without paying their mana costs" (Doom Reigns Supreme); "exile
+   it if it's an instant or sorcery card. You may cast that card until the end of your next turn" for a dying face-down
+   creature (Cryptic Pursuit); "return it to the battlefield face down ... if it's a permanent card, then turn it face up"
+   (Yarus, Roar of the Old Gods: its turned-face-up abilities trigger, not its enters ones); base 4/4 for any number of
+   target Shapeshifters you control and "Each creature you control with power 4 or greater deals damage equal to its power
+   to up to one target creature or planeswalker" (The Bears of Littjara); "The tokens are goaded for as long as this Saga
+   remains on the battlefield" and "you may exile a nontoken creature you control. When you do, exile all Warriors" (The
+   War Games); "Return two cards exiled with this Saga to the battlefield under their owners' control and put the rest on
+   the bottom of their owners' libraries" (Vault 13: Dweller's Journey: two chosen, the rest ordered by each owner); "a
+   tapped and attacking token that's a copy of the exiled card, except it's an Illusion in addition to its other types"
+   (Phantom Steed). +9, 30,096 of 31,936.
+   Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
+   counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
+   Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
+   (each player plays their own exiled cards and can't play cards from their hand); Ian Chesterton and Hatchery Sliver
+   (replicate granted to Saga or Sliver spells, its cost equal to the spell's mana cost); Rashmi and Ragavan (cast free
+   only if the mana value is less than your artifacts, else castable this turn); Boltbender (new targets for any number
+   of other spells and abilities).
    Out after round 288 (looked at, not done): Rift Elemental (a cost that removes a time counter from a permanent or
    suspended card you own); Red Sun's Twilight (copies of each artifact destroyed this way when X is 5 or more); Green
    Sun's Twilight (a creature and/or land card from among revealed cards, put onto the battlefield or into your hand when

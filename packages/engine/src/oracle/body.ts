@@ -536,6 +536,8 @@ const checkableMay = (e: Effect): boolean =>
   // Fugitive of the Judoon: "you may exile a Human you control and an artifact you control": offered only when both can be
   // (canDoNow), the second pick then done inside "if you do".
   (e.type === "pick" && e.who.ref === "you" && e.action === "exile" && e.n === 1 && !!e.leaving && !e.unless) ||
+  // The War Games: "You may exile a nontoken creature you control. When you do, ...": only with one to exile.
+  (e.type === "pick" && e.who.ref === "you" && e.action === "exile" && e.n === 1 && !e.leaving && !e.unless && !e.among && !e.greatest && !e.linked && e.filter.kind === "object" && e.filter.token === false) ||
   // Wicked Guardian: "you may have it deal 2 damage to another creature you control. If you do, ...": to the creature the
   // pick before it chose (choosing one is doing it, even if the damage is prevented, rulings).
   (e.type === "damage" && e.to.ref === "created" && typeof e.amount === "number" && !e.also && !e.by) ||
@@ -1092,6 +1094,25 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const filter = parseTargetPhrase("creature with haste");
     if (filter?.kind !== "object") return null;
     return { ...b!, effects: [gain, { type: "continuous", what: gain.what, mods: [{ kind: "blockableOnlyBy", filters: [{ ...filter, text: "creatures with haste" }], text: "creatures with haste" }], duration: "endOfTurn" }], text };
+  }
+  // Cryptic Pursuit: "Whenever a face-down creature you control dies, exile it if it's an instant or sorcery card. You may
+  // cast that card until the end of your next turn.": the card it became in the graveyard, by its own characteristics
+  // (a face-down permanent is revealed as it leaves, CR 708.9); nothing exiled, nothing to cast.
+  const exileIfCard = opts.subjectLeft ? /^exile it if it's an? ((?:instant or sorcery|[a-z]+) card)\. (You may cast that card until the end of your next turn\.)$/.exec(text.trim()) : null;
+  if (exileIfCard) {
+    const b = parseBody(`exile it. ${exileIfCard[2]}`, opts);
+    const filter = parseSearchFilter(exileIfCard[1]!);
+    if (!b || b.targets.length || !filter || b.effects.length !== 1 || b.effects[0]!.type !== "exile" || (b.effects[0] as { what: ObjRef }).what.ref !== "subjectCard") return null;
+    return { ...b, effects: [{ type: "if", cond: { kind: "subjectCardIs", filter }, effects: b.effects }], text };
+  }
+  // Yarus, Roar of the Old Gods: "Whenever a face-down creature you control dies, return it to the battlefield face down
+  // under its owner's control if it's a permanent card, then turn it face up.": the card in the graveyard, if it's still
+  // there (CR 400.7, rulings), a 2/2 with no ward as it enters (so no enters abilities of the card, CR 708.8), then turned
+  // face up; one that can't be stays face down (rulings).
+  if (opts.subjectLeft && text.trim() === "return it to the battlefield face down under its owner's control if it's a permanent card, then turn it face up.") {
+    const filter = parseSearchFilter("permanent card");
+    if (!filter) return null;
+    return { targets: [], effects: [{ type: "if", cond: { kind: "subjectCardIs", filter }, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, owner: true, faceDown: "plain" }, { type: "turnFaceUp", what: { ref: "created" } }] }], text };
   }
   // Skulking Killer: "target creature an opponent controls gets -2/-2 until end of turn if that opponent controls no other
   // creatures": the target's controller, checked as it resolves (rulings).
@@ -1654,6 +1675,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nissa's Judgment: "Choose up to one target creature an opponent controls. Each creature you control with a +1/+1
   // counter on it deals damage equal to its power to that creature": the same, after its support (rulings).
   text = text.replace(/(^|\. |• )Choose ((?:up to one )?target creature(?: you don't control| an opponent controls)?)\. (Each (?:other )?creature you control(?: with a \+1\/\+1 counter on it)? deals damage equal to its power) to that creature\./, "$1$3 to $2.");
+  // The Bears of Littjara: "Choose up to one target creature or planeswalker. Each creature with power 4 or greater you
+  // control deals damage equal to its power to that permanent.": the same, each as the source of its own damage.
+  text = text.replace(/^Choose (up to one target creature or planeswalker)\. Each creature with power (\d+) or greater you control deals damage equal to its power to that permanent\.$/, "Each creature you control with power $2 or greater deals damage equal to its power to $1.");
   // Motivated Pony: "attacking creatures get +1/+1 until end of turn. If a Food entered the battlefield under your control
   // this turn, untap those creatures and they get an additional +2/+2 until end of turn": both under the condition (it
   // can't change in between), about the creatures the first effect affected (CR 611.2c).
@@ -2719,6 +2743,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     return { targets: [], effects: [{ type: "secretNumbers", then: "wheel" }], text };
   if (/^[Ee]ach player secretly chooses a number\. Then those numbers are revealed\. Each player with the highest number loses that much life\. If you are one of those players, put two \+1\/\+1 counters on ~\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "secretNumbers", then: "ogre" }], text };
+  // Goblin Game: "Each player hides at least one item, then all players reveal them simultaneously. ...": the number of
+  // items is a number 1 or greater each chooses secretly (rulings: "write numbers on a piece of paper"), revealed at once.
+  // Half of a negative life total is half of 0 (rulings, CR 107.1b), rounded up (CR 107.1a).
+  if (/^Each player hides at least one item, then all players reveal them simultaneously\. Each player loses life equal to the number of items they revealed\. The player who revealed the fewest items then loses half their life, rounded up\. If two or more players are tied for fewest, each loses half their life, rounded up\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "secretNumbers", then: "goblin" }], text };
   if (/^Exile the top card of your library\. You may put that card into your hand unless it has the same name as another card exiled this way\. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "taintedPact" }], text };
   // Protection Racket: "repeat the following process for each opponent in turn order. Reveal the top card of your library.
@@ -7607,6 +7636,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer("target opponent", ctx);
       if (who?.ref !== "target") return null;
       effects.push({ type: "castFromAmong", who, n: 0, topYardHand: true, max: 1 });
+      si++;
+      continue;
+    }
+    // Doom Reigns Supreme: "target opponent exiles the top five cards of their library. You may cast up to two spells from
+    // among the exiled cards without paying their mana costs." Cast one at a time as this resolves, or never (CR 608.2g);
+    // lands can't be cast, and what isn't cast stays exiled.
+    const oppTop = /^[Tt]arget opponent exiles the top (two|three|four|five|six|seven) cards of their library$/.exec(s);
+    const oppTopCast = oppTop ? /^You may cast up to (two|three) spells from among the exiled cards without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (oppTop && oppTopCast) {
+      const who = parsePlayer("target opponent", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who, n: num(oppTop[1]!), max: num(oppTopCast[1]!) });
       si++;
       continue;
     }
@@ -14070,6 +14111,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "selfHere", controlledByEventPlayer: true }, effects: inner });
         continue;
       }
+    }
+    // The War Games: "Each player creates three tapped 1/1 white Warrior creature tokens. The tokens are goaded for as long
+    // as ~ remains on the battlefield.": goaded by you (CR 701.15a) until ~ leaves; nothing if it already has (CR 611.2b).
+    if (s === "The tokens are goaded for as long as ~ remains on the battlefield") {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "createToken" || prev.attachTo || ctx.spell) return null;
+      effects.push({ type: "continuous", what: { ref: "created" }, mods: [{ kind: "goad" }], duration: "whileControlled", whileOnBattlefield: true });
+      continue;
     }
     // Yes Man, Personal Securitron: "Target opponent gains control of ~. When they do, ...": a reflexive trigger (CR
     // 603.12) only if that opponent now controls ~ (rulings: not if ~ left the battlefield or the target is illegal).

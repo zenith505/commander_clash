@@ -10,7 +10,7 @@ import { CARD_TOKENS, INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, par
 import { parseSentence } from "../sentence";
 import { halfX, parseCount } from "../counts";
 import type { Ctx } from "../body";
-import { canonicalKeyword, SUPPORTED_KEYWORDS } from "../../keywords";
+import { canonicalKeyword, CREATURE_TYPES, SUPPORTED_KEYWORDS } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -280,6 +280,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(`${m[1]} target ${m[2]}`, ctx);
     if (what?.ref !== "target" || what.n === undefined || what.card) return null;
     return [{ type: "createTokenCopy", who: { ref: "you" }, n: amt(m[3]!), what, each: true }];
+  }
+  // Phantom Steed: "Whenever ~ attacks, create a tapped and attacking token that's a copy of the exiled card, except it's an
+  // Illusion in addition to its other types": a copy of the card its enters ability exiled (CR 607.2a, the "exiled card"
+  // of its rulings), attacking a player or planeswalker you choose (rulings); a noncreature copy isn't attacking (CR
+  // 506.3a) and gets no creature type (CR 205.3d).
+  if (!ctx.spell && !ctx.activated && !ctx.targets.length && (m = /^[Cc]reate a tapped and attacking token that's a copy of the exiled card, except it's an? ([A-Z][a-z]+) in addition to its other types$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) {
+    const except = parseCopyExcept(`it's a ${m[1]} in addition to its other types`);
+    return except ? [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "linkedCard" }, except, tapped: true, attacking: true }] : null;
   }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".

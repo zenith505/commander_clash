@@ -5226,6 +5226,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
       else if ("targetDiscountAny" in cost) out.targetDiscountAny = (out.targetDiscountAny ?? 0) + cost.targetDiscountAny;
+      else if ("targetDiscountYou" in cost) out.targetDiscountYou = (out.targetDiscountYou ?? 0) + cost.targetDiscountYou;
       else if ("castTargetEnchantedPlayerLess" in cost) out.castTargetEnchantedPlayerLess = (out.castTargetEnchantedPlayerLess ?? 0) + cost.castTargetEnchantedPlayerLess;
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;

@@ -5917,6 +5917,17 @@ export function compile(d: CardDef): CompiledCard {
       else out.triggers.push(bindThisAbility({ ...t, draws: { ...t.draws, revealed: revealEach[1] === "creature" ? "creature" : "basicLand" } }, line));
       continue;
     }
+    // Inquisitor Eisenhorn: "You may reveal the first card you draw each turn as you draw it. Whenever you reveal an
+    // instant or sorcery card this way, create ...": as miracle (game.ts), an instant or sorcery card is always revealed
+    // as it's drawn, and whether to have the trigger's result is asked as it resolves: you needn't reveal it if you don't
+    // want that (rulings); the token is made even if the card has left your hand by then (rulings).
+    const mayReveal = /^You may reveal the first card you draw each turn as you draw it\. Whenever you reveal an instant or sorcery card this way, (.+\.)$/.exec(line);
+    if (mayReveal) {
+      const t = parseTrigger(`Whenever you draw your first card each turn, you may ${mayReveal[1]!.replace(/^./, (c) => c.toLowerCase())}`);
+      if (!t || t === "fail" || t.event !== "playerDraws" || !t.draws || t.ifCond || !/^you may create /.test(t.body.text)) out.unsupported.push(raw);
+      else out.triggers.push(bindThisAbility({ ...t, draws: { ...t.draws, revealed: "instantOrSorcery" } }, line));
+      continue;
+    }
     const trig = parseTrigger(line);
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);
@@ -6505,6 +6516,10 @@ function linkExile(out: CompiledCard) {
     if (others || out.additionalCosts?.some((c) => "exile" in c && c.exile) || out.exileInsteadOfDying) out.unsupported.push("(returns cards exiled with it that it can't link to its delve)");
     else out.delveLinked = true;
   }
+  // Savior of Ollenbock: "Whenever ~ trains" (CR 702.149c): its training ability puts the counter and says whether it
+  // trained (Effect "train").
+  if (out.triggers.some((t) => t.event === "selfTrains"))
+    for (const t of out.triggers) if (t.training && t.event === "selfAttacks" && t.body.effects.length === 1 && t.body.effects[0]!.type === "counters") t.body = { ...t.body, effects: [{ type: "train" }] };
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
   // Siegebreaker): the one its "exile ... until ~ leaves the battlefield" ability exiled, when it has no other exile.
@@ -6629,7 +6644,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     // Primordial Mist: "that card" of an "Exile a face-down permanent you control" cost, likewise.
-    if (o.ref === "costExiled" && !handExileCost && !permExileCost) bad = true;
+    if (o.ref === "costExiled" && !handExileCost && !permExileCost && !yardCostCard) bad = true;
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
@@ -6664,6 +6679,9 @@ function checkCastingLinks(out: CompiledCard) {
   let yardExile = yardExileOne(out.additionalCosts);
   let handExileCost = false;
   let permExileCost = false;
+  // Tawnos, Solemn Survivor: "the exiled card" of an "Exile an artifact or creature card from your graveyard" cost, the
+  // ability's only cost that exiles anything (game.ts payExtraCosts keeps it in StackItem.costExiled).
+  let yardCostCard = false;
   const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
   let revealCost = oneReveal(out.additionalCosts);
   visit([out.spell, out.triggers, out.statics, out.mana]);
@@ -6674,9 +6692,11 @@ function checkCastingLinks(out: CompiledCard) {
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
     permExileCost = ab.costs?.filter((c) => c.kind === "exileFromHand" || c.kind === "exileFromGraveyard" || c.kind === "sacrifice" || c.kind === "craft").length === 1 && !!ab.costs.some((c) => c.kind === "sacrifice" && c.exile && c.n === 1);
     revealCost = oneReveal(ab.costs);
+    yardCostCard = ab.costs?.filter((c) => c.kind === "exileFromGraveyard" || c.kind === "exileFromHand" || c.kind === "craft" || (c.kind === "sacrifice" && c.exile) || (c.kind === "mill" && c.exile) || (c.kind === "reveal" && c.exile)).length === 1 && !!ab.costs.some((c) => c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.process && c.n === 1);
     visit(ab);
   }
   revealCost = false;
+  yardCostCard = false;
   exileCost = false;
   yardExile = false;
   handExileCost = false;

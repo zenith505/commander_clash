@@ -4317,6 +4317,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a754458d-55b5-44c2-98de-8bf26b82c1b1",
+  "name": "Chaotic Transformation",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile up to one target artifact, up to one target creature, up to one target enchantment, up to one target planeswalker, and/or up to one target land. For each permanent exiled this way, its controller reveals cards from the top of their library until they reveal a card that shares a card type with it, puts that card onto the battlefield, then shuffles.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f50ec9f-78e6-403f-8f41-84d603fee0eb",
   "name": "Charred Foyer // Warped Space",
   "manaCost": "{3}{R} // {4}{R}{R}",

@@ -172,11 +172,13 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
   // Shah of Naar Isle: "When ~'s echo cost is paid" (CR 702.30a): as its echo trigger resolves and the cost is paid.
   [/^When ~'s echo cost is paid, (.+)$/, "selfEchoPaid"],
+  // Savior of Ollenbock: "Whenever ~ trains" (CR 702.149c).
+  [/^Whenever ~ trains, (.+)$/, "selfTrains"],
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfExiledCrafting", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfExploits",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfDealsCombatDamageToBlockers", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfLastCounterRemoved", "selfEchoPaid", "selfTrains", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
@@ -5150,6 +5152,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const blockedThisCombat = event === "selfDies" ? /^(?:it|~) deals (\d+) damage to each creature it blocked this combat\.$/.exec(text) : null;
       if (blockedThisCombat) body = { targets: [], effects: [{ type: "damage", amount: Number(blockedThisCombat[1]), to: { ref: "blockHistory", of: { ref: "self" }, blocked: true, thisCombat: true, diedSelf: true } }], text };
       if (event === "selfDies" && /^destroy all creatures blocking or blocked by it\. They can't be regenerated\.$/.test(text)) body = { targets: [], effects: [{ type: "destroy", what: { ref: "inCombatWithSelf", lastKnown: true }, noRegen: true }], text };
+      // Triumph of Saint Katherine: "exile it and the top six cards of your library in a face-down pile. If you do, shuffle
+      // that pile and put it back on top of your library": the card in the graveyard and those cards (rulings).
+      const pile = event === "selfToGraveyard" && /^When ~ is put into your graveyard/.test(line) ? /^exile (?:it|~) and the top (\w+) cards of your library in a face-down pile\. If you do, shuffle that pile and put it back on top of your library\.$/.exec(text) : null;
+      if (pile && Number.isInteger(num(pile[1]!)) && num(pile[1]!) > 0) body = { targets: [], effects: [{ type: "pileOnTop", n: num(pile[1]!) }], text };
       if (brood) body = { targets: [], effects: [{ type: "delayed", when: "nextEndStep", each: "selfCard", effects: [{ type: "loseLife", who: { ref: "you" }, n: Number(brood[1]) }, { type: "bounce", what: { ref: "subjectCard" } }], text: `you lose ${brood[1]} life and return ~ to your hand` }], text };
       // Ochre Jelly: "create a token that's a copy of it at the beginning of the next end step. The token enters with half
       // that many +1/+1 counters on it, rounded down": a delayed trigger copying ~ as it last existed on the battlefield

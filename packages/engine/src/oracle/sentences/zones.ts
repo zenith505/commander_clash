@@ -72,6 +72,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Doomsday Excruciator: "each player exiles all but the bottom six cards of their library face down": each their own top
   // cards, none with six or fewer (rulings); nobody may look at them (CR 406.3).
+  // Pyxis of Pandemonium: "Each player exiles the top card of their library face down": nobody may look at them (CR
+  // 406.3, rulings); they're linked to the source (CR 607.2a).
+  if (/^[Ee]ach player exiles the top card of their library face down$/.test(s) && !ctx.spell) return [{ type: "exileFaceDown", from: "top", who: { ref: "eachPlayer" }, n: 1 }];
   if ((m = new RegExp(`^[Ee]ach (player|opponent) exiles all but the bottom (${NUM}) cards of their library face down$`).exec(s)))
     return [{ type: "exileFaceDown", from: "top", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, plus: -num(m[2]!) } }];
   // Everything Comes to Dust: "Exile all creatures except those that share a creature type with a creature that convoked
@@ -1262,7 +1265,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
-    const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
+    // Savior of Ollenbock: "up to one other target creature from the battlefield or creature card from a graveyard", the same.
+    const what = parseObject(m[1]!, ctx, !/ from the battlefield (?:and\/or|or) /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
   }
   if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere |from the battlefield )?this turn| that wasn't put there this combat)?) to (your|its owner's) hand$/i.exec(s))) {
@@ -1555,6 +1559,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
   if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Savior of Ollenbock: "When ~ leaves the battlefield, put the exiled cards onto the battlefield under their owners'
+  // control": the same, the cards its own exile ability took (CR 607.2a).
+  if (/^Put the exiled cards onto the battlefield under their owners' control$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];
   // Gravegouger: "When ~ leaves the battlefield, return the exiled cards to their owner's graveyard": the cards its enters
   // ability exiled, while they're still in exile (CR 607.2a, 400.7); compile() links the two.
   if (/^Return the exiled cards to their owner's graveyard$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "graveyard" }];
@@ -1562,6 +1569,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // it": the same, the cards its own exile ability took, under their owners' control (CR 607.2a, 610.3).
   if ((m = /^[Ee]ach player returns to (the battlefield|their hand) all cards they own exiled with (?:it|~)$/.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: m[1] === "the battlefield" ? "battlefield" : "hand" }];
+  // Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among
+  // them onto the battlefield": its own face-down exiles (CR 607.2a), each owner's under their control.
+  if (/^[Ee]ach player turns face up all cards they own exiled with ~ and puts all permanent cards among them onto the battlefield$/.test(s) && ctx.activated && !ctx.spell)
+    return [{ type: "returnLinked", dest: "battlefield", permanentCards: true }];
   // Admonition Angel: "When ~ leaves the battlefield, return all cards exiled with it to the battlefield under their owners'
   // control": the same.
   if (/^[Rr]eturn all cards exiled with (?:it|~) to the battlefield under their owners' control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];

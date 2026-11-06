@@ -733,7 +733,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (targetsYou) s = targetsYou[1]!;
   // Fork: "Copy target instant or sorcery spell, except that the copy is red": its copiable color is red, whatever its mana
   // cost says (CR 707.9b, rulings), the mana cost the same.
-  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary|, except that the copy is (white|blue|black|red|green))?( twice| three times)?$/i.exec(s))) {
+  // Venser, Fervent Forger: "Copy target instant or sorcery spell an opponent controls twice": only an opponent's.
+  if ((m = /^Copy target (.*?spell(?: you control| an opponent controls)?(?: with mana value (?:X|\d+ or less)| that wasn't cast)?)(, except it isn't legendary if the spell is legendary|, except that the copy is (white|blue|black|red|green))?( twice| three times)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
     const parsed = parseTargetPhrase(m[1]!, { x: true });
     const spec = targetsYou && parsed?.kind === "spell" ? { ...parsed, targetsWhat: "you" as const, text: `${parsed.text} that targets you` } : parsed;

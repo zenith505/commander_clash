@@ -258,6 +258,7 @@ export type TriggerSourceEvent =
   /** `n` counters of a kind were removed from it at the same time, for any reason (see countersRemoved in counters.ts). */
   | { type: "countersRemoved"; id: ObjectId; counter: string; n: number }
   | { type: "echoPaid"; id: ObjectId }
+  | { type: "trained"; id: ObjectId }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
@@ -1743,6 +1744,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "echoPaid") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfEchoPaid");
+  } else if (ev.type === "trained") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfTrains");
   } else if (ev.type === "timeCountersRemovedExiled") {
     // Aeon Chronicler: "Whenever a time counter is removed from ~ while it's exiled": it works in exile (CR 113.6), its
     // owner controlling it (CR 113.8), once for each counter.
@@ -2445,7 +2449,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (!c || c.zone !== "hand") return false;
           const kind = t.draws.revealed;
           // Rowen: "a basic land card" (CR 205.4a), Primitive Etchings: "a creature card", as it is in the hand.
-          const fits = kind === "basicLand" ? objIsType(s, c, "Land") && characteristics(s, c).supertypes.includes("Basic") : kind === "creature" ? objIsType(s, c, "Creature") : objIsType(s, c, "Land") === (kind === "land");
+          const fits = kind === "instantOrSorcery" ? objIsType(s, c, "Instant") || objIsType(s, c, "Sorcery") : kind === "basicLand" ? objIsType(s, c, "Land") && characteristics(s, c).supertypes.includes("Basic") : kind === "creature" ? objIsType(s, c, "Creature") : objIsType(s, c, "Land") === (kind === "land");
           if (!fits) return false;
         }
         if (!eventPlayerFits(s, o, t, ev.player)) return false;

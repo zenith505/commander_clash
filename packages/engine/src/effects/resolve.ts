@@ -1175,6 +1175,16 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runBasicsEffect(s, e, ctx, src);
     case "damageRule":
       return runPreventionEffect(s, e, ctx, src);
+    case "train": {
+      // CR 702.149c: it trains when its resolving training ability puts one or more +1/+1 counters on it.
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (me?.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const before = me.counters["+1/+1"] ?? 0;
+      const r = runEffect(s, { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }, ctx);
+      if (r === "paused") return r;
+      if ((me.counters["+1/+1"] ?? 0) > before) fireEvent(s, { type: "trained", id: me.id });
+      return;
+    }
     case "echoPaid": {
       // "When ~'s echo cost is paid" (Shah of Naar Isle): the permanent whose echo it is, still that object (CR 400.7).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1233,6 +1243,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "livingDeath":
     case "putAllOnBottom":
     case "linkedToBottom":
+    case "pileOnTop":
+    case "returnOtherUntilLeaves":
+    case "untilLeavesToGraveyard":
     case "returnFaceDownExiled":
     case "exiledToGraveyard":
     case "exileRemembered":
@@ -1480,6 +1493,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileNamed":
     case "revealUntil":
     case "revealUntilPerDestroyed":
+    case "revealUntilPerExiled":
     case "banName":
       return runNamesEffect(s, e, ctx, src);
     case "venture":

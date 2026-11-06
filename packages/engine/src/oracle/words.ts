@@ -46,6 +46,8 @@ export const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 /** "Elves" -> "Elf", "Zombies" -> "Zombie", "Wolves" -> "Wolf". */
 export function singular(word: string): string {
+  // "Plains" is its own singular (CR 205.3i): "two Plains", "Plains you control", also after a text change (CR 612).
+  if (/^plains$/i.test(word)) return word;
   if (/^(Zombie|Faerie|Detective|Cave)s$/i.test(word)) return word.slice(0, -1);
   if (/^(?:Octopus|Hero)es$/i.test(word)) return word.slice(0, -2);
   if (/^Mice$/i.test(word)) return `${word.charAt(0)}ouse`;

@@ -1194,9 +1194,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // A plural noun is a group; a singular one only after "each" ("each creature", but not "all creature").
   // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word; so is a static
   // ability's subject, "Other Merfolk get +1/+1" (Lord of Atlantis), whose verb is plural.
-  // "Destroy all Plains" (Flashfires): the basic land type is the same word in the plural.
+  // "Destroy all Plains" (Flashfires): the basic land type is the same word in the plural; so is "Plains you control"
+  // with no article, as in "Mountains you control have ..." after a text change made it Plains (CR 612.2).
   // "Mice you control get +1/+0" (Flowerfoot Swordmaster): an irregular plural.
-  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || ((/s$/.test(w) || /^(?:Mice|Oxen|Pegasi)$/.test(w)) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)) || (!!all && w === "Plains"));
+  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || ((/s$/.test(w) || /^(?:Mice|Oxen|Pegasi)$/.test(w)) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)) || (!!all && w === "Plains") || (w === "Plains" && /^(?:you|your opponents|an opponent) control/.test(tail) && !/\b(?:a|an|another|target|each|that|this)\b/i.test(head)));
   if (!plural && !(all && all[1]!.toLowerCase() === "each")) return null;
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))

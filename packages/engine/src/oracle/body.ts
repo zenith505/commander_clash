@@ -11533,7 +11533,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // ~ was kicked, untap all Forests put onto the battlefield this way. They become 3/3 green creatures with haste that are
     // still lands.": the lands found, from then on (rulings: permanently, CR 611.2a), each while it's the same object (CR
     // 400.7); they're Forests by the search's filter.
-    const kickedLands = /^If ~ was kicked, untap all ([A-Z][a-z]+)s put onto the battlefield this way$/.exec(s);
+    const kickedLands = /^If ~ was kicked, untap all (Plains(?= )|[A-Z][a-z]+?)s? put onto the battlefield this way$/.exec(s);
     const forestSearch = effects.at(-1);
     const theyBecome = kickedLands ? /^They (become \d+\/\d+ [a-z ]+creatures(?: with [a-z]+)? that are still lands)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
     if (kickedLands && theyBecome && ctx.spell && forestSearch?.type === "search" && forestSearch.dest.zone === "battlefield" && forestSearch.filter?.subtypes?.join() === kickedLands[1] && !forestSearch.others && !forestSearch.who && !forestSearch.library && !forestSearch.split && !forestSearch.condDest && !forestSearch.landTo && !forestSearch.cardTo && !forestSearch.mayInstead && !forestSearch.payDiff && !forestSearch.withHeld && !forestSearch.orGraveyard && !forestSearch.andGraveyard) {

@@ -1496,6 +1496,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // The Motherlode, Excavator: "destroy target nonbasic land defending player controls, and creatures that player controls
   // without flying can't block this turn": two instructions, "that player" being the defending player.
   text = text.replace(/\b([Dd]estroy target [a-z ]+ defending player controls), and creatures that player controls (without flying )?can't block this turn\./, "$1. Creatures defending player controls $2can't block this turn.");
+  // Roving Keep: "~ gets +2/+0 and gains trample until end of turn. It can attack this turn as though it didn't have
+  // defender.": "it" is ~ (CR 702.3b).
+  text = text.replace(/^(~ gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)? until end of turn\.) It (can attack this turn as though it didn't have defender\.)$/, "$1 ~ $2");
   // Dragon Turtle: "tap it and up to one target creature an opponent controls. They don't untap during their controllers'
   // next untap steps." Both tapped, then neither untaps; with no target chosen, only ~ (rulings).
   text = text.replace(/^[Tt]ap (?:it|~) and (up to one target creature an opponent controls)\. They don't untap during their controllers' next untap steps\./, "Tap ~. Tap $1. ~ doesn't untap during its controller's next untap step. That creature doesn't untap during its controller's next untap step.");
@@ -8851,13 +8854,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Oran-Rief Hydra: "Put a +1/+1 counter on ~. If that land is a Forest, put two +1/+1 counters on ~ instead."; Akoum
     // Hellkite: "~ deals 1 damage to any target. If that land is a Mountain, ~ deals 2 damage instead." The land that
     // entered as this resolves, or as it last existed (CR 608.2h); the same instruction with the other number.
-    const landMore = ctx.subject ? /^If that land is an? (Plains|Island|Swamp|Mountain|Forest), (put (two|three) \+1\/\+1 counters on ~|~ deals (\d+) damage) instead$/.exec(s) : null;
+    // Guul Draz Overseer: "Other creatures you control get +1/+0 until end of turn. If that land is a Swamp, those
+    // creatures get +2/+0 until end of turn instead.": the same creatures with the other bonus.
+    const landMore = ctx.subject ? /^If that land is an? (Plains|Island|Swamp|Mountain|Forest), (put (two|three) \+1\/\+1 counters on ~|~ deals (\d+) damage|those creatures get \+(\d+)\/\+(\d+) until end of turn) instead$/.exec(s) : null;
     if (landMore) {
       const prev = effects[effects.length - 1];
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landMore[1]!], text: landMore[1]! };
+      const pt = prev?.type === "continuous" && prev.what.ref === "each" && prev.duration === "endOfTurn" && prev.mods.length === 1 && prev.mods[0]!.kind === "modifyPT" ? prev.mods[0]! : undefined;
       const more: Effect | null =
         landMore[3] && prev?.type === "counters" && prev.what.ref === "self" && prev.counter === "+1/+1" && prev.n === 1 ? { ...prev, n: num(landMore[3]) }
         : landMore[4] && prev?.type === "damage" && typeof prev.amount === "number" && !prev.by && !prev.also && !prev.divided ? { ...prev, amount: Number(landMore[4]) }
+        : landMore[5] && prev?.type === "continuous" && pt?.kind === "modifyPT" && typeof pt.power === "number" && typeof pt.toughness === "number" ? { ...prev, mods: [{ kind: "modifyPT", power: Number(landMore[5]), toughness: Number(landMore[6]) }] }
         : null;
       if (!more || !prev) return null;
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [more], otherwise: [prev] };
@@ -10015,6 +10022,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, effects: [{ type: "continuous", what: { ref: "target", index: i }, mods: [{ kind: "cantBlock" }], duration: "endOfTurn" }] });
       continue;
     }
+    // Mark for Death: "Target creature an opponent controls blocks this turn if able. Untap that creature. Other creatures
+    // that player controls can't block this turn.": the creatures its controller controls, but the target
+    // (a rule for the turn, so creatures that player gets later can't block either, CR 611.2c only fixes the set for
+    // changes to characteristics; the player is the target's controller as this resolves).
+    if (/^Other creatures that player controls can't block this turn$/.test(s) && ctx.targets.length === 1 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.types?.includes("Creature") && !ctx.targets[0]!.many && !ctx.targets[0]!.optional && effects.length && effects.every((e) => mentionsTarget(e, 0))) {
+      effects.push({ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creatures that player controls" }, ofPlayer: { ref: "targetController", index: 0 }, exceptTarget: 0 });
+      continue;
+    }
     // Lifecraft Awakening: "Put X +1/+1 counters on target artifact you control. If it isn't a creature or Vehicle, it
     // becomes a 0/0 Construct artifact creature": neither as it resolves; a noncreature Vehicle just keeps the counters
     // (rulings). It keeps its other types and subtypes but its creature types (CR 205.1b).
@@ -10123,6 +10138,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (enteredMine && ctx.targets.length === 2 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.controller === "you" && ctx.targets[0]!.types?.includes("Creature") && !ctx.targets[0]!.optional && !ctx.targets[0]!.many && !effects.length) {
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], enteredThisTurn: true, text: "entered this turn" };
       effects.push({ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n: 1 }] });
+      continue;
+    }
+    // Joust: "The creature you control gets +2/+1 until end of turn if it's a Knight.": the first target, only if it's a
+    // Knight as this resolves; it fights either way (rulings, CR 608.2c).
+    const pumpIfKnight = /^The creature you control gets (\+\d+)\/(\+\d+) until end of turn if it's an? ([A-Z][a-z]+)$/.exec(s);
+    if (pumpIfKnight && ctx.targets.length === 2 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.controller === "you" && ctx.targets[0]!.types?.includes("Creature") && !ctx.targets[0]!.optional && !ctx.targets[0]!.many && !effects.length) {
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [pumpIfKnight[3]!], text: pumpIfKnight[3]! };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [{ type: "continuous", what: { ref: "target", index: 0 }, mods: [{ kind: "modifyPT", power: Number(pumpIfKnight[1]), toughness: Number(pumpIfKnight[2]) }], duration: "endOfTurn" }] });
       continue;
     }
     const putIfMine = /^Put an? \+1\/\+1 counter on the creature you control if it has power (\d+) or greater$/.exec(s);
@@ -10999,6 +11022,37 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
       payFirst = null;
+      continue;
+    }
+    // Dead Reckoning: "You may put target creature card from your graveyard on top of your library. If you do, ~ deals
+    // damage equal to that card's power to target creature.": only with that card still a legal target; its power as it
+    // was in the graveyard (a "*" counting that graveyard, rulings); the damage needs the creature to be legal too.
+    const reckon = /^You may put (target creature card from your graveyard) on top of your library$/.test(s) ? /^If you do, (~ deals damage equal to that card's power to target creature)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (reckon && !payFirst) {
+      const before = ctx.targets.length;
+      const put = parseOne("Put target creature card from your graveyard on top of your library", ctx);
+      const dmg = put && ctx.targets.length === before + 1 ? parseOne(reckon[1]!, ctx) : null;
+      const d0 = dmg?.[0];
+      if (!put || put.length !== 1 || put[0]!.type !== "putInLibrary" || !dmg || dmg.length !== 1 || d0?.type !== "damage" || ctx.targets.length !== before + 2 || ctx.targets[before]!.kind !== "card") return null;
+      const powerOf = d0.amount;
+      if (typeof powerOf !== "object" || powerOf.count.kind !== "power" || powerOf.count.of.ref !== "target" || powerOf.count.of.index !== before) return null;
+      // The damage is apart from the choice: with the creature no longer a legal target, the card can still be put there.
+      const may: Effect = { type: "may", effects: [{ type: "noteAmount", n: powerOf }, put[0]!], text: "put that creature card from your graveyard on top of your library" };
+      const dealt: Effect = { type: "if", cond: { kind: "youDid" }, effects: [{ ...d0, amount: { count: { kind: "notedAmount" } } }] };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "still in your graveyard" } }, effects: [may, dealt] });
+      si++;
+      continue;
+    }
+    // Primordial Ooze: "Then you may pay {X}, where X is the number of +1/+1 counters on it. If you don't, tap ~ and it
+    // deals X damage to you.": {1} for each of its counters as this resolves; if not paid, it's tapped even if the damage
+    // is prevented (rulings), the same X.
+    const oozePay = /^(?:Then )?you may pay \{X\}, where X is the number of \+1\/\+1 counters on (?:it|~)$/i.test(s) ? /^If you don't, tap ~ and it deals X damage to you\.?$/.exec(sentences[si + 1] ?? "") : null;
+    const oozePrev = effects.at(-1);
+    if (oozePay && !payFirst && oozePrev?.type === "counters" && oozePrev.what.ref === "self" && oozePrev.counter === "+1/+1") {
+      const n = parseCount("the number of +1/+1 counters on ~", ctx);
+      if (!n) return null;
+      effects.push({ type: "may", effects: [], pay: { mana: "{1}" }, payTimes: n, otherwise: [{ type: "tap", what: { ref: "self" } }, { type: "damage", amount: n, to: { ref: "you" } }], text: "pay {X}, X being the number of +1/+1 counters on ~. If you don't, tap ~ and it deals X damage to you" });
+      si++;
       continue;
     }
     // Relentless Dead: "you may pay {X}. If you do, return another target Zombie creature card with mana value X from your

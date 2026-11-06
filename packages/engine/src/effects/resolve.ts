@@ -359,6 +359,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       return o?.zone === "battlefield" && (s.resolving!.countersPutThisWay ?? []).some((c) => c.id === id && (o.zoneChanges ?? 0) === c.zc) ? [o] : [];
     });
   // Urge to Feed: "each of those Vampires", the ones its tapAnyNumber tapped, while each is still that permanent (CR 400.7).
+  if (ref.ref === "costTapped") {
+    const st = ctx.stationed;
+    const o = st && s.objects[st.id];
+    return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st!.zc ? [o] : [];
+  }
   if (ref.ref === "tappedThisWay")
     return (s.resolving?.tappedIds ?? []).flatMap((c) => {
       const o = s.objects[c.id];

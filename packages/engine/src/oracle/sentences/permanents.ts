@@ -605,6 +605,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
     return what ? [{ type: "exileIfDies", what }] : null;
   }
+  // Unnatural Aggression: "If the creature an opponent controls would die this turn, exile it instead": the one target an
+  // opponent controls, even if it survives the fight and would die later this turn (rulings).
+  if (/^If the creature an opponent controls would die this turn, exile it instead$/.test(s)) {
+    const idx = ctx.targets.flatMap((t, i) => (t.kind === "object" && t.controller === "opponent" && t.types?.includes("Creature") && !t.many && !t.optional ? [i] : []));
+    return idx.length === 1 && ctx.targets.length === 2 ? [{ type: "exileIfDies", what: { ref: "target", index: idx[0]! } }] : null;
+  }
   if (/^If a creature would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn" }];
   // Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (CR 614.1a),
   // Containment Priest's replacement for the rest of the turn, from any zone but the stack (rulings).

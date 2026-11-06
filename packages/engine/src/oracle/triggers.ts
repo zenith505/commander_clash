@@ -335,6 +335,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       if (/\b(it|its)\b/i.test(text.replace(/\b(that creature) doesn't untap during its controller's untap step\b/gi, "$1 doesn't untap"))) return "fail"; // the creature dealing damage, or the one dealt it?
       text = text.replace(/\bthe other creature\b/g, "that creature");
     }
+    // Slab Hammer: "Whenever equipped creature attacks, you may return a land you control to its owner's hand. If you do,
+    // the creature gets +2/+2 until end of turn.": the attacking creature (the subject), wherever the Equipment is then.
+    if (!m[1] && m[2] === "creature" && event === "selfAttacks") text = text.replace(/^(you may [^.]+\. If you do, )the creature (gets [+-]\d+\/[+-]\d+ until end of turn\.?)$/, "$1it $2");
     // Mask of the Schemer: "it connives X, where X is the amount of damage it dealt to that player": that much.
     if (o.thatMuch && event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage it dealt to that player\.$/, "$1that many$2.");
     // "With mana value less than or equal to that damage" (Glamdring): the damage dealt, like "that much".

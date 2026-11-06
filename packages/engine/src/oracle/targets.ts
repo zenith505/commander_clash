@@ -467,6 +467,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Goad each creature that had a double strike counter put on it this way" (Spectacular Showdown).
   const hadPut = /^each creature that had an? (\+1\/\+1|double strike) counter put on it this way$/i.exec(x);
   if (hadPut) return { ref: "countersPutThisWay", kind: hadPut[1]!.toLowerCase() };
+  // Swallow Whole: "the creature tapped to pay ~'s additional cost" (compile checks the spell has that one cost).
+  if (ctx.spell && /^the creature tapped to pay ~'s additional cost$/i.test(x)) return { ref: "costTapped" };
   // Urge to Feed: "each permanent tapped this way" (the body's reading of "each of those Vampires" after tapping them).
   if (ctx.tappedThisWay && /^each permanent tapped this way$/i.test(x)) return { ref: "tappedThisWay" };
   // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."

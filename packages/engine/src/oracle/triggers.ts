@@ -1639,9 +1639,13 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // Cabal Slaver: "Whenever a Goblin deals combat damage to a player, that player discards a card": the player dealt it.
   const anySliver = /^Whenever a ([A-Z][a-z]+) deals combat damage to a player, (.+)$/.exec(line);
   if (anySliver && CREATURE_TYPES.has(anySliver[1]!)) {
-    if (/\b(?:defending player|that much|that many|you|your)\b/i.test(anySliver[2]!) || (/\bthat player\b/i.test(anySliver[2]!) && !/^that player discards a card\.?$/.test(anySliver[2]!))) return "fail";
-    const body = parseBody(anySliver[2]!, { subjectIt: true, eventPlayer: true });
-    if (!body) return "fail";
+    // The Sea Devils: "it deals that much damage to target creature that player controls": the creature that dealt the
+    // damage is the source (the subject), the amount and the player dealt it from the event.
+    const seaDevils = /^it deals that much damage to target creature that player controls\.?$/.test(anySliver[2]!);
+    if (!seaDevils && (/\b(?:defending player|that much|that many|you|your)\b/i.test(anySliver[2]!) || (/\bthat player\b/i.test(anySliver[2]!) && !/^that player discards a card\.?$/.test(anySliver[2]!)))) return "fail";
+    const parsed = parseBody(seaDevils ? anySliver[2]!.replace("that much", "X") : anySliver[2]!, { subjectIt: true, eventPlayer: true });
+    if (!parsed) return "fail";
+    const body = seaDevils ? { ...replaceX(parsed, { count: { kind: "eventAmount" } }), text: unX(parsed.text, anySliver[2]!) } : parsed;
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
   }
   // Essence Sliver: "Whenever a Sliver deals damage, its controller gains that much life": anyone's Sliver, any damage, once

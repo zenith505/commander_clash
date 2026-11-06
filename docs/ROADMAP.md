@@ -1,6 +1,6 @@
 # Roadmap
 
-30,160 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,170 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -2330,6 +2330,39 @@ line blocks.
    the battlefield attached to that creature" (Rohirrim Chargers); "gain control of that creature until end of turn" for a
    spell targeting only it (Loki, God of Lies); each player's top three, a creature put from each, then a fight (Guild Feud,
    with a browser test of the pick). +10, 30,150 of 31,936 with B122.
+   Round 293 took names from the top no earlier round looked at (rank 11,200 to 24,100): "Choose left or right. Starting
+   with you and proceeding in the chosen direction, each player chooses a creature controlled by the next player in that
+   direction. Each player gains control of the creature they chose" (Order of Succession, with a browser test); "Each
+   player secretly chooses a creature they control and a creature they don't control ... Destroy each creature chosen
+   this way" (Call to the Void, with a browser test); "For each non-Saga permanent, choose a counter on it. You may put an
+   additional counter of that kind on that permanent" (The Caves of Androzani: the permanents picked, then the kind, with
+   a browser test); "Until end of turn, whenever a Salamander deals combat damage to a player, it deals that much damage
+   to target creature that player controls" (The Sea Devils: anyone's Salamander); "If you lose the flip, the next time
+   it would deal combat damage this turn, it deals that damage to you instead" (Goblin Psychopath); "for each 1 life you
+   lost, sacrifice a permanent other than ~ unless you discard a card" (Oath of Lim-Dûl); "becomes an enchantment and
+   loses all abilities until a player casts a creature spell" (Soul Sculptor, a new end: ContinuousEffect.untilCreatureSpell);
+   "becomes a 6/6 legendary Horror creature named Fenric and loses all abilities" and "fights another target creature
+   named Fenric" (The Curse of Fenric); "exile target spell" linked to "Your opponents can't cast spells with the same name
+   as the exiled card" and the return when it leaves (Ashiok's Erasure); "each player exiles X permanents they control
+   and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
+   Out after round 293 (looked at, not done): Spellweaver Helix (copying the other imprinted card when a card with one's
+   name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
+   activated); Throne of the Grim Captain (craft with four named creature types); Uvilda, Dean of Perfection (refine
+   counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (a redirection chosen for each
+   damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
+   Caller of the Hunt, Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
+   Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
+   (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (changing a single
+   target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
+   Defensive Formation, Sorrow's Path, Blaze of Glory (block requirements and damage assignment); Piracy (tapping lands you
+   don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (manifest, then becoming an Aura);
+   Cathedral of Serra and the other "bands with other" lands; Mangara's Tome and Aladdin's Lamp (a draw replaced); All
+   Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
+   Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
+   stack); Damping Engine; Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
+   Chaos Moon; A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
+   Aperture; Grimoire Thief (face-down exiles you may look at, then spells countered by their names); Chorus of the
+   Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands.
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of

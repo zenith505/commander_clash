@@ -543,11 +543,34 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
       return [{ type: "searchLibrary", player: pid, found: lands >= 5 ? pend.cards.filter((id) => defOf(s, obj(s, id)).types.includes("Land")).slice(0, pend.max) : [] }];
     }
+    // Descent into Madness: what we'd miss least, hand cards (lands first) before permanents, then the smallest.
+    if (pend.kind === "searchLibrary" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "eachExilesPermanentsOrHand")) {
+      const cost = (id: ObjectId) => {
+        const o = obj(s, id);
+        if (o.zone === "hand") return isType(defOf(s, o), "Land") ? 1 : 2 + defMv(defOf(s, o));
+        return 3 + worth(s, pid, o);
+      };
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => cost(a) - cost(b)).slice(0, pend.min) }];
+    }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     // Malik, Grim Manipulator: their best creature goes; of our own, the least useful one (the other choice is hidden).
+    // The Caves of Androzani: ours with a counter that helps, others' with one that hurts (as proliferate decides), and
+    // that kind.
+    if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "counterOfKindEach")) {
+      const helpful = (k: string) => k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade" && k !== "doom";
+      const good = (o: GameObject) => Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0 && (controllerOf(s, o) === pid ? helpful(k) : harmfulCounter(k)));
+      if (pend.kind === "pickPermanents" && pend.anyNumber) return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => good(obj(s, id)).length > 0) }];
+      if (pend.kind === "chooseOption" && pend.what === "counterKind" && pend.about) {
+        const g = good(obj(s, pend.about));
+        return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
+      }
+    }
+    // Order of Succession: the best of the creatures we gain control of.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "pickPermanents" && pend.secret) {
       const sorted = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
       return [{ type: "pickPermanents", player: pid, ids: [pend.secret === "theirs" ? sorted[sorted.length - 1]! : sorted[0]!] }];
@@ -4344,6 +4367,15 @@ const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolvi
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid);
+  // Order of Succession: the direction whose next player has the best creature for us to take (someone takes ours
+  // either way).
+  if (what === "direction" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl")) {
+    const best = (side: "left" | "right") => {
+      const p = nearestOpponent(s, pid, side);
+      return Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => p !== undefined && controllerOf(s, o) === p && objIsType(s, o, "Creature")).map((o) => worth(s, pid, o)));
+    };
+    return best("right") > best("left") ? "right" : "left";
+  }
   // Pramikon, Teyo: the direction whose player who could attack us then has the least creature power.
   if (what === "direction") {
     const threat = (side: "left" | "right") =>

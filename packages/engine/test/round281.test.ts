@@ -224,7 +224,8 @@ describe("round 281: text-changing effects", () => {
     const { s: s0, ap, ids, opp } = setup([newBlood()]);
     const vamp = putOnBattlefield(s0, ap, vampire());
     const king = putOnBattlefield(s0, opp, goblinKing());
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(king)])));
+    // "Tap an untapped Vampire you control" is chosen as it's cast (CR 601.2h).
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(king)], undefined, undefined, undefined, { tap: [vamp] })));
     expect(s.objects[vamp]!.tapped).toBe(true);
     const p = s.pending;
     expect(p?.kind === "chooseOption" && p.what === "textFrom").toBe(true);

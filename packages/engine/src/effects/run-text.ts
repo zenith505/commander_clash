@@ -6,7 +6,10 @@ import { log, player } from "../game";
 import { invalidateCharacteristics } from "../layers";
 import { CREATURE_TYPES } from "../keywords";
 import { BASIC_LAND_TYPES, COLOR_WORDS } from "../text-changes";
-import type { GameObject, GameState, TextChange } from "../types";
+import type { CardDef, GameObject, GameState, TextChange } from "../types";
+import { compileCard, isFullySupported } from "../oracle";
+import { gateBody, withModes, type CastHow } from "../modes";
+import { settleDivided } from "./targeting";
 import { objects, type ResolveCtx } from "./resolve";
 
 type Kind = TextChange["kind"];
@@ -57,9 +60,14 @@ export function runTextEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: str
   const to = e.newWord ?? st.to!;
   // New Blood: "one creature type with Vampire": choosing Vampire itself changes nothing.
   if (to !== st.from) {
+    const before = defOf(s, o);
     (o.textChanges ??= []).push({ kind, from: st.from, to, ...(e.endOfTurn ? { endOfTurn: true as const } : {}) });
     invalidateCharacteristics(s);
-    defOf(s, o); // registers its definition with the new text (cards.ts)
+    const after = defOf(s, o); // registers its definition with the new text (cards.ts)
+    if (o.zone === "stack") respell(s, o, before, after);
+    // A few changed texts are ones the engine can't read (a "Plains" it takes as singular, Defiler of Faith's cost line):
+    // said in the log, as those abilities are lost.
+    if (!isFullySupported(after) && isFullySupported(before)) log(s, `(The engine can't read all of ${name}'s new text: ${compileCard(after).unsupported.join(" ")})`);
   }
   log(s, `${player(s, ctx.controller).name} changes the text of ${name}: ${st.from} becomes ${to}${e.endOfTurn ? " until end of turn" : ""} (${src}).`);
 }
@@ -68,3 +76,30 @@ const describeKinds = (kinds: Kind[]) => kinds.map((k) => (k === "color" ? "colo
 
 /** "White", "Island", "Goblin": each word as a button shows it. */
 const labelsOf = (words: string[]) => words.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+
+/**
+ * A spell's text changed (Glamerdye on Doom Blade): what it does as it resolves is its new text (CR 608.2b checks its
+ * targets against it then; rulings: "the text change will probably cause it to be countered since the targets will be
+ * illegal"). Its targets stay (rulings). The stack item keeps what was worked out as it was cast (castSpell), so that's
+ * worked out again from the new text, the same way, when the old text gives what it has now.
+ */
+function respell(s: GameState, o: GameObject, before: CardDef, after: CardDef) {
+  const item = s.stack.find((x) => x.kind === "spell" && x.objectId === o.id);
+  if (!item?.body) return;
+  const how: CastHow = {
+    ...(o.kicked?.length ? { kicks: o.kicked } : {}),
+    ...(o.bargained ? { bargained: true } : {}),
+    ...(o.evidence ? { evidence: true } : {}),
+    ...(o.teamwork ? { teamwork: true } : {}),
+    ...(o.gift !== undefined ? { gift: true } : {}),
+    ...(o.castAlt ? { alt: o.castAlt } : {}),
+    ...(o.face !== undefined ? { face: o.face } : {}),
+  };
+  const body = (d: CardDef) => {
+    const spell = compileCard(d).spell;
+    return spell && settleDivided(s, gateBody(withModes(spell, item.modes), how), { controller: item.controller, sourceId: o.id, x: item.x ?? 0 });
+  };
+  const old = body(before);
+  const now = body(after);
+  if (old && now && JSON.stringify(old) === JSON.stringify(item.body) && now.targets.length === old.targets.length) item.body = now;
+}

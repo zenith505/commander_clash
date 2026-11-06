@@ -47,6 +47,8 @@ export function changeWords(text: string, c: TextChange, names: string[]): strin
   let t = text;
   for (const n of [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length)) t = t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc(n)}(?![\\p{L}\\p{N}])`, "gu"), hide);
   t = t.replace(/(\bnamed )([A-Z][\w'-]*(?:,? (?:of|the|and|[A-Z][\w'-]*))*)/g, (_, a: string, n: string) => `${a}${hide(n)}`);
+  // Each new word is marked while articles before it are fixed ("a Island" is "an Island", "an Elf" becomes "a Goblin").
+  const mark = (w: string) => `\u0006${w}\u0006`;
   if (c.kind === "color") {
     // "Black", "black", "nonblack", "non-black" (CR 105.1, 612.2); never a mana symbol (rulings: "won't change mana symbols").
     t = t.replace(new RegExp(`(?<![\\p{L}])(non-?)?(${esc(c.from)})(?![\\p{L}])`, "giu"), (_, non: string | undefined, w: string) => `${non ?? ""}${cased(w, c.to)}`);
@@ -54,18 +56,23 @@ export function changeWords(text: string, c: TextChange, names: string[]): strin
     // "Island", "Islands", "islandwalk", "Islandcycling", "non-Island", "nonIsland" (CR 205.3i, 702.14, 702.29).
     const plural = (w: string) => (w === "Plains" ? "Plains" : `${w}s`);
     const fromPlural = plural(c.from);
-    t = t.replace(new RegExp(`(?<![\\p{L}])(non-?)?(${esc(fromPlural)}|${esc(c.from)})(walk|cycling)?(?![\\p{L}])`, "giu"), (m: string, non: string | undefined, w: string, suffix: string | undefined) => {
-      // "Plains" is both singular and plural: it stays one word ("Plains" -> "Island" reads "Island(s)" by the context
-      // the engine parses: a plural after "number of", "all", "two" and such).
-      const isPlural = w.toLowerCase() === fromPlural.toLowerCase() && fromPlural !== c.from;
-      return `${non ?? ""}${cased(w, isPlural ? plural(c.to) : c.to)}${suffix ?? ""}`;
+    t = t.replace(new RegExp(`(?<![\\p{L}])(non-?)?(${esc(fromPlural)}|${esc(c.from)})(walk|cycling)?(?![\\p{L}])`, "giu"), (m: string, non: string | undefined, w: string, suffix: string | undefined, at: number, all: string) => {
+      // "Plains" is both singular and plural: plural where the words before it count ("all Plains", "two Plains", "other
+      // Plains", "untapped Plains", "number of Plains", "are Plains"), not before "card", or it's what "you control" ("Plains you control").
+      const before = all.slice(Math.max(0, at - 40), at);
+      const after = all.slice(at + m.length, at + m.length + 20);
+      const pluralPlains = c.from === "Plains" && !non && !suffix && !/^\s+cards?\b/.test(after) && !/\b(?:a|an|target|another|each|that|this|enchanted)\s+(?:(?:basic|snow|tapped|untapped|nonbasic)\s+)*$/i.test(before) && (/\b(?:all|are|other|two|three|four|five|six|seven|more|of|untapped|tapped|X|any number of|\d+)\s+(?:(?:basic|snow)\s+)?$/i.test(before) || /^\s+(?:you|they|your opponents|an opponent|that player|defending player) control/.test(after));
+      const isPlural = pluralPlains || (w.toLowerCase() === fromPlural.toLowerCase() && fromPlural !== c.from);
+      const word = cased(w, isPlural ? plural(c.to) : c.to);
+      return `${non ?? ""}${suffix || non ? word : mark(word)}${suffix ?? ""}`;
     });
   } else {
     // A creature type is written capitalized ("Goblin", "Goblins", "non-Goblin"): only those words (CR 205.3m).
     const fromForms = creatureForms(c.from);
     const toPlural = creatureTypePlural(c.to);
-    t = t.replace(new RegExp(`(?<![\\p{L}'-])(non-)?(${fromForms.map(esc).join("|")})(?![\\p{L}'])`, "gu"), (_, non: string | undefined, w: string) => `${non ?? ""}${w === c.from ? c.to : toPlural}`);
+    t = t.replace(new RegExp(`(?<![\\p{L}'-])(non-)?(${fromForms.map(esc).join("|")})(?![\\p{L}'])`, "gu"), (_, non: string | undefined, w: string) => `${non ?? ""}${non ? (w === c.from ? c.to : toPlural) : mark(w === c.from ? c.to : toPlural)}`);
   }
+  t = t.replace(/\b([Aa])n? \u0006([^\u0006]+)\u0006/g, (_, a: string, w: string) => `${a}${/^[AEIOU]/i.test(w) ? "n" : ""} ${w}`).replace(/\u0006/g, "");
   return t.replace(/\u0005(\d+)\u0005/g, (_, i: string) => kept[Number(i)]!);
 }
 

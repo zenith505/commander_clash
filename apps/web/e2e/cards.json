@@ -5992,6 +5992,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2847c8a0-f6aa-4e4a-a7b8-fc116436a264",
+  "name": "Demonic Hordes",
+  "manaCost": "{3}{B}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "{T}: Destroy target land.\nAt the beginning of your upkeep, unless you pay {B}{B}{B}, tap this creature and sacrifice a land of an opponent's choice.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dac85722-d741-4584-8b98-8ac220958a38",
   "name": "Demonmail Hauberk",
   "manaCost": "{4}",
@@ -8878,6 +8908,40 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2026-06-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e8521fdf-0896-4747-8c66-ea3bb69eb876",
+  "name": "Gabriel Angelfire",
+  "manaCost": "{3}{G}{G}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Angel",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose flying, first strike, trample, or rampage 3. Gabriel Angelfire gains that ability until your next upkeep. (Whenever a creature with rampage 3 becomes blocked, it gets +3/+3 until end of turn for each creature blocking it beyond the first.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

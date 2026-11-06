@@ -1,6 +1,6 @@
 # Roadmap
 
-30,120 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+30,130 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
@@ -5931,6 +5931,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   damage is dealt, a trigger condition), Whipgrass Entangler (the granted attack and block cost counts every Cleric on
   the battlefield as it's paid, two of them cumulative, rulings). Bots now put Auras whose triggers hurt the enchanted
   permanent's controller (Artifact Possession, Psychic Venom) on an opponent's permanent. +12 (30,120 of 31,936 with B121 and rounds 288-289).
+- Round B123 (least played first, from the skip lists): Cyclone (sacrifice it unless you pay {G} for each wind counter,
+  then "If you pay" it deals that much damage to each creature and each player), Rogue Skycaptain (pay {2} for each wage counter; if you don't, remove them
+  all and an opponent gains control of it: the bot hands it to the weakest opponent), Gargantuan Gorilla (unless you
+  sacrifice a Forest it's sacrificed and deals 7 damage to you; a snow Forest sacrificed this way gives it trample: the
+  last known snow supertype, CR 608.2h), Demonic Hordes (unless you pay {B}{B}{B}, tap it and an opponent you choose picks
+  one of your lands for you to sacrifice, with a browser test of the pick), Hedron Alignment (reveal your hand: you win if
+  you own a card named Hedron Alignment in exile, in your hand, in your graveyard and on the battlefield; tokens and
+  face-down cards don't count, rulings), Stangg (a legendary token named Stangg Twin, exiled when Stangg leaves; Stangg
+  sacrificed when the token leaves, each tied to that object only, CR 400.7), Splintering Wind (a Splinter token with
+  flying and cumulative upkeep {G} that deals 1 damage to you and each creature you control when it leaves: the token is
+  the source, by its last known information), Orcish Farmer (a land becomes a Swamp until its controller's next untap
+  step: a new duration ending as that player's untap step begins), Gabriel Angelfire (your choice of flying, first
+  strike, trample or rampage 3 until your next upkeep, with a browser test of the Rampage 3 button), Wellspring (you gain
+  control of the enchanted land until end of turn on entering and at your upkeep; bots enchant an opponent's land).
+  +10 (30,130 of 31,936 with B122).
+- Out after round B123 (looked at, not done): Misfortune, Library of Lat-Nam and Fatal Lore (an opponent chooses the mode
+  as the spell is cast, CR 700.2e), Kheru Lich Lord (a returned card's abilities and its exile replacement), Fasting (an
+  optional draw-step skip with a counter rider), Matopi Golem and Skeleton Scavengers (a rider on one regeneration
+  shield, a choice among shields), Thirsting Axe (combat damage dealt to creatures this turn isn't tracked), Heat Wave (a
+  block tax paid in life), Rohgahh of Kher Keep (payment to keep the Kobolds, then control of all of them to an opponent),
+  Evangelize and Echo Chamber (a target an opponent chooses for your spell or ability).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
   dealing damage to several things doesn't report as one yet), Guardian Beast ("can't be enchanted" for other permanents
   while it's untapped, with "doesn't remove Auras already attached" and a control rule), Tetravus (its tokens' plain "can't be

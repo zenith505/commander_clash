@@ -115,6 +115,9 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const by = choose(m[1], m[2]);
     const to = m[3] ? protectedAny(m[3], ctx) : undefined;
     if (!by || to === null) return null;
+    // Reflect Damage: "that damage is dealt to that source's controller instead": whoever controls the chosen source as
+    // the damage would be dealt (CR 614.9), whatever it would be dealt to.
+    if (m[5] === "that source's controller") return rule({ by: { choose: by }, ...(to ? { to } : {}), nextTime: true, redirectToSourceController: true });
     const redirect = /^prevent/i.test(m[4]!) ? undefined : m[5] ? destination(m[5], ctx) : ({ ref: "you" } as const);
     if (redirect === null) return null;
     return rule({ by: { choose: by }, ...(to ? { to } : {}), nextTime: true, ...(redirect ? { redirect } : {}) });
@@ -281,6 +284,14 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const target = ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many && !ctx.lastChosen ? ctx.lastObjectTarget : undefined;
     const redirect: DamageRecipient | null = ctx.lastChosen && target === undefined ? { ref: "created" } : target !== undefined ? { ref: "target", index: target } : null;
     return to && redirect ? rule({ to, redirect }) : null;
+  }
+  // Ascent of the Worthy: "Choose a creature you control. Until your next turn, all damage that would be dealt to
+  // creatures you control is dealt to that creature instead": the one chosen as it resolves, not targeted; damage to
+  // creatures its controller controls then, even if the chosen one changes controller; none while it's gone (rulings,
+  // CR 614.9, 611.2b).
+  if (/^Until your next turn, all damage that would be dealt to creatures you control is dealt to that creature instead$/.test(s)) {
+    const to = protectedGroup("creatures you control");
+    return to && ctx.lastChosen ? rule({ to, redirect: { ref: "created" }, untilYourNextTurn: true }) : null;
   }
   // Turn the Tables: "All combat damage that would be dealt to you this turn is dealt to target attacking creature
   // instead": to that creature while it's on the battlefield, even if it's been removed from combat; not if it's gone

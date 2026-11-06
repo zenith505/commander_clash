@@ -1568,6 +1568,8 @@ export interface DamageRuleSpec {
   redirect?: DamageRecipient;
   /** "That spell deals that damage to its controller instead" (Aegis of Honor): to the source's controller as the damage would be dealt (CR 614.9). */
   redirectToSourceController?: true;
+  /** "Until your next turn, ..." (Ascent of the Worthy): it lasts until its controller's next turn begins, not just this turn (CR 611.2b). */
+  untilYourNextTurn?: true;
   /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
@@ -2444,6 +2446,7 @@ export type Effect =
       divided?: true;
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
+      /** Lava Burst: "If ~ would deal damage to a creature, that damage can't be prevented or dealt instead to another permanent or player" (CR 615.12): its damage to creatures only. */ toCreaturesUnalterable?: true;
       /** Errant Minion: "Prevent X of that damage, where X is ...": each recipient's damage less this, unless it can't be prevented (CR 615.1a, 615.12). */ preventOf?: Amount;
       /** Banefire: "If X is 5 or more, ... the damage can't be prevented": while the spell's X is at least this (CR 615.12). */ unpreventableX?: number;
       /** Demonfire: "If you have no cards in hand, ... the damage can't be prevented": while this holds as the damage is dealt (CR 615.12). */ unpreventableIf?: StaticCondition;
@@ -6292,6 +6295,8 @@ export interface CostMod {
   perSameNameInGraveyard?: true;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
   nth?: number;
+  /** "The first kicked spell you cast each turn" (Vine Gecko): only a spell cast with its kicker paid (CR 702.33d); `nth` counts kicked ones. */
+  kicked?: true;
   /** Only while this holds: a Class level's (CR 716.2a). */
   if?: StaticCondition;
   /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
@@ -6583,6 +6588,12 @@ export interface CompiledCard {
   libraryInsteadOfDying?: "top" | "bottom";
   /** Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead" (CR 614.1a). */
   handInsteadOfDying?: TargetSpec;
+  /** Coalition Honor Guard: opponents choosing targets for spells they cast and abilities they activate must choose a Flagbearer if able (rulings, CR 601.2c). */
+  flagbearerRule?: true;
+  /** Firestorm Phoenix: "If ~ would die, return it to its owner's hand instead. Until that player's next turn, that player plays with that card revealed in their hand and can't play it." */
+  rebirthToHand?: true;
+  /** Keen-Eared Sentry: "Each opponent can't venture into the dungeon more than once each turn" (CR 701.49). */
+  ventureOncePerTurn?: true;
   /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
   regeneratesInsteadOfDestroyed?: true;
   /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */

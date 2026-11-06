@@ -49,6 +49,8 @@ export interface DamageRule {
   /** A copy of a `sourceController` rule for one controller of the source (planShields): that player, and the rule it's from. */
   srcController?: PlayerId;
   base?: string;
+  /** "Until your next turn" (Ascent of the Worthy): it lasts past this turn, until `controller`'s next turn begins (CR 611.2b). */
+  untilYourNextTurn?: true;
   /** Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library" (CR 615.5): its controller exiles them, even if the damage can't be prevented (rulings, 615.12). */
   exileTop?: true;
   gainLife?: { colors?: Color[] };
@@ -922,7 +924,9 @@ export interface Player {
    */
   /** How many creatures this player declared as attackers in this turn's latest combat (Kytheon, Hero of Akros: "~ and at least two other creatures attacked this combat"). */
   attackedCombat?: { turn: number; combat: number; n: number };
-  attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all">; /** The players each one was declared attacking, not their planeswalkers (Ramses, Assassin Lord). */ to?: Record<string, PlayerId[]> };
+  /** The last turn this player ventured into the dungeon (Keen-Eared Sentry, CR 701.49). */
+  venturedTurn?: number;
+  attackedWith?: { turn: number; keys: string[]; /** Each one's creature types as it was declared ("all" with changeling-like), for "you attacked with three or more Merfolk this turn" (Deepway Navigator). */ kinds?: Record<string, string[] | "all">; /** The players each one was declared attacking, not their planeswalkers (Ramses, Assassin Lord). */ to?: Record<string, PlayerId[]>; /** Each one's other subtypes as it was declared, artifact types such as Spacecraft (Thaumaton Torpedo). */ others?: Record<string, string[]> };
   /**
    * The total power of the creatures this player declared as attackers in the latest combat, as they were declared, and its
    * turn (pack tactics: a later change of power, or an attacker leaving, doesn't matter; AFR release notes).
@@ -1833,7 +1837,7 @@ export interface GameState {
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
-  castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** Its card types as it was cast (April O'Neil, Hacktivist). */ types?: string[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true; /** Its mana value on the stack (CR 202.3e). */ mv?: number }[];
+  castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** Its card types as it was cast (April O'Neil, Hacktivist). */ types?: string[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true; /** Its mana value on the stack (CR 202.3e). */ mv?: number; /** Its kicker cost was paid (CR 702.33d; Vine Gecko). */ kicked?: true }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
   costModsThisTurn?: { player: PlayerId; mod: CostMod; /** Until that player's next turn begins, not just this turn (CR 611.2b, 800.4m). */ untilYourNextTurn?: true; /** Only the next matching spell that player casts this turn, removed as it becomes cast (Hardened Berserker). */ next?: true }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
@@ -1887,6 +1891,8 @@ export interface GameState {
   preventCombatDamage?: boolean;
   /** Prevention and redirection effects from resolved spells and abilities that apply to damage this turn (see DamageRule). */
   damageRules?: DamageRule[];
+  /** Firestorm Phoenix: cards returned to a hand that are revealed there and can't be played until `player`'s next turn, while they're that object (`zc`) in the hand. */
+  cantPlayUntilTurn?: { id: ObjectId; zc: number; player: PlayerId; card: string }[];
   /**
    * Combat damage about to be dealt, waiting on choices about which of it damage shields apply to (CR 615.7, 616.1):
    * the damage as assigned, and the options picked so far (see damage.ts planShields).

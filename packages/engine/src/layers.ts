@@ -1962,10 +1962,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (!list.includes(you)) list.push(you);
       return;
     }
-    case "cantBeBlockedByGreaterPower":
     case "cantBeEnchantedByOthers":
       if (e.sourceId !== undefined) c.enchantedOnlyBy = [...c.enchantedOnlyBy, e.sourceId];
       return;
+    case "cantBeBlockedByGreaterPower":
     case "cantBlockGreaterPower":
     case "cantBlockPowerAtLeastToughness":
     case "cantAttackAlone":

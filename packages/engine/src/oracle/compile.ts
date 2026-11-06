@@ -2273,6 +2273,19 @@ export function compile(d: CardDef): CompiledCard {
       out.sacrificeInsteadOfEnchantedDestroyed = true;
       continue;
     }
+    if (line === "If ~ would die, return it to its owner's hand instead. Until that player's next turn, that player plays with that card revealed in their hand and can't play it.") {
+      out.rebirthToHand = true;
+      continue;
+    }
+    if (line === "Each opponent can't venture into the dungeon more than once each turn.") {
+      out.ventureOncePerTurn = true;
+      continue;
+    }
+    // Coalition Honor Guard, Standard Bearer, Coalition Flag: the Flagbearer targeting rule (see flagbearerProblem).
+    if (line === "While an opponent is choosing targets as part of casting a spell they control or activating an ability they control, that player must choose at least one Flagbearer on the battlefield if able.") {
+      out.flagbearerRule = true;
+      continue;
+    }
     // Necromancer's Magemark: "If a creature you control that's enchanted would die, return it to its owner's hand instead."
     if (line === "If a creature you control that's enchanted would die, return it to its owner's hand instead.") {
       const filter = parseTargetPhrase("creature you control that's enchanted");

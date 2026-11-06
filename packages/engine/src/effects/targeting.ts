@@ -1173,6 +1173,54 @@ export function targetProblem(s: GameState, specs: TargetSpec[], targets: Target
   return divisionProblem(specs, t);
 }
 
+/** The Flagbearers on the battlefield: creatures with the creature type, changelings too (CR 205.3m, 702.73a). */
+export function flagbearers(s: GameState): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const c = characteristics(s, obj(s, id));
+    return c.types.includes("Creature") && (c.allCreatureTypes || c.subtypes.includes("Flagbearer"));
+  });
+}
+
+/** The permanent whose Flagbearer rule binds `pid` (an opponent of its controller), if any (Coalition Honor Guard). */
+export function flagbearerRuleFor(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).flagbearerRule && controllerOf(s, obj(s, id)) !== pid);
+}
+
+/**
+ * Coalition Honor Guard, Standard Bearer, Coalition Flag: "While an opponent is choosing targets as part of casting a
+ * spell they control or activating an ability they control, that player must choose at least one Flagbearer on the
+ * battlefield if able" (CR 601.2c): anyone's Flagbearer; not triggered abilities, copies or changed targets (rulings).
+ * Choosing one is possible when some target slot could have one instead, the others as chosen; `many`, the printed
+ * "any number of targets" specs, which could take one more.
+ */
+export function flagbearerProblem(s: GameState, specs: TargetSpec[], targets: TargetChoice[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId, many: TargetSpec[] = []): string | null {
+  const rule = flagbearerRuleFor(s, controller);
+  if (!rule) return null;
+  const flags = flagbearers(s);
+  if (!flags.length || targets.some((t) => t.kind === "object" && flags.includes(t.id))) return null;
+  const able =
+    specs.some((spec, i) => !spec.divided && flags.some((id) => canChooseTarget(s, specs, targets, i, { kind: "object", id }, controller, src, sourceId))) ||
+    many.some((spec) => flags.some((id) => isLegalTarget(s, spec, { kind: "object", id }, controller, src)));
+  return able ? `you must choose a Flagbearer as a target (${characteristics(s, obj(s, rule)).name})` : null;
+}
+
+/**
+ * For the target pickers (the UI): whether choosing `c` for the next slot still leaves a way to meet the Flagbearer rule
+ * (flagbearerProblem): a Flagbearer is chosen now or already, a later slot could still take one, or none could anyway.
+ */
+export function flagbearerAllows(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], c: TargetChoice, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
+  if (!flagbearerRuleFor(s, controller)) return true;
+  const flags = flagbearers(s);
+  const isFlag = (t: TargetChoice) => t.kind === "object" && flags.includes(t.id);
+  if (!flags.length || isFlag(c) || chosen.some(isFlag)) return true;
+  const k = chosen.length;
+  const rest: TargetChoice[] = Array.from({ length: Math.max(0, specs.length - k - 1) }, () => ({ kind: "none" }));
+  const after = [...chosen, c, ...rest];
+  for (let j = k + 1; j < specs.length; j++)
+    if (!specs[j]!.divided && flags.some((id) => canChooseTarget(s, specs, after.slice(0, j), j, { kind: "object", id }, controller, src, sourceId))) return true;
+  return flagbearerProblem(s, specs, after, controller, src, sourceId) === null;
+}
+
 /** "Divided as you choose" (CR 601.2d): each target chosen gets at least 1, and the parts add up to the amount. */
 export function divisionProblem(specs: TargetSpec[], t: TargetChoice[]): string | null {
   const part = (c: TargetChoice | undefined) => (c && (c.kind === "object" || c.kind === "player") ? c.amount : undefined);

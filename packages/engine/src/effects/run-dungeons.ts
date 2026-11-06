@@ -26,6 +26,13 @@ export function runDungeonsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src:
 function venture(s: GameState, pid: PlayerId, undercity: boolean, src: string): "paused" | void {
   const p = player(s, pid);
   if (p.lost) return;
+  // Keen-Eared Sentry: "Each opponent can't venture into the dungeon more than once each turn": venturing into Undercity
+  // too, a variant of it (CR 701.49d).
+  const sentry = p.venturedTurn === s.turn ? s.battlefield.find((id) => abilitiesOf(s, s.objects[id]!).ventureOncePerTurn && controllerOf(s, s.objects[id]!) !== pid) : undefined;
+  if (sentry) {
+    log(s, `${p.name} can't venture into the dungeon again this turn (${s.cards[s.objects[sentry]!.cardId]?.name ?? "Keen-Eared Sentry"}).`);
+    return;
+  }
   const sc = (s.resolving!.scratch ??= {});
   const cur = p.dungeon && dungeonByName(p.dungeon.name);
   const next = cur ? cur.rooms[p.dungeon!.room]!.next : [];
@@ -60,6 +67,7 @@ function venture(s: GameState, pid: PlayerId, undercity: boolean, src: string): 
 
 /** Move the venture marker into a room; its room ability triggers, controlled by the dungeon's owner (CR 309.4c). */
 function enterRoom(s: GameState, p: Player, d: Dungeon, room: number) {
+  p.venturedTurn = s.turn;
   const def = dungeonDef(d);
   s.cards[def.oracleId] ??= def;
   p.dungeon = { name: d.name, room };

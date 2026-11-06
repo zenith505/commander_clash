@@ -1191,6 +1191,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Ramses, Assassin Lord: only the ones declared attacking the event's player.
       if (cond.eventPlayer && (eventPlayer === undefined || w?.turn !== s.turn)) return false;
       const keys = cond.eventPlayer ? w!.keys.filter((k) => !!w!.to?.[k]?.includes(eventPlayer!)) : (w?.keys ?? []);
+      // A Spacecraft isn't a creature type: only its own subtypes count, not changeling's (CR 702.73a).
+      if (cond.subtype && !CREATURE_TYPES.has(cond.subtype)) return w?.turn === s.turn && keys.filter((k) => !!w.others?.[k]?.includes(cond.subtype!)).length >= cond.n;
       if (cond.subtype) return w?.turn === s.turn && keys.filter((k) => w.kinds?.[k] === "all" || !!(w.kinds?.[k] as string[] | undefined)?.includes(cond.subtype!)).length >= cond.n;
       return w?.turn === s.turn && keys.length >= cond.n;
     }

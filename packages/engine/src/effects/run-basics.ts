@@ -250,7 +250,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       let events: DamageEvent[] = [
-        ...all.flatMap((x) => x.objs.map((o): DamageEvent => ({ src: from, to: { object: o.id }, n: x.n }))),
+        // Lava Burst: to a creature, the damage can't be prevented or redirected (CR 615.12, 614.9).
+        ...all.flatMap((x) => x.objs.map((o): DamageEvent => ({ src: e.toCreaturesUnalterable && objIsType(s, o, "Creature") ? { ...from, unpreventable: "all", noRedirect: true } : from, to: { object: o.id }, n: x.n }))),
         ...all.flatMap((x) => x.pids.map((pid): DamageEvent => ({ src: from, to: { player: pid }, n: x.n }))),
       ];
       // Kaervek's Hex: each recipient's parts as one amount (Effect damage `merge`).

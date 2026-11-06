@@ -47,6 +47,8 @@ export interface DamageSource {
   spell?: true;
   /** The damage it deals can't be prevented (CR 615.12): all of it, or its combat damage. */
   unpreventable?: "all" | "combat";
+  /** Lava Burst's damage to a creature: it can't be dealt instead to another permanent or player (redirection, CR 614.9). */
+  noRedirect?: true;
   /** Its mana value, a spell's with its X (CR 202.3), for protection from a mana value. */
   manaValue?: number;
 }
@@ -448,7 +450,7 @@ interface PlanShield {
 // Damage rules (GameState.damageRules): prevention and redirection effects of resolved spells and abilities that
 // aren't a shield on one permanent or player.
 
-const live = (s: GameState) => (s.damageRules ?? []).filter((r) => r.turn === s.turn);
+const live = (s: GameState) => (s.damageRules ?? []).filter((r) => r.turn === s.turn || r.untilYourNextTurn);
 
 /**
  * The damage rules permanents' static abilities make for this damage (CR 615.1a), worked out as it would be dealt: Cover
@@ -795,7 +797,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   // Pariah).
   const staticRedirect = (k: string) => k.startsWith("static-redirect:");
   const takes = (sh: PlanShield, e: DamageEvent) =>
-    (sh.kind !== "prevent" || prev(e)) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
+    (sh.kind !== "prevent" || prev(e)) && !(sh.kind === "redirect" && e.src.noRedirect) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
   let queue = events.filter((e) => e.n > 0).map((e) => ({ ...e, applied: e.applied ?? [] }));
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you

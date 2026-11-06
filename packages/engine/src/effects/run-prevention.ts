@@ -109,6 +109,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return spell ? cardIdOf(spell) : (item?.sourceCardId ?? Object.keys(s.cards).find((k) => s.cards[k] === ctx.sourceDef) ?? "");
     })(),
     ...(spec.combat ? { combat: spec.combat } : {}),
+    ...(spec.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}),
   };
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {

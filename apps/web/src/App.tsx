@@ -50,6 +50,7 @@ import {
   describeTargets,
   describeCount,
   canChooseTarget,
+  flagbearerAllows,
   sameTarget,
   divisionProblem,
   legalModes,
@@ -673,7 +674,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         ? true // kept, legal or not (CR 115.7d)
         : inRun
           ? runSlot(c) >= 0
-          : !(retargeted && c.kind === "stack" && c.id === retargeted.id) && canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, targetController, targetQuality, targetSource));
+          : !(retargeted && c.kind === "stack" && c.id === retargeted.id) &&
+            canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, targetController, targetQuality, targetSource) &&
+            // Coalition Honor Guard: a Flagbearer must be among the targets of a spell cast or an ability activated, if able.
+            ((targeting.mode !== "cast" && targeting.mode !== "activate") || flagbearerAllows(s, targeting.specs, targeting.chosen, c, targetController, targetQuality, targetSource)));
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;

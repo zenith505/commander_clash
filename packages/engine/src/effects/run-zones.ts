@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -3134,6 +3134,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const back = exiled.filter(([id, zc]) => s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === zc).map(([id]) => id);
       if (back.length) log(s, `${src} puts ${back.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
       enterTogether(s, () => back.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
+      return;
+    }
+    case "exiledCardToGraveyard": {
+      // Binding Negotiation: "you may put a face-up exiled card they own into their graveyard": chosen as it resolves, not
+      // targeted; a face-down exiled card can't be chosen (CR 406.3).
+      const sc = (s.resolving!.scratch ??= {});
+      const pid = players(s, e.owner, ctx)[0];
+      if (pid === undefined) return;
+      const p = player(s, pid);
+      const faceUp = (id: ObjectId) => {
+        const o = s.objects[id];
+        return !!o && o.zone === "exile" && o.owner === pid && !o.isToken && !o.faceDown && faceDownExileGroup(o) === undefined;
+      };
+      if (!sc.found) {
+        const cards = p.exile.filter(faceUp);
+        if (!cards.length) return;
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `up to one face-up exiled card ${p.name} owns`, cards, min: 0, max: 1, exiled: true, dig: { looked: cards, to: `to put into ${p.name}'s graveyard`, rest: "stay in exile" } };
+        return "paused";
+      }
+      const found = sc.found.filter(faceUp);
+      sc.found = undefined;
+      for (const id of found) {
+        log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from exile into ${p.name}'s graveyard.`);
+        moveObject(s, id, "graveyard");
+      }
       return;
     }
     case "putInGraveyard":

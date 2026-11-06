@@ -1603,6 +1603,8 @@ export interface TurnLog {
   searched?: PlayerId[];
   /** The owners of cards that left their graveyard this turn (Gau, Feral Youth). */
   leftGraveyard?: PlayerId[];
+  /** The owners of creature cards that left their graveyard this turn (Syrix, Carrier of the Flame). */
+  creatureCardLeftGraveyard?: PlayerId[];
   /** How many cards left each player's graveyard this turn (Bonecache Overseer's "three or more cards"). */
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
   /** The players a permanent was put into the hand of from the battlefield this turn, its owner's (CR 400.3), a token too (Barrin, Tolarian Archmage). */
@@ -1707,6 +1709,8 @@ export interface TurnLog {
   damagedCreature?: string[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
+  /** The damage each source (`id@zoneChanges`, a card's name without one) dealt to each player this turn (Vessel of the All-Consuming). */
+  sourceToPlayer?: Record<string, Record<number, number>>;
   /** The damage each source dealt in total, by the player who controlled it as it dealt it (Dragon Cultist). */
   sourceDamage?: Record<number, Record<string, number>>;
   /** Noncombat damage dealt by sources of each color, by the player who controlled each as it dealt it (Temple of Power). */

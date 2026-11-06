@@ -165,7 +165,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       }
       return;
-    case "exileTop":
+    case "exileTop": {
+      // Several players' libraries (Pako, Arcane Retriever: "the top card of each player's library"): "exiled this way" is
+      // every player's cards, not only the last player's.
+      const allExiled: ObjectId[] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         // Scalpelexis: "If two or more of those cards have the same name, repeat this process": as often as it takes not
@@ -197,9 +200,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          if (e.counters && o.zone === "exile") for (const [k, n] of Object.entries(e.counters)) o.counters[k] = (o.counters[k] ?? 0) + n;
         }
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
-        if (s.resolving) s.resolving.exiledTopCards = ids;
+        allExiled.push(...ids);
+        if (s.resolving) s.resolving.exiledTopCards = e.counters ? [...allExiled] : ids;
         // An empty library: nothing happens (ingest rulings).
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
         // Only permanent cards can be put onto the battlefield (CR 110.4b); they enter at the same time.
@@ -210,6 +215,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       }
       return;
+    }
     case "suspendExiledTop":
       for (const id of s.resolving?.exiledTopCards ?? []) {
         const o = s.objects[id];

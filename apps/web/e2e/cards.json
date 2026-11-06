@@ -2295,6 +2295,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "86dc3a41-4fb9-4b1f-8279-2b5edbc7e170",
+  "name": "Binding Negotiation",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You may choose a nonland card from it. If you do, they discard it. Otherwise, you may put a face-up exiled card they own into their graveyard.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
   "name": "Birds of Paradise",
   "manaCost": "{G}",

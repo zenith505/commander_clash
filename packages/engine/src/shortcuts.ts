@@ -401,6 +401,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     playedFromExile: t.playedFromExile,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,
     permanentToHand: t.permanentToHand,
+    creatureCardLeftGraveyard: t.creatureCardLeftGraveyard,
     descended: capped(t.descended ?? {}),
     creaturesExiled: capped(t.creaturesExiled ?? {}),
     // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.
@@ -414,6 +415,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     toGraveyardTypes: capped(t.toGraveyardTypes ?? {}),
     diedDamaged: Math.min(t.diedDamaged?.length ?? 0, TURN_LOG_CAP),
     // The most damage one source dealt counts to 5 (Dragon Cultist).
+    // Vessel of the All-Consuming counts to 10.
+    sourceToPlayer: Object.fromEntries(Object.entries(t.sourceToPlayer ?? {}).map(([k, v]) => [k, Math.min(Math.max(0, ...Object.values(v)), 10)])),
     sourceDamage: Object.fromEntries(Object.entries(t.sourceDamage ?? {}).map(([k, v]) => [k, Math.min(Math.max(0, ...Object.values(v)), 5)])),
     toOwnGraveyardTypes: t.toOwnGraveyardTypes,
     damageSources: capped(Object.fromEntries(Object.entries(t.damageSources ?? {}).map(([k, v]) => [k, v.length]))),

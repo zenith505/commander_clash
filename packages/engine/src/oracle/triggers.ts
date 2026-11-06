@@ -3651,6 +3651,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
   // Gate Colossus: "you may put ~ from your graveyard on top of your library", the same.
+  // Syrix, Carrier of the Flame: "Whenever another Phoenix you control dies, you may cast ~ from your graveyard": the
+  // effect moves the card out of the graveyard, so the ability works only there (CR 113.6m; rulings: it doesn't trigger
+  // if Syrix dies at the same time). Cast as it resolves or not at all, paying its costs (rulings, CR 608.2g).
+  const castSelfYard = /^((?:When|Whenever) another [A-Z][a-z]+ you control dies), you may cast ~ from your graveyard\.$/.exec(line);
+  if (castSelfYard) {
+    const t = parseTrigger(`${castSelfYard[1]}, draw a card.`);
+    if (!t || t === "fail" || t.event !== "permanentDies" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || t.ifCond) return "fail";
+    return { ...t, body: { targets: [], effects: [{ type: "castNow", what: { ref: "selfCard" } }], text: "you may cast ~ from your graveyard" }, zone: "graveyard" };
+  }
   // Old One Eye: "you may discard two cards. If you do, ...": only with two cards in hand (see canDoNow).
   // Akuta, Born of Ash: "you may sacrifice a Swamp. If you do, return ~ from your graveyard to the battlefield".
   const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:(?:pay [^.]+|discard (?:a card|two cards)|sacrifice an? [A-Z][a-z]+)\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
@@ -3732,6 +3741,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (notAttack) {
     const t = parseTrigger(`${notAttack[1]}, ${notAttack[2]}`);
     return t && t !== "fail" && t.event === "permanentBecomesTapped" ? { ...t, notDeclaringAttack: true } : "fail";
+  }
+  // Vessel of the All-Consuming: "Whenever ~ deals damage to a player, if it has dealt 10 or more damage to that player this
+  // turn, they lose the game.": all the damage this object dealt that player this turn, this damage included, as it
+  // triggers and again as it resolves (CR 603.4).
+  const vessel = /^(Whenever ~ deals damage to a player), if it has dealt (\d+) or more damage to that player this turn, (they|that player) loses? the game\.$/.exec(line);
+  if (vessel) {
+    const t = parseTrigger(`${vessel[1]}, that player loses the game.`);
+    if (!t || t === "fail" || t.ifCond || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "loseGame") return "fail";
+    return { ...t, ifCond: { kind: "selfDealtEventPlayer", min: Number(vessel[2]) } };
   }
   // Lolth, Spider Queen's emblem: "Whenever an opponent is dealt combat damage by one or more creatures you control, if
   // that player lost less than 8 life this turn, they lose life equal to the difference": once for each opponent, after

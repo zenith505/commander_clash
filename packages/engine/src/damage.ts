@@ -312,6 +312,10 @@ export function dealDamage(
       if (!list.includes(`${from.id}@${zc}`)) list.push(`${from.id}@${zc}`);
     }
     (s.damageThisTurn ??= {})[p.id] = (s.damageThisTurn[p.id] ?? 0) + n;
+    // Vessel of the All-Consuming: "if it has dealt 10 or more damage to that player this turn": each source as the object
+    // it is (CR 400.7), to each player.
+    const toPlayer = ((s.turnLog ??= {}).sourceToPlayer ??= {})[key] ??= {};
+    toPlayer[p.id] = (toPlayer[p.id] ?? 0) + n;
     if (!opts.combat) ((s.turnLog ??= {}).noncombatDamage ??= {})[p.id] = (s.turnLog.noncombatDamage?.[p.id] ?? 0) + n;
     if (src.types.includes("Artifact")) ((s.turnLog ??= {}).artifactDamage ??= {})[p.id] = (s.turnLog.artifactDamage?.[p.id] ?? 0) + n;
     // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).

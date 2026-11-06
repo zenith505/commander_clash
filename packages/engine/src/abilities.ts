@@ -2345,7 +2345,7 @@ export type StaticCondition =
   | { kind: "youMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
-  | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number }
+  | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number; /** "If a creature card left your graveyard this turn" (Syrix, Carrier of the Flame). */ creature?: true }
   /** "If a permanent was put into your hand from the battlefield this turn" (Barrin, Tolarian Archmage): the whole turn, a token too (rulings). */
   | { kind: "permanentToYourHand" }
   | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Enters with ... unless you've cast another red spell this turn" (Hotheaded Giant): as it enters, other than itself if it was cast (rulings). */ entering?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color; /** "Another instant or sorcery spell" (Mage Duel): one with any of these card types. */ types?: string[] }
@@ -2362,6 +2362,8 @@ export type StaticCondition =
   | { kind: "eventPlayerPoisoned" }
   /** "If that player lost less than 8 life this turn" (Lolth's emblem): the life the event's player lost this turn (CR 119.3). */
   | { kind: "eventPlayerLifeLost"; max: number }
+  /** Vessel of the All-Consuming: "if it has dealt 10 or more damage to that player this turn": the source, as this object (CR 400.7), to the trigger's player. */
+  | { kind: "selfDealtEventPlayer"; min: number }
   /** "If the player is your opponent" (Fevered Visions): the event's player is an opponent of this ability's controller. */
   | { kind: "eventPlayerOpponent" }
   /** "If they don't have any rad counters" (Vexing Radgull): the trigger's event player has none (CR 122.1, 728.1). */
@@ -3529,7 +3531,7 @@ export type Effect =
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
   | { type: "suspendExiledTop"; filter: TargetSpec }
-  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec; /** "And put a fetch counter on each of them" (Pako, Arcane Retriever): on each card exiled, in exile. */ counters?: Record<string, number> }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -3611,6 +3613,8 @@ export type Effect =
   | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
   | { type: "putInGraveyard"; what: ObjRef }
+  /** Binding Negotiation: "you may put a face-up exiled card they own into their graveyard": up to one, chosen as it resolves (not a target). */
+  | { type: "exiledCardToGraveyard"; owner: PlayerRef }
   /** Champion's first ability (CR 702.72a): "sacrifice it unless you exile another [object] you control". */
   | { type: "champion"; filter: TargetSpec }
   /** Champion's second: "When this permanent leaves the battlefield, return the exiled card to the battlefield under its owner's control." */

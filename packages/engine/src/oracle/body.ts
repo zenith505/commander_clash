@@ -3702,6 +3702,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
     ctx.afterTargetDiscard = last?.type === "discard" && last.who.ref === "target" && !last.who.n;
     ctx.afterExileTop = last?.type === "exileTop";
+    // Pako, Arcane Retriever: "exile the top card of each player's library and put a fetch counter on each of them": in
+    // turn order, each card with the counter as it's in exile (CR 122.1); "exiled this way" is all of them.
+    const exileEachCounter = /^[Ee]xile the top card of each player's library and put an? ([a-z]+) counter on each of them$/.exec(s);
+    if (exileEachCounter) {
+      effects.push({ type: "exileTop", who: { ref: "eachPlayer" }, n: 1, counters: { [counterKind(exileEachCounter[1]!)]: 1 } });
+      continue;
+    }
     // Kari Zev, Skyship Raider: "Create Ragavan, a legendary 2/1 red Monkey creature token. Ragavan enters tapped and
     // attacking.": the token is created tapped and attacking (CR 506.3d), as "a token that's tapped and attacking".
     const named = /^[Cc]reate ([A-Z][a-z]+), (a legendary .+ token)$/.exec(s);
@@ -5461,6 +5468,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si = after.next - 1;
         continue;
       }
+    }
+    // Black Widow, Super Spy: "that player exiles cards from the top of their library until they exile a nonland card. You
+    // may put a +1/+1 counter on ~. If you don't, you may cast the exiled nonland card until end of turn and mana of any
+    // type can be spent to cast that spell.": exiled one at a time, the counter decided after; not put, the card may be
+    // cast this turn with its usual timing, by you though its owner is that player (CR 609.4b for the mana).
+    if (
+      ctx.eventPlayer &&
+      /^[Tt]hat player exiles cards from the top of their library until they exile a nonland card$/.test(s) &&
+      sentences[si + 1] === "You may put a +1/+1 counter on ~" &&
+      sentences[si + 2]?.replace(/\.$/, "") === "If you don't, you may cast the exiled nonland card until end of turn and mana of any type can be spent to cast that spell"
+    ) {
+      effects.push(
+        { type: "exileUntilNonland", who: { ref: "eventPlayer" }, then: "keep" },
+        { type: "may", effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "put a +1/+1 counter on ~" },
+        { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: [{ type: "mayCastFromGraveyard", what: { ref: "revealed" }, inExile: true, anyType: true }] },
+      );
+      si += 2;
+      continue;
     }
     const untilNonland = parseUntilNonland(sentences, si, ctx);
     if (untilNonland === "fail") return null;
@@ -12829,6 +12854,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Fractured Powerstone: "Roll the planar die": in a game that isn't Planechase it has no effect (rulings), and outside
     // Planechase rolling it doesn't count as rolling a die for other abilities either (CR 706.7, 901.9d).
+    // Start the TARDIS: "You may planeswalk": "You may planeswalk only in games using the Planechase variant. If you are
+    // instructed to planeswalk in any other game, nothing happens." (rulings, CR 701.31a).
+    if (s === "You may planeswalk" && ctx.spell) {
+      effects.push({ type: "noEffect", text: "planeswalking does nothing outside a Planechase game" });
+      continue;
+    }
     if (s === "Roll the planar die" && ctx.activated) {
       effects.push({ type: "noEffect", text: "rolling the planar die does nothing outside a Planechase game" });
       continue;
@@ -13022,6 +13053,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: millText ? { ...reflexive, text: millText } : reflexive, ...(mvOf || millMv ? { xDiscardedMv: true as const } : {}) }] });
       continue;
     }
+    // Frenetic Sliver: "If ~ is on the battlefield, flip a coin. If you win the flip, exile ~ and return it ... If you lose
+    // the flip, sacrifice it.": nothing if it has left (rulings: activated many times in response to itself, only one coin
+    // is flipped for it), so then neither "if you win/lose the flip" applies.
+    if (s === "If ~ is on the battlefield, flip a coin" && ctx.activated) {
+      effects.push({ type: "if", cond: { kind: "selfHere" }, effects: [{ type: "flipCoin" }] });
+      continue;
+    }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
     // wasn't flipped ("you may flip a coin").
     const flipped = (es: Effect[]): boolean => es.some((e) => (e.type === "flipCoin" && !e.untilLose) || ((e.type === "may" || e.type === "if") && flipped(e.effects)));
@@ -13050,7 +13088,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "If you win the flip, you may exile ~, then return it to the battlefield transformed ..." (Ral, Monsoon Mage):
       // decided as it resolves, after the flip (CR 608.2d).
       const may = /^you may (exile ~, then return it to the battlefield transformed under its owner's control)$/.exec(ifFlip[2]!);
-      const inner0 = flipped(effects) && parseOne(capital(may ? may[1]! : ifFlip[2]!), ctx);
+      // Frenetic Sliver: "exile ~ and return it to the battlefield under its owner's control at the beginning of the next
+      // end step" (a new object then, CR 400.7), and "If you lose the flip, sacrifice it": ~, the only "it" there.
+      const lastIf = effects[effects.length - 1];
+      const selfFlicker = /^exile ~ and return it to the battlefield under its owner's control at the beginning of the next end step$/.test(ifFlip[2]!);
+      const sacIt = ifFlip[1] === "lose" && ifFlip[2] === "sacrifice it" && lastIf?.type === "if" && lastIf.cond.kind === "wonFlip" && lastIf.effects.length === 1 && lastIf.effects[0]!.type === "flicker" && lastIf.effects[0]!.what.ref === "self";
+      const inner0 = !flipped(effects) ? null : selfFlicker ? [{ type: "flicker" as const, what: { ref: "self" as const }, under: "owner" as const, at: "nextEndStep" as const }] : sacIt ? [{ type: "sacrifice" as const, what: { ref: "self" as const } }] : parseOne(capital(may ? may[1]! : ifFlip[2]!), ctx);
       const inner = inner0 && may ? [{ type: "may" as const, effects: inner0, text: may[1]! }] : inner0;
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "wonFlip", ...(ifFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: inner });
@@ -17007,6 +17050,10 @@ function lastAllChose(e: Effect | undefined): Extract<Effect, { type: "if" }> | 
 }
 
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
+  // Binding Negotiation: "Otherwise, you may put a face-up exiled card they own into their graveyard": the target
+  // opponent's card, chosen as it resolves.
+  if (/^You may put a face-up exiled card (?:they own|that player owns) into their graveyard$/.test(s) && ctx.targets.length === 1 && ctx.targets[0]!.kind === "player")
+    return [{ type: "exiledCardToGraveyard", owner: { ref: "target", index: 0 } }];
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
   // Psionic Entity: "~ deals 2 damage to any target and 3 damage to itself": ~ is dealt the second amount.

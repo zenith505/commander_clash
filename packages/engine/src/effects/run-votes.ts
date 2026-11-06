@@ -24,6 +24,60 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.votesChosenBy = { player: ctx.controller, turn: s.turn };
       log(s, `${player(s, ctx.controller).name} chooses how each player votes this turn.`);
       return;
+    case "bidLife": {
+      // Life bidding (Illicit Auction, Mages' Contest, Pain's Reward): you start with a bid, then the others in turn order
+      // after you may each top the high bid, around and around, until every other bidder has declined to top the bid
+      // that stands (rulings). Bids are life to be lost, not paid, so a bid can be more than a player's life (rulings).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.bid) {
+        const t = e.bidders === "targetSpellController" ? ctx.targets[0] : undefined;
+        const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+        if (e.bidders === "targetSpellController" && !item) return;
+        const order = turnOrderFrom(s, ctx.controller).filter((pid) => e.bidders === "each" || pid === ctx.controller || pid === item!.controller);
+        sc.bid = { order, high: typeof e.start === "number" ? e.start : 0, leader: ctx.controller, passes: 0, next: 1, started: typeof e.start === "number" };
+      }
+      const st = sc.bid;
+      const most = 999_999;
+      if (!st.started) {
+        if (st.pick === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "bid", options: [], numberRange: { min: 0, max: most }, prompt: "start the bidding: how much life do you bid?" };
+          return "paused";
+        }
+        st.high = st.pick === "pass" ? 0 : st.pick;
+        st.pick = undefined;
+        st.started = true;
+      }
+      if (st.pick === undefined && st.passes === 0 && st.next === 1) log(s, `${player(s, ctx.controller).name} starts the bidding at ${st.high} life (${src}).`);
+      // Players who have left the game bid no more (CR 800.4a); no life changes hands until the bidding ends.
+      while (st.passes < st.order.filter((pid) => !player(s, pid).lost && pid !== st.leader).length) {
+        const pid = st.order[st.next % st.order.length]!;
+        if (pid === st.leader || player(s, pid).lost) {
+          st.next++;
+          continue;
+        }
+        if (st.pick === undefined) {
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "bid", options: ["pass"], numberRange: { min: st.high + 1, max: most }, prompt: `the high bid is ${st.high} life, by ${player(s, st.leader).name}: top it, or pass` };
+          return "paused";
+        }
+        if (st.pick === "pass") {
+          st.passes++;
+          log(s, `${player(s, pid).name} doesn't top the bid (${src}).`);
+        } else {
+          st.high = st.pick;
+          st.leader = pid;
+          st.passes = 0;
+          log(s, `${player(s, pid).name} bids ${st.high} life (${src}).`);
+        }
+        st.pick = undefined;
+        st.next++;
+      }
+      r.bidWinner = st.leader;
+      log(s, `${player(s, st.leader).name} wins the bidding with ${st.high} life (${src}).`);
+      if (st.high > 0) loseLife(s, st.leader, st.high);
+      r.chosen = { ...(r.chosen ?? {}), player: st.leader };
+      return;
+    }
     case "secretNumbers": {
       // Each player chooses in turn order, none seeing another's number until all are revealed at once (rulings).
       const r = s.resolving!;

@@ -732,6 +732,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? e.cond.n.includes(s.resolving!.nth ?? 0) !== !!e.cond.not
           : e.cond.kind === "wonClash"
             ? !!(s.resolving!.wonClash ?? ctx.event?.wonClash)
+            : e.cond.kind === "wonBidding"
+            ? s.resolving!.bidWinner === ctx.controller
             : e.cond.kind === "wonFlip"
             ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
             : e.cond.kind === "atRandom"

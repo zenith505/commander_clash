@@ -8948,6 +8948,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     log(s, `${player(s, Number(choice)).name} chooses the target of ${pend.source}'s ability (picked by ${p.name}).`);
     return;
   }
+  if (pend.what === "bid") {
+    // Effect "bidLife": a bid that tops the high bid (checked against `numberRange` above), or "pass".
+    const st = s.resolving?.scratch?.bid;
+    if (!st) throw new RulesError("nothing to bid on");
+    st.pick = choice === "pass" ? "pass" : Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "secretNumber") {
     // Kept secret until all are revealed (Wheel of Misfortune): the log says only that it was chosen.
     const st = s.resolving?.scratch?.numbers;
@@ -9199,6 +9207,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "topOrBottom") {
     if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
     (r.scratch ??= {}).topOrBottom = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "pileCard") {
+    (r.scratch ??= {}).pileCard = choice;
     continueResolution(s);
     return;
   }

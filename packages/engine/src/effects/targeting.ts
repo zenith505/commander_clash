@@ -12,6 +12,7 @@ import type { BlockQualities, CardDef, Chosen, Color, GameObject, GameState, Obj
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
+import { isSuspended } from "./run-zones";
 
 const CARD_TYPES = new Set(["Artifact", "Battle", "Creature", "Enchantment", "Kindred", "Land", "Planeswalker", "Instant", "Sorcery"]);
 
@@ -701,6 +702,9 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (t.zc !== undefined && (o.zoneChanges ?? 0) !== t.zc) return false; // it's a new object now (CR 400.7)
   // "Creatures from the battlefield and/or creature cards from graveyards": a card in a graveyard fits the card half.
   if (spec.kind === "object" && spec.orCard && o.zone === "graveyard") return isLegalTarget(s, spec.orCard, t, controller, src);
+  // "Target permanent or suspended card": a card in exile fits if it's suspended (CR 702.62b); its characteristics there
+  // are the printed card's, and hexproof and the like only work on the battlefield.
+  if (spec.kind === "object" && spec.orSuspended && o.zone === "exile") return isSuspended(s, o) && !s.players[o.owner]?.lost && (spec.orSuspended !== "you" || o.owner === controller);
   if (spec.kind === "card") {
     // A card in a graveyard (CR 109.2a). Nothing in the engine changes characteristics in a
     // graveyard, so the printed card is what's checked; hexproof only works on the battlefield.
@@ -732,7 +736,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   // "Target spell or nonland permanent": a permanent fits the permanent half.
-  if (spec.kind === "spell" && spec.orPermanent) return o.zone === "battlefield" && isLegalTarget(s, spec.orPermanent, t, controller, src);
+  // Endless Detour: "target spell, nonland permanent, or card in a graveyard": a graveyard card fits the card half.
+  if (spec.kind === "spell" && spec.orPermanent) return (o.zone === "battlefield" || (o.zone === "graveyard" && !!spec.orPermanent.orCard)) && isLegalTarget(s, spec.orPermanent, t, controller, src);
   // A mutating creature spell's target has the same owner as the spell (CR 702.140a).
   if (spec.ownerIs !== undefined && o.owner !== spec.ownerIs) return false;
   // "That saddled it this turn" needs the source: checked with it (lesserPowerOk).
@@ -835,9 +840,10 @@ export function legalTargets(s: GameState, spec0: TargetSpec, controller: Player
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
   if (spec.kind === "object" || spec.kind === "any" || spec.orPermanent) for (const id of s.battlefield) out.push({ kind: "object", id });
   if (spec.kind === "spell") for (const item of s.stack) if (item.id !== excludeStackId) out.push({ kind: "stack", id: item.id });
+  if (spec.orSuspended) for (const pid of livingPlayers(s)) for (const id of player(s, pid).exile) out.push({ kind: "object", id });
   if (spec.kind === "card" && spec.linkedExile) for (const l of linkedCards(s, sourceId)) out.push({ kind: "object", id: l.id, zc: l.zc });
   else if (spec.kind === "card" && spec.inExile) for (const pid of livingPlayers(s)) for (const id of player(s, pid).exile) out.push({ kind: "object", id });
-  else if (spec.kind === "card" || spec.orCard) for (const pid of livingPlayers(s)) for (const id of [...player(s, pid).graveyard, ...(spec.orExile ? player(s, pid).exile : [])]) out.push({ kind: "object", id });
+  else if (spec.kind === "card" || spec.orCard || spec.orPermanent?.orCard) for (const pid of livingPlayers(s)) for (const id of [...player(s, pid).graveyard, ...(spec.orExile ? player(s, pid).exile : [])]) out.push({ kind: "object", id });
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));
 }
 

@@ -745,6 +745,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const k = pend.counterKind ?? "";
       const helpful = k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
       const mine = !!o && controllerOf(s, o) === pid;
+      // Clockspinning, Jhoira's Timebug: a time counter on a suspended card (CR 702.62b), its owner's, comes off for our
+      // own (sooner) and goes on for an opponent's (later); with "you may", a time counter on our own permanent goes on
+      // (vanishing lasts longer), unless it's impending (it becomes a creature sooner).
+      if (o?.zone === "exile" && k === "time") return [{ type: "chooseOption", player: pid, choice: o.owner === pid ? "remove" : "add" }];
+      if (o && k === "time" && pend.options.includes("none")) return [{ type: "chooseOption", player: pid, choice: mine ? (o.castAlt === "impending" ? "remove" : "add") : "none" }];
       return [{ type: "chooseOption", player: pid, choice: (mine ? helpful : harmfulCounter(k)) ? "add" : "remove" }];
     }
     if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
@@ -3076,6 +3081,9 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
+              : c.kind === "putCounter"
+                ? // Blight X (Soul Immolation): no more than the greatest toughness among our creatures (its own cap).
+                  Math.max(0, ...s.battlefield.map((x) => obj(s, x)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Creature")).map((b) => toughness(s, b)))
               : c.kind === "tap" || c.kind === "reveal" || c.kind === "removeCounters"
                 ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand", "Remove X +1/+1 counters from among ..." are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;

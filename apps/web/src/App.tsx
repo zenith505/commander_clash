@@ -1471,7 +1471,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                     : `(${targeting.specs.slice(0, targeting.chosen.length).filter((t) => !t.skip).length + 1}/${targeting.specs.filter((t) => !t.skip).length})`}
               </span>
               {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") || targeting.ahead?.some(Boolean) ? "Done" : "Choose none"}</button>}
-              {nextSpec?.orCard && <button onClick={() => setYardTargets(true)}>From a graveyard</button>}
+              {(nextSpec?.orCard ?? nextSpec?.orPermanent?.orCard) && <button onClick={() => setYardTargets(true)}>From a graveyard</button>}
+              {nextSpec?.orSuspended && <button onClick={() => setYardTargets(true)}>A suspended card</button>}
               {targeting.mode === "copy" && pending?.kind === "copyTargets" && (
                 <button
                   onClick={() => {
@@ -1548,15 +1549,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={answering(targeting) ? undefined : () => setTargeting(null)}
             />
           )}
-          {targeting && yardTargets && nextSpec?.orCard && (
+          {targeting && yardTargets && (nextSpec?.orCard ?? nextSpec?.orPermanent?.orCard ?? nextSpec?.orSuspended) && (
             // The card half of "creatures from the battlefield and/or creature cards from graveyards"; a creature is
             // clicked on the battlefield as usual.
             <GraveyardPicker
               s={s}
               label={targeting.label}
-              spec={nextSpec.orCard}
+              // "Target permanent or suspended card" (TargetSpec.orSuspended): the suspended cards in exile.
+              spec={nextSpec.orCard ?? nextSpec.orPermanent?.orCard ?? nextSpec}
               sourceId={targetSource}
-              allowed={(id) => canTarget({ kind: "object", id })}
+              allowed={(id) => canTarget({ kind: "object", id }) && (!nextSpec.orSuspended || s.objects[id]?.zone === "exile")}
               onHover={setHover}
               onPick={(id) => {
                 setYardTargets(false);

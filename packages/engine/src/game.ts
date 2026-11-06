@@ -5409,6 +5409,8 @@ export function castProblem(
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   // Open the Way: "X can't be greater than the number of players in the game" (a player who left isn't, CR 800.4a).
   if (compileCard(d).xMaxPlayers && (x ?? 0) > livingPlayers(s).length) return "X can't be greater than the number of players in the game";
+  if (compileCard(d).xMaxGreatestToughness && (x ?? 0) > Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Creature")).map((b) => toughness(s, b))))
+    return "X can't be greater than the greatest toughness among creatures you control";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
   const or = compileCard(d).costOr;
@@ -9402,7 +9404,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.addOrRemove;
     if (!st || !pend.counterKind || !pend.options.includes(choice)) throw new RulesError("put another counter of that kind on it or remove one");
     st.picks[pend.counterKind] = choice;
-    log(s, `${p.name} chooses to ${choice === "add" ? "put another" : "remove a"} ${pend.counterKind} counter (${pend.source}).`);
+    log(s, choice === "none" ? `${p.name} chooses to leave the ${pend.counterKind} counters as they are (${pend.source}).` : `${p.name} chooses to ${choice === "add" ? "put another" : "remove a"} ${pend.counterKind} counter (${pend.source}).`);
     continueResolution(s);
     return;
   }

@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
+import { ANY_COUNTER, NON_AURA_ENCHANTMENT, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type PunisherOption, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind, type TriggeredAbility } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_LANDWALK, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, TARGET_PLAYER_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -1604,6 +1604,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
   text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Clockspinning: "Choose a counter on target permanent or suspended card. Remove that counter from that permanent or
+  // card or put another of those counters on it." One instruction: one kind of counter it has, chosen as it resolves,
+  // then one more or one fewer of it (rulings).
+  text = text.replace(/^Choose a counter on (target permanent or suspended card)\. Remove that counter from that permanent or card or put another of those counters on it\.$/, "For one kind of counter on $1, put another counter of that kind on it or remove one from it.");
+  // Jhoira's Timebug: "Choose target permanent you control or suspended card you own. If that permanent or card has a
+  // time counter on it, you may remove a time counter from it or put another time counter on it." One instruction.
+  text = text.replace(/^Choose (target permanent you control or suspended card you own)\. If that permanent or card has a time counter on it, you may remove a time counter from it or put another time counter on it\.$/, "For the time counters on $1, you may put another counter of that kind on it or remove one from it.");
   // Aether Gust: "Choose target spell or permanent that's red or green. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of target ... puts it ...".
   text = text.replace(/^[Cc]hoose (target spell or permanent that's [a-z]+ or [a-z]+)\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1 puts it on their choice of the top or bottom of their library.");
@@ -2714,6 +2721,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     return { targets: [], effects: [{ type: "secretNumbers", then: "ogre" }], text };
   if (/^Exile the top card of your library\. You may put that card into your hand unless it has the same name as another card exiled this way\. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "taintedPact" }], text };
+  // Protection Racket: "repeat the following process for each opponent in turn order. Reveal the top card of your library.
+  // That player may pay life equal to that card's mana value. If they do, exile that card. Otherwise, put it into your
+  // hand.": a pass for each opponent, starting after you; each sees a new top card, and may pay only with that much life
+  // (CR 119.4).
+  if (/^[Rr]epeat the following process for each opponent in turn order\. Reveal the top card of your library\. That player may pay life equal to that card's mana value\. If they do, exile that card\. Otherwise, put it into your hand\.$/.test(text.trim())) {
+    const toHand = revealedAction("put it into your hand", ctx);
+    if (!toHand) return null;
+    const pay: PunisherOption = { pay: { cost: "", lifeAmount: { count: { kind: "revealedManaValue" } } } };
+    const pass: Effect[] = [{ type: "revealTop" }, { type: "punisher", who: { ref: "eachOne" }, options: [pay], effects: [{ type: "exile", what: { ref: "revealed" } }], mode: "ifAny", otherwise: toHand, thenText: "exiles the revealed card (if they don't pay, it goes to its owner's hand)" }];
+    return { targets: [], effects: [{ type: "repeat", n: 0, forEach: { ref: "eachOpponent" }, effects: pass }], text };
+  }
   // Tempt with Discovery: a tempting offer whose searches each end with their own shuffle here. A library is shuffled
   // after each search instead of once at the end; nothing between them depends on its order (the next search sees the
   // whole library anyway), so it comes to the same.
@@ -4177,6 +4195,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Out of Time: "untap all creatures, then those creatures phase out until ~ leaves the battlefield. Put a time counter
+    // on ~ for each creature that phased out this way.": the creatures it untapped (all of them, Out of Time too if it's a
+    // creature, rulings), back as they are only once ~ leaves (CR 610.3); nothing phases out if ~ has already left.
+    const lastUntap = effects.at(-1);
+    if (!ctx.spell && /^those creatures phase out until ~ leaves the battlefield$/i.test(s.replace(/\.$/, "")) && lastUntap?.type === "untap" && lastUntap.what.ref === "each" && JSON.stringify(lastUntap.what.filter) === JSON.stringify({ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "all creatures" }) && sentences[si + 1]?.replace(/\.$/, "") === "Put a time counter on ~ for each creature that phased out this way") {
+      effects.push({ type: "phaseOut", what: lastUntap.what, untilSourceLeaves: true, noTap: true }, { type: "counters", what: { ref: "self" }, counter: "time", n: { count: { kind: "phasedThisWay" } } });
+      si++;
+      continue;
+    }
     // Oubliette: "target creature phases out until ~ leaves the battlefield. Tap that creature as it phases in this way."
     // It doesn't phase in in its controller's untap step, but right after ~ leaves (rulings, CR 610.3); nothing if ~ has
     // already left.
@@ -4414,6 +4441,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Sins of the Past: "Until end of turn, you may cast target instant or sorcery card from your graveyard without paying
     // its mana cost. If that spell would be put into your graveyard, exile it instead.": the same permission, free (CR
     // 118.9: no alternative cost, X is 0), the card exiled however it would go to the graveyard (rulings).
+    // Kethis, the Hidden Hand: "Until end of turn, each legendary card in your graveyard gains "You may play this card from
+    // your graveyard."": the cards there as it resolves, not those put there later or played and back (rulings); their
+    // costs paid and timing followed, a land with the turn's land play (rulings, CR 305.2).
+    const kethis = /^Until end of turn, each ([a-z]+) card in your graveyard gains "You may play ~ from your graveyard\.?"\.?$/.exec(s);
+    if (kethis) {
+      const filter = parseSearchFilter(`${kethis[1]} card`);
+      if (!filter) return null;
+      effects.push({ type: "mayCastFromGraveyard", what: { ref: "yourGraveyard", filter }, play: true });
+      continue;
+    }
+    // Primordial Mist: "Exile a face-down permanent you control face up: You may play that card this turn.": the card its
+    // cost exiled, still that card in exile (CR 400.7); only with such a cost (checked in compile.ts). Its costs are
+    // paid and its timing followed (rulings).
+    if (si === 0 && !effects.length && !ctx.targets.length && /^You may play that card this turn\.?$/.test(s) && sentences.length === 1) {
+      effects.push({ type: "mayCastFromGraveyard", what: { ref: "costExiled" }, play: true, inExile: true });
+      continue;
+    }
     const sins = /^Until end of turn, you may cast (target .+? card) from your graveyard without paying its mana cost$/.exec(s.replace(/\.$/, ""));
     // Kaldring, the Rimestaff: "You may play target snow permanent card from your graveyard this turn. If you do, it enters
     // tapped.": a land too, played with the turn's land play (CR 305.1-2, rulings); the land or the permanent the spell

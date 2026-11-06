@@ -572,7 +572,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield. */ until?: { id: ObjectId; zc: number } };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
@@ -2484,6 +2484,8 @@ export interface Resolving {
   countersPutThisWay?: { id: ObjectId; zc: number; kind?: string; /** How many were put (distributed counters, Shambling Swarm). */ n?: number }[];
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
+  /** Out of Time: how many creatures its phaseOut phased out directly (Count "phasedThisWay"). */
+  phasedThisWay?: number;
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   /** Starving Revenant: how many cards this resolution's surveil put on top of the library (Count surveilTopThisWay). */
   surveilTop?: number;
@@ -2739,7 +2741,7 @@ export interface Resolving {
     /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
     join?: { queue: PlayerId[]; paid: number; asked?: number; by: Record<PlayerId, number> };
     /** "Then repeat this process X more times": the passes left (this one too), the next instruction, and the scratch from before it started. */
-    repeat?: { left: number; step?: number; keep: string[]; gathered?: ObjectId[] };
+    repeat?: { left: number; step?: number; keep: string[]; gathered?: ObjectId[]; order?: PlayerId[] };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */

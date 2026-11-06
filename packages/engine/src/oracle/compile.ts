@@ -2123,6 +2123,18 @@ export function compile(d: CardDef): CompiledCard {
       else out.kicker = { costs: [""], extraCosts: [cost], text: mayCost[1]!, optional: true, ...(st ? { ifControl: { kind: "object" as const, subtypes: [st], controller: "you" as const, text: `${st} you control` } } : {}) };
       continue;
     }
+    // Soul Immolation: "As an additional cost to cast this spell, blight X. X can't be greater than the greatest toughness
+    // among creatures you control.": X announced as it's cast, no more than that toughness then (CR 601.2b).
+    const blightX = /^As an additional cost to cast (?:this spell|~), blight X\. X can't be greater than the greatest toughness among creatures you control\.$/.exec(line);
+    if (blightX && isSpell && !parseManaCost(d.manaCost).hasX) {
+      const cost = parseAdditionalCost("blight X", true);
+      if (!cost) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push(cost);
+        out.xMaxGreatestToughness = true;
+      }
+      continue;
+    }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
@@ -6575,7 +6587,8 @@ function checkCastingLinks(out: CompiledCard) {
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
-    if (o.ref === "costExiled" && !handExileCost) bad = true;
+    // Primordial Mist: "that card" of an "Exile a face-down permanent you control" cost, likewise.
+    if (o.ref === "costExiled" && !handExileCost && !permExileCost) bad = true;
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
@@ -6609,6 +6622,7 @@ function checkCastingLinks(out: CompiledCard) {
   let exileCost = false;
   let yardExile = yardExileOne(out.additionalCosts);
   let handExileCost = false;
+  let permExileCost = false;
   const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
   let revealCost = oneReveal(out.additionalCosts);
   visit([out.spell, out.triggers, out.statics, out.mana]);
@@ -6617,6 +6631,7 @@ function checkCastingLinks(out: CompiledCard) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice") || yardExile;
     exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
+    permExileCost = ab.costs?.filter((c) => c.kind === "exileFromHand" || c.kind === "exileFromGraveyard" || c.kind === "sacrifice" || c.kind === "craft").length === 1 && !!ab.costs.some((c) => c.kind === "sacrifice" && c.exile && c.n === 1);
     revealCost = oneReveal(ab.costs);
     visit(ab);
   }
@@ -6624,6 +6639,7 @@ function checkCastingLinks(out: CompiledCard) {
   exileCost = false;
   yardExile = false;
   handExileCost = false;
+  permExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   // Petrified Hamlet: a ban's or a static's chosen name is the one the permanent chose as it entered (its Chosen.name);

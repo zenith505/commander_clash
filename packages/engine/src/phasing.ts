@@ -106,8 +106,10 @@ export function phaseInUntil(s: GameState, id: ObjectId, zc: number) {
     return u && u.id === id && u.zc === zc;
   });
   if (!back.length) return;
+  // Out of Time: as they were (rulings); Oubliette's text taps them.
+  const tap = back.filter((x) => !s.objects[x]!.phased?.until?.noTap);
   phaseIn(s, back);
-  for (const x of back) if (s.objects[x]?.zone === "battlefield") s.objects[x]!.tapped = true;
+  for (const x of tap) if (s.objects[x]?.zone === "battlefield") s.objects[x]!.tapped = true;
 }
 
 /** Players who left the game whose turns would have begun: what they phased out phases in at the next untap step (CR 702.26n). */

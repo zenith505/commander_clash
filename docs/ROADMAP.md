@@ -2298,6 +2298,37 @@ line blocks.
    order prompt); "Whenever ~ trains" (Savior of Ollenbock, CR 702.149c, with "up to one other target creature from the
    battlefield or creature card from a graveyard"); "Copy target instant or sorcery spell an opponent controls twice"
    (Venser, Fervent Forger). +10, 30,118 of 31,936 with round 289.
+   Round 291 took the next names from the top no earlier round looked at (rank 10,900 to 14,500): "Choose target opponent.
+   ... Then the chosen player loses X life" (Haunt the Network: the chosen player is that target); "Discard all the cards in
+   your hand, then draw that many cards. You may choose an artifact or creature card with mana value 1 you discarded this
+   way, then do the same for ... 2 and 3. Return those cards to the battlefield" (Queen Kayla bin-Kroog: discarded cards a
+   replacement exiled are found in exile, rulings); "look at the top two cards of your library, then exile them face down.
+   Then you may cast a Hero or noncreature spell from among cards exiled with ~" (Scarlet Witch, Chaotic Avenger: the spell
+   as cast fits, castFree spellFilter); "you may cast an Ally spell from among cards you own exiled with ~", paid for
+   (Boiling Rock Rioter); "Pay any amount of {E}. If you paid one or more {E} this way, shuffle your library, then exile that
+   many cards from the top. You may play one of those cards" (Vault 112: Sadistic Simulation: a land played is the one);
+   "Mill two cards. If two cards that share a card type were milled this way, draw a card and repeat this process" and "Exile
+   any number of target instant, sorcery, and/or Tamiyo planeswalker cards from your graveyard. Copy them. You may cast any
+   number of the copies" (The Tale of Tamiyo); "you may have ~ become a copy of that card until end of turn", the card
+   exiled from a graveyard (Lazav, Familiar Stranger); "choose target player and any number of target attacking creatures
+   their opponents control. Those creatures are now attacking that player" (Portal Manipulator, with a bot pick); "exile up
+   to one target nonland card of each card type from your graveyard. Copy those cards. You may cast any number of spells
+   with total mana value 6 or less from among the copies" (Uldaros Theorix, "if you cast him"); "Whenever you cast a modal
+   spell, choose up to X, where X is the number of times you chose a mode for that spell" (Riku of Many Paths, spree too).
+   +10.
+   Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
+   exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
+   spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
+   as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
+   them); Verrak, Warped Sengir, Ashnod the Uncaring and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
+   Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
+   (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ; Baron Helmut Zemo (black mana
+   symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
+   The Brothers' War (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
+   Stalactite (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
+   life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
+   Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (the attacking player declares
+   blocks); Alaundo the Seer (time counters given to a card exiled from your hand).
    Still open from the top (looked at, not done): Ria Ivor, Bane of Bladehold (the next combat damage to players prevented,
    tokens for the amount); Volo, Itinerant Scholar and Long List of the Ents (noted creature types); Mavinda, Students'
    Advocate (a cost increase for a spell that doesn't target your creature); Eye of Duskmantle (cards surveilled this

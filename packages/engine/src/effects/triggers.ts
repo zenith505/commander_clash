@@ -2676,7 +2676,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
     if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
       // Tranquil Frillback: "choose up to that many" in a reflexive trigger: its X, the times paid.
-      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId, ...(t.x !== undefined ? { x: t.x } : {}) })));
+      t.maxModes = Math.max(0, Math.min(printed.modal.modes.length, evalAmount(s, printed.modal.maxCount, { controller: t.controller, sourceId: t.sourceId, ...(t.x !== undefined ? { x: t.x } : {}), ...(t.cause ? { cause: t.cause } : {}) })));
       printed = triggerBody(s, t);
     }
     if (printed.modal && !t.modes) {

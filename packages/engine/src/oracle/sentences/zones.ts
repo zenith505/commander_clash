@@ -112,6 +112,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
     return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
   }
+  // Scarlet Witch, Chaotic Avenger: "You may cast a Hero or noncreature spell from among cards exiled with ~ without paying
+  // its mana cost": one spell now, from the linked cards, the spell as it's cast fitting (an Adventure's half, CR 715.3).
+  if ((m = /^[Yy]ou may cast a (Hero or noncreature) spell from among cards exiled with ~ without paying its mana cost$/.exec(s)) && !ctx.spell) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    if (!filter) return null;
+    return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, filter, asSpell: true }];
+  }
+  // Boiling Rock Rioter: "you may cast an Ally spell from among cards you own exiled with ~": one, paid for as it resolves,
+  // its timing ignored (CR 608.2g), from the cards its exile ability exiled (CR 607.2a) that you own.
+  if ((m = /^[Yy]ou may cast an? (Ally) spell from among cards you own exiled with ~$/.exec(s)) && !ctx.spell) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    if (!filter) return null;
+    return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, ownedOnly: true, max: 1, filter, asSpell: true, paid: true }];
+  }
   // Rod of Absorption: "You may cast any number of spells from among cards exiled with ~ with total mana value X or less
   // without paying their mana costs": as this resolves, in any order (rulings), each one's mana value counted against X;
   // those not cast stay exiled.
@@ -766,6 +780,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // as many as there are of those mana values (a card with {X} in its cost has mana value 0 there, rulings).
   if (s === "Return a creature card with mana value 1, 2, and 3 each from your graveyard to the battlefield")
     return [{ type: "chooseFromGraveyard", n: 3, distinctManaValues: true, dest: "battlefield", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], manaValue: { min: 1, max: 3 }, text: "creature card with mana value 1, 2 or 3" } }];
+  // Queen Kayla bin-Kroog (rewritten in body.ts): up to one artifact or creature card of each mana value from 1 to 3 among
+  // the cards the discard before put into your graveyard, or into exile instead (rulings), all at once.
+  if (s === "Return up to one artifact or creature card with mana value 1, 2, and 3 each discarded this way to the battlefield")
+    return [{ type: "chooseFromGraveyard", n: 3, upTo: true, distinctManaValues: true, discarded: true, discardedExiled: true, dest: "battlefield", filter: { kind: "card", types: ["Artifact", "Creature"], notTypes: [], notColors: [], manaValue: { min: 1, max: 3 }, text: "artifact or creature card with mana value 1, 2 or 3" } }];
   // "Return any number of permanent cards with different names from your graveyard to the battlefield" (Eerie Ultimatum):
   // chosen as it resolves (rulings), one of each name; an Aura can't enchant another card entering with it (rulings).
   if ((m = /^[Rr]eturn any number of (.+?) with different names from your graveyard to the battlefield$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
@@ -1668,6 +1686,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if ((m = new RegExp(`^Exile the top ${NUM} cards of your library face down$`, "i").exec(s))) return [{ type: "exileFaceDown", from: "top", n: num(m[1]!) }];
     // Kayla's Music Box: "Look at the top card of your library, then exile it face down. (You may look at it any time.)"
     if (/^Look at and exile the top card of your library face down$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 1, look: true }];
+    if (/^Look at and exile the top two cards of your library face down$/.test(s)) return [{ type: "exileFaceDown", from: "top", n: 2, look: true }];
     // Connecting the Dots: "exile the top card of your library face down" (no one may look at it, CR 406.3).
     if (/^Exile the top card of your library face down$/i.test(s)) return [{ type: "exileFaceDown", from: "top", n: 1 }];
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];

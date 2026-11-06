@@ -662,6 +662,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "spentWas":
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
+    case "castSpellModes": {
+      // Riku of Many Paths: the modes chosen as it was cast (CR 601.2b), each time a mode was chosen.
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return item?.modes?.length ?? 0;
+    }
     case "colorsSpent": {
       if (c.of?.ref === "castSpell") {
         // As it was cast (CR 601.2h), while it's still that spell on the stack.

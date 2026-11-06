@@ -7941,6 +7941,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       }
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
+      // "Create a token that's a copy of the exiled card" (Tawnos, Solemn Survivor): the one card this cost exiled, the
+      // only cost that exiles anything (compile.ts yardCostCard), still that card in exile (CR 400.7).
+      if (c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.process && c.n === 1 && ids.length === 1 && costs.filter((x) => x.kind === "exileFromGraveyard" || x.kind === "exileFromHand" || x.kind === "craft" || (x.kind === "sacrifice" && x.exile) || (x.kind === "mill" && x.exile) || (x.kind === "reveal" && x.exile)).length === 1)
+        exiled?.push({ id: ids[0]!, zc: obj(s, ids[0]!).zoneChanges ?? 0 });
     }
     closeZoneBatch(s); // each cost is an event of its own (rulings on Conspiracy Unraveler)
   }
@@ -9555,6 +9559,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "nextExiled") {
+    if (!r.scratch?.chaos) throw new RulesError("no exiled permanents to order");
+    r.scratch.nextExiled = choice;
     continueResolution(s);
     return;
   }

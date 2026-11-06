@@ -11,7 +11,7 @@ import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
-import { ResolveCtx, amountCtx, amountNow, apnap, players } from "./resolve";
+import { ResolveCtx, amountCtx, amountNow, apnap, players, runEffect } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -69,6 +69,43 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, who ? `${who.map((p) => player(s, p).name).join(", ")} can't cast spells named ${name} ${until}.` : `Spells named ${name} can't be cast${e.lands ? " and lands named it can't be played" : ""} ${until}.`);
       return;
     }
+    case "revealUntilPerExiled": {
+      // Chaotic Transformation (rulings): the permanents were exiled at once; each one's controller as it last existed (CR
+      // 608.2h) reveals until a card that shares a card type with it as it last existed, puts that card onto the
+      // battlefield and shuffles, one permanent at a time; a player with several chooses the order.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.chaos) {
+        const ex = (s.resolving!.exiled ?? []).filter((x) => x.controller !== undefined);
+        const order = apnap(s, [...new Set(ex.map((x) => x.controller!))]);
+        sc.chaos = { left: order.flatMap((pid) => ex.filter((x) => x.controller === pid).map((x) => ({ id: x.o.id, controller: pid, types: [...x.ch.types], name: x.ch.name }))) };
+      }
+      const st = sc.chaos;
+      while (st.left.length) {
+        if (st.current === undefined) {
+          const pid = st.left[0]!.controller;
+          const mine = st.left.filter((x) => x.controller === pid);
+          let pick = mine[0]!;
+          if (mine.length > 1 && !player(s, pid).lost) {
+            if (sc.nextExiled === undefined) {
+              s.pending = { kind: "chooseOption", player: pid, source: src, what: "nextExiled", options: mine.map((x) => x.id), labels: mine.map((x) => x.name), prompt: "choose the exiled permanent to reveal for next" };
+              return "paused";
+            }
+            pick = mine.find((x) => x.id === sc.nextExiled) ?? pick;
+            sc.nextExiled = undefined;
+          }
+          st.current = pick.id;
+        }
+        const cur = st.left.find((x) => x.id === st.current)!;
+        if (!player(s, cur.controller).lost) {
+          const r = runEffect(s, { type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], text: `card that shares a card type with ${cur.name}` }, found: "battlefield", rest: "shuffle", who: { ref: "eachOne" }, sharesTypes: cur.types }, { ...ctx, eachOne: cur.controller });
+          if (r === "paused") return "paused";
+        }
+        st.left = st.left.filter((x) => x.id !== cur.id);
+        st.current = undefined;
+      }
+      sc.chaos = undefined;
+      return;
+    }
     case "revealUntilPerDestroyed": {
       // Indomitable Creativity (rulings): each destroyed permanent's controller as it last existed, once for each, in
       // turn order; the revealed cards stay in the library (on top) until the shuffle, so a second reveal sees them again;
@@ -121,7 +158,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Bag of Tricks: "a creature card with mana value equal to the result", the roll's (TargetSpec.bound).
       const filter = bindBound(s, bindChosen(e.filter, ctx.chosen), amountCtx(s, ctx));
       // "Shares a card type with that permanent": its types as it last existed if it's gone (CR 608.2h).
-      const shared = e.sharesTypeWith === undefined ? undefined : targetTypes(s, ctx, e.sharesTypeWith);
+      const shared = e.sharesTypes ?? (e.sharesTypeWith === undefined ? undefined : targetTypes(s, ctx, e.sharesTypeWith));
       if (shared && !shared.length) return;
       // "Shares a creature type with it" (Heirloom Blade): the creature that died, as it last existed (rulings). With no
       // creature type, nothing shares one: the whole library is revealed.

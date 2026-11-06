@@ -960,9 +960,10 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
   // "Up to three other target creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity):
   // each target one or the other (TargetSpec.orCard).
-  const both = !cards && !differMv && !each ? / from the battlefield and\/or (.+?) from graveyards$/.exec(mine) : null;
+  // Savior of Ollenbock: "up to one other target creature from the battlefield or creature card from a graveyard", the same.
+  const both = !cards && !differMv && !each ? / from the battlefield (?:and\/or (.+?) from graveyards|or (.+?) from a graveyard)$/.exec(mine) : null;
   const perm = both ? parseTargetPhrase(singularPhrase(mine.slice(0, both.index))) : undefined;
-  const yard = both ? parseTargetPhrase(`${singularPhrase(both[1]!)} from a graveyard`) : undefined;
+  const yard = both ? parseTargetPhrase(`${singularPhrase(both[1] ?? both[2]!)} from a graveyard`) : undefined;
   if (both && (perm?.kind !== "object" || yard?.kind !== "card" || perm.controller || yard.owner || theirs)) return null;
   const parsed = perm && yard ? { ...perm, orCard: yard, text: `${perm.text} or ${yard.text.replace(/^target /, "")}` } : differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine), ctx.spell && / with (?:toughness|power|mana value) X or less$/.test(mine) ? { x: true } : undefined) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx), target: true });
   // Skullsnatcher: "up to two target cards from that player's graveyard": cards that player owns (as for one target).

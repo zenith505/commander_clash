@@ -2572,7 +2572,7 @@ export type Effect =
    */
   | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec; /** The Grim Captain's Locker: "Until end of turn, each creature card in your graveyard gains "Escape—{3}{B}, Exile four other cards from your graveyard."": escape with this cost instead of flashback (CR 702.138a). */ escape?: { /** Left out: the card's own mana cost (Confession Dial: "The escape cost is equal to its mana cost plus ..."). */ mana?: string; exile: number }; /** Case of the Uneaten Feast: "Creature cards in your graveyard gain "You may cast this card from your graveyard" until end of turn": that permission instead of flashback. */ cast?: true }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
-  | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true }
+  | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
    * (Skyclave Apparition): the cards this object's linked exile took (CR 607.2a) that are still in exile. Each of their
@@ -2613,6 +2613,27 @@ export type Effect =
    * the source (CR 607.2a), each owner choosing the order of theirs (rulings).
    */
   | { type: "linkedToBottom" }
+  /**
+   * Triumph of Saint Katherine: "exile it and the top six cards of your library in a face-down pile. If you do, shuffle
+   * that pile and put it back on top of your library": the card (its source, still that object in the graveyard, CR 400.7) and the
+   * top `n` cards, only if there are that many (rulings), shuffled together on top.
+   */
+  | { type: "pileOnTop"; n: number }
+  /**
+   * Mysterious Limousine: "exile up to one other target creature until ~ leaves the battlefield. If a creature is put into
+   * exile this way, return each other card exiled with ~ to the battlefield under its owner's control": if this
+   * resolution's exile took a creature (a token too, CR 111.7), every other card still exiled until ~ leaves returns.
+   */
+  | { type: "returnOtherUntilLeaves" }
+  /** Foreboding Steamboat: "put a card exiled with it into its owner's graveyard": one of the cards still exiled until ~ leaves the battlefield, chosen by the controller as this resolves; sets StackItem `did` for "If you do". */
+  | { type: "untilLeavesToGraveyard" }
+  /**
+   * Chaotic Transformation: "For each permanent exiled this way, its controller reveals cards from the top of their library
+   * until they reveal a card that shares a card type with it, puts that card onto the battlefield, then shuffles." Each
+   * permanent this resolution exiled, by its controller as it last existed, in turn order; a player with several chooses
+   * which one is next (rulings).
+   */
+  | { type: "revealUntilPerExiled" }
   | { type: "moveLinked"; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman" }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
@@ -3322,6 +3343,8 @@ export type Effect =
       yours?: true;
       /** "A permanent card that shares a card type with that permanent" (Wild Magic Surge): target `index` as it is, or last was on the battlefield (CR 608.2h). */
       sharesTypeWith?: number;
+      /** Chaotic Transformation (set as it resolves): shares a card type with these types, a permanent's as it last existed. */
+      sharesTypes?: string[];
       /** "A creature card that shares a creature type with it" (Heirloom Blade): with the trigger's subject as it last existed (CR 608.2h). */
       sharesCreatureTypeWithSubject?: true;
       /** "A creature card that shares a creature type with the sacrificed creature" (Descendants' Fury): as it last existed (rulings). */
@@ -3849,6 +3872,8 @@ export type Effect =
   | { type: "fight"; a: ObjRef; b: ObjRef; /** Grim Contest: "Each of those creatures deals damage equal to its toughness to the other": the same exchange by toughness, which isn't fighting (no "fight" event, CR 701.14). */ byToughness?: true } // CR 701.14: each deals damage equal to its power to the other
   /** Echo's cost was just paid, by its "sacrifice it unless you pay": "When ~'s echo cost is paid" triggers (Shah of Naar Isle). */
   | { type: "echoPaid" }
+  /** Training (CR 702.149a) for a creature with a "whenever ~ trains" ability: a +1/+1 counter on ~, and if one was put on it, it trains (CR 702.149c). */
+  | { type: "train" }
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
    * fights a different one of those creatures" (`filter`), all at the same time; tokens beyond one each (a doubler's)
@@ -5326,6 +5351,7 @@ export type TriggerEvent =
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   | "selfLastCounterRemoved" // "When the last ore counter is removed from ~" (Orcish Mine): the kind in `countersKind`
   | "selfEchoPaid" // "When ~'s echo cost is paid" (Shah of Naar Isle, CR 702.30a)
+  | "selfTrains" // "Whenever ~ trains" (Savior of Ollenbock, CR 702.149c): its resolving training ability put a +1/+1 counter on it
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
   | "selfExploits"
   /** "Whenever a creature you control exploits a nontoken creature": see TriggeredAbility.subjectFilter. */
@@ -5504,7 +5530,7 @@ export interface TriggeredAbility {
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true; /** "During their turn": only while the player who draws is the active player. */ ownTurn?: true; /** Keranos, God of Storms: "Reveal the first card you draw on each of your turns. Whenever you reveal a land card this way, ...": only when the card drawn is (not) a land, revealed as it's drawn. Rowen, Primitive Etchings: "Reveal the first card you draw each turn. Whenever you reveal a basic land (creature) card this way" on any turn. */ revealed?: "land" | "nonland" | "basicLand" | "creature" | /** Inquisitor Eisenhorn. */ "instantOrSorcery" };
   /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
   eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**

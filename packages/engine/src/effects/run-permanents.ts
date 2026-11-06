@@ -516,10 +516,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           return;
         }
         phaseOut(s, ids);
+        let n = 0;
         for (const id of ids) {
           const p = s.objects[id]!.phased;
-          if (p && !p.indirect) p.until = { id: me.id, zc: me.zoneChanges ?? 0 };
+          if (p && !p.indirect) {
+            p.until = { id: me.id, zc: me.zoneChanges ?? 0, ...(e.noTap ? { noTap: true as const } : {}) };
+            if (objIsType(s, s.objects[id]!, "Creature")) n++;
+          }
         }
+        s.resolving!.phasedThisWay = n;
         return;
       }
       phaseOut(s, ids);
@@ -638,19 +643,31 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // made one after another; then the counters are put and removed together.
       const you = ctx.controller;
       const sc = (s.resolving!.scratch ??= {});
+      // Clockspinning, Jhoira's Timebug: the target may be a suspended card in exile (TargetSpec.orSuspended), which
+      // must still be suspended as it resolves; a permanent with no counter on it is left as it is (rulings).
+      const here = (x: GameObject) => x.zone === "battlefield" || (x.zone === "exile" && isSuspended(s, x));
       if (!sc.addOrRemove) {
-        const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");
-        const kinds = o ? Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0) : [];
+        const o = objects(s, e.what, ctx).find(here);
+        let kinds = o ? Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0 && (e.kind === undefined || k === e.kind)) : [];
         if (!o || !kinds.length) return;
+        // Clockspinning: one kind of counter it has, chosen as it resolves (rulings).
+        if (e.one && kinds.length > 1) {
+          if (sc.counterKind === undefined || !kinds.includes(sc.counterKind)) {
+            s.pending = { kind: "chooseOption", player: you, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), about: o.id, prompt: `choose a counter on ${o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name}` };
+            return "paused";
+          }
+          kinds = [sc.counterKind];
+        }
+        sc.counterKind = undefined;
         sc.addOrRemove = { id: o.id, zc: o.zoneChanges ?? 0, kinds, picks: {} };
       }
       const st = sc.addOrRemove;
       const o = s.objects[st.id];
-      if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== st.zc) {
+      if (!o || !here(o) || (o.zoneChanges ?? 0) !== st.zc) {
         sc.addOrRemove = undefined;
         return;
       }
-      const name = characteristics(s, o).name;
+      const name = o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name;
       const kind = st.kinds.find((k) => st.picks[k] === undefined);
       if (kind !== undefined) {
         const n = o.counters[kind] ?? 0;
@@ -659,8 +676,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           player: you,
           source: src,
           what: "addOrRemoveCounter",
-          options: ["add", "remove"],
-          labels: [`Put another ${kind} counter on it`, `Remove a ${kind} counter from it`],
+          options: ["add", "remove", ...(e.may ? ["none"] : [])],
+          labels: [`Put another ${kind} counter on it`, `Remove a ${kind} counter from it`, ...(e.may ? ["Neither"] : [])],
           about: o.id,
           counterKind: kind,
           prompt: `${name} has ${n} ${kind} counter${n === 1 ? "" : "s"}: put another or remove one`,
@@ -671,6 +688,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const changed: string[] = [];
       const last: string[] = [];
       for (const k of st.kinds) {
+        if (st.picks[k] === "none") continue;
         if (st.picks[k] === "add") {
           const put = putCounters(s, o, k, 1);
           if (put) changed.push(`+${put} ${k}`);
@@ -680,6 +698,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           else delete o.counters[k];
           changed.push(`-1 ${k}`);
           countersRemoved(s, o, k, 1);
+          // A time counter off a suspended card (CR 702.62a): "while it's exiled" triggers see it too.
+          if (k === "time" && o.zone === "exile") fireEvent(s, { type: "timeCountersRemovedExiled", id: o.id, n: 1 });
           if (!left) last.push(k);
         }
       }

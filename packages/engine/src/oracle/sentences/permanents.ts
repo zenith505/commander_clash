@@ -1460,6 +1460,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "object" ? [{ type: "counterKindsAddOrRemove", what: { ref: "target", index: addTarget(ctx, spec) } }] : null;
   }
+  // Clockspinning (body.ts): "for one kind of counter on target permanent or suspended card, ...": one kind it has, chosen
+  // as it resolves (rulings). Jhoira's Timebug: "for the time counters on target permanent you control or suspended card
+  // you own, you may ...": only time counters, and doing neither is allowed.
+  if ((m = /^For (one kind of counter|the time counters) on target (permanent or suspended card|permanent you control or suspended card you own), (you may )?put another counter of that kind on it or remove one from it$/.exec(s))) {
+    const spec = parseTargetPhrase(m[2]!);
+    if (spec?.kind !== "object" || !spec.orSuspended || (m[1] === "one kind of counter") === !!m[3]) return null;
+    return [{ type: "counterKindsAddOrRemove", what: { ref: "target", index: addTarget(ctx, spec) }, ...(m[1] === "one kind of counter" ? { one: true as const } : { kind: "time", may: true as const }) }];
+  }
   // Reluctant Role Model: "put a flying, lifelink, or +1/+1 counter on it": one of the three kinds, chosen as it resolves.
   if ((m = new RegExp(`^[Pp]ut an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on (.+)$`).exec(s)) && new Set([m[1], m[2], m[3]]).size === 3) {
     const what = parseObject(m[4]!, ctx);

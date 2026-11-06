@@ -1,7 +1,7 @@
 # Roadmap
 
-30,097 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,961 of 4,988 (99%), top 10,000: 9,611 of
+30,111 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,962 of 4,988 (99%), top 10,000: 9,621 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2250,6 +2250,27 @@ line blocks.
    replacement applies (CR 616.1); the engine applies the exile (with flashback's exile, Feather's goes first, which is the
    choice its rulings allow). Two Rods or Diaries: the first trigger to resolve is the one that exiles it (its controller
    chooses, rulings).
+   Round 288 took the next names from the top and cards on the same pieces: "target spell, nonland permanent, or card in
+   a graveyard" (Endless Detour: its owner puts it on the top or bottom of their library); "target permanent or suspended
+   card" (a card in exile with suspend and a time counter, CR 702.62b: Timecrafting, Fury Charm, Timebender, Shivan
+   Sand-Mage, Venser's Diffusion; "suspended card you own" for Jhoira's Timebug); "For each kind of counter ... put another
+   ... or remove one" as "one kind of counter" (Clockspinning: the kind chosen as it resolves) and "you may" for time
+   counters only (Jhoira's Timebug, with a "Neither" answer); "repeat the following process for each opponent in turn
+   order ... That player may pay life equal to that card's mana value" (Protection Racket: a pass for each opponent,
+   starting after you, a player who left skipped, CR 800.4a; 0 life can always be paid, CR 119.4); "Exile a face-down
+   permanent you control face up: You may play that card this turn" (Primordial Mist); "each legendary card in your
+   graveyard gains 'You may play this card from your graveyard'" until end of turn (Kethis, the Hidden Hand); "you may put
+   a creature card and/or a land card from your hand onto the battlefield" (Yuna's Decision: at most one of each); "blight
+   X. X can't be greater than the greatest toughness among creatures you control" (Soul Immolation, CR 701.68); "untap all
+   creatures, then those creatures phase out until this enchantment leaves the battlefield. Put a time counter on this
+   enchantment for each creature that phased out this way" (Out of Time: they phase in untapped, and the count is only the
+   creatures phased out directly, not their attachments, CR 702.26). Also fixed: a lone "unless pays life equal to ..."
+   (Essence Vortex) keeps checking the amount as it asks. +14, 30,099 of 31,936 with B120 and B121.
+   Out after round 288 (looked at, not done): Rift Elemental (a cost that removes a time counter from a permanent or
+   suspended card you own); Red Sun's Twilight (copies of each artifact destroyed this way when X is 5 or more); Green
+   Sun's Twilight (a creature and/or land card from among revealed cards, put onto the battlefield or into your hand when
+   X is 5 or more); Canoptek Wraith (basic lands with the same name as a chosen land); Rootweaver Druid (each opponent's
+   search, one card put onto the battlefield under your control).
    Out after round 287 (looked at, not done): Haldan, Avid Arcanist and Evelyn, the Covetous ("cards you exiled": who
    exiled a card isn't tracked); Blim, Comedic Genius ("permanents they control but don't own"); The Beamtown Bullies
    ("Target opponent whose turn it is puts ... onto the battlefield under their control"); Forger's Foundry (an exile as it
@@ -5887,7 +5908,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   can), Molten Lavamancer ("to one or more of your opponents during your turn" once each turn: during your turn as the
   damage is dealt, a trigger condition), Whipgrass Entangler (the granted attack and block cost counts every Cleric on
   the battlefield as it's paid, two of them cumulative, rulings). Bots now put Auras whose triggers hurt the enchanted
-  permanent's controller (Artifact Possession, Psychic Venom) on an opponent's permanent. +12 (30,097 of 31,936 with B121).
+  permanent's controller (Artifact Possession, Psychic Venom) on an opponent's permanent. +12 (30,111 of 31,936 with B121 and round 288).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
   dealing damage to several things doesn't report as one yet), Guardian Beast ("can't be enchanted" for other permanents
   while it's untapped, with "doesn't remove Auras already attached" and a control rule), Tetravus (its tokens' plain "can't be

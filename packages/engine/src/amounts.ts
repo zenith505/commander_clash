@@ -487,6 +487,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "phasedThisWay":
+      return s.resolving?.phasedThisWay ?? 0;
     case "goadedThisWay":
       return s.resolving?.goadedThisWay ?? 0;
     case "revealedUntilCount":

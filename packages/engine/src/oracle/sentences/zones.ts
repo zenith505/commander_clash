@@ -1129,6 +1129,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put up to seven permanent cards from your hand onto the battlefield" (Ugin, the Spirit Dragon), "you may put up to
   // two creature cards ..." (Smuggler's Surprise): any number of them up to that many.
   // "Put up to X land cards from your hand and/or graveyard onto the battlefield tapped" (Worldsoul's Rage): from either zone.
+  // Yuna's Decision: "you may put a creature card and/or a land card from your hand onto the battlefield": up to one of
+  // each, put onto the battlefield at the same time; a card that's both (Dryad Arbor) counts as either.
+  if ((m = /^[Yy]ou may put an? ([a-z]+) card and\/or an? ([a-z]+) card from your hand onto the battlefield$/.exec(s))) {
+    const a = parseSearchFilter(`${m[1]} card`);
+    const b = parseSearchFilter(`${m[2]} card`);
+    if (!a || !b || a.kind !== "card" || b.kind !== "card") return null;
+    const either = parseSearchFilter(`${m[1]} or ${m[2]} card`);
+    if (!either) return null;
+    return [{ type: "putFromHand", filter: { ...either, text: `${m[1]} card and/or ${/^[aeiou]/.test(m[2]!) ? "an" : "a"} ${m[2]} card` }, may: true, any: true, upTo: 2, oneOfEach: [a, b] }];
+  }
   if ((m = /^(?:You may )?[Pp]ut up to (two|three|four|five|six|seven|X) (.+?) cards from your hand( and\/or graveyard)? onto the battlefield( tapped)?$/.exec(s))) {
     const filter = parseSearchFilter(`${m[2]!} card`);
     if (filter === null) return null;
@@ -1451,6 +1461,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       const perm = parseTargetPhrase(`${words} permanent`);
       if (spell?.kind !== "spell" || perm?.kind !== "object" || !spell.colors?.length) return null;
       const i = addTarget(ctx, { ...spell, orPermanent: perm, text: m[2]! });
+      return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
+    }
+    // Endless Detour: "The owner of target spell, nonland permanent, or card in a graveyard puts it ...": one target of
+    // any of the three kinds; a spell leaves the stack without being countered (rulings), its owner choosing as it resolves.
+    const orPermCard = m[2] && /^target spell, (nonland permanent), or (card in a graveyard)$/.exec(m[2]);
+    if (orPermCard && !/second from the top/.test(m[3]!)) {
+      const perm = parseTargetPhrase(orPermCard[1]!);
+      const card = parseTargetPhrase(orPermCard[2]!);
+      if (perm?.kind !== "object" || card?.kind !== "card") return null;
+      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: { ...perm, orCard: card }, text: m[2]! });
       return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
     }
     if (orPerm && !/second from the top/.test(m[3]!)) {

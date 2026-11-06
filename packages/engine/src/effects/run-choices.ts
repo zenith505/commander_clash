@@ -757,7 +757,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "bouncedThisWay"
             ? ((c) => !!s.resolving!.bouncedThisWay?.some((b) => (!c.subtype || b.subtypes.includes(c.subtype)) && (!c.another || b.id !== ctx.sourceId) && (!c.returned || !!(b as { returned?: true }).returned)))(e.cond as Extract<SpellCondition, { kind: "bouncedThisWay" }>)
             : e.cond.kind === "excessDealt"
-            ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
+            ? e.cond.redirected ? (s.resolving!.excessRedirected ?? 0) > 0 : (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
             : e.cond.kind === "noneAttackedYou"
             ? ctx.event?.amount === 0
             : e.cond.kind === "eventPlayerAttackedYou"
@@ -951,6 +951,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((option) => { const chose = Object.entries(s.resolving!.chose ?? {}).filter(([p]) => !player(s, Number(p)).lost); return chose.length > 0 && chose.every(([, w]) => w === option); })(e.cond.option)
             : e.cond.kind === "amountNow"
             ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
+            : e.cond.kind === "transformedThisWay"
+            ? !!s.resolving!.transformedThisWay
             : e.cond.kind === "powerBecame"
             ? ((me, n) => s.resolving!.powerBefore !== undefined && s.resolving!.powerBefore !== n && me?.zone === "battlefield" && power(s, me) === n)(objects(s, { ref: "self" }, ctx)[0], e.cond.n)
             : e.cond.kind === "amountsCompare"

@@ -3669,6 +3669,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       last.equipToSelf = true;
       continue;
     }
+    // Ultra Magnus, Armored Carrier: "attacking creatures you control gain indestructible until end of turn. If those
+    // creatures have total power 8 or greater, convert ~": the creatures the effect just before gave it to (the group as it
+    // resolves, CR 611.2c), their power counted now.
+    const groupPower = /^If those creatures have total power (\d+) or greater, (.+)$/.exec(s.replace(/\.$/, ""));
+    if (groupPower) {
+      const prev = effects[effects.length - 1];
+      const then = prev?.type === "continuous" && prev.what.ref === "each" ? parseOne(capital(groupPower[2]!), ctx) : null;
+      if (!then || prev?.type !== "continuous") return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "totalPowerOf", of: prev.what } }, min: Number(groupPower[1]) }, effects: then });
+      continue;
+    }
+    // Living Breakthrough: "your opponents can't cast spells with the same mana value as that spell until your next turn":
+    // that spell's mana value as cast (X included, CR 202.3e), worked out as this resolves; spells already cast aren't
+    // touched (rulings).
+    if (ctx.castSpell && /^[Yy]our opponents can't cast spells with the same mana value as that spell until your next turn$/.test(s.replace(/\.$/, ""))) {
+      effects.push({ type: "cantCast", who: { ref: "eachOpponent" }, mvIs: { count: { kind: "manaValue", of: { ref: "castSpell" } } }, untilYourNextTurn: true });
+      continue;
+    }
     // Zaffai, Thunder Conductor: "If that spell's mana value is 10 or greater, ~ deals 10 damage to an opponent chosen at
     // random.": the opponent picked at random as it resolves, only if the spell that triggered it has that mana value (X
     // as cast, rulings).
@@ -4308,6 +4326,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "newTargets", index: (effects[effects.length - 1] as Extract<Effect, { type: "controlSpell" }>).index });
       continue;
     }
+    // Whispersteel Dagger: "you may cast a creature spell from that player's graveyard this turn, and you may spend mana as
+    // though it were mana of any color to cast that spell": one spell, a permission for later this turn (rulings), paying
+    // its costs with the normal timing; colored mana symbols paid by any mana (CR 609.4b).
+    if (ctx.eventPlayer && /^[Yy]ou may cast a creature spell from that player's graveyard this turn, and you may spend mana as though it were mana of any color to cast that spell$/.test(s.replace(/\.$/, ""))) {
+      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, fromYardOf: { ref: "eventPlayer" }, anyType: true });
+      continue;
+    }
     // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): a permission, not a choice.
     const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardCast) {
@@ -4343,12 +4368,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // its mana cost. If that spell would be put into your graveyard, exile it instead.": the same permission, free (CR
     // 118.9: no alternative cost, X is 0), the card exiled however it would go to the graveyard (rulings).
     const sins = /^Until end of turn, you may cast (target .+? card) from your graveyard without paying its mana cost$/.exec(s.replace(/\.$/, ""));
-    const yardTarget = sins ?? /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    // Kaldring, the Rimestaff: "You may play target snow permanent card from your graveyard this turn. If you do, it enters
+    // tapped.": a land too, played with the turn's land play (CR 305.1-2, rulings); the land or the permanent the spell
+    // becomes enters tapped (CR 614.1c).
+    const yardPlay = sins ? null : /^[Yy]ou may play (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    const yardTarget = sins ?? yardPlay ?? /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardTarget) {
       const before = ctx.targets.length;
       const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");
       const t = ctx.targets[before];
-      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || (t.types.includes("Land") && !yardPlay)) return null;
+      if (yardPlay) {
+        const tapped = sentences[si + 1]?.replace(/\.$/, "") === "If you do, it enters tapped";
+        effects.push({ type: "mayCastFromGraveyard", what, play: true, ...(tapped ? { tapped: true as const } : {}) });
+        if (tapped) si++;
+        continue;
+      }
       // Vohar, Vodalian Desecrator: "... this turn. If that spell would be put into your graveyard, exile it instead."
       const rider = sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
       if (sins && !rider) return null;
@@ -5075,6 +5110,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "chooseFromGraveyard" || !n || typeof n !== "object" || !then) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: n, min: 1 }, effects: [...fx, ...then], otherwise: [{ type: "sacrifice", what: { ref: "self" } }] });
       si += 2;
+      continue;
+    }
+    // Cyclonus, Cybertronian Fighter: "convert it. If you do, there is an additional beginning phase after this phase": only
+    // if it turned over (CR 701.27f: not if it left, or transformed since the ability triggered).
+    const transformDo = /^If you do, (.+)$/.exec(s.replace(/\.$/, ""));
+    const transformPrev = effects[effects.length - 1];
+    if (transformDo && transformPrev?.type === "transform" && transformPrev.what.ref === "self") {
+      const then = parseOne(capital(transformDo[1]!), ctx);
+      if (!then) return null;
+      effects.push({ type: "if", cond: { kind: "transformedThisWay" }, effects: then });
       continue;
     }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
@@ -16193,6 +16238,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "~ deals 4 damage to target creature. Excess damage is dealt to that creature's controller instead." (Flame Spill):
     // the damage beyond lethal goes to its controller (CR 120.4a).
+    // Megatron, Destructive Force: "If excess damage would be dealt to that creature this way, instead that damage is
+    // dealt to that creature's controller and you convert ~": the same replacement (CR 120.4a, 614.1a), and the convert
+    // only if there was excess damage to send.
+    const excessThen = /^If excess damage would be dealt to that creature this way, instead that damage is dealt to that creature's controller(?: and you (convert ~))?$/.exec(s);
+    if (excessThen) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage" || last.divided || last.evenly || last.also || last.excessToController || last.to.ref !== "target" || ctx.targets[last.to.index]?.kind !== "object") return null;
+      last.excessToController = true;
+      if (excessThen[1]) {
+        const then = parseOne(capital(excessThen[1]), ctx);
+        if (!then) return null;
+        effects.push({ type: "if", cond: { kind: "excessDealt", redirected: true }, effects: then });
+      }
+      continue;
+    }
     if (/^Excess damage is dealt to that creature's controller instead$/.test(s)) {
       const last = effects[effects.length - 1];
       if (last?.type !== "damage" || last.divided || last.evenly || last.also || last.excessToController) return null;

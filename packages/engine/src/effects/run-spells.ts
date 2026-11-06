@@ -876,6 +876,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "newTargets": {
+      // Speedball, New Warrior: the spell whose casting triggered this, if it's still on the stack.
+      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? newTargets(s, ctx, ctx.cause, src) : undefined;
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       return newTargets(s, ctx, t.id, src, e.allOrNone);

@@ -1,7 +1,7 @@
 # Roadmap
 
-30,004 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
+30,014 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,602 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2193,6 +2193,31 @@ line blocks.
    "~ has flying as long as a card exiled with it has flying. The same is true for ..." (Urborg Scavengers: a face-up card
    still exiled with it, by that card's own keywords, layer 6); "a land an opponent controls with the same name as the
    exiled card" entering (Invader Parasite). +13, 29,993 of 31,936 (30,004 with B116).
+   Round 285 took the next names from the top that no earlier round looked at: "Each other creature you control becomes
+   a copy of it until end of turn, except those creatures aren't legendary" (Echoing Equation); "Whenever a player casts a
+   spell that targets ~, ~ gets +2/+2 until end of turn. You may choose new targets for that spell" (Speedball, New
+   Warrior: anyone's spell, its controller's trigger and choice, with a browser test); "your opponents can't cast spells
+   with the same mana value as that spell until your next turn" (Living Breakthrough: X counted as cast, spells already
+   cast untouched, rulings); "If those creatures have total power 8 or greater, convert ~" (Ultra Magnus, Armored
+   Carrier); "convert it. If you do, there is an additional beginning phase after this phase" (Cyclonus, Cybertronian
+   Fighter; the same "If you do" now reads Soundwave, Superior Captain, whose front face still doesn't); "You may play
+   target snow permanent card from your graveyard this turn. If you do, it enters tapped" (Kaldring, the Rimestaff: the
+   land with the turn's land play, with a browser test); "you may cast a creature spell from that player's graveyard this
+   turn, and you may spend mana as though it were mana of any color to cast that spell" (Whispersteel Dagger: one spell
+   for each trigger, CR 609.4b, with a browser test; bots use it too); "If damage would be dealt to ~, instead that damage
+   is dealt, but all other damage already dealt to ~ is healed" (Wolverine, Fierce Fighter: combat damage is one event,
+   CR 510.2); "If excess damage would be dealt to that creature this way, instead that damage is dealt to that creature's
+   controller and you convert ~" (Megatron, Destructive Force); "As long as you control your commander, activated
+   abilities of cards in your graveyard cost {2} less to activate" (Convergence of Dominion, not below one mana). +10,
+   30,014 of 31,936.
+   Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
+   the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
+   Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move ("When you gain
+   control of ~ from another player": no control-change event yet); Blaster, Combat DJ (granted modular, and moving X
+   counters onto another artifact); Jetfire, Ingenious Scientist (removing counters from among artifacts as a cost, mana
+   for a target player); Sabertooth Cobra ("unless they pay {2} before that step"); Ranar the Ever-Watchful (the first
+   foretell each turn for {0}, and exile from hand or by your effects as one trigger); Soundwave, Sonic Spy (a copy of a
+   card exiled from a graveyard by the damage dealt); Grip of Chaos and Psychic Battle (targets reselected at random).
    Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
    for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
    Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the

@@ -2223,7 +2223,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
       const o = s.objects[id];
-      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e, t) => e === "selfTargetedByYourSpell" && (!t.heroicSpell || (item ? spellMatches(s, t.heroicSpell, item) : printedMatches(t.heroicSpell, ev.card))), undefined, ev.stackId);
+      // Speedball, New Warrior: "Whenever a player casts a spell that targets ~": anyone's spell, its controller's trigger.
+      if (o?.zone === "battlefield") {
+        const wc = controllerOf(s, o);
+        add(o, wc, (e, t) => e === "selfTargetedByYourSpell" && (wc === ev.controller || !!t.heroicAnyCaster) && (!t.heroicSpell || (item ? spellMatches(s, t.heroicSpell, item) : printedMatches(t.heroicSpell, ev.card))), undefined, ev.stackId);
+      }
     }
     causedBy = null;
   } else if (ev.type === "targeted") {

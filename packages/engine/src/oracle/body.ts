@@ -3248,6 +3248,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
+  // Artificial Evolution: "... replacing all instances of one creature type with another. The new creature type can't be
+  // Wall." One instruction: Wall isn't offered as the new word.
+  text = text.replace(/(by replacing all instances of one creature type with another)\. The new creature type can't be Wall\./, "$1 except Wall.");
   // Cyber Conversion: "Turn target creature face down. It's a 2/2 Cyberman artifact creature." One instruction: it's turned
   // face down as that (FaceDownKind "cyberman", rulings).
   text = text.replace(/\b([Tt]urn target creature face down)\. It's a 2\/2 Cyberman artifact creature\./, "$1 as a 2/2 Cyberman artifact creature.");

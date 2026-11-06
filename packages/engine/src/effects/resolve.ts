@@ -19,6 +19,7 @@ import { runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFli
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
+import { runTextEffect } from "./run-text";
 import { runTokensEffect, createToken } from "./run-tokens";
 import { runCopiesEffect } from "./run-copies";
 import { runSpellsEffect, addDelayed } from "./run-spells";
@@ -1251,6 +1252,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendCard":
     case "sunburstChoose":
       return runZonesEffect(s, e, ctx, src);
+    case "changeText":
+      return runTextEffect(s, e, ctx, src);
     case "tap":
     case "turnFaceUp":
     case "turnFaceDown":

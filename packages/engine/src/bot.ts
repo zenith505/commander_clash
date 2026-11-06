@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
+import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
@@ -929,6 +929,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lord of the Void: the costliest card to put onto the battlefield.
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && /onto the battlefield/.test(pend.prompt ?? ""))
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
+    // Sleight of Mind and the like (effect "changeText"): see textWordPick.
+    if (pend.kind === "chooseOption" && (pend.what === "textFrom" || pend.what === "textTo")) return [{ type: "chooseOption", player: pid, choice: textWordPick(s, pid, pend) }];
     // Truth or Tale: the best card of the chosen pile.
     if (pend.kind === "chooseOption" && pend.what === "pileCard") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => handWorth(s, b) - handWorth(s, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
@@ -6586,4 +6588,22 @@ export function processOrder(s: GameState, pid: PlayerId, cards: ObjectId[]): Ob
   };
   const value = (id: ObjectId) => (hiddenInExile(obj(s, id), pid) ? 0 : mv(s, id));
   return [...cards].sort((a, b) => playable(b) - playable(a) || value(b) - value(a));
+}
+
+/**
+ * A text change's words (effect "changeText"): the word to replace is one the permanent or spell has (in its text or on its
+ * type line), so the change does something; a basic land type becomes one as chooseLandType picks. Otherwise the first
+ * word offered.
+ */
+function textWordPick(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "chooseOption" }>): string {
+  const o = pend.about ? s.objects[pend.about] : undefined;
+  if (!o) return pend.options[0]!;
+  const d = defOf(s, o);
+  if (pend.what === "textFrom") {
+    const has = (w: string) => d.subtypes.includes(w) || new RegExp(`(?<![a-z])${w}`, "i").test(d.oracleText.replace(new RegExp(d.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), "~"));
+    return pend.options.find((w) => d.subtypes.includes(w)) ?? pend.options.find(has) ?? pend.options[0]!;
+  }
+  // A basic land type: as for "becomes the basic land type of your choice" (Reef Shaman).
+  if (pend.options.every((w) => LAND_COLOR[w])) return chooseLandType(s, pid, pend.options);
+  return pend.options[0]!;
 }

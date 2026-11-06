@@ -6,6 +6,7 @@ import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
 import { bindChosen, objectMatches, printedMatches } from "./effects/targeting";
 import { isRingBearer } from "./effects/run-ring";
+import { textChangesKey, withTextChanges } from "./text-changes";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -94,7 +95,22 @@ const ownId = (o: GameObject): string => o.melded ?? (o.face !== undefined ? fac
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : textKey(o) ?? copiedId(o));
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : wordsKey(o, textKey(o) ?? copiedId(o)));
+
+/** Text changes apply on the stack and the battlefield (GameObject.textChanges, CR 612, 400.7a). */
+const textChanged = (o: GameObject): boolean => !!o.textChanges?.length && !o.faceDown && (o.zone === "stack" || o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged");
+/** With text-changing effects on it: the key its definition with the changed text has (registered by defOf). */
+const wordsKey = (o: GameObject, base: string): string => (textChanged(o) ? textChangesKey(base, o.textChanges!) : base);
+
+/** `d` with `o`'s text changes, registered in GameState.cards under its own key so it compiles and caches like any card. */
+function withWords(s: GameState, o: GameObject, d: CardDef): CardDef {
+  if (!textChanged(o)) return d;
+  const key = textChangesKey(d.oracleId, o.textChanges!);
+  const out = (s.cards[key] ??= withTextChanges(d, o.textChanges!, key));
+  // cardIdOf names it too (a prototyped or bestowed one's key differs from its definition's): triggers find it by that.
+  s.cards[cardIdOf(o)] ??= out;
+  return out;
+}
 
 /** With its text box exchanged (GameObject.textFrom), on the battlefield: the key its definition with that text has. */
 const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") ? `${copiedId(o)}|text:${o.textFrom}` : undefined);
@@ -102,7 +118,9 @@ const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone ==
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
-  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return o.textFrom && !o.faceDown ? withTextOf(s, out, o.textFrom, textKey(o)!) : out;
+  // Text changes apply after an exchange of text boxes (both layer 3, CR 613.1c; an exchange is as the permanent enters).
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return withWords(s, o, o.textFrom && !o.faceDown ? withTextOf(s, out, o.textFrom, textKey(o)!) : out);
+  if (o.zone === "stack") return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(withWords(s, o, out)))));
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types; a "*" power
   // or toughness is what its characteristic-defining ability says (CR 604.3), last: the caches above key on the card.
   return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out))));

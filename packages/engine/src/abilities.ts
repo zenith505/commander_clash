@@ -4067,6 +4067,13 @@ export type Effect =
   | { type: "extraLandThisTurn"; n: Amount }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
+  /**
+   * "Change the text of target spell or permanent by replacing all instances of one color word with another" (Sleight of
+   * Mind, CR 612): the two words chosen as it resolves (rulings), any of `kinds` (one kind for both words), then a text
+   * change on that spell or permanent for as long as it's that object, a permanent spell's on the permanent it becomes too
+   * (CR 400.7a); with `endOfTurn`, until end of turn (Crystal Spray). See GameObject.textChanges.
+   */
+  | { type: "changeText"; what: ObjRef; kinds: ("color" | "basicLandType" | "creatureType")[]; endOfTurn?: true; /** New Blood: "with Vampire", the new word. */ newWord?: string; /** Artificial Evolution: "The new creature type can't be Wall." */ notTo?: string[] }
   /** The end of every crew ability (CR 702.122a): it "becomes crewed" as the ability resolves (CR 702.122e). */
   | { type: "becameCrewed" }
   /** The end of every gift's effect (CR 702.174c): its controller "gives a gift" as the spell or the gift trigger resolves. */

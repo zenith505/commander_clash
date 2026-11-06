@@ -6380,11 +6380,11 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
   let blocks = a.blocks;
   for (;;) {
     const blockers = [...new Set(blocks.map((b) => b.blocker))];
-    const cost = blockCost(s, blockers.length, blockers);
+    const cost = blockCost(s, blockers.length, blockers, blocks);
     const taps = cost ? planMana(s, pid, parseManaCost(cost)) : [];
     if (taps) return [...taps, { ...a, blocks }];
     // Qal Sisma Behemoth: the last one chosen that costs something to block.
-    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b]))!;
+    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b], blocks.filter((x) => x.blocker === b)))!;
     blocks = blocks.filter((b) => b.blocker !== drop);
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);

@@ -172,6 +172,8 @@ export interface Characteristics {
   ownAttackTax: number;
   /** Generic mana to block with this creature (Qal Sisma Behemoth, Oppressive Rays). */
   ownBlockTax: number;
+  /** Generic mana to block a creature with at least this power with this creature (Hipparion, CR 509.1d). */
+  ownBlockTaxVs: { n: number; minPower: number }[];
   /** Costs to attack with this creature that aren't mana (Exalted Dragon's "sacrifice a land", CR 508.1g). */
   ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
@@ -388,6 +390,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     blockTax: 0,
     ownAttackTax: 0,
     ownBlockTax: 0,
+    ownBlockTaxVs: [],
     ownAttackCosts: [],
     mustAttack: [],
     cantBeBlockedBy: [],
@@ -1773,6 +1776,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "ownAttackCost":
       c.ownAttackCosts = [...c.ownAttackCosts, { action: m.action, filter: m.filter, n: m.n }];
+      return;
+    case "ownBlockTaxVs":
+      c.ownBlockTaxVs = [...c.ownBlockTaxVs, { n: m.n, minPower: m.minPower }];
       return;
     case "ownAttackTax":
     case "ownBlockTax": {

@@ -2978,6 +2978,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const n = Number(ownTax[3]);
     return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
   }
+  // Hipparion: "~ can't block creatures with power 3 or greater unless you pay {1}": a cost to block such a creature, its
+  // power as blockers are declared, paid then (CR 509.1d-e); nothing obliges paying it (CR 509.1c).
+  const vsTax = /^~ can't block creatures with power (\d+) or greater unless you pay \{(\d+)\}$/.exec(text);
+  if (vsTax) return { affects: { kind: "self" }, mods: [{ kind: "ownBlockTaxVs", n: Number(vsTax[2]), minPower: Number(vsTax[1]) }], text: line };
   // Exalted Dragon: "~ can't attack unless you sacrifice a land"; Leviathan: "... unless you sacrifice two Islands";
   // Floodtide Serpent: "... unless you return an enchantment you control to its owner's hand": costs to attack, paid as
   // attackers are declared (CR 508.1g-i), with permanents of yours.

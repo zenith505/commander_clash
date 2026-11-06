@@ -134,6 +134,8 @@ export interface Ctx {
   afterMillOne?: boolean;
   /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
   afterAnyMill?: boolean;
+  /** The instruction before was a destroy: "the number of Mountains put into a graveyard this way" (Volcanic Eruption). */
+  afterDestroy?: boolean;
   /** An instruction before in this ability discarded cards of yours: "for each card discarded this way" (Pyretic Charge). */
   afterYourDiscard?: boolean;
   /** The instruction before made one target player discard (Skull Raid): "cards discarded this way" are theirs. */
@@ -3380,6 +3382,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Ajani Goldmane: "Create a white Avatar creature token. It has "This creature's power and toughness are each equal to
   // your life total."": the token is created with that ability.
   text = text.replace(/(^|\. )(Create an? [^."]+? creature token)\. It has ("(?:This creature|~)'s power and toughness are each equal to [^"]+")\.?$/, "$1$2 with $3.");
+  // Elephant Resurgence: "Each player creates a green Elephant creature token. Those creatures have "~'s power and
+  // toughness are each equal to ..."": each token's own characteristic-defining ability (rulings: not locked in).
+  text = text.replace(/^(Each player creates an? [^."]+? creature token)\. Those creatures have ("~'s power and toughness are each equal to [^"]+")\.?$/, "$1 with $2.");
   // Broken Visage, Kalitas, Ritual of the Returned: "Create a black Spirit creature token. Its power is equal to that
   // creature's power and its toughness is equal to that creature's toughness": one instruction (tokens.ts).
   text = text.replace(/(^|\. |, )([Cc]reate) an? ([a-z]+ [A-Z][a-z]+ creature token)\. Its power is equal to (that creature|that card)'s power and its toughness is equal to \4's toughness\./, "$1$2 a 0/0 $3 with power and toughness equal to $4's.");
@@ -3692,6 +3697,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card's mana value": one target player's card.
     ctx.afterMillOne = last?.type === "mill" && last.n === 1 && (last.who.ref === "you" || last.who.ref === "eventPlayer" || (last.who.ref === "target" && !last.who.n));
     ctx.afterAnyMill = last?.type === "mill";
+    ctx.afterDestroy = last?.type === "destroy";
     // "You may discard your hand." (Balin, Loremaster): none discarded this way if you don't.
     ctx.afterYourDiscard = effects.some((e) => (e.type === "discard" && e.who.ref === "you") || (e.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "discard" && e.effects[0]!.who.ref === "you"));
     ctx.afterTargetDiscard = last?.type === "discard" && last.who.ref === "target" && !last.who.n;
@@ -6499,6 +6505,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Superior Foes of Spider-Man: "you may exile the top card of your library. If you do, you may play that card until you
+    // exile another card with ~": the same, only if they chose to exile it.
+    if (!ctx.spell && /^[Yy]ou may exile the top card of your library$/.test(s) && /^If you do, you may play that card until you exile another card with ~$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "may", effects: [{ type: "impulse", n: 1, until: "exiled", untilAnother: true }], text: "exile the top card of your library" });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     // Metzali, Tower of Triumph: "Choose a creature at random that attacked this turn. Destroy that creature.": any player's
     // creature declared as an attacker this turn (not one put onto the battlefield attacking), chosen as it resolves with
     // nothing in between (rulings); not targeted.
@@ -6634,6 +6648,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
     if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a token, you may play that card") {
       effects.push({ type: "impulse", n: 1, until: "exiled", attackedWithToken: true });
+      si++;
+      continue;
+    }
+    // Goblin Researcher: "When ~ enters, exile the top card of your library. During any turn you attacked with ~, you may play
+    // that card." For as long as it stays exiled, in a turn its controller declared this object as an attacker, whatever
+    // became of it since (rulings); a Researcher that left and came back is a new object (CR 400.7).
+    // Boros Strike-Captain: "During any turn you attacked with three or more creatures, you may play that card": in a turn
+    // they declared three or more creatures as attackers, whatever became of them and of the Captain (rulings).
+    const attackedWith = exTop && !exTop[1] && !exEqual && !impulseIf && !ctx.spell ? /^During any turn you attacked with (~|three or more creatures), you may play that card$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (attackedWith) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", ...(attackedWith[1] === "~" ? { attackedWithSource: true as const } : { attackedWithAtLeast: 3 }) });
+      ctx.exiledTop = true;
       si++;
       continue;
     }
@@ -13405,6 +13431,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const spec = parseTargetPhrase(singularWord(lossThisWay[1]!), { chosen: true });
       if (effects[effects.length - 1]?.type !== "destroy" || spec?.kind !== "object") return null;
       effects.push({ type: "forEachThisWay", which: "destroyed", filter: { ...spec, text: lossThisWay[1]! }, effects: [{ type: "loseLife", who: { ref: "eachOne" }, n: 1 }] });
+      continue;
+    }
+    // Stench of Evil: "Destroy all Plains. For each land destroyed this way, ~ deals 1 damage to that land's controller unless
+    // they pay {2}": each player who controlled one as it was destroyed (CR 608.2h), in APNAP order (CR 101.4), once for each
+    // of theirs; a destroyed land counts even if it went somewhere other than a graveyard (as with Rampage of the Clans).
+    const perPunish = /^For each (land|creature|artifact|enchantment|permanent) destroyed this way, ~ deals (\d+) damage to that (land|creature|artifact|enchantment|permanent)'s controller unless they pay ((?:\{\d+\})+)$/.exec(s);
+    if (perPunish) {
+      const spec = parseTargetPhrase(perPunish[1]!, { chosen: true });
+      if (perPunish[1] !== perPunish[3] || effects[effects.length - 1]?.type !== "destroy" || spec?.kind !== "object") return null;
+      const n = Number(perPunish[2]);
+      effects.push({ type: "forEachThisWay", which: "destroyed", filter: { ...spec, text: perPunish[1]! }, effects: [{ type: "punisher", who: { ref: "eachOne" }, options: [{ pay: { cost: perPunish[4]! } }], effects: [{ type: "damage", amount: n, to: { ref: "punished" } }], penalty: `Take ${n} damage` }] });
       continue;
     }
     // Luminate Primordial: "for each opponent, exile up to one target creature that player controls and that player gains

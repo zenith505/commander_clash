@@ -147,9 +147,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // characteristic-defining ability sets them (CR 604.3, 613.4a).
   // 'With reach and "..."' (Wrenn and Seven): keywords too.
   // Consuming Blob: '"This token's power is equal to ... and its toughness is equal to that number plus 1."', the same.
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (.+?) creature tokens? with (?:([a-z, ]+?),? and )?"(~'s power (?:and toughness are each|is) equal to [^"]+)"$`).exec(s))) {
-    const token = parseToken(0, 0, m[2]!, `${m[3] ? `${m[3]} and ` : ""}"${m[4]!}"`);
-    return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
+  // Elephant Resurgence: "Each player creates a green Elephant creature token. Those creatures have "..."" (body.ts reads it
+  // as "with"): each player their own, all at once.
+  if ((m = new RegExp(`^(?:(Each player) creates|(?:You )?[Cc]reate) ${NUMX} (.+?) creature tokens? with (?:([a-z, ]+?),? and )?"(~'s power (?:and toughness are each|is) equal to [^"]+)"$`).exec(s))) {
+    const token = parseToken(0, 0, m[3]!, `${m[4] ? `${m[4]} and ` : ""}"${m[5]!}"`);
+    return token ? [{ type: "createToken", who: m[1] ? { ref: "eachPlayer" } : { ref: "you" }, n: amt(m[2]!), token }] : null;
   }
   // A Vehicle token: "create a 3/2 colorless Vehicle artifact token with crew 1" (Mu Yanling, Wind Rider), "a 5/5
   // colorless Vehicle artifact token named Zeppelin with flying and crew 3" (Lita): an artifact, not a creature, with its

@@ -670,6 +670,9 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller);
     case "eachPlayer":
       return livingPlayers(s);
+    case "teammates":
+      // Imperial Mask: no teams in this free-for-all game, so no teammates (CR 102.3).
+      return [];
     case "attackedThisTurnBySelf": {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return o?.attacked?.turn === s.turn ? livingPlayers(s).filter((p) => o.attacked!.players?.includes(p)) : [];

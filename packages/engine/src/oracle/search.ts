@@ -91,6 +91,10 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // with each other one; one card alone is fine (rulings).
   const share = / that share a land type$/.exec(m[3]!);
   if (share && (n === 1 || eachX)) return null;
+  // Hiveheart Shaman: "a basic land card that doesn't share a land type with a land you control": none of the land types
+  // among lands you control as it resolves (CR 205.3i); Wastes has none, so it always fits.
+  const noShare = / that doesn't share a land type with a land you control$/.exec(m[3]!);
+  if (noShare && (n !== 1 || eachX || share)) return null;
   // "Any number of creature cards with total mana value 6 or less" (Protean Hulk): all the cards found together, a card
   // with {X} in its mana cost counting X as 0 (CR 202.3e, rulings).
   const total = / with total mana value (\d+) or less$/.exec(m[3]!);
@@ -103,13 +107,14 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const unlike = / and with a different name than each ([A-Z][a-z]+) you control$/.exec(m[3]!) ?? / that doesn't have the same name as an? ([A-Z][a-z]+) you control$/.exec(m[3]!);
   const unlikeSpec = unlike ? parseSearchFilter(`${unlike[1]} card`) : undefined;
   if (unlike && (!unlikeSpec || n !== 1 || eachX || share || total)) return null;
-  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : unlike ? m[3]!.slice(0, unlike.index).replace(/ with mana value less than or equal to that Aura$/, " with mana value less than or equal to that permanent's mana value") : m[3]!;
+  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : noShare ? m[3]!.slice(0, noShare.index) : total ? m[3]!.slice(0, total.index) : unlike ? m[3]!.slice(0, unlike.index).replace(/ with mana value less than or equal to that Aura$/, " with mana value less than or equal to that permanent's mana value") : m[3]!;
   // "That each have different names" (Tiamat), "that have different names" (Omenpath Journey) say the same.
   const different = / (?:with|that each have|that have) different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
   const filter00 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
   if (filter00 === null || (eachX && (!filter00 || filter00.bound)) || (unlike && !filter00)) return null;
-  const filter0 = unlike ? { ...filter00!, notNamedAsYours: { ...unlikeSpec!, kind: "object" as const, text: `${unlike[1]} you control` }, text: m[3]! } : filter00;
+  if (noShare && (!filter00 || filter00.kind !== "card" || !filter00.types?.includes("Land") || unlike || total)) return null;
+  const filter0 = unlike ? { ...filter00!, notNamedAsYours: { ...unlikeSpec!, kind: "object" as const, text: `${unlike[1]} you control` }, text: m[3]! } : noShare ? { ...filter00!, noLandTypeOfYours: true as const, text: m[3]! } : filter00;
   const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).

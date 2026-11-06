@@ -1253,6 +1253,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "livingDeath":
     case "putAllOnBottom":
     case "linkedToBottom":
+    case "topYardSplit":
     case "pileOnTop":
     case "returnOtherUntilLeaves":
     case "untilLeavesToGraveyard":

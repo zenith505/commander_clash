@@ -714,7 +714,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: ["0"], numberRange: { min: 0, max: most }, prompt: `discard how many cards at random (0 to ${most})?` };
           return "paused";
         }
-        if (r.chosen?.number !== undefined || !e.range) return;
+        if (r.chosen?.number !== undefined || !e.range) {
+          // Shapeshifter: "the last chosen number" is kept on the permanent, while it's still that object (CR 400.7).
+          const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.number !== undefined) {
+            me.chosen = { ...me.chosen, number: r.chosen.number };
+            invalidateCharacteristics(s);
+          }
+          return;
+        }
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
         return "paused";
       }

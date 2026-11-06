@@ -125,6 +125,7 @@ import {
   attackTargetScore,
   discardKeywordKinds,
   auraHostOptions,
+  lastDrawnInHand,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -369,6 +370,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // From an opponent's revealed hand: take their most expensive card.
     // Memoricide's search: every card with the name it can take; from the hand last, which may give that player cards back.
     // Benthic Anomaly: the creature most worth copying (its power and toughness will be the totals anyway).
+    // Phyrexian Grimoire: exile the card its controller would rather have back (the other goes to their hand); our own
+    // pick (no opponent to choose) keeps the better one.
+    if (pend.kind === "searchLibrary" && pend.cards.length === 2 && s.resolving?.body.effects[s.resolving.next]?.type === "topYardSplit") {
+      const ranked = [...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a));
+      return [{ type: "searchLibrary", player: pid, found: [pid === s.resolving.item.controller ? ranked[1]! : ranked[0]!] }];
+    }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
@@ -4289,6 +4296,15 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
     const n = Math.min(me.life > 20 ? 5 : me.life > 12 ? 3 : 1, Math.max(1, me.library.length - 1));
     return String(Math.max(r.min, Math.min(r.max, n)));
   }
+  // Shapeshifter: power the number, toughness 7 minus it, kept until our next upkeep: 4/3 while no opponent's creature
+  // could kill it in combat, else 3/4.
+  if (c && JSON.stringify(c.statics).includes('"selfChosenNumber"')) {
+    const big = s.battlefield.some((id) => {
+      const o = obj(s, id);
+      return controllerOf(s, o) !== pid && objIsType(s, o, "Creature") && power(s, o) >= 3;
+    });
+    return String(Math.max(r.min, Math.min(r.max, big ? 3 : 4)));
+  }
   // A resolving spell's own "choose a number" (Expel the Interlopers).
   const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
   if (forSpell !== undefined) return String(forSpell);
@@ -5553,6 +5569,10 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter);
       if (!ids) return null;
       out.collect = ids;
+    } else if (c.kind === "discard" && c.lastDrawn) {
+      // Jandor's Ring: trade the card just drawn only when it's a land we don't need.
+      const last = lastDrawnInHand(s, pid);
+      if (!last || !isType(defOf(s, obj(s, last)), "Land") || lands(s, pid) < 5) return null;
     } else if (c.kind === "discard" && c.random) {
       if (player(s, pid).hand.length < c.n + 4) return null;
     } else if (c.kind === "discard" && c.sameName) {

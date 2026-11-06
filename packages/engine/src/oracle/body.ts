@@ -2598,6 +2598,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
+  // Phyrexian Grimoire (see Effect "topYardSplit"): the opponent is targeted, the cards aren't (rulings).
+  if (opts.activated && text.trim() === "Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.")
+    return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "topYardSplit", chooser: { ref: "target", index: 0 } }], text };
   // Reins of Power (see Effect "swapCreatures").
   if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
     return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };

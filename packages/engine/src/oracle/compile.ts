@@ -6472,6 +6472,13 @@ function linkExile(out: CompiledCard) {
     if (chooses.length !== 1 || out.spell || out.entersChoose) out.unsupported.push("(the last chosen player isn't chosen by one triggered ability)");
     else chooses[0]!.keepOnSource = true;
   }
+  // Shapeshifter: "the last chosen number" is the one chosen as it entered or by its one "you may choose a number"
+  // trigger since, kept on the permanent (rulings: one choice each upkeep).
+  if (JSON.stringify(out.statics).includes('"selfChosenNumber"')) {
+    const chooses = out.triggers.flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "choose" }> => e.type === "choose" && e.choice === "number" && !!e.range);
+    if (chooses.length !== 1 || out.spell || out.activated.length || out.entersChoose?.length !== 1 || out.entersChoose[0]!.what !== "number") out.unsupported.push("(the last chosen number isn't chosen as it enters and by one triggered ability)");
+    else chooses[0]!.keepOnSource = true;
+  }
   // Circu: both of its "exile the top card of target player's library" triggers are linked to its ban (CR 607.2a).
   // Exclusion Ritual, Ixalan's Binding: "the exiled card" lines linked their one exile as they were read; nothing more to do.
   const exiledCardBan = out.linkedNameCastBan && bodies.flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" && e.linked).length === 1 && out.triggers.length === 1 && !out.activated.length && !out.spell;

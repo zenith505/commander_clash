@@ -883,6 +883,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** The last card this player drew, in turn `turn`, as the object it became in their hand (Jandor's Ring's "the last card you drew this turn"). */
+  lastDrawn?: { turn: number; id: ObjectId; zc: number };
   /** The names of the creatures that have dealt this player combat damage this game (Gollum, Obsessed Stalker). */
   combatDamagedByNames?: string[];
   /** How many spells of each English name this player has cast this game (copies aren't cast): Approach of the Second Sun. */
@@ -2788,6 +2790,8 @@ export interface Resolving {
     faceDownBottom?: ObjectId[];
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
+    /** Phyrexian Grimoire: the opponent's pick of the top two cards has been asked (answer in `found`). */
+    yardSplit?: true;
     linkedCopyPick?: true;
     /** Benthic Anomaly: the creatures chosen so far (one for each opponent), and whether the one to copy is being asked. */
     perOpponent?: { picked: ObjectId[]; copyPick?: true };

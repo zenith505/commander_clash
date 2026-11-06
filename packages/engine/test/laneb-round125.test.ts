@@ -1,10 +1,11 @@
 // Lane B round B125: Lichenthrope and Phytohydra (damage replaced by counters, CR 614.1a, ordered with prevention by
 // their controller, CR 616.1), Emberwilde Djinn (pay {R}{R} or 2 life to gain control of it),
-// Purgatory (the creature cards its trigger exiled, one returned at upkeep for {4} and 2 life).
+// Purgatory (the creature cards its trigger exiled, one returned at upkeep for {4} and 2 life), Jandor's Ring (discard
+// the last card you drew this turn), Phyrexian Grimoire (an opponent picks which of your top two graveyard cards is exiled).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, mountain, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, characteristics, controllerOf, moveObject, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
+import { abilityProblem, botActions, characteristics, controllerOf, draw, moveObject, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -53,6 +54,9 @@ const phyto = (): CardDef => ({"oracleId":"4f5a7b65-b7f4-4bad-acfd-35edfb8f86a7"
 const shock = (): CardDef => ({"oracleId":"a9d288b8-cdc1-4e55-a0c9-d6edfc95e65d","name":"Shock","manaCost":"{R}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Shock deals 2 damage to any target.","colors":["R"],"colorIdentity":["R"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/6/760b41a1-c087-4b11-b8a0-fb01d8a4c0c6.jpg?1783905334","commanderLegal":"legal","set":"spm","rarity":"common","layout":"normal"}) as CardDef;
 const djinn = (): CardDef => ({"oracleId":"3e1a7146-75d5-499f-8718-303bc6ea139b","name":"Emberwilde Djinn","manaCost":"{2}{R}{R}","cmc":4,"typeLine":"Creature — Djinn","supertypes":[],"types":["Creature"],"subtypes":["Djinn"],"oracleText":"Flying\nAt the beginning of each player's upkeep, that player may pay {R}{R} or 2 life. If the player does, they gain control of this creature.","power":"5","toughness":"4","colors":["R"],"colorIdentity":["R"],"keywords":["Flying"],"artUrl":"https://cards.scryfall.io/art_crop/front/c/9/c9e8c9f5-61dd-4dcc-bd40-8f366374ea18.jpg?1783947081","commanderLegal":"legal","set":"mir","rarity":"rare","layout":"normal"}) as CardDef;
 const purg = (): CardDef => ({"oracleId":"2fb8e100-58a1-4dc6-bc38-ad7f115e3e46","name":"Purgatory","manaCost":"{2}{W}{B}","cmc":4,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"Whenever a nontoken creature is put into your graveyard from the battlefield, exile that card.\nAt the beginning of your upkeep, you may pay {4} and 2 life. If you do, return a card exiled with this enchantment to the battlefield.","colors":["B","W"],"colorIdentity":["B","W"],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/9/e/9ed5e58b-46f3-437c-89ac-24235a65bd1f.jpg?1783947051","commanderLegal":"legal","set":"mir","rarity":"rare","layout":"normal"}) as CardDef;
+const ring = (): CardDef => ({"oracleId":"737db899-dcdb-48f9-8d30-cbbce3ae3434","name":"Jandor's Ring","manaCost":"{6}","cmc":6,"typeLine":"Artifact","supertypes":[],"types":["Artifact"],"subtypes":[],"oracleText":"{2}, {T}, Discard the last card you drew this turn: Draw a card.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/7/1/71504078-a16f-4dc4-9626-0ecc42b1e93b.jpg?1783948378","commanderLegal":"legal","set":"arn","rarity":"rare","layout":"normal"}) as CardDef;
+const grimoire = (): CardDef => ({"oracleId":"090052a8-9e5b-4024-881f-5f8b65db7aa7","name":"Phyrexian Grimoire","manaCost":"{3}","cmc":3,"typeLine":"Artifact — Book","supertypes":[],"types":["Artifact"],"subtypes":["Book"],"oracleText":"{4}, {T}: Target opponent chooses one of the top two cards of your graveyard. Exile that card and put the other one into your hand.","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/2/f/2fcf5b8a-563b-48d7-a874-e9c226192320.jpg?1783946602","commanderLegal":"legal","set":"tmp","rarity":"rare","layout":"normal"}) as CardDef;
+const shifter = (): CardDef => ({"oracleId":"82a6d89d-9215-4540-b7d5-26cdd6afb05b","name":"Shapeshifter","manaCost":"{6}","cmc":6,"typeLine":"Artifact Creature — Shapeshifter","supertypes":[],"types":["Artifact","Creature"],"subtypes":["Shapeshifter"],"oracleText":"As this creature enters, choose a number between 0 and 7.\nAt the beginning of your upkeep, you may choose a number between 0 and 7.\nShapeshifter's power is equal to the last chosen number and its toughness is equal to 7 minus that number.","power":"*","toughness":"7-*","colors":[],"colorIdentity":[],"keywords":[],"artUrl":"https://cards.scryfall.io/art_crop/front/c/c/cc278af4-b60d-41b7-b9d7-36c8aefca1a7.jpg?1783948358","commanderLegal":"legal","set":"atq","rarity":"rare","layout":"normal"}) as CardDef;
 
 describe("Lichenthrope and Phytohydra: damage replaced by counters", () => {
   it("compile", () => supported(lichen(), phyto()));
@@ -216,5 +220,175 @@ describe("Purgatory: dying nontoken creatures exiled, one returned at upkeep for
     moveObject(s0, mine, "graveyard");
     const s = settle(s0);
     expect(s.objects[mine]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Jandor's Ring: discard the last card you drew this turn", () => {
+  it("compile", () => supported(ring()));
+
+  it("discards the last of the cards drawn this turn, then draws", () => {
+    const { s, ap } = setup([]);
+    const r = putOnBattlefield(s, ap, ring());
+    s.players[ap]!.hand = [];
+    draw(s, ap, 2);
+    const [first, second] = s.players[ap]!.hand;
+    pool(s, ap, { C: 2 });
+    const after = settle(run(s, planActivate(s, ap, r, 0, [])));
+    expect(after.objects[second!]!.zone).toBe("graveyard");
+    expect(after.objects[first!]!.zone).toBe("hand");
+    expect(after.players[ap]!.hand.length).toBe(2);
+  });
+
+  it("can't be activated once that card has left the hand, or for a card drawn in an earlier turn", () => {
+    const { s, ap } = setup([]);
+    const r = putOnBattlefield(s, ap, ring());
+    s.players[ap]!.hand = [];
+    draw(s, ap, 1);
+    const drawn = s.players[ap]!.hand[0]!;
+    pool(s, ap, { C: 2 });
+    // Another card in hand that wasn't drawn can't be discarded for it.
+    const other = putOnBattlefield(s, ap, bear());
+    moveObject(s, other, "hand");
+    expect(abilityProblem(s, ap, r, 0, [], undefined, undefined, undefined, { discard: [drawn] })).toBeNull();
+    expect(abilityProblem(s, ap, r, 0, [], undefined, undefined, undefined, { discard: [other] })).toMatch(/not a card of your choice/);
+    moveObject(s, drawn, "graveyard");
+    expect(abilityProblem(s, ap, r, 0, [])).toMatch(/last card you drew this turn/);
+    s.players[ap]!.lastDrawn = { turn: s.turn - 1, id: drawn, zc: s.objects[drawn]!.zoneChanges ?? 0 };
+    expect(abilityProblem(s, ap, r, 0, [])).toMatch(/last card you drew this turn/);
+  });
+
+  it("a bot cycles a land it just drew once it has five lands", () => {
+    const { s, ap } = setup([]);
+    const r = putOnBattlefield(s, ap, ring());
+    s.players[ap]!.hand = [];
+    s.players[ap]!.command = [];
+    s.players[ap]!.landsPlayedThisTurn = 1;
+    draw(s, ap, 1);
+    const drawn = s.players[ap]!.hand[0]!;
+    expect(s.cards[s.objects[drawn]!.cardId]!.typeLine).toMatch(/Land/);
+    let t = s;
+    for (let i = 0; i < 400 && t.objects[drawn]!.zone === "hand" && t.step !== "end"; i++) {
+      const p = t.pending;
+      if (p?.kind === "declareAttackers") t = act(t, { type: "declareAttackers", player: p.player, attacks: [] });
+      else if (p?.kind === "declareBlockers") t = act(t, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) t = run(t, botActions(t, p.player));
+      else t = run(t, botActions(t, waitingOn(t)!));
+    }
+    expect(t.objects[drawn]!.zone).toBe("graveyard");
+    expect(t.objects[r]!.tapped).toBe(true);
+  });
+});
+
+describe("Phyrexian Grimoire: the target opponent chooses which of your top two graveyard cards is exiled", () => {
+  it("compile", () => supported(grimoire()));
+
+  const yard = (s: GameState, pid: PlayerId, defs: CardDef[]) => defs.map((d) => {
+    const id = putOnBattlefield(s, pid, d);
+    moveObject(s, id, "graveyard");
+    return id;
+  });
+
+  it("the opponent picks: that card is exiled, the other goes to your hand; older cards stay", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, grimoire());
+    const [old, a, b] = yard(s0, ap, [bear({ name: "Old Bear" }), bear({ name: "Bear A" }), bear({ name: "Bear B" })]);
+    pool(s0, ap, { C: 4 });
+    let s = settle(run(s0, planActivate(s0, ap, g, 0, [{ kind: "player", id: opp }])), { me: [opp] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: opp, min: 1, max: 1 });
+    expect([...(s.pending as { cards: string[] }).cards].sort()).toEqual([a, b].sort());
+    s = settle(act(s, { type: "searchLibrary", player: opp, found: [a!] }), { me: [opp] });
+    expect(s.objects[a!]!.zone).toBe("exile");
+    expect(s.objects[b!]!.zone).toBe("hand");
+    expect(s.objects[old!]!.zone).toBe("graveyard");
+  });
+
+  it("a bot opponent exiles the better card", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, grimoire());
+    const [land, big] = yard(s0, ap, [card("Plains", "Basic Land — Plains"), bear({ name: "Big Bear", manaCost: "{5}{G}{G}", cmc: 7, power: "7", toughness: "7" })]);
+    pool(s0, ap, { C: 4 });
+    const s = settle(run(s0, planActivate(s0, ap, g, 0, [{ kind: "player", id: opp }])));
+    expect(s.objects[big!]!.zone).toBe("exile");
+    expect(s.objects[land!]!.zone).toBe("hand");
+  });
+
+  it("with one card in the graveyard it's exiled and nothing goes to your hand", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, grimoire());
+    const [only] = yard(s0, ap, [bear()]);
+    const hand = s0.players[ap]!.hand.length;
+    pool(s0, ap, { C: 4 });
+    const s = settle(run(s0, planActivate(s0, ap, g, 0, [{ kind: "player", id: opp }])), { me: [opp] });
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[only!]!.zone).toBe("exile");
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+});
+
+describe("Shapeshifter: power the last chosen number, toughness 7 minus it", () => {
+  it("compile", () => supported(shifter()));
+
+  it("the number chosen as it enters sets its power and toughness; off the battlefield it's 0/7", () => {
+    const { s: s0, ap, ids } = setup([shifter()]);
+    expect(ptOf(s0, ids[0]!)).toBe("0/7");
+    pool(s0, ap, { C: 6 });
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])), { me: [ap] });
+    const p = s.pending;
+    expect(p?.kind === "chooseOption" && p.what === "number" && p.numberRange).toEqual({ min: 0, max: 7 });
+    s = act(s, { type: "chooseOption", player: ap, choice: "5" });
+    s = settle(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(ptOf(s, ids[0]!)).toBe("5/2");
+  });
+
+  it("at its controller's upkeep a new number may be chosen; 7 makes it 7/0 and it dies", () => {
+    const { s: s0, ap, ids } = setup([shifter()]);
+    pool(s0, ap, { C: 6 });
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])), { me: [ap] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "2" }));
+    expect(ptOf(s, ids[0]!)).toBe("2/5");
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+    s = goTo(s, "main1", next);
+    expect(ptOf(s, ids[0]!)).toBe("2/5");
+    // Ken's upkeep: the trigger asks.
+    for (let i = 0; i < 3000 && !(s.pending?.kind === "chooseMay" && s.pending.player === ap); i++) {
+      const q = s.pending;
+      if (q?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: q.player, blocks: [] });
+      else if (q?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: q.player, attacks: [] });
+      else if (q) s = run(s, botActions(s, q.player));
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.activePlayer).toBe(ap);
+    expect(s.step).toBe("upkeep");
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }), { me: [ap] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "7" }));
+    // 7/0: toughness 0: put into the graveyard (CR 704.5f), where it's 0/7 again.
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(ptOf(s, ids[0]!)).toBe("0/7");
+  });
+
+  it("returned to the battlefield it's a new object with a new number (CR 400.7)", () => {
+    const { s: s0, ap, ids } = setup([shifter()]);
+    pool(s0, ap, { C: 6 });
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])), { me: [ap] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "6" }));
+    expect(ptOf(s, ids[0]!)).toBe("6/1");
+    moveObject(s, ids[0]!, "hand");
+    invalidateCharacteristics(s);
+    expect(ptOf(s, ids[0]!)).toBe("0/7");
+  });
+
+  it("a bot picks 4/3, or 3/4 facing a creature with 3 or more power", () => {
+    const { s: s0, ap, ids } = setup([shifter()]);
+    const bot = s0.turnOrder.find((x) => x !== ap)!;
+    pool(s0, ap, { C: 6 });
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [])), { me: [ap] });
+    let answer = botActions(s, ap)[0];
+    expect(answer).toMatchObject({ type: "chooseOption", choice: "4" });
+    putOnBattlefield(s, bot, bear());
+    putOnBattlefield(s, bot, { ...bear(), name: "Big Bear", power: "3", oracleId: "big-bear" });
+    invalidateCharacteristics(s);
+    answer = botActions(s, ap)[0];
+    expect(answer).toMatchObject({ type: "chooseOption", choice: "3" });
   });
 });

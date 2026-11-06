@@ -1,6 +1,6 @@
 # Roadmap
 
-29,980 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,993 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2174,6 +2174,36 @@ line blocks.
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
    among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
+   Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
+   graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
+   card without one, CR 118.6); "turn target creature with a morph ability face down" and "any number of target creatures
+   with morph abilities other than ~" (Master of the Veil, Weaver of Lies, Backslide: morph or megamorph, CR 702.37b, on
+   the permanent now, so never a face-down one; its controller may turn it face up again for its morph cost); "put a
+   creature card with a morph ability from your hand onto the battlefield face up. If you do, return ~ to its owner's hand"
+   (Dermoplasm, with a browser test for the hand pick, and one for Weaver of Lies's targets); "you may play lands and cast
+   Mutant, Ninja, or Turtle spells from the top of your library. If you cast a creature spell this way, that creature enters
+   with an additional +1/+1 counter on it" (Mikey & Don, Party Planners); "Creatures the active player controls attack this
+   turn if able" and, at the next end step, the non-Wall ones that didn't attack destroyed unless they came under that
+   player's control this turn (Siren's Call: destroyed even if they couldn't attack, rulings); "target non-Wall creature the
+   active player has controlled continuously since the beginning of the turn ... attacks this turn if able. Destroy it at
+   the beginning of the next end step if it didn't attack this turn" (Nettling Imp, Norritt: even with the source gone,
+   rulings); "that player exiles a card at random from their hand. The player may play that card this turn" and the end
+   step's graveyard if they didn't (Elkin Lair); "put a creature card ... from your hand onto the battlefield. It enters
+   tapped and attacking and gains indestructible until end of turn" when a creature attacks alone (Nick Fury, Spymaster);
+   "~ has flying as long as a card exiled with it has flying. The same is true for ..." (Urborg Scavengers: a face-up card
+   still exiled with it, by that card's own keywords, layer 6); "a land an opponent controls with the same name as the
+   exiled card" entering (Invader Parasite). +13, 29,993 of 31,936.
+   Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
+   for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
+   Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the
+   Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
+   Moon's Legacy (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
+   exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
+   (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
+   ordered with other copy effects, CR 616.1); Ice Cave (any other player may pay a spell's mana cost to counter it);
+   Journey to the Lost City (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
+   face-down pile); Soulflayer and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
+   as Urborg Scavengers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
    opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
    Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game

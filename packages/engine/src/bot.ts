@@ -738,6 +738,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Time travel (CR 701.56a): a suspended card or an impending permanent comes sooner with one fewer; a permanent with
     // vanishing lasts longer, and one whose mana or power counts its time counters grows, with one more. Anything else
     // stays as it is.
+    // Quarry Hauler: on our own permanent, more of what helps it and less of what doesn't (proliferate's sense); on an
+    // opponent's, the other way round.
+    if (pend.kind === "chooseOption" && pend.what === "addOrRemoveCounter") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const k = pend.counterKind ?? "";
+      const helpful = k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
+      const mine = !!o && controllerOf(s, o) === pid;
+      return [{ type: "chooseOption", player: pid, choice: (mine ? helpful : harmfulCounter(k)) ? "add" : "remove" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const mine = o?.zone === "battlefield" && controllerOf(s, o) === pid;

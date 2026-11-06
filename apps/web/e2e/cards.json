@@ -18654,6 +18654,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a55bdb73-e17a-414d-b27f-dc53af2f345c",
+  "name": "Quarry Hauler",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Camel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Camel"
+  ],
+  "oracleText": "When this creature enters, for each kind of counter on target permanent, put another counter of that kind on it or remove one from it.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "82372776-bedd-4893-92ad-f1272f9c3250",
   "name": "Quicksilver Wall",
   "manaCost": "{2}{U}",

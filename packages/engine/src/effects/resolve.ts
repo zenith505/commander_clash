@@ -1317,6 +1317,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "toggleTapped":
     case "proliferate":
     case "timeTravel":
+    case "counterKindsAddOrRemove":
     case "removeTimeSuspended":
     case "amass":
     case "connive":

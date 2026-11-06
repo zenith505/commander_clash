@@ -3616,6 +3616,12 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const mine = options.every((id) => controllerOf(s, obj(s, id)) === pid);
     return [...options].sort((a, b) => (mine ? 1 : -1) * (worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))).slice(0, count);
   }
+  // Planar Overlay: a land already chosen for another basic land type (a dual land) goes back only once, so that one first.
+  const overlay = action === "bounce" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+  if (overlay?.type === "keepRest" && overlay.bounceChosen) {
+    const before = new Set(Object.values(s.resolving!.scratch?.keepRest?.kept ?? {}).flat());
+    return [...options].sort((a, b) => (before.has(a) ? 0 : 1) - (before.has(b) ? 0 : 1) || worth(s, pid, obj(s, a)) - (obj(s, a).tapped ? 1 : 0) - (worth(s, pid, obj(s, b)) - (obj(s, b).tapped ? 1 : 0))).slice(0, count);
+  }
   // "Untap up to seven lands": ours, not an opponent's.
   if (action === "untap") return options.filter((id) => controllerOf(s, obj(s, id)) === pid).slice(0, count);
   // "Tap any number of untapped creatures you control. ... for each creature tapped this way": all of them, but on our
@@ -4755,7 +4761,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "self") && allEffects(ab.body.effects).some((e) => e.type === "revealUntil" && e.rest === "graveyard")) continue;
       // Gomazoa: shuffling itself away is only worth it to take an attacker it blocks along, one that costs at least as much.
       const takesBlocked = ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "inCombatWithSelf" && e.what.andSelf);
-      if (takesBlocked && !(o.blocking ?? []).some((a) => s.objects[a]?.attacking !== undefined && mv(s, a) >= mv(s, id))) continue;
+      // Vortex Elemental: also a creature blocking it while it attacks.
+      const takesBlockers = takesBlocked && ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "inCombatWithSelf" && !e.what.blocked);
+      if (takesBlocked && !(o.blocking ?? []).some((a) => s.objects[a]?.attacking !== undefined && mv(s, a) >= mv(s, id)) && !(takesBlockers && o.attacking !== undefined && (o.blockedBy ?? []).some((b) => s.objects[b]?.blocking !== undefined && mv(s, b) >= mv(s, id)))) continue;
       // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
       if (!craft && doesNothingNow(s, id, ab.body)) continue;
       // "Search your library for a card named Sphinx Sovereign" (the Heralds): not with none of them left to find.

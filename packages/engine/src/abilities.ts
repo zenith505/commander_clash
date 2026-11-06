@@ -751,7 +751,7 @@ export interface TargetSpec {
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
   /** "That blocked or was blocked by a Zombie this turn" (Time to Reflect), "by a legendary creature" (You Cannot Pass!): a block declared this turn with a creature that had this creature type or supertype as the block was declared (TurnLog.blocks `aq`/`bq`, rulings). */
   blockedWith?: { subtype?: string; supertype?: string };
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked you this turn" (Jabari's Influence): declared as an attacker of you this turn (not your planeswalker). */ "attackedYouThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked or blocked this turn" (Gideon's Triumph): either one declared this turn. */ "attackedOrBlockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked you this turn" (Jabari's Influence): declared as an attacker of you this turn (not your planeswalker). */ "attackedYouThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked or blocked this turn" (Gideon's Triumph): either one declared this turn. */ "attackedOrBlockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | /** Total War: "that didn't attack", in the declaration that triggered it: not declared as an attacker in this combat (CR 508.1a). */ "didntAttackThisCombat" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking your opponents and/or planeswalkers they control" (Roar of Resistance): not a battle. */ "attackingOpponentOrTheirPlaneswalker" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -1321,6 +1321,8 @@ export type ObjRef =
   | { ref: "exiledTop" }
   /** "The exiled card" after "you may exile a creature card from your hand" (Nexus of Becoming): the one card this resolution's takeFromHand exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledFromHand" }
+  /** "All cards exiled this way" after "Exile all creatures" (Worlds Within Worlds): the cards this resolution's exile effects put into exile, while they're still those cards there (CR 400.7; a token ceases to exist, 704.5d). */
+  | { ref: "exiledThisWay" }
   /** "Defending player chooses a nonland card in your graveyard. Return that card to your hand." (O-Kagachi Made Manifest): the card this resolution's chooseFromGraveyard moved, where it went, while it's still that card (CR 400.7). */
   | { ref: "chosenFromYard" }
   /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
@@ -2662,6 +2664,8 @@ export type Effect =
       destroy?: true;
       /** Consuming Tide: "Return all nonland permanents not chosen this way to their owners' hands": returned instead. */
       bounce?: true;
+      /** Planar Overlay: "Return those lands to their owners' hands": the chosen ones are returned, all at once, and the rest stay. */
+      bounceChosen?: true;
       /** Killing Wave: "sacrifices it unless they pay X life": any number kept, this much life paid for each (as many as they can pay for). */
       payLife?: Amount;
       /** Winnowing: "all other creatures they control that don't share a creature type with the chosen creature": the rest sharing one with a kept one stay too. */
@@ -6581,6 +6585,12 @@ export interface CompiledCard {
    * permanent; a card elsewhere counts as its owner's (CR 108.4a). `linked`: the card is "exiled with ~" (CR 607.2a).
    */
   /** `permanents`: "If a permanent would be put into a graveyard, exile it instead" (Samurai of the Pale Curtain): only from the battlefield, tokens too. */
+  /**
+   * Wheel of Sun and Moon: "If a card would be put into enchanted player's graveyard from anywhere, instead that card is
+   * revealed and put on the bottom of that player's library." A replacement effect of this Aura's (CR 614.1a) on cards
+   * (not tokens or copies of spells, rulings) going to the graveyard of the player it enchants, its owner's (CR 404.2).
+   */
+  graveyardToLibraryBottom?: true;
   graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;

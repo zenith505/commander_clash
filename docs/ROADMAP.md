@@ -1,6 +1,6 @@
 # Roadmap
 
-29,953 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,961 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2169,7 +2169,7 @@ line blocks.
    you control", "untap all Plains", Leviathan's cost), "All Mountains are Mountains" sets their land types (CR 305.7),
    and the 127 swaps that still leave a line the engine can't read (30 cards; repeated words such as "both red and red"
    or "a Plains or a Plains", Defiler of Faith's cost line, Hazezon Tamar's token colors, card-specific wordings such as
-   Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,953 of 31,936 with B113.
+   Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,961 of 31,936 with B113 and B114.
    Out after round 282 (looked at, not done): Arena (an activated ability's second target chosen by an opponent);
    Jinxed Choker (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
    read).
@@ -4771,7 +4771,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
   of the Grim Captain ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape, Bridge from Below, Aetherborn Marauder, Sigardian Zealot,
-  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar, Sita Varma, Munda and Hans Eriksson.
+  Rhuk (done in round B70), Alpha Brawl, Brain in a Jar, Sita Varma (done in round B114), Munda and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
   end of turn if its power is 2" (Savage Swipe), "costs {2} less if a creature is attacking you" and "If a Hero enters
   this way, it enters with two additional +1/+1 counters" (Heroic Return; the same condition lets Confront the Assault
@@ -5641,6 +5641,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Reckoning (the card on top of your library is a may of its own; the damage is its power as it was in the graveyard),
   Not Forgotten (top or bottom of its owner's library, the caster's choice), Grim Contest (each deals damage equal to its
   toughness to the other, not a fight). No new prompts. +12 (29,943 of 31,936 with B112 and rounds 280 and 281).
+- Round B114 (fresh single-line blockers, least played first): Vortex Elemental ("~ and each creature blocking or blocked
+  by it", shuffled into their owners' libraries; with it gone, those in combat with it as it last existed, rulings, CR
+  608.2h, which now holds for Gomazoa too), Lost in the Woods (a Forest card on top removes the attacker from combat, and
+  the revealed card goes to the bottom either way), Planar Overlay (each player chooses a land of each basic land type,
+  a dual land counting for both, rulings, then they all return at once; a new land picker with a browser test), Total
+  War (the attacking player's untapped non-Wall creatures that weren't declared as attackers in that combat, other than
+  ones they haven't controlled since the turn began), Wheel of Sun and Moon (cards, not tokens or spell copies, headed to
+  the enchanted player's graveyard from anywhere go to the bottom of their library, CR 614.1a), Dreams of Steel and Oil
+  (one artifact or creature card from the revealed hand and one from the graveyard, each if there is one, rulings),
+  Worlds Within Worlds (the creatures' cards back to their owners' hands after everyone puts creature cards from hand),
+  Sita Varma, Masked Racer (the other creatures' base power and toughness become her power, locked in, CR 608.2h). Fixes:
+  "put it on the bottom of your library" for a card revealed or looked at on top did nothing, so it stayed on top
+  (Garruk, Savage Herald, Lurking Predators, Vivien's Grizzly, Aid from the Cowl, Ajani, Sleeper Agent, Cabaretti
+  Ascendancy, Kenessos, Lantern of Revealing); in the app, two "click a permanent" questions in a row kept the first
+  one's selection. Bots don't foresee Total War when they attack. +8 (29,951 of 31,936 with B113 and round 281).
+- Out after round B114 (looked at, not done): Binding Negotiation (putting a face-up exiled card into its owner's
+  graveyard: no such choice yet), Titania's Song (its effect continuing until end of turn after it leaves the
+  battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
+  (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
+  another).
 - Out after round B113 (looked at, not done): Kaervek's Spite (sacrificing all permanents you control as an additional
   cost: whether it can be paid while one of them can't be sacrificed), Ruin in Their Wake (a "may" between the battlefield
   and your hand only while you control a land named Wastes), Bargaining Table (an opponent chosen as it's activated sets X).
@@ -5727,7 +5747,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
   unless they put a card from their hand on top of their library": a punisher option with a card from hand), Vortex
-  Elemental (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
+  Elemental (done in round B114) (creatures blocking or blocked by it as it last existed, rulings, when it has left the battlefield), Stromgald
   Spy (play with that hand revealed for as long as it remains), Bone Mask and Mourner's Shield (damage prevented by a
   source of your choice, then exile that many / sharing a color with the imprinted card), Soltari Guerrillas (redirect the
   next combat damage to an opponent), Shifty Doppelganger (return the exiled card at end step if the creature was
@@ -5755,7 +5775,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and Haunting Wind ("activates an artifact's ability without {T} in its activation cost", and "that artifact's
   controller"), Fasting (a may skip of the draw step as it would begin), Naked Singularity (a land with two basic land
   types, as Reality Twist), Harsh Judgment and Aegis of Honor (an instant or sorcery's damage redirected to its
-  controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal, Planar Overlay, Worldpurge,
+  controller), Peace Talks ("this turn and next turn"), Stronghold Gambit, Grenzo's Rebuttal, Planar Overlay (done in round B114), Worldpurge,
   Call to Arms.
 - Out after round B92 (looked at, not done): Reality Twist ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of

@@ -472,6 +472,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = s.resolving?.discardedCards?.length === 1 ? s.objects[s.resolving.discardedCards[0]!.id] : undefined;
     return o && o.zone === "graveyard" && (o.zoneChanges ?? 0) === s.resolving!.discardedCards![0]!.zc ? [o] : [];
   }
+  if (ref.ref === "exiledThisWay")
+    return (s.resolving?.exiled ?? []).map((x) => s.objects[x.o.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === (s.resolving!.exiled![i]!.o.zoneChanges ?? 0) + 1);
   if (ref.ref === "exiledFromHand") {
     const ex = s.resolving?.exiledFromHandCards;
     const o = ex?.length === 1 ? s.objects[ex[0]!.id] : undefined;
@@ -509,7 +511,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "inCombatWithSelf") {
     const me = ref.ofTarget !== undefined ? objects(s, { ref: "target", index: ref.ofTarget }, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    if (!me || me.zone !== "battlefield" || (ref.ofTarget === undefined && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
+    if (!me || me.zone !== "battlefield" || (ref.ofTarget === undefined && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) {
+      // "~ and each creature blocking or blocked by it" with ~ gone (Vortex Elemental, Gomazoa): those in combat with it as
+      // it last existed on the battlefield (CR 608.2h; rulings on Vortex Elemental), still blocking or attacking.
+      const lk = ref.andSelf && ref.ofTarget === undefined && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+      if (!lk || ctx.sourceZc === undefined || lk.zc !== ctx.sourceZc) return [];
+      return s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && lk.blockedBy?.includes(o.id) && o.blocking !== undefined) || (lk.blocking?.includes(o.id) && o.attacking !== undefined));
+    }
     // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
     const them = s.battlefield.map((id) => obj(s, id)).filter((o) => (!ref.blocked && o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
     return ref.andSelf ? [me, ...them] : them;

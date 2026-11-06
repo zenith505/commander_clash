@@ -28,6 +28,7 @@ import {
   beholdCandidates,
   attackablePermanentProblem,
   attackProblem,
+  nearestOpponent,
   attackCost,
   attackCostOptions,
   attackCostsPayable,
@@ -819,6 +820,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Wall of Shards: the life to the opponent who has the most already, where it matters least.
     // "Target ... of an opponent's choice" (Mausoleum Turnkey): any one of them will choose against us; the next in turn order.
     if (pend.kind === "chooseOption" && pend.what === "targetChooser") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Plague of Vermin: Rats for life we can spare (keeping 20) in the first round only, so the rounds end.
+    if (pend.kind === "chooseOption" && pend.what === "payLifeRound") {
+      const st = s.resolving?.scratch?.lifeRounds;
+      const first = !st || st.next < st.order.length;
+      const n = first ? Math.max(0, Math.min(pend.numberRange?.max ?? 0, player(s, pid).life - 20, 8)) : 0;
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
+    // Fatespinner: the combat phase when none of ours could deal damage attacking, else the draw step (a main phase is
+    // where everything else happens).
+    if (pend.kind === "chooseOption" && pend.what === "skipChoice") {
+      const hitters = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) > 0 && !objHasKeyword(s, o, "Defender"));
+      return [{ type: "chooseOption", player: pid, choice: hitters.length ? "draw" : "combat" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "giveLife") return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
@@ -4227,6 +4241,14 @@ const edictsChosenType = (s: GameState) => !!s.resolving && allEffects(s.resolvi
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "parity") return chooseParity(s, pid);
+  // Pramikon, Teyo: the direction whose player who could attack us then has the least creature power.
+  if (what === "direction") {
+    const threat = (side: "left" | "right") =>
+      s.turnOrder
+        .filter((p) => p !== pid && !player(s, p).lost && nearestOpponent(s, p, side) === pid)
+        .reduce((n, p) => n + s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objIsType(s, o, "Creature")).reduce((m, o) => m + Math.max(0, power(s, o)), 0), 0);
+    return threat("right") < threat("left") ? "right" : "left";
+  }
   // Abundant Harvest: a land while short of lands (fewer than five on the battlefield and in hand), else a spell.
   if (what === "landOrNonland") {
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length + player(s, pid).hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;

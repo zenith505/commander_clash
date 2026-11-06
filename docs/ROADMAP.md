@@ -1,7 +1,7 @@
 # Roadmap
 
-29,951 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
+29,961 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2152,6 +2152,27 @@ line blocks.
    name (White Knight stays White Knight) or a mana symbol. It applies after copy effects and isn't copied (CR 707.2);
    it ends when the object leaves its zone, except a permanent spell's, which goes on with the permanent (CR 400.7a); on
    a spell it can make the spell's targets illegal (Doom Blade's "nonblack" made "nongreen"). +11, 29,931 of 31,936.
+   Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
+   opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
+   Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game
+   has no seat, and two directions that disagree allow no attacks at all); "that player chooses draw step, main phase,
+   or combat phase" and skips each instance of it that turn (Fatespinner; both main phases); life paid round after round
+   from you until a whole round goes by with no one paying, a Rat for each 1 life (Plague of Vermin, rulings); secret
+   council votes for players (Mob Verdict: "another player"; Círdan the Shipwright: draws for votes from the active
+   player, then each player with none may put a permanent card from their hand onto the battlefield) and "for each
+   creature with one or more votes, put that many stun counters on it, then tap it" (Trap the Trespassers); a target the
+   damaged player chooses among your opponents' permanents, another opponent you choose if that player left the game
+   (Bladegriff Prototype, CR 800.4g); a lore counter put on target Saga or removed, and a trigger for each lore counter
+   you put on a Saga (Sigurd, Jarl of Ravensthorpe); tapping an untapped artifact, creature or land for each fade
+   counter (Tangle Wire). It also took review follow-up 12 (text changes, round 281): every color word and basic land
+   type swap on every supported card was tried (24,328); "Plains" is read as plural where it is ("two Plains", "Plains
+   you control", "untap all Plains", Leviathan's cost), "All Mountains are Mountains" sets their land types (CR 305.7),
+   and the 127 swaps that still leave a line the engine can't read (30 cards; repeated words such as "both red and red"
+   or "a Plains or a Plains", Defiler of Faith's cost line, Hazezon Tamar's token colors, card-specific wordings such as
+   Tithe's and Wood Elemental's) aren't offered, to bots or in the UI. +10, 29,961 of 31,936 with B113 and B114.
+   Out after round 282 (looked at, not done): Arena (an activated ability's second target chosen by an opponent);
+   Jinxed Choker (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
+   read).
    Out after round 281 (looked at, not done): Balduvian Shaman (a target "that doesn't have cumulative upkeep" and a
    granted cumulative upkeep that must count for it); Swirl the Mists (every color word in every spell and permanent,
    a static text change); The Animus, King Narfi's Betrayal, Wizard's Spellbook and the rest of the most played
@@ -5905,9 +5926,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 
 - Layer 3: Swirl the Mists (a static text change on every spell and permanent) and Exchange of Words-style swaps are
   still out; a text change and Deadpool's exchange of text boxes on one permanent apply exchange first, whatever their
-  timestamps. A text change leaves a few supported cards with a line the engine can't read (35 of about 5,000 color and
-  land-type swaps tried on supported cards, round 281: mostly "Plains" read as singular where it's plural, Defiler of
-  Faith's cost line, Hazezon Tamar's token colors); the game log says so, and that ability is lost. A text change on a
+  timestamps. A text change that would leave a supported card with a line the engine can't read isn't offered (127 of
+  24,328 color and land-type swaps on 30 cards, round 282: repeated words like "both red and red", Defiler of Faith's
+  cost line, Hazezon Tamar's token colors, card-specific wordings), though the rules allow choosing it. A text change on a
   spell whose targets were fitted as it was cast ("any number of target", splice) keeps what the spell does from its
   old text.
 - "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing X counters

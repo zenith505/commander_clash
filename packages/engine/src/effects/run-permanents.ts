@@ -11,6 +11,7 @@ import { becomePrepared, unprepare } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { exiledWithCounter } from "./run-choices";
+import { voteTally } from "./run-votes";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards, discardToTop } from "./run-library";
 import { describeMods } from "./describe";
@@ -880,6 +881,19 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           invalidateCharacteristics(s);
           const put = putCounters(s, o, e.counter, n);
           log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+        }
+        return;
+      }
+      // Trap the Trespassers: each one with votes gets that many, for each vote it got.
+      if (e.perVote) {
+        const tally = voteTally(s);
+        const n = amountNow(s, e.n, ctx);
+        for (const o of objects(s, e.what, ctx)) {
+          const k = n * (tally.get(`${o.id}@${o.zoneChanges ?? 0}`) ?? 0);
+          if (k <= 0 || o.zone !== "battlefield") continue;
+          invalidateCharacteristics(s);
+          const put = putCounters(s, o, e.counter, k);
+          log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put === 1 ? "" : "s"}.`);
         }
         return;
       }

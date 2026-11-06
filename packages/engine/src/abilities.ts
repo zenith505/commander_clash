@@ -2990,7 +2990,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** Bold Plagiarist: "the same ... kind of counters": the kind the trigger's event put (TriggerEventInfo.counter); `counter` is ignored. */ eventCounter?: true; /** "Put the same number of each kind of counter on that creature" as ~ has (Denry Klin, Editor in Chief): each kind `copyFrom` has as it resolves, that many; `counter` and `n` are ignored. */ copyFrom?: ObjRef; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** Bold Plagiarist: "the same ... kind of counters": the kind the trigger's event put (TriggerEventInfo.counter); `counter` is ignored. */ eventCounter?: true; /** "Put the same number of each kind of counter on that creature" as ~ has (Denry Klin, Editor in Chief): each kind `copyFrom` has as it resolves, that many; `counter` and `n` are ignored. */ copyFrom?: ObjRef; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true; /** With what "voted" `any`: "For each creature with one or more votes, put that many stun counters on it" (Trap the Trespassers): `n` for each vote it got. */ perVote?: true; /** "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to be greater than four" (Clockwork Beast): no more than it takes to bring that kind up to this many, none if it has that many or more (rulings). */ maxTotal?: number }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -3965,6 +3965,19 @@ export type Effect =
    * `activeFirst`: "Each player may pay any amount of mana" (Liege of the Hollows): starting with the active player
    * (CR 101.4, rulings), each one's amount kept too.
    */
+  /**
+   * Plague of Vermin: "Starting with you, each player may pay any amount of life. Repeat this process until no one pays
+   * life." Each pays in turn order, around and around, until every player in a row has declined (rulings); each payment
+   * is its own (rulings). The totals are ResolvingInfo.joinForcesPaidBy, for "for each 1 life they paid this way".
+   */
+  | { type: "payLifeRounds" }
+  /**
+   * What a vote for players does (Effect "vote" `players`), once the votes are revealed: `mobVerdict`, for each vote an
+   * opponent of the controller received, 2 damage to that player and each creature they control, all at once, and a card
+   * for each vote the controller received; `cirdan`, each player draws a card for each vote they received, then each who
+   * received none may put a permanent card from their hand onto the battlefield, each in turn order (rulings).
+   */
+  | { type: "playerVotes"; then: "mobVerdict" | "cirdan" }
   | { type: "joinForces"; activeFirst?: true; /** Errant Minion: "that player may pay any amount of mana": that player only. */ who?: PlayerRef }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: Amount; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
@@ -4321,6 +4334,17 @@ export type Effect =
    */
   | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
+  /**
+   * Teyo, Geometric Tactician: "Until your next turn, each player may attack only the nearest opponent in the last chosen
+   * direction and planeswalkers controlled by that opponent": the direction just chosen (Chosen.direction), kept in
+   * GameState.attackDirections until its controller's next turn (attackProblem).
+   */
+  | { type: "attackDirection" }
+  /**
+   * Fatespinner: "that player chooses draw step, main phase, or combat phase. The player skips each instance of the
+   * chosen step or phase this turn" (CR 614.10): every one of them this turn, also ones added later (rulings).
+   */
+  | { type: "skipChosenThisTurn"; who: PlayerRef }
   | { type: "skip"; who: PlayerRef; skip: SkipWhat; /** "Skips their next X turns, where X is the number of coins that came up heads" (Ral Zarek, Guest Lecturer): counted as it resolves. */ n: Amount; thisTurn?: true; /** "Skips all combat phases of their next turn" (False Peace). */ wholeTurn?: true }
   /**
    * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
@@ -4482,6 +4506,8 @@ export type Effect =
       type: "vote";
       options?: string[];
       among?: TargetSpec;
+      /** "Each player secretly votes for another player" (Mob Verdict), "for a player" (Círdan the Shipwright): a player still in the game, "p:<id>"; "other": not the voter. */
+      players?: "other" | "any";
       secret?: true;
       choose?: true;
       /** With `choose`: "Starting with the next opponent in turn order, each player chooses a creature you don't control" (Sadistic Shell Game): not "may", so one each while there's one to choose, starting after the controller. */
@@ -4505,7 +4531,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | /** "Choose a land type" (Traveler's Cloak): any land type, basic or not (CR 205.3i), kept as Chosen.landType. */ "landType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity" | /** "Choose land or nonland" (Abundant Harvest, Chosen.landOrNonland). */ "landOrNonland" | /** "Choose white Citizen, blue Camarid, ..." (Sarpadian Empires, Vol. VII): a color and a creature type at once (Chosen.color and type), from `options`. */ "colorAndType";
+export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | /** "Choose a land type" (Traveler's Cloak): any land type, basic or not (CR 205.3i), kept as Chosen.landType. */ "landType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity" | /** "Choose left or right" (Chosen.direction). */ "direction" | /** "Choose land or nonland" (Abundant Harvest, Chosen.landOrNonland). */ "landOrNonland" | /** "Choose white Citizen, blue Camarid, ..." (Sarpadian Empires, Vol. VII): a color and a creature type at once (Chosen.color and type), from `options`. */ "colorAndType";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
@@ -7648,6 +7674,12 @@ export interface CompiledCard {
   lookFaceDown?: true;
   /** Arboria: "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn" (attackProblem). */
   attackOnlyActive?: true;
+  /**
+   * Pramikon, Sky Rampart: "Each player may attack only the nearest opponent in the chosen direction and planeswalkers
+   * controlled by that opponent" (attackProblem, attackDirections), with the direction chosen as it entered
+   * (Chosen.direction); none chosen, no effect (rulings).
+   */
+  attackNearestChosen?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
   /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */

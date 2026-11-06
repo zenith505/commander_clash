@@ -314,7 +314,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -2394,7 +2394,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.embalm && !ev.embalm) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
+        if (e !== "abilityActivated" || !a || a.subjectSource || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu) || (a.boast && !ev.boast) || (a.embalm && !ev.embalm) || (a.exhaust && !ev.exhaust) || (a.inYourGraveyard && !ev.fromOwnGraveyard)) return false;
         // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
         // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
         if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;
@@ -2411,6 +2411,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, a.ofActivators ? ev.player : you, false, undefined, ev.source.chars));
       }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
+      // Haunting Wind: "Whenever ... a player activates an artifact's ability without {T} in its activation cost, ~ deals 1
+      // damage to that artifact's controller": the artifact as it was activated is the subject, its controller then too
+      // if it's gone (a Clue sacrificed to pay for it, CR 608.2h). Mana abilities too, as nothing says otherwise.
+      if (ev.source) {
+        const src = ev.source;
+        add(o, you, (e, t) => {
+          const a = t.activates;
+          if (e !== "abilityActivated" || !a?.subjectSource || (ev.mana && !a.mana) || (a.noTapSymbol && ev.tapSymbol) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you)) return false;
+          // Artifact Possession: "an ability of enchanted artifact": the one it's attached to as it was activated.
+          if (a.equipped && (o.attachedTo !== src.snapshot.id || (s.objects[o.attachedTo]?.zoneChanges ?? 0) !== (src.snapshot.zoneChanges ?? 0))) return false;
+          return !a.of || objectMatches(s, a.of, src.snapshot, a.ofActivators ? ev.player : you, false, undefined, src.chars);
+        }, undefined, ev.stackId, src.snapshot, { controller: src.chars.controller }, undefined, undefined, { player: ev.player });
+      }
     }
     // Afterburner Expert: "Whenever you activate an exhaust ability, return this card from your graveyard ...".
     if (ev.exhaust) fromGraveyards((o, owner) => owner === ev.player && add(o, owner, (e, t) => e === "abilityActivated" && !!t.activates?.exhaust && t.activates.by === "you", undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));

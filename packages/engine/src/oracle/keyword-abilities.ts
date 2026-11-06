@@ -1270,6 +1270,13 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", sacrifice: { n, filter: { ...filter, text } } }, ward: true }], text: `Ward—Sacrifice ${m[1]} ${m[2]}: counter that spell or ability unless its controller sacrifices ${m[1]} ${m[2]}.` },
         });
       }
+    } else if ((m = /^ward—discard a card or pay ((?:\{(?:\d+|[WUBRGC])\})+)\.?$/i.exec(p))) {
+      // "Ward—Discard a card or pay {2}" (Titania, Rugged Rumbler): counter it unless that player discards a card or pays
+      // {2}, their choice (CR 702.21a).
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discard: 1, label: "Discard a card", orElse: { cost: m[1]!, label: `Pay ${m[1]}` } }, ward: true }], text: `Ward—Discard a card or pay ${m[1]}: counter that spell or ability unless its controller discards a card or pays ${m[1]}.` },
+      });
     } else if ((m = /^ward—discard (a|two) cards?\.?$/i.exec(p))) {
       // CR 702.21a with a discard cost: "counter that spell or ability unless that player discards a card".
       const n = m[1] === "a" ? 1 : 2;

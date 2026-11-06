@@ -275,6 +275,11 @@ export interface Characteristics {
   cantCrew: boolean;
   /** "Can't be equipped" (Goblin Brawler). */
   cantBeEquipped: boolean;
+  /**
+   * "Can't be enchanted by other Auras" (Anti-Magic Aura, Consecrate Land): the Auras whose effects say so. Any other
+   * Aura can't be attached to it (CR 303.4, 303.4f, 303.4j), and one that is goes to the graveyard (704.5m).
+   */
+  enchantedOnlyBy: ObjectId[];
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
@@ -419,6 +424,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantTransform: false,
     cantCrew: false,
     cantBeEquipped: false,
+    enchantedOnlyBy: [],
     cantAttackPlayers: [],
     cantAttackPlayersOnly: [],
     mustBeBlocked: false,
@@ -1957,6 +1963,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     }
     case "cantBeBlockedByGreaterPower":
+    case "cantBeEnchantedByOthers":
+      if (e.sourceId !== undefined) c.enchantedOnlyBy = [...c.enchantedOnlyBy, e.sourceId];
+      return;
     case "cantBlockGreaterPower":
     case "cantBlockPowerAtLeastToughness":
     case "cantAttackAlone":
@@ -2487,3 +2496,6 @@ export function mostCommonColors(s: GameState, view: (id: ObjectId) => Character
   const most = Math.max(0, ...Object.values(n));
   return most ? (Object.keys(n) as Color[]).filter((c) => n[c] === most) : [];
 }
+
+/** An Aura `auraId` may be attached to a permanent with these characteristics: no other Aura's "can't be enchanted by other Auras" says no. */
+export const enchantableBy = (hc: Characteristics, auraId: ObjectId): boolean => hc.enchantedOnlyBy.every((x) => x === auraId);

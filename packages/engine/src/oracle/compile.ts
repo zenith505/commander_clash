@@ -319,7 +319,10 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
     .filter((st) => st.affects.kind === "attached")
     .map((st) => ({ type: "continuous", what: { ref: "target", index: 0 }, mods: st.mods, duration: "game" }));
   // Brand of Ill Omen: "Enchanted creature's controller can't cast creature spells" isn't a layer effect, but it hurts.
-  return { targets: [c.enchantedControllerCantCast ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
+  // Psychic Venom, Artifact Possession: a trigger about the enchanted permanent that deals damage to its controller or
+  // has them lose life hurts too.
+  const hurtsHost = c.triggers.some((tr) => (tr.host === "attached" || tr.activates?.equipped) && allEffects(tr.body.effects).some((e) => (e.type === "damage" && e.to.ref === "subjectController") || (e.type === "loseLife" && e.who.ref === "subjectController")));
+  return { targets: [c.enchantedControllerCantCast || hurtsHost ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
 }
 
 // ---------------------------------------------------------------------------
@@ -5681,6 +5684,27 @@ export function compile(d: CardDef): CompiledCard {
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
     if (isSpell && (/^When you next cast /.test(line) || /^When target creature dies this turn, /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
+      continue;
+    }
+    // Haunting Wind: "Whenever an artifact becomes tapped or a player activates an artifact's ability without {T} in its
+    // activation cost, ~ deals 1 damage to that artifact's controller": an artifact tapped for any reason (for its own {T}
+    // ability too), or an ability activated without the tap symbol, mana abilities included as nothing says otherwise;
+    // never one event, so two triggers. Powerleech: an opponent's artifact, an opponent activating (any artifact's ability).
+    // Artifact Possession: the enchanted artifact (the Aura's host trigger, and its abilities as they're activated).
+    const artifactUse =
+      /^Whenever (an artifact|an artifact an opponent controls|enchanted artifact) becomes tapped or (a player|an opponent) activates (an artifact's ability|an ability of enchanted artifact) without \{T\} in its activation cost, (.+)$/.exec(line);
+    if (artifactUse) {
+      const host = artifactUse[1] === "enchanted artifact";
+      const ok = host === (artifactUse[3] === "an ability of enchanted artifact") && (artifactUse[1] === "an artifact an opponent controls") === (artifactUse[2] === "an opponent");
+      const effect = artifactUse[4]!.replace(/\bthat artifact's controller\b/g, "its controller");
+      const tapped = ok ? parseTrigger(`Whenever ${artifactUse[1]} becomes tapped, ${effect}`) : null;
+      const body = ok ? parseBody(effect, { subjectIt: true }) : null;
+      if (!tapped || tapped === "fail" || !body || (tapped.event !== "permanentBecomesTapped" && tapped.event !== "selfBecomesTapped")) out.unsupported.push(raw);
+      else {
+        out.triggers.push(bindThisAbility(tapped, line));
+        const of: TargetSpec = { kind: "object", types: ["Artifact"], text: "artifact" };
+        out.triggers.push(bindThisAbility({ event: "abilityActivated", activates: { by: artifactUse[2] === "an opponent" ? "opponent" : "any", ...(host ? { equipped: true as const } : { of }), mana: true, noTapSymbol: true, subjectSource: true }, body }, line));
+      }
       continue;
     }
     // Giott, King of the Dwarves: "Whenever ~ or another Dwarf you control enters and whenever an Equipment you control

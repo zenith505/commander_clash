@@ -178,6 +178,8 @@ export interface Ctx {
   chooseResult?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
   defending?: boolean;
+  /** An activated ability with "Activate only if ~ is attacking" (Ancient Hellkite): "defending player" is the player ~ attacks. */
+  selfAttacking?: boolean;
   /** "Whenever a source you control deals damage to a permanent or player": "that permanent or player" is the one dealt it. */
   eventRecipient?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
@@ -882,6 +884,12 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     ctx.revealedUntil = true;
     return { effect: { type: "exileUntilNonland", reveal: true, then: "keep" }, next: at + 1 };
   }
+  // Undying Flames: "Exile cards from the top of your library until you exile a nonland card. ~ deals damage to any target
+  // equal to that card's mana value." The exiled nonland card's (none with no such card: no damage, rulings).
+  if (exile && !they && /^~ deals damage to any target equal to that card's mana value\.?$/.test(sentences[at + 1] ?? "")) {
+    ctx.revealedTop = true;
+    return { effect: { type: "exileUntilNonland", then: "keep" }, next: at + 1 };
+  }
   // Breaching Dragonstorm: "You may cast it without paying its mana cost if that spell's mana value is 8 or less. If you
   // don't, put that card into your hand." Any nonland card stops it; one with a greater mana value goes to the hand.
   const upTo = exile && !they ? new RegExp(`^You may cast it without paying its mana cost if that spell's mana value is (${NUM}) or less$`).exec(sentences[at + 1] ?? "") : null;
@@ -1043,7 +1051,7 @@ function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damag
   return undefined;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // Vildin-Pack Alpha: "Whenever a Werewolf you control enters, you may transform it": the whole instruction, about the
   // permanent that entered while it's still that object (CR 400.7); one that can't transform doesn't (CR 701.27c).
   if (opts.subjectIt && !opts.selfIt && /^you may transform it\.$/.test(text)) return { targets: [], effects: [{ type: "may", effects: [{ type: "transform", what: { ref: "subject" } }], text: "transform it" }], text };
@@ -1165,7 +1173,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
@@ -1413,6 +1421,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.activatedAbility ? { activatedAbility: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
+    ...(opts.selfAttacking ? { selfAttacking: true } : {}),
     ...(opts.eventRecipient ? { eventRecipient: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
     ...(opts.selfEntered ? { selfEntered: true } : {}),
@@ -1563,6 +1572,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
   text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Aether Gust: "Choose target spell or permanent that's red or green. Its owner puts it on their choice of the top or
+  // bottom of their library." One instruction, as "The owner of target ... puts it ...".
+  text = text.replace(/^[Cc]hoose (target spell or permanent that's [a-z]+ or [a-z]+)\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1 puts it on their choice of the top or bottom of their library.");
   // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
   // Mana Short: "Tap all lands target player controls and that player loses all unspent mana": two instructions, in order.
@@ -1618,6 +1630,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // the same as "If you control ..., put .... Then if you control ..., you gain .... Then if ..., you win the game."
   text = text.replace(/^([a-z][^.]*?) if (you control a creature with power \d+ or greater)\.(?= Then )/, (_, a: string, c: string) => `If ${c}, ${a}.`);
   text = text.replace(/\. Then ([a-z][^.]*?) if (you control a creature with power \d+ or greater)(?=\.)/g, ". Then if $2, $1");
+  // Triumph of Cruelty: "target opponent discards a card if you control the creature with the greatest power or tied for
+  // the greatest power": the opponent is targeted as it triggers, the condition checked as it resolves (rulings).
+  text = text.replace(/^([Tt]arget opponent discards a card) if (you control the creature with the greatest power or tied for the greatest power)\.$/, (_, a: string, c: string) => `If ${c}, ${a.replace(/^T/, "t")}.`);
   // Dowsing Device: "Then transform ~ if you control four or more artifacts": checked as it resolves (CR 608.2c), the
   // same as "Then if you control ..., transform ~".
   text = text.replace(/(^|\. )Then transform ~ if (you control [^.]+)\./, "$1Then if $2, transform ~.");
@@ -5054,6 +5069,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay", subtype: sacSub[1]! }, effects: inner });
       continue;
     }
+    // Warren Weirding: "Target player sacrifices a creature of their choice. If a Goblin is sacrificed this way, that player
+    // creates two 1/1 black Goblin Rogue creature tokens, and those tokens gain haste until end of turn.": the creature as it
+    // last existed (CR 608.2h), a changeling too.
+    const sacTheirSub = /^If an? ([A-Z][a-z]+) is sacrificed this way, (that player creates [^.]+ tokens), and those tokens (gain [a-z]+ until end of turn)$/.exec(s);
+    if (sacTheirSub && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "target" && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber) {
+      const made = parseOne(capital(sacTheirSub[2]!), ctx);
+      const gain = made && parseOne(`They ${sacTheirSub[3]!}`, ctx);
+      if (!made || !gain) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", subtype: sacTheirSub[1]! }, effects: [...made, ...gain] });
+      continue;
+    }
     // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life.": only if it was
     // exiled from the battlefield (rulings: not from the zone it went to if it left first).
     if (sacDo && !/, where X is /.test(s) && sacPrev?.type === "exile" && sacPrev.what.ref === "self" && Object.keys(sacPrev).length === 2) {
@@ -5871,6 +5897,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(webMay[1]!), ctx);
       if (!then || then.some((e) => pauses(e))) return null;
       effects.push({ type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile" }], text: "exile a card from your graveyard", each: true, need: { zone: "graveyard", filter: { kind: "card", text: "card" } } }, { type: "if", cond: { kind: "theyChose", not: true }, effects: then });
+      si++;
+      continue;
+    }
+    // Apathy: "At the beginning of the upkeep of enchanted creature's controller, that player may discard a card at random.
+    // If the player does, untap that creature.": their choice (none to make with an empty hand, CR 101.3), then what it buys.
+    const discardMay = ctx.eventPlayer && !ctx.spell ? /^[Tt]hat player may discard a card( at random)?$/.exec(s) : null;
+    const discardDo = discardMay ? /^If (?:the player|that player|they) (?:does|do), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (discardMay && discardDo) {
+      const then = parseOne(capital(discardDo[1]!), ctx);
+      if (!then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "eachMay", who: { ref: "eventPlayer" }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: !!discardMay[1] }], text: `discard a card${discardMay[1] ?? ""}`, each: true, need: { zone: "hand", filter: { kind: "card", text: "card" } } }, { type: "if", cond: { kind: "theyChose" }, effects: then });
       si++;
       continue;
     }
@@ -8036,6 +8073,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "draw", who: prevDiscard.who, n: { count: { kind: "discardedThisWay" } } });
       continue;
     }
+    // Mind Roots: "Target player discards two cards. Put up to one land card discarded this way onto the battlefield tapped
+    // under your control.": you choose among the cards that discard put into that player's graveyard, still there (CR 400.7).
+    const putDiscarded = /^Put up to one (land) card discarded this way onto the battlefield( tapped)? under your control$/.exec(s);
+    const prevDiscard0 = effects[effects.length - 1];
+    if (putDiscarded && prevDiscard0?.type === "discard" && prevDiscard0.who.ref === "target" && !("n" in prevDiscard0.who && prevDiscard0.who.n)) {
+      const filter = parseSearchFilter(`${putDiscarded[1]} card`);
+      if (!filter) return null;
+      effects.push({ type: "chooseFromGraveyard", who: prevDiscard0.who, youChoose: true, filter, n: 1, upTo: true, discarded: true, dest: "battlefield", ...(putDiscarded[2] ? { tapped: true as const } : {}) });
+      continue;
+    }
     // Gerrard's Verdict: "Target player discards two cards. You gain 3 life for each land card discarded this way."
     const gainPer = /^You gain (\d+) life for each (land|creature|nonland) card discarded this way$/.exec(s);
     if (gainPer && effects[effects.length - 1]?.type === "discard") {
@@ -8645,6 +8692,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Putrid Cyclops: "Reveal the top card of your library. ~ gets -X/-X until end of turn, where X is that card's mana
     // value"; Riddle of Lightning: "~ deals damage equal to that card's mana value to any target": the card revealed, still
     // on top of the library (CR 701.20a).
+    // Glittering Lion: "Until end of turn, ~ loses "Prevent all damage that would be dealt to ~."": that printed static
+    // ability of its own, in layer 6 (CR 613.1f); compile() checks the card has it.
+    const losesStatic = ctx.activated ? /^Until end of turn, ~ loses "([^"]+\.)"$/.exec(s) : null;
+    if (losesStatic) {
+      effects.push({ type: "continuous", what: { ref: "self" }, mods: [{ kind: "loseStatic", text: losesStatic[1]! }], duration: "endOfTurn" });
+      continue;
+    }
     // A Licid's ability: "~ loses this ability and becomes an Aura enchantment with enchant creature. Attach it to target
     // creature. You may pay {W} to end this effect." (CR 116.2c; see the "becomeLicid" effect).
     if (ctx.activated && si === 0 && sentences.length === 3 && s === "~ loses this ability and becomes an Aura enchantment with enchant creature" && sentences[1] === "Attach it to target creature") {

@@ -767,6 +767,14 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound) return null;
     return { ref: "target", index: addTarget(ctx, { ...spec, controlledByTarget: ctx.lastPlayerTarget, text: `target ${m[1]!}` }) };
   }
+  // Ancient Hellkite: "{R}: ~ deals 1 damage to target creature defending player controls. Activate only if ~ is attacking.":
+  // the player ~ is attacking (CR 506.2; TargetSpec.defendingOfSource).
+  const sourceDefending = !cards && ctx.selfAttacking && !ctx.eventPlayer && !ctx.defending ? / defending player controls$/i.exec(m[1]!) : null;
+  if (sourceDefending) {
+    const spec = parseTargetPhrase(m[1]!.slice(0, sourceDefending.index), { target: true });
+    if (spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound || spec.chosen) return null;
+    return { ref: "target", index: addTarget(ctx, { ...spec, defendingOfSource: true, text: `target ${m[1]!}` }) };
+  }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   // "Target creature card of the chosen type" (From the Rubble, Dawn-Blessed Pennant): the creature type chosen as its
   // source entered, filled in on its abilities (cards.ts abilitiesOf); compile checks the source makes that choice.

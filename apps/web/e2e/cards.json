@@ -2200,6 +2200,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "77849657-c872-4d54-9149-a08bbe90f787",
+  "name": "Betrothed of Fire",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nSacrifice an untapped creature: Enchanted creature gets +2/+0 until end of turn.\nSacrifice enchanted creature: Creatures you control get +2/+0 until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8f351961-69e3-4637-b010-d13f19daca39",
   "name": "Bigger on the Inside",
   "manaCost": "{3}{R}{G}",
@@ -9174,6 +9204,36 @@
   "commanderLegal": "legal",
   "set": "sth",
   "releasedAt": "1998-03-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "549e6de7-56e9-4f5c-8c88-30e446bc53bb",
+  "name": "Glittering Lion",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Cat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat"
+  ],
+  "oracleText": "Prevent all damage that would be dealt to this creature.\n{3}: Until end of turn, this creature loses \"Prevent all damage that would be dealt to this creature.\" Any player may activate this ability.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

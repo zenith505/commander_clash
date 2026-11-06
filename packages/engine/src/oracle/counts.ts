@@ -507,6 +507,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Sengir, the Dark Baron: "that player's life total as the turn began".
   if (ctx?.eventPlayer && /^that player's life total as the turn began$/i.test(p)) return count({ kind: "eventPlayerLifeAsTurnBegan" });
+  // Roiling Horror: "your life total minus the life total of an opponent with the most life": whichever opponent has the
+  // most now, never one chosen (rulings), and less than 0 when you have less (its toughness then kills it, rulings).
+  if (/^your life total minus the life total of an opponent with the most life$/i.test(p))
+    return { count: { kind: "difference", of: [{ kind: "life", who: { ref: "you" } }, { kind: "life", who: { ref: "eachOpponent" }, highest: true }] }, signed: true };
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
   // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too); Sorin, Grim

@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, CHOSEN_LAND_TYPE, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, LINKED_TYPES_PROTECTION, YOURS_COLORS_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -58,6 +58,7 @@ export function layerOf(m: Modification): Layer {
     case "addAbility":
     case "unblockedDamage":
     case "loseActivated":
+    case "loseStatic":
     case "enchantCreature":
       return "6";
     case "definePT":
@@ -215,6 +216,8 @@ export interface Characteristics {
   cantHave?: string[];
   /** "~ loses this ability" (a Licid): the indexes of its printed activated abilities it doesn't have (abilitiesOf). */
   lostActivated?: number[];
+  /** Glittering Lion: "~ loses "Prevent all damage ..."": the texts of its printed static abilities it doesn't have. */
+  lostStatics?: string[];
   /** "Becomes an Aura enchantment with enchant creature" (a Licid): enchant creature from an effect (enchantOf). */
   enchantCreature?: true;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
@@ -500,6 +503,8 @@ interface Inst {
   /** A static ability an effect gave its source, not one of its card's (grantedStatics): the quoted text it came from. */
   granted?: true;
   grantedText?: string;
+  /** A permanent's printed static ability: its text, which a "loseStatic" effect can take away (Glittering Lion). */
+  staticText?: string;
   /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
   emblem?: true;
   /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
@@ -602,6 +607,7 @@ function gather(s: GameState): Inst[] {
         mods: st.mods,
         affects: st.affects,
         condition: st.condition,
+        staticText: st.text,
         ...(st.offField ? { offField: true as const } : {}),
         ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
         ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
@@ -622,6 +628,8 @@ function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
   // A granted one exists only while its source still has the ability (an effect in layer 6 may take it away, CR 613.8a).
   if (e.grantedText !== undefined && !src.grantedAbilities.includes(e.grantedText)) return false;
+  // Glittering Lion: a printed static ability an effect in layer 6 took away (CR 613.1f).
+  if (e.staticText !== undefined && src.lostStatics?.includes(e.staticText)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
@@ -1374,6 +1382,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // "An opponent controls seven or more lands": any one opponent.
       // "Activate only during combat and only if defending player controls ..." (Kjeldoran Guard): the player the source is
       // attacking, or else any one of the defending players, the active player's opponents (CR 508.5a, 802.2).
+      // Lurebound Scarecrow: "permanents of the chosen color", the color chosen for the source; none chosen: never true.
+      const filter = cond.filter.chosen ? bindChosen(cond.filter, src.chosen) : cond.filter;
+      if (filter.chosen) return false;
       const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? [chars.get(src.attachedTo)!.controller] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
@@ -1386,7 +1397,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
           if (cond.other && id === (cond.who === "attached" ? src.attachedTo : sourceId)) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
-          if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
+          if (!objectMatches(s, filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
           if (cond.sameCreatureType) {
             if (c.allCreatureTypes) everyType++;
             else for (const st of new Set(c.subtypes.filter((x) => CREATURE_TYPES.has(x)))) byType.set(st, (byType.get(st) ?? 0) + 1);
@@ -1417,6 +1428,13 @@ export const isPrime = (n: number): boolean => {
 export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
   return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc);
+}
+
+/** The colors among the permanents `pid` controls, in WUBRG order. */
+function colorsAmongYours(chars: CharMap, pid: PlayerId): Color[] {
+  const all = new Set<Color>();
+  for (const c of chars.values()) if (c.controller === pid) for (const col of c.colors) all.add(col);
+  return (["W", "U", "B", "R", "G"] as Color[]).filter((col) => all.has(col));
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
@@ -1603,7 +1621,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
+      // Empty-Shrine Kannushi: "protection from each color among permanents you control", the colors layer 5 left them.
+      for (const k of bindChosenKeywords(m.keywords.includes(LINKED_TYPES_PROTECTION) || m.keywords.includes(YOURS_COLORS_PROTECTION) ? m.keywords.flatMap((k) => (k === LINKED_TYPES_PROTECTION ? linkedCardTypesProtection(s, e.sourceId) : k === YOURS_COLORS_PROTECTION ? colorsAmongYours(chars, controllerOfInst(e, chars)).map((col) => `Protection from ${COLOR_WORD[col]}`) : [k])) : m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.keywords : undefined, c.colors, e.sourceId ? s.objects[e.sourceId]?.chosen?.landType : undefined)) {
         const key = k.toLowerCase();
         if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
@@ -1651,6 +1670,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "loseActivated":
       c.lostActivated = [...(c.lostActivated ?? []), m.index];
+      return;
+    case "loseStatic":
+      c.lostStatics = [...(c.lostStatics ?? []), m.text];
       return;
     case "enchantCreature":
       c.enchantCreature = true;

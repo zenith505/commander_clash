@@ -2314,6 +2314,18 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     destroyPermanent(s, umbra, `${defOf(s, umbra).name} is destroyed instead.`);
     return false;
   }
+  // Crackling Emergence: "If enchanted land would be destroyed, instead sacrifice ~ and that land gains indestructible until
+  // end of turn" (CR 614.1a): the Aura's controller sacrifices it (CR 701.21a), and the land stays, damage and all.
+  const emergence = s.battlefield.map((id) => obj(s, id)).find((a) => a.attachedTo === o.id && !!abilitiesOf(s, a).sacrificeInsteadOfEnchantedDestroyed);
+  if (emergence) {
+    const auraController = controllerOf(s, emergence);
+    const source = nameOf(s, emergence.id);
+    log(s, `${player(s, auraController).name} sacrifices ${source} instead, and ${name} gains indestructible until end of turn.`);
+    moveObject(s, emergence.id, "graveyard", { sacrificed: true });
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: auraController, sourceName: source, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Indestructible"] }] });
+    invalidateCharacteristics(s);
+    return false;
+  }
   log(s, message);
   const noncreature = !objIsType(s, o, "Creature");
   const controller = controllerOf(s, o);
@@ -2433,6 +2445,14 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       if (made.length) made.shift();
       else n--;
       stealDraw(s, pid, thief);
+      continue;
+    }
+    // Possessed Portal: this draw is skipped, and nothing happens instead.
+    const portal = drawSkipper(s);
+    if (portal) {
+      if (made.length) made.shift();
+      else n--;
+      skipDraw(s, pid, portal);
       continue;
     }
     let archives: number;
@@ -2586,11 +2606,23 @@ export function cantDraw(s: GameState, pid: PlayerId): ObjectId | undefined {
 
 function drawWithoutAsking(s: GameState, pid: PlayerId) {
   if (cantDraw(s, pid)) return;
+  // Possessed Portal: the draw a Notion Thief or an Alms Collector makes is skipped too (CR 614.5: it's a new draw).
+  const portal = drawSkipper(s);
+  if (portal) return skipDraw(s, pid, portal);
   const p = player(s, pid);
   const asks = dredgeOptions(s, pid).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook));
   if (!asks) draw(s, pid, 1, undefined, [], true);
   else if (!notionThief(s, pid)) drawOne(s, pid);
   else draw(s, pid, 1, undefined, [], true);
+}
+
+/** Possessed Portal: a permanent whose "If a player would draw a card, that player skips that draw instead" applies now (CR 614.1b). */
+const drawSkipper = (s: GameState): ObjectId | undefined => s.battlefield.find((id) => !!abilitiesOf(s, obj(s, id)).skipsAllDraws);
+
+/** A draw skipped (CR 614.1b): it doesn't happen, so an empty library loses nothing (CR 704.5b). */
+function skipDraw(s: GameState, pid: PlayerId, src: ObjectId) {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  log(s, `${player(s, pid).name} skips that draw (${nameOf(s, src)}).`);
 }
 
 /** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
@@ -3000,7 +3032,8 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
   const digs: ObjectId[] = [];
   for (const id of mine((a) => a.drawDig)) if (!digs.some((d) => nameOf(s, d) === nameOf(s, id))) digs.push(id);
-  if (!shields.length && digs.length < 2 && !thief) return undefined;
+  const portal = drawSkipper(s);
+  if (!shields.length && digs.length < 2 && !thief && !portal) return undefined;
   const out = [...shields];
   for (const id of digs) {
     const a = abilitiesOf(s, obj(s, id));
@@ -3014,6 +3047,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const abundance = mine((a) => a.drawAbundance)[0];
   if (abundance !== undefined) for (const k of ["land", "nonland"]) out.push({ key: `abundance:${k}`, label: `Choose ${k}, reveal until you reveal a ${k} card and put it into your hand (${nameOf(s, abundance)})` });
   if (thief) out.push({ key: "thief", label: `${player(s, thief.controller).name} draws a card instead (${thief.name})` });
+  if (portal) out.push({ key: "skip", label: `Skip this draw (${nameOf(s, portal)})` });
   // A Notion Thief with nothing else to choose from goes on as before.
   if (!shields.length && digs.length < 2 && out.length < 2) return undefined;
   return out;
@@ -3028,6 +3062,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   const p = player(s, pid);
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
+  if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("dig:")) return digInstead(s, pid, left, after, made, 0, key.slice("dig:".length)) === "paused" ? "paused" : undefined;
   if (key.startsWith("dredge:")) return dredgeInstead(s, p, key.slice("dredge:".length));
   if (key === "archive") {
@@ -7210,7 +7245,7 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
-    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
     return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }

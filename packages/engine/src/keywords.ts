@@ -164,6 +164,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "creatures of the chosen type") return CHOSEN_CREATURE_TYPE_PROTECTION;
   if (q === "each of that creature's colors") return TARGET_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
+  if (q === "each color among permanents you control") return YOURS_COLORS_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
   if (/^mana value \d+ or (?:less|greater)$/.test(q)) return `Protection from ${q}`;
@@ -213,7 +214,7 @@ export const keywordLabel = (k: string, name: (pid: number) => string) => k.repl
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 /** "Hexproof from that color" after "Choose a color" (Skrelv): filled in with the color chosen as it resolved (CR 702.11d). */
 export const CHOSEN_HEXPROOF = "Hexproof from the chosen color";
-const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
+export const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
 /**
  * "Has hexproof from each of its colors" (Tam, Mindful First-Year): filled in, in layer 6, with the colors the permanent
  * has after layer 5 (CR 613.1e-f), one "hexproof from [color]" each (CR 702.11d); none if it's colorless (rulings).
@@ -225,6 +226,12 @@ export const OWN_COLORS_HEXPROOF = "Hexproof from each of its colors";
  * commander (rulings).
  */
 export const IDENTITY_PROTECTION = "Protection from each color not in your commander's color identity";
+/**
+ * "Protection from each color among permanents you control" (Empty-Shrine Kannushi, Pledge of Loyalty): filled in as the
+ * layers apply it with the colors of the permanents the effect's controller controls, as layer 5 left them (CR 613.1e-f);
+ * the permanent itself counts too.
+ */
+export const YOURS_COLORS_PROTECTION = "Protection from each color among permanents you control";
 /**
  * Mirror Golem: "~ has protection from each of the exiled card's card types": filled in from the cards its imprint
  * ability exiled (CR 607.2a) that are still in exile, as the layers apply it.

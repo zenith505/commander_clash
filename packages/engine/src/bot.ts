@@ -2160,9 +2160,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // Push, with revolt checked now): when that's all it does, only a target it holds for now.
     const guard = targetGuard(s, pid, body.effects, i, sourceId);
     const holds = (t: TargetChoice) => !guard || guard(t);
-    const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
+    const all0 = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))),
     );
+    // A target only the guard rules out still has to be chosen when the ability must have one (a trigger): Triumph of
+    // Cruelty's opponent when we don't control the greatest power now (it's checked again as it resolves).
+    const held = all0.filter(holds);
+    const all = held.length || !forced ? held : all0;
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
     const reanimate = reanimators.length > 0 || allEffects(body.effects).some((e) => e.type === "animateDead" && e.target === i);
@@ -5355,7 +5359,7 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.
-    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id) } : c1;
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id, o.attachedTo) } : c1;
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;

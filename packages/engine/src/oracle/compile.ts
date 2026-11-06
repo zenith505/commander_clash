@@ -2252,6 +2252,13 @@ export function compile(d: CardDef): CompiledCard {
       out.regeneratesInsteadOfDestroyed = true;
       continue;
     }
+    // Crackling Emergence, Harmonious Emergence: "If enchanted land would be destroyed, instead sacrifice ~ and that land
+    // gains indestructible until end of turn." A replacement of the destruction (CR 614.1a), whatever destroys it, lethal
+    // damage too; not a sacrifice of the land (rulings).
+    if (/^If enchanted land would be destroyed, instead sacrifice ~ and that land gains indestructible until end of turn\.$/.test(line) && out.enchant?.kind === "object") {
+      out.sacrificeInsteadOfEnchantedDestroyed = true;
+      continue;
+    }
     const libraryDies = /^If ~ would die, put it on (top|the bottom) of its owner's library instead\.$/.exec(line);
     if (libraryDies) {
       out.libraryInsteadOfDying = libraryDies[1] === "top" ? "top" : "bottom";
@@ -2883,6 +2890,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.") {
       out.stealsDraws = true;
+      continue;
+    }
+    // Possessed Portal: "If a player would draw a card, that player skips that draw instead": a replacement effect (CR
+    // 614.1b) on every draw, the first in a draw step too, which the drawing player orders with any other (CR 616.1).
+    if (line === "If a player would draw a card, that player skips that draw instead.") {
+      out.skipsAllDraws = true;
       continue;
     }
     if (line === "If an opponent would draw two or more cards, instead you and that player each draw a card.") {
@@ -6593,6 +6606,12 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
   const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX);
   const bad = (what: string) => out.unsupported.push(what);
+  // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
+  out.activated = out.activated.filter((a) => {
+    const ok = allEffects(a.body.effects).every((e) => e.type !== "continuous" || e.mods.every((m) => m.kind !== "loseStatic" || out.statics.some((st) => st.text === m.text && st.affects.kind === "self")));
+    if (!ok) bad(a.text);
+    return ok;
+  });
   if (out.spell && usesX(out.spell) && !cardX) {
     bad(out.spell.text);
     delete out.spell;

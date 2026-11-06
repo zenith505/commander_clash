@@ -24,9 +24,10 @@ const settle = (s: GameState) => {
 const named = (s: GameState, name: string) => s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === name);
 
 describe("becomes tapped (CR 701.26a)", () => {
-  it("compile; a filter that's a color in only some of its alternatives doesn't (Royal Decree)", () => {
+  it("compile; a filter that's a color in only some of its alternatives too (Royal Decree, since round B111)", () => {
     supported(cityOfBrass, emmara, insolence, lifetap);
-    expect(isFullySupported(royalDecree)).toBe(false);
+    // Royal Decree's "a Swamp, Mountain, black permanent, or red permanent" compiles since round B111 (laneb-round111.test.ts).
+    expect(isFullySupported(royalDecree)).toBe(true);
   });
 
   it("City of Brass: tapped for mana, it deals 1 damage to you after the mana ability", () => {

@@ -882,6 +882,12 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     ctx.revealedUntil = true;
     return { effect: { type: "exileUntilNonland", reveal: true, then: "keep" }, next: at + 1 };
   }
+  // Undying Flames: "Exile cards from the top of your library until you exile a nonland card. ~ deals damage to any target
+  // equal to that card's mana value." The exiled nonland card's (none with no such card: no damage, rulings).
+  if (exile && !they && /^~ deals damage to any target equal to that card's mana value\.?$/.test(sentences[at + 1] ?? "")) {
+    ctx.revealedTop = true;
+    return { effect: { type: "exileUntilNonland", then: "keep" }, next: at + 1 };
+  }
   // Breaching Dragonstorm: "You may cast it without paying its mana cost if that spell's mana value is 8 or less. If you
   // don't, put that card into your hand." Any nonland card stops it; one with a greater mana value goes to the hand.
   const upTo = exile && !they ? new RegExp(`^You may cast it without paying its mana cost if that spell's mana value is (${NUM}) or less$`).exec(sentences[at + 1] ?? "") : null;
@@ -1563,6 +1569,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   // Riftsweeper: "When ~ enters, choose target face-up exiled card. Its owner shuffles ...": a trigger's body, the same.
   text = text.replace(/^[Cc]hoose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Aether Gust: "Choose target spell or permanent that's red or green. Its owner puts it on their choice of the top or
+  // bottom of their library." One instruction, as "The owner of target ... puts it ...".
+  text = text.replace(/^[Cc]hoose (target spell or permanent that's [a-z]+ or [a-z]+)\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1 puts it on their choice of the top or bottom of their library.");
   // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
   // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
   // Mana Short: "Tap all lands target player controls and that player loses all unspent mana": two instructions, in order.
@@ -1618,6 +1627,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // the same as "If you control ..., put .... Then if you control ..., you gain .... Then if ..., you win the game."
   text = text.replace(/^([a-z][^.]*?) if (you control a creature with power \d+ or greater)\.(?= Then )/, (_, a: string, c: string) => `If ${c}, ${a}.`);
   text = text.replace(/\. Then ([a-z][^.]*?) if (you control a creature with power \d+ or greater)(?=\.)/g, ". Then if $2, $1");
+  // Triumph of Cruelty: "target opponent discards a card if you control the creature with the greatest power or tied for
+  // the greatest power": the opponent is targeted as it triggers, the condition checked as it resolves (rulings).
+  text = text.replace(/^([Tt]arget opponent discards a card) if (you control the creature with the greatest power or tied for the greatest power)\.$/, (_, a: string, c: string) => `If ${c}, ${a.replace(/^T/, "t")}.`);
   // Dowsing Device: "Then transform ~ if you control four or more artifacts": checked as it resolves (CR 608.2c), the
   // same as "Then if you control ..., transform ~".
   text = text.replace(/(^|\. )Then transform ~ if (you control [^.]+)\./, "$1Then if $2, transform ~.");
@@ -8619,6 +8631,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Putrid Cyclops: "Reveal the top card of your library. ~ gets -X/-X until end of turn, where X is that card's mana
     // value"; Riddle of Lightning: "~ deals damage equal to that card's mana value to any target": the card revealed, still
     // on top of the library (CR 701.20a).
+    // Glittering Lion: "Until end of turn, ~ loses "Prevent all damage that would be dealt to ~."": that printed static
+    // ability of its own, in layer 6 (CR 613.1f); compile() checks the card has it.
+    const losesStatic = ctx.activated ? /^Until end of turn, ~ loses "([^"]+\.)"$/.exec(s) : null;
+    if (losesStatic) {
+      effects.push({ type: "continuous", what: { ref: "self" }, mods: [{ kind: "loseStatic", text: losesStatic[1]! }], duration: "endOfTurn" });
+      continue;
+    }
     // A Licid's ability: "~ loses this ability and becomes an Aura enchantment with enchant creature. Attach it to target
     // creature. You may pay {W} to end this effect." (CR 116.2c; see the "becomeLicid" effect).
     if (ctx.activated && si === 0 && sentences.length === 3 && s === "~ loses this ability and becomes an Aura enchantment with enchant creature" && sentences[1] === "Attach it to target creature") {

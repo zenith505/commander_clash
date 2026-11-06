@@ -1408,6 +1408,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // resolves (rulings); like Airbend's spell or permanent.
     // Swat Away: "target spell or creature", the same with a creature.
     const orPerm = m[2] && /^target spell or (nonland permanent|creature)$/.exec(m[2]);
+    // Aether Gust: "target spell or permanent that's red or green": a spell or a permanent of either color (as it resolves).
+    const colored = m[2] && /^target spell or permanent that's ([a-z]+) or ([a-z]+)$/.exec(m[2]);
+    if (colored && !/second from the top/.test(m[3]!)) {
+      const words = `${colored[1]} or ${colored[2]}`;
+      const spell = parseTargetPhrase(`${words} spell`);
+      const perm = parseTargetPhrase(`${words} permanent`);
+      if (spell?.kind !== "spell" || perm?.kind !== "object" || !spell.colors?.length) return null;
+      const i = addTarget(ctx, { ...spell, orPermanent: perm, text: m[2]! });
+      return [{ type: "counterSpell", index: i, bounce: true, libraryChoice: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "ownersChoice" }];
+    }
     if (orPerm && !/second from the top/.test(m[3]!)) {
       const perm = parseTargetPhrase(orPerm[1]!);
       if (perm?.kind !== "object") return null;

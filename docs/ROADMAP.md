@@ -1,6 +1,6 @@
 # Roadmap
 
-29,883 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,896 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
 9,979 (96%).
 
@@ -2303,7 +2303,7 @@ line blocks.
    token doubler its controller picks which, CR 707.10e); Optimus Prime, Autobot Leader ("the chosen creature" after
    bolster, and a floating "when that creature deals combat damage this turn"); The War Doctor (phasing out and exile
    batch triggers); Saving Grace (redirecting damage to itself); Volcanic Offering (a target an opponent chooses);
-   Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (its
+   Riftmarked Knight (the token its suspend makes, with flanking and protection from white); Roiling Horror (done in round B111) (its
    characteristic-defining P/T counts a life difference); Watcher of Hours ("you remove a time counter", a choice of
    which); Jaya's Phoenix and Repeated Reverberation (copy the next loyalty ability); Coveted Falcon, Shadow Kin, Arna
    Kennerüd, Confusion in the Ranks, Imodane, Mavinda, Manascape Refractor, Cass, Bronzehide Lion, Ria Ivor and
@@ -2501,7 +2501,7 @@ line blocks.
    of Power only in their own first main phase, at the opponent with the strongest army, and Slippery Bogbonder's bot
    moves only harmful counters (onto an opponent's creature). Karazikar's "whenever an opponent attacks another
    one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Prowl cards still out for other
-   lines: Earwig Squad (search an opponent's library for three cards), Knowledge Exploitation, Noggin Whack, Notorious
+   lines: Earwig Squad (done in round B111) (search an opponent's library for three cards), Knowledge Exploitation, Noggin Whack, Notorious
    Throng (the damage dealt to your opponents this turn), Stinkdrinker Bandit, Auntie's Snitch. Smaller gaps from round
    141: Metalworker's buttons reveal the first artifact cards in your hand (you choose how many, not which: the mana is
    the same); with two Mystic Reflections waiting, they apply in the order they resolved rather than the entering
@@ -2667,7 +2667,7 @@ line blocks.
    Maskwood Nexus's creature types for cards off the battlefield don't count there; Conduit of Worlds casts for the
    mana cost only (no alternative costs); bots never flash in Opposition Agent in response to a search, and "the one
    that entered most recently" is read from the permanents' timestamps. Smaller gaps from round 94: "X mana in any combination of colors" with {X} in the cost (Wizard's Rockets)
-   or chosen among a few colors (Hazel of the Rootbloom); Triumph of Cruelty (a target in "... if you control the
+   or chosen among a few colors (Hazel of the Rootbloom); Triumph of Cruelty (done in round B111) (a target in "... if you control the
    creature with the greatest power"); Fastbond and the "you play a land or cast a spell" triggers (Cemetery
    Protector, Infernal Sovereign); bots move Forgotten Ancient's counters only onto an evasive creature of theirs.
    Smaller gaps from round 91 still out: Tail Swipe, Contractual Safeguard,
@@ -2769,7 +2769,7 @@ line blocks.
    - Bots never activate another player's "any player may activate" abilities, and the UI's auto-pass doesn't stop for
      them (click the permanent to open its menu). Those with {T}, mana abilities, graveyard or hand abilities, or costs
      that sacrifice or exile the permanent stay unsupported, as do Temporal Extortion (half your life), Truce, Shah of
-     Naar Isle, Carrion Rats and Wurm, Mana Cache, Xantcha, Casey Jones, Glittering Lion and Lynx, Volrath's Dungeon,
+     Naar Isle, Carrion Rats and Wurm, Mana Cache, Xantcha, Casey Jones, Glittering Lion and Lynx (done in round B111), Volrath's Dungeon,
      and Kaya's -3.
    - "Any player may ...": the chosen actions all happen after everyone has chosen. Shivan Wumpus's ruling has each
      one happen as it's chosen; the outcome is the same for the supported cards.
@@ -2854,7 +2854,7 @@ line blocks.
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
-   - Punishers still out: Possessed Portal (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom),
+   - Punishers still out: Possessed Portal (done in round B111) (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom),
      "that many permanents" (Archfiend of Spite), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
      trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
@@ -2949,7 +2949,7 @@ line blocks.
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel, done in round 277).
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
      (Echoing Return, Rat King), "not named ~" (Detention Sphere, done in round 277), Legion's End's "exiles all cards with that name from
-     their hand". (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End (done in round B104)
+     their hand" (done in round B111). (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End (done in round B104)
      is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
@@ -2971,7 +2971,7 @@ line blocks.
      alternative cost. Memory Crystal ("buyback costs cost {2} less").
    - Miracle: the card is always revealed when it's the first one drawn (revealing is optional in the rules) and the
      cast is offered as the trigger resolves; Bonfire of the Damned and Terminus are out on their own lines.
-   - Epic: Eternal Dominion, Neverending Torment, Undying Flames are out on their own lines. Bots cast an epic spell
+   - Epic: Eternal Dominion, Neverending Torment, Undying Flames (done in round B111) are out on their own lines. Bots cast an epic spell
      only as their last spell in hand.
    - Free casts from hand still out: "mana value 1 or 2", "shares a card type" (Counterlash), "where X is ..." (Gandalf, Party Guest, Epistolary Librarian), "once
      during each of your turns" (Zaffai, Vision), named filters (West Coast Expansion's Hero spell).
@@ -3063,7 +3063,7 @@ line blocks.
      Vortex, Epic Experiment, Collected Conjuring).
    - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
-     (per-recipient damage), Aspect of Wolf, The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
+     (per-recipient damage), Aspect of Wolf (done in round B111), The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
      Wish, Contaminated Drink (rad
      counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
@@ -3453,7 +3453,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with cycling (mutate) from your graveyard". +73, four of them also done by round 177: +69 (25,641 with round 177).
 - Skipped there, with reasons: Sadistic Sacrament (a kicked search "instead"); Dark Matter Manipulator (done in round B104) and Master's
   Councillors ("for every seven": a divided amount); Ichor Shade (done in round B109) (a typed "put into a graveyard this turn" count);
-  Crackling Emergence and Harmonious Emergence (a destroy replacement on the enchanted land); Genju of the Fields (a
+  Crackling Emergence and Harmonious Emergence (done in round B111) (a destroy replacement on the enchanted land); Genju of the Fields (a
   damage trigger granted until end of turn); Oppressive Rays, Qal Sisma Behemoth, Myr Prototype and Cowed by Wisdom
   (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid (done in round B108), Gremlin Infestation
   (each a template not parsed yet); Wall of Shadows ("can't be the target of spells that can target only Walls");
@@ -3747,7 +3747,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,709 with round 187).
 - Skipped there, with reasons: Recross the Paths (its reveal-until-a-land line); Scattering Stroke (mana at your next
   main phase); Wormfang Newt and Wormfang Turtle ("exile a land you control" and its linked return); Curse Artifact,
-  Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx
+  Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx (done in round B111)
   (losing one static ability until end of turn); Wall of Tombstones and Descendant of Masumaro (upkeep counts set as
   base toughness or added then removed); Lava Storm (old "X or Y" wording with no mode choice); Eternal Flame and
   Banshee ("half X, rounded up/down" to two recipients); Homarid and Tidal Influence (tide counters and the "four or
@@ -5552,6 +5552,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Runner, Fog Patch, Choking Vines; "blocked or was blocked by a Zombie / a legendary creature this turn" (what the other
   creature was as the block was declared, kept in the turn's block log, rulings): Time to Reflect, You Cannot Pass!. +13
   (29,876 of 31,936 with rounds 276 to 278).
+- Round B111 (single-line blockers from the skip lists, least played first): Legion's End (that player's cards with the
+  target's name from their hand and graveyard too, the name as it last existed, CR 608.2h), Aether Gust ("target spell or
+  permanent that's red or green", to the top or bottom of its owner's library, their choice), Crackling Emergence and
+  Harmonious Emergence (the Aura is sacrificed instead of the enchanted land being destroyed, which gains indestructible
+  until end of turn, CR 614.1a), Triumph of Cruelty (the discard only if you control the creature with the greatest
+  power, tied too), Aspect of Wolf (+X/+Y, X and Y half your Forests rounded down and up), Possessed Portal (every draw
+  skipped, CR 614.1b; one of the draw replacements its controller orders, CR 616.1), Earwig Squad (prowl, then three
+  cards from target opponent's library), Roiling Horror (your life minus the most life among your opponents, below 0
+  too), Undying Flames (cards exiled from the top until a nonland card, damage equal to its mana value), Royal Decree (a
+  Swamp, Mountain, black or red permanent becomes tapped), Glittering Lion and Glittering Lynx (a permanent loses one of
+  its static abilities until end of turn, any player may activate it, CR 602.2; a browser test activates Ana's Lion). Bots
+  answering a forced trigger whose targets all fail their guard now still pick a target. No new prompts. +13 (29,896 of
+  31,936 with B110 and rounds 278 and 279).
+- Out after round B111 (looked at, not done): Roar of Jukai, Torrent of Stone, Horobi's Whisper and Hundred-Talon Strike
+  (splice costs that aren't mana: sacrificing lands, tapping creatures, exiling cards), Grip of Phyresis (attaching the
+  Equipment to the Germ just created), Anti-Magic Aura ("can't be enchanted by other Auras"). Possessed Portal's skip isn't
+  offered against a replacement that applies only to a draw from an empty library, as with Notion Thief.
 - Out after round B110 (looked at, not done): Evangelize, Preacher, Arena, Magus of the Arena, Cuombajj Witches, Diaochan,
   Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
@@ -5942,7 +5959,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield and came back the same turn (should be a new object, CR 400.7); Krovikan Vampire, Runesword.
 - "Becomes tapped": "another ... becomes tapped", "during your turn", "for the first time each turn", "while it has a
   -1/-1 counter", granted ("Elves you control have \"Whenever this creature becomes tapped ...\""); filters with
-  colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent").
+  colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent", done in round B111).
 - Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix.
 - "Mana a land could produce" for Gates (Gond Gate, Plaza of Harmony), "basic land" (Star Compass), "that land"
   (Benthic Explorers), Incubation Druid's "three mana of that type instead".
@@ -6004,7 +6021,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Sidar Kondo); lures with a filter (Talruum Piper's fliers) or a condition (Seton's Desire).
 - Untapping during other players' untap steps with color pairs ("green and/or blue", Murkfiend Liege), a condition
   (Quest for Renewal) or granted to a land (Urban Burgeoning).
-- Top or bottom of a library for spells and graveyard cards (Aether Gust, Endless Detour) and for several
+- Top or bottom of a library for spells and graveyard cards (Aether Gust (done in round B111), Endless Detour) and for several
   objects at once (Aetherspouts).
 - "Whenever a creature is dealt damage" (Death Pits of Rath, Shriveling Rot), "becomes tapped or is dealt damage"
   (Cryoshatter). Old-Growth Troll and Harold and Bob (they return as Auras). Mayhem without a cost (a land, CR

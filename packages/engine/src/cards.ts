@@ -347,7 +347,7 @@ export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  let own = withGranted(c.hasPrintedAbilities ? withoutLost(compileCard(defOf(s, o)), c.lostActivated) : NO_ABILITIES, c.grantedAbilities);
+  let own = withGranted(c.hasPrintedAbilities ? withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
@@ -571,13 +571,13 @@ const merged = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 const lostFrom = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 
 /** Its printed abilities without the activated ones it lost ("~ loses this ability", a Licid; CR 613.1f). */
-function withoutLost(base: CompiledCard, lost: readonly number[] | undefined): CompiledCard {
-  if (!lost?.length) return base;
-  const key = lost.join(",");
+function withoutLost(base: CompiledCard, lost: readonly number[] | undefined, lostStatics?: readonly string[]): CompiledCard {
+  if (!lost?.length && !lostStatics?.length) return base;
+  const key = `${(lost ?? []).join(",")}|${(lostStatics ?? []).join("|")}`;
   let byKey = lostFrom.get(base);
   if (!byKey) lostFrom.set(base, (byKey = new Map()));
   let hit = byKey.get(key);
-  if (!hit) byKey.set(key, (hit = { ...base, activated: base.activated.filter((_, i) => !lost.includes(i)) }));
+  if (!hit) byKey.set(key, (hit = { ...base, activated: base.activated.filter((_, i) => !lost?.includes(i)), statics: base.statics.filter((st) => !lostStatics?.includes(st.text)) }));
   return hit;
 }
 

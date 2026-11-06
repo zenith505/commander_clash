@@ -1719,6 +1719,8 @@ export type Modification =
   | { kind: "unblockedDamage" }
   /** Layer 6: "~ loses this ability" (a Licid): its printed activated ability with this index (in CompiledCard.activated). */
   | { kind: "loseActivated"; index: number }
+  /** Layer 6: Glittering Lion's "~ loses "Prevent all damage that would be dealt to ~."": the printed static ability with this text (CR 613.1f). */
+  | { kind: "loseStatic"; text: string }
   /** Layer 6: "becomes an Aura enchantment with enchant creature" (a Licid): it has enchant creature (CR 702.5a). */
   | { kind: "enchantCreature" }
   | { kind: "doesntUntap"; /** Fall from Favor: "unless that player is the monarch": not while its controller is (CR 725). */ unlessMonarch?: true }
@@ -3181,7 +3183,7 @@ export type Effect =
    * chosen (`filter` with chosen "name"), or `sameAs`: "with the same name as that spell" (Counterbore), target `sameAs`'s
    * name as it last existed (CR 608.2h).
    */
-  | { type: "exileNamed"; who: PlayerRef; filter: TargetSpec; all?: true; max?: number; sameAs?: number; /** "The same name as the exiled card" (Pick the Brain): the name or names found this way instead. */ sameName?: SameNameRef; /** Hour of Glory: "reveals their hand and exiles all cards from it with the same name": only the revealed hand, every such card there (no search, no shuffle). */ handOnly?: true }
+  | { type: "exileNamed"; who: PlayerRef; filter: TargetSpec; all?: true; max?: number; sameAs?: number; /** "The same name as the exiled card" (Pick the Brain): the name or names found this way instead. */ sameName?: SameNameRef; /** Hour of Glory: "reveals their hand and exiles all cards from it with the same name": only the revealed hand, every such card there (no search, no shuffle). */ handOnly?: true; /** With `handOnly`, Legion's End: "from their hand and graveyard": every such card in both. */ andGraveyard?: true }
   /**
    * "Reveal cards from the top of your library until you reveal a card with the chosen name" (Demonic Consultation, CR
    * 701.20a): `found`, where that card goes; `rest`, where the other revealed cards go (all of them when none is found);
@@ -6436,6 +6438,10 @@ export interface CompiledCard {
   libraryInsteadOfDying?: "top" | "bottom";
   /** Mossbridge Troll: "If ~ would be destroyed, regenerate it" (CR 614.1a, 701.19a), every time. */
   regeneratesInsteadOfDestroyed?: true;
+  /** Possessed Portal: "If a player would draw a card, that player skips that draw instead" (CR 614.1b). */
+  skipsAllDraws?: true;
+  /** Crackling Emergence: "If enchanted land would be destroyed, instead sacrifice ~ and that land gains indestructible until end of turn" (CR 614.1a). */
+  sacrificeInsteadOfEnchantedDestroyed?: true;
   exileInsteadOfDying?: {
     self?: true;
     /** A granted "If this creature would die, exile it instead" (Can't Stay Away) beside its own one about others (cards.ts withGranted). */

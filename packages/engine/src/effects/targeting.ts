@@ -323,7 +323,10 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
     const ac = view && a.zone === "battlefield" ? view(a) : characteristics(s, a);
     if (!ac) continue;
     if (status === "enchantedByYours") {
-      if (ac.subtypes.includes("Aura") && ac.controller === you) return true;
+      // An Aura that has left the battlefield too: its controller as it last existed there (Dawn Evangel, CR 603.10a).
+      const lk = a.zone !== "battlefield" ? s.lastKnown?.[a.id] : undefined;
+      const ctl = lk && lk.zc === (a.zoneChanges ?? 0) - 1 ? lk.controller : ac.controller;
+      if (ac.subtypes.includes("Aura") && ctl === you) return true;
       continue;
     }
     if (status === "legendaryEquipped") {

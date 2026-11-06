@@ -343,8 +343,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   // "An artifact creature card or Vehicle card" (Szarekh), "a Hero or enchantment card" (Rick Jones): either one.
   // "An artifact or Dragon card" (Magda, Brazen Outlaw).
-  // "A Bird or basic land card" (Sazh Katzroy).
-  const either = /^(.+ card) or (.+ card)$/.exec(p) ?? /^([A-Z][a-z]+) or ((?:basic )?[a-z]+ card)$/.exec(p) ?? /^([a-z]+) or ([A-Z][a-z]+ card)$/.exec(p);
+  // "A Bird or basic land card" (Sazh Katzroy). "A land or legendary Turtle card" (Definitely Not a Turtle).
+  const either = /^(.+ card) or (.+ card)$/.exec(p) ?? /^([A-Z][a-z]+) or ((?:basic )?[a-z]+ card)$/.exec(p) ?? /^([a-z]+) or ((?:legendary )?[A-Z][a-z]+ card)$/.exec(p);
   if (either && !/,| or /.test(either[1]!) && !/,| or /.test(either[2]!)) {
     const subs = [either[1]!.replace(/^([A-Za-z]+)$/, "$1 card"), either[2]!].map((x) => plainFilter(x));
     if (subs.some((x) => !x)) return null;

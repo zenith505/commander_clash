@@ -864,10 +864,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // their graveyard" (all of them with fewer, rulings).
   if ((m = new RegExp(`^(?:(Target player|Target opponent|[Tt]hat player) exiles|[Ee]xile) ${NUM} (.+?) from (their|your) graveyard$`).exec(s)) && (m[4] === "their") === !!m[1]) {
     const who = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : undefined;
-    const filter = parseSearchFilter(m[3]!);
+    // Ichorid: "exile a black creature card other than ~ from your graveyard": not the card with the ability itself.
+    const other = !m[1] ? /^(.+? cards?) other than ~$/.exec(m[3]!) : null;
+    const filter = parseSearchFilter(other ? other[1]! : m[3]!);
     const n = num(m[2]!.replace(/^an?$/, "one"));
-    if (who === null || filter === null || !Number.isInteger(n)) return null;
-    return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
+    if (who === null || filter === null || !Number.isInteger(n) || (other && !filter)) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter: other ? { ...filter, text: `${filter.text} other than ~` } : filter } : {}), ...(other ? { notSelf: true as const } : {}) }];
   }
   // Augusta, Order Returned: "each player exiles a card from their graveyard": each chooses one in APNAP order, then all
   // the chosen cards are exiled at the same time (CR 101.4, rulings).

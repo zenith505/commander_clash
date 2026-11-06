@@ -1492,6 +1492,9 @@ export function parseTargetPhrase(
     p = p.slice(0, atLeastChosen.index);
     phrase = phrase.trim().slice(0, atLeastChosen.index);
   }
+  // Celestial Kirin, Skyfire Kirin: "permanents with that spell's mana value", in a cast trigger: its mana value equal to
+  // the spell's, X included (rulings; CR 202.3e).
+  phrase = phrase.replace(/ with that spell's mana value$/i, " with mana value equal to that spell's mana value");
   // Master Symmetrist: "with power equal to its toughness" is its own comparison (TargetSpec.ptEqual, below), not an amount.
   const bound0 = / with power equal to its toughness$/i.test(phrase.trim()) ? null : / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);

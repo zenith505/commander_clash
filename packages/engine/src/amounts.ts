@@ -745,6 +745,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.item.asCast ?? evalCount(s, c.of, ctx);
     case "discardedMatching":
       return (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id] && printedMatches(c.filter, defOf(s, s.objects[id]!))).length;
+    case "discardedShareType": {
+      // As they are in the graveyard (or wherever a replacement put them), by their card types (rulings: kindred is one).
+      const types = (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id]).map((id) => defOf(s, s.objects[id]!).types);
+      return types.some((t, i) => types.slice(i + 1).some((u) => u.some((x) => t.includes(x)))) ? 1 : 0;
+    }
     case "discardedTypes":
       return new Set((s.resolving?.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size;
     case "snowSpent":
@@ -1551,6 +1556,8 @@ function describeCount(c: Count): string {
       return `${describeCount(c.of)} as cast`;
     case "discardedTypes":
       return "#card types discarded";
+    case "discardedShareType":
+      return "discarded cards share a card type";
     case "discardedMatching":
       return `#${c.filter.text}s discarded`;
     case "flipsWon":

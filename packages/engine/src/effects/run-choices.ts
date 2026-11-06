@@ -1173,11 +1173,13 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || (me.transforms ?? 0) !== (ctx.sourceTransforms ?? 0) || (me.isToken ? !defOf(s, me).tokenBack || me.tokenBackUp : !canTransform(s, me))) return false;
     }
+    // Petals of Insight: only with a looked-at card still on top to put on the bottom.
+    if (e.type === "revealedUntilToBottom" && !(s.resolving?.revealedUntil ?? []).some((id) => s.objects[id]?.zone === "library")) return false;
     // Entrails Feaster: "you may exile a creature card from a graveyard": any player's graveyard.
-    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !(e.anyGraveyard ? livingPlayers(s).flatMap((pid) => player(s, pid).graveyard) : player(s, ctx.controller).graveyard).some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !(e.anyGraveyard ? livingPlayers(s).flatMap((pid) => player(s, pid).graveyard) : player(s, ctx.controller).graveyard).some((id) => (!e.notSelf || id !== ctx.sourceId) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))))) return false;
     // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
     // (CR 609.3).
-    if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !e.upTo && !e.nAmount && e.n > 1 && player(s, ctx.controller).graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))).length < e.n) return false;
+    if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !e.upTo && !e.nAmount && e.n > 1 && player(s, ctx.controller).graveyard.filter((id) => (!e.notSelf || id !== ctx.sourceId) && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))).length < e.n) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
     // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).

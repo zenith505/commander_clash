@@ -180,7 +180,8 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           continue;
         }
         if (st.pick === undefined) {
-          s.pending = { kind: "chooseOption", player: pid, source: src, what: "secretNumber", options: ["0"], numberRange: { min: 0, max: 999 }, prompt: "secretly choose a number 0 or greater" };
+          const least = e.then === "goblin" ? 1 : 0;
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "secretNumber", options: [String(least)], numberRange: { min: least, max: 999 }, prompt: e.then === "goblin" ? "secretly choose how many items you hide (1 or more)" : "secretly choose a number 0 or greater" };
           return "paused";
         }
         st.chosen[pid] = st.pick;
@@ -195,6 +196,17 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const highest = entries.filter((x) => x.n === high).map((x) => x.pid);
       if (!st.step) {
         log(s, `The numbers are revealed: ${turnOrderFrom(s, ctx.controller).filter((p) => p in st.chosen).map((p) => `${player(s, p).name} ${st.chosen[p]}`).join(", ")}.`);
+        if (e.then === "goblin") {
+          // Goblin Game: each player loses life equal to their number, then the one with the fewest (each of them, if
+          // tied) loses half their life as it is then, rounded up; half of a negative total is half of 0 (rulings).
+          for (const { pid, n } of entries) if (n > 0 && !player(s, pid).lost) loseLife(s, pid, n);
+          for (const pid of apnap(s, entries.filter((x) => x.n === low).map((x) => x.pid))) {
+            const p = player(s, pid);
+            const half = Math.ceil(Math.max(0, p.life) / 2);
+            if (half > 0 && !p.lost) loseLife(s, pid, half);
+          }
+          return;
+        }
         if (e.then === "ogre") {
           // Menacing Ogre: each player with the highest number loses that much life; the counters if you're one of them.
           for (const pid of apnap(s, highest)) if (high > 0) loseLife(s, pid, high);

@@ -2608,7 +2608,12 @@ export type Effect =
    * `dest` "battlefield": "Put all creature cards exiled with ~ onto the battlefield under your control. They gain
    * decayed." (Gisa, Glorious Resurrector): those matching `filter`, all at once, gaining `gain` for good.
    */
-  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman" }
+  /**
+   * Vault 13: Dweller's Journey: "... and put the rest on the bottom of their owners' libraries": the cards still linked to
+   * the source (CR 607.2a), each owner choosing the order of theirs (rulings).
+   */
+  | { type: "linkedToBottom" }
+  | { type: "moveLinked"; /** Vault 13: "Return two cards exiled with ~": exactly this many, chosen as it resolves (all of them with fewer). */ exactly?: number; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game" | /** Yggdrasil, Rebirth Engine: "It gains haste until end of turn." */ "endOfTurn"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true; /** With `one`: chosen at random (Skyship Weatherlight). */ random?: true; /** Omenpath Journey: "onto the battlefield tapped". */ tapped?: true; /** Bag of Devouring: "up to X cards from among" them, chosen as it resolves. */ upTo?: Amount; /** Clone Shell: "turn the exiled card face up" first: every card exiled with it, then `filter` picks the ones that move. */ turnFaceUp?: true; /** Death in Heaven: "onto the battlefield face down under your control. They're 2/2 Cyberman artifact creatures" (FaceDownKind "cyberman"). */ faceDown?: "cyberman" }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -2847,7 +2852,7 @@ export type Effect =
       /** Craft (CR 702.167c): the cards its activation's cost exiled (StackItem.costExiled) are linked to the permanent it becomes, "the exiled cards used to craft it". */
       linkCostExiled?: true;
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"); "They're 2/2 Cyberman artifact creatures" (The Cyber-Controller): "cyberman". */
-      faceDown?: "forest" | "cyberman";
+      faceDown?: "forest" | "cyberman" | /** Yarus, Roar of the Old Gods: "face down", a plain 2/2 with no ward (FaceDownKind "morph": turned face up only by its own morph, CR 702.37e; rulings). */ "plain";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[]; /** Princess Yue: "She's a land named Moon": its new name (CR 201.4). */ name?: string; /** Princess Yue: "~ gains "{T}: Add {C}."" for as long as it's that object. */ ability?: string };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
@@ -4562,7 +4567,7 @@ export type Effect =
    * choose the lowest discards their hand and draws seven. `ogre`: each player with the highest number loses that much
    * life, and two +1/+1 counters on the source if its controller is one of them.
    */
-  | { type: "secretNumbers"; then: "wheel" | "ogre" }
+  | { type: "secretNumbers"; /** "goblin" (Goblin Game): "hides at least one item", a number 1 or greater; each loses that much life, then the fewest lose half their life, rounded up. */ then: "wheel" | "ogre" | "goblin" }
   /**
    * `choose`: "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of
    * Purification): not a vote (no extra votes, nobody chooses for another), each player in turn order picks one of

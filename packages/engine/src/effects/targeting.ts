@@ -343,7 +343,9 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
  * Ronin, Shadow Stalker: "Sacrifice an Equipment attached to ~": the cost's filter names its source as "~" (the
  * `attachedTo.objectId` the parser leaves, which matches nothing), made into the source's id as the cost is paid.
  */
-export function bindAttachedToSource(spec: TargetSpec, sourceId: ObjectId | undefined): TargetSpec {
+export function bindAttachedToSource(spec: TargetSpec, sourceId: ObjectId | undefined, host?: ObjectId): TargetSpec {
+  // Bloodfire Infusion: "Sacrifice enchanted creature": `host`, the permanent the source is attached to now (none: nothing).
+  if (spec.sourceHost) return (({ sourceHost: _, ...r }) => ({ ...r, objectId: host ?? "" }))(spec);
   return spec.attachedTo?.objectId === "~" && sourceId ? { ...spec, attachedTo: { ...spec.attachedTo, objectId: sourceId } } : spec;
 }
 
@@ -776,7 +778,11 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   const spec2: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;
   // Crown of Doom: "target player other than ~'s owner" (owners never change, CR 108.3).
   const owner = spec2.notSourceOwner && ctx.sourceId ? s.objects[ctx.sourceId]?.owner : undefined;
-  const spec: TargetSpec = owner !== undefined ? { ...spec2, notPlayer: owner } : spec2;
+  const spec3: TargetSpec = owner !== undefined ? { ...spec2, notPlayer: owner } : spec2;
+  // Ancient Hellkite: "target creature defending player controls": the player the source is attacking (CR 506.2), as it is
+  // now or as it last existed on the battlefield; none (-1, no one) once it isn't attacking.
+  const src = spec3.defendingOfSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  const spec: TargetSpec = spec3.defendingOfSource ? (({ defendingOfSource: _, ...r }) => ({ ...r, controlledBy: (src?.zone === "battlefield" ? src.attacking : ctx.lki?.attacking) ?? -1 }))(spec3) : spec3;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.

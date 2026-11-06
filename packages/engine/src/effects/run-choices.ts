@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -739,7 +739,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { youOrToken?: true }).youOrToken || d.ch.controller === ctx.controller || !!d.o.isToken) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)) && (!(e.cond as { color?: Color }).color || d.ch.colors.includes((e.cond as { color: Color }).color)))
             : e.cond.kind === "sacrificedThisWay"
-            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && (!(e.cond as { subtype?: string }).subtype || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))
+            ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && ((sub) => !sub || !!k.subtypes?.includes(sub) || (!!k.allCreatureTypes && CREATURE_TYPES.has(sub)))((e.cond as { subtype?: string }).subtype))
             : e.cond.kind === "anotherDied"
             ? ((t) => (s.diedThisTurn?.length ?? 0) - (t?.kind === "object" && s.resolving!.destroyed?.some((d) => d.died && d.o.id === t.id) ? 1 : 0) > 0)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetSpellTargets"
@@ -1171,7 +1171,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || (me.transforms ?? 0) !== (ctx.sourceTransforms ?? 0) || (me.isToken ? !defOf(s, me).tokenBack || me.tokenBackUp : !canTransform(s, me))) return false;
     }
-    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    // Entrails Feaster: "you may exile a creature card from a graveyard": any player's graveyard.
+    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || e.dest === "libraryBottom" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !(e.anyGraveyard ? livingPlayers(s).flatMap((pid) => player(s, pid).graveyard) : player(s, ctx.controller).graveyard).some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
     // (CR 609.3).
     if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !e.upTo && !e.nAmount && e.n > 1 && player(s, ctx.controller).graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))).length < e.n) return false;

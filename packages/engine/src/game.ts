@@ -7234,7 +7234,7 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
-    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id) } : c1;
+    const c = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
     return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
   });
 }

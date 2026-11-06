@@ -861,6 +861,20 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
       next: at + 3,
     };
   }
+  // Goblin Charbelcher: "Reveal cards from the top of your library until you reveal a land card. ~ deals damage equal to
+  // the number of nonland cards revealed this way to any target. If the revealed land card was a Mountain, ~ deals double
+  // that damage instead. Put the revealed cards on the bottom of your library in any order." The target is chosen as it's
+  // activated; with no land card, the damage is the number of cards revealed (rulings).
+  if (!shuffleFirst && /^[Rr]eveal cards from the top of your library until you reveal a land card$/.test(s) && sentences[at + 1] === "~ deals damage equal to the number of nonland cards revealed this way to any target" && sentences[at + 2] === "If the revealed land card was a Mountain, ~ deals double that damage instead" && /^Put the revealed cards on the bottom of your library in any order\.?$/.test(sentences[at + 3] ?? "")) {
+    const fx = parseOne("~ deals X damage to any target", ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "damage") return "fail";
+    const n: AmountExpr = { count: { kind: "revealedUntilNonland" } };
+    return {
+      effect: { type: "exileUntilNonland", reveal: true, then: "keep", untilTypes: ["Land"] },
+      more: [{ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", subtypes: ["Mountain"], text: "Mountain card" } }, effects: replaceX(fx, { ...n, times: 2 }), otherwise: replaceX(fx, n) }, { type: "revealedUntilToBottom" }],
+      next: at + 4,
+    };
+  }
   const reveal = (shuffleFirst ? /^Reveal cards from the top of it until you reveal a nonland card$/ : /^[Rr]eveal cards from the top of your library until you reveal a nonland card$/).test(s);
   const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
   // "They exile cards ... until they exile a nonland card" in a villainous choice's option (Ensnared by the Mara): the
@@ -2851,6 +2865,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(
     /\bSearch your library for ([^.]+?) and reveal them\. (Target opponent|An opponent) chooses (one|two)(?: of (?:them|those cards))?\. Put (?:that card|the chosen cards?) (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)(?:\. Then shuffle|, then shuffle)\./g,
     (_, what, who, n, to, rest) => `Search your library for ${what}; ${who.toLowerCase()} chooses ${n}; put them ${to} and the rest ${rest}.`,
+  );
+  // Burning-Rune Demon: "you may search your library for exactly two cards ... If you do, reveal those cards. An opponent
+  // chooses one of them. Put the chosen card into your hand and the other into your graveyard, then shuffle." The same
+  // instruction, which it may not do at all (then nothing is revealed and there's no shuffle, rulings). Threats
+  // Undetected: "... An opponent chooses two of those cards. Shuffle the chosen cards into your library and put the rest
+  // into your hand.": the chosen ones go back into the library, which is then shuffled.
+  text = text.replace(
+    /\b([Yy]ou may search|Search) your library for (exactly two [^.]+?)\. If you do, reveal those cards\. (Target opponent|An opponent) chooses one of them\. Put the chosen card (into your hand|into your graveyard) and the other (into your hand|into your graveyard), then shuffle\./g,
+    (_, how, what, who, to, rest) => `${how} your library for ${what}; ${who.toLowerCase()} chooses one; put them ${to} and the rest ${rest}.`,
+  );
+  text = text.replace(
+    /\bSearch your library for ([^.]+?) and reveal them\. (Target opponent|An opponent) chooses (one|two) of those cards\. Shuffle the chosen cards? into your library and put the rest (into your hand|into your graveyard)\./g,
+    (_, what, who, n, rest) => `Search your library for ${what}; ${who.toLowerCase()} chooses ${n}; put them into your library and the rest ${rest}.`,
   );
   text = text.replace(
     /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard)| and (exile the other with an? [a-z]+ counter on it))?(\.|, then )/g,

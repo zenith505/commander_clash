@@ -489,6 +489,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.goadedThisWay ?? 0;
     case "revealedUntilCount":
       return s.resolving?.revealedUntilCount ?? 0;
+    case "revealedUntilNonland":
+      return (s.resolving?.revealedUntil ?? []).filter((id) => s.objects[id] && !defOf(s, s.objects[id]!).types.includes("Land")).length;
     case "joinForcesPaid":
       return c.whose ? refPlayers(s, c.whose, ctx).reduce((a, pid) => a + (s.resolving?.joinForcesPaidBy?.[pid] ?? 0), 0) : (s.resolving?.joinForcesPaid ?? 0);
     case "manifestedThisWay":

@@ -19,7 +19,7 @@ export function describeDest(d: SearchDest): string {
     : d.zone === "battlefield"
       ? `onto the battlefield${d.tapped ? " tapped" : ""}`
       : d.zone === "libraryTop"
-        ? d.third ? "into your library third from the top" : "on top of your library"
+        ? d.third ? "into your library third from the top" : d.shuffleIn ? "shuffled into your library" : "on top of your library"
         : d.zone === "graveyard"
           ? "into your graveyard"
           : d.zone === "cast"

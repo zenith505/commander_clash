@@ -2210,6 +2210,25 @@ line blocks.
    controller and you convert ~" (Megatron, Destructive Force); "As long as you control your commander, activated
    abilities of cards in your graveyard cost {2} less to activate" (Convergence of Dominion, not below one mana). +10,
    30,014 of 31,936.
+   Round 286 took more earlier skips from the top: "Target player gains control of up to three target nonattacking
+   creatures until end of turn. Untap those creatures. They block this turn if able" (Domineering Will, with a browser
+   test); "Gain control of all creatures target opponent controls until end of turn ... You can't attack that player this
+   turn. You can't sacrifice those creatures this turn" (Call for Aid: for a cost or by an effect, your own creatures
+   still, rulings); "you may search your library for exactly two cards not named ~ that have different names. If you do,
+   reveal those cards. An opponent chooses one of them. Put the chosen card into your hand and the other into your
+   graveyard" (Burning-Rune Demon: two or none, with a browser test); "Search your library for up to four creature cards
+   with different powers and reveal them. An opponent chooses two of those cards. Shuffle the chosen cards into your
+   library and put the rest into your hand" (Threats Undetected); "sacrifice any number of creatures each with base power
+   or toughness 1 or less. Create that many ..." (Angelic Aberration: counters don't change base power, rulings; with a
+   browser test); "Whenever you cast an Adventure instant or sorcery spell, copy it" (Lucky Clover: cast as an Adventure,
+   CR 715.3); "Reveal cards ... until you reveal a land card. ~ deals damage equal to the number of nonland cards revealed
+   this way to any target. If the revealed land card was a Mountain, ~ deals double that damage instead" (Goblin
+   Charbelcher: with no land card, all the cards revealed count, rulings); "until you reveal a Doctor card, a card with
+   doctor's companion, or a Vehicle card" (An Unearthly Child). Also fixed: a "you may search" answer was cleared by the
+   search itself, so a "may" before a search with an opponent's choice asked twice. +8, 30,022 of 31,936.
+   Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (damage replaced by milling,
+   ordered with prevention and other replacements, CR 616.1); Turtles Forever (a search of your library and outside the
+   game); Panglacial Wurm (cast from your library while searching it).
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
    Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move ("When you gain

@@ -1219,7 +1219,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (sc.found && queue.length) {
         searchedBy.push({ pid: queue.shift()!, found: sc.found, ...(sc.searchExileFor !== undefined ? { exiledFor: sc.searchExileFor } : {}) });
         sc.found = undefined;
-        sc.may = undefined;
+        // The next player's own "may search" (Veteran Explorer); a "you may search" around the whole search (Burning-Rune
+        // Demon) keeps its answer, or it would be asked again when the search pauses after this.
+        if (e.may) sc.may = undefined;
         sc.searchExileFor = undefined;
         sc.perN = undefined;
       }
@@ -1275,7 +1277,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
-        const max = Math.min(n, cards.length);
+        // "Exactly two" (Burning-Rune Demon): with fewer to find, none can be found.
+        const max = e.exactly && cards.length < n ? 0 : Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         // Opposition Agent: searching their own library, an opponent of its controller is controlled by them (CR 723.5).
         const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
@@ -1294,6 +1297,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
           ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others), ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
+          ...(e.exactly ? { exactly: true as const } : {}),
+          ...(e.differentPowers ? { distinctPowers: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
           ...(oneOfEach ? { oneOfEach } : {}),
           ...(e.away && agent === undefined ? { away: true as const } : {}),
@@ -1439,8 +1444,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);
         }
+      // "Shuffle the chosen cards into your library" (Threats Undetected): put into it, then it's shuffled.
+      const shuffledIn = [...new Set(moves.filter((m) => dest(m.pid, m.id).shuffleIn && obj(s, m.id).zone === "library").map((m) => m.pid))];
+      for (const pid of shuffledIn) {
+        shuffleLibrary(s, libOf(pid));
+        log(s, `${libOf(pid).name} shuffles ${moves.filter((m) => m.pid === pid && dest(m.pid, m.id).shuffleIn).length === 1 ? "a card" : "the chosen cards"} into their library.`);
+      }
       // "Put those cards on top in any order" (Goblin Recruiter): the searcher orders the cards now on top.
-      const onTop = moves.filter((m) => !e.dest.third && dest(m.pid, m.id).zone === "libraryTop" && obj(s, m.id).zone === "library");
+      const onTop = moves.filter((m) => !e.dest.third && !dest(m.pid, m.id).shuffleIn && dest(m.pid, m.id).zone === "libraryTop" && obj(s, m.id).zone === "library");
       if (onTop.length > 1 && searchers.length === 1) {
         const lib = libOf(onTop[0]!.pid);
         sc.topOrdered = true;

@@ -831,6 +831,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "60d0c941-39f6-4144-abef-02b0a84d602e",
+  "name": "Angelic Aberration",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Eldrazi Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Angel"
+  ],
+  "oracleText": "Devoid (This card has no color.)\nFlying, vigilance\nWhen this creature enters, sacrifice any number of creatures each with base power or toughness 1 or less. Create that many 4/4 colorless Eldrazi Angel creature tokens with flying and vigilance.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Devoid",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c0d8fef4-65f4-4769-982d-b397d2b7e977",
   "name": "Animate Dead",
   "manaCost": "{1}{B}",
@@ -3459,6 +3492,39 @@
   "set": "shm",
   "releasedAt": "2008-05-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d551fae8-6b40-4118-b9db-29d2f5dff405",
+  "name": "Burning-Rune Demon",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Demon Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon",
+   "Berserker"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may search your library for exactly two cards not named Burning-Rune Demon that have different names. If you do, reveal those cards. An opponent chooses one of them. Put the chosen card into your hand and the other into your graveyard, then shuffle.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6357,6 +6423,32 @@
   "set": "dom",
   "releasedAt": "2018-04-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c438ecb-b127-4450-9395-2d1eea294f30",
+  "name": "Domineering Will",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player gains control of up to three target nonattacking creatures until end of turn. Untap those creatures. They block this turn if able.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

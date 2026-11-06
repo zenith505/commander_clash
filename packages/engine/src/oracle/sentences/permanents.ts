@@ -627,8 +627,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "mustBlockSource", what: { ref: "target", index }, attacker: { ref: "target", index: prev }, thisTurn: true }];
   }
   // "Target creature blocks this turn if able": any attacking creature (CR 509.1c).
-  if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s))) {
-    const what = parseObject(m[1]!, ctx);
+  // Call for Aid: "You can't attack that player this turn": the target opponent, not their planeswalkers (CR 506.2), and
+  // "You can't sacrifice those creatures this turn": the ones it gained control of, for a cost or by an effect (rulings).
+  if (/^You can't attack that player this turn$/.test(s) && ctx.spell) {
+    const that = parsePlayer("that player", ctx);
+    return that?.ref === "target" ? [{ type: "attackBanThisTurn", who: { ref: "you" }, protects: that }] : null;
+  }
+  if (/^You can't sacrifice those creatures this turn$/.test(s) && ctx.spell) {
+    const what = parseObject("those creatures", ctx);
+    return what?.ref === "affected" ? [{ type: "continuous", what, mods: [{ kind: "cantBeSacrificedBy", player: "you" }], duration: "endOfTurn" }] : null;
+  }
+  // Domineering Will: "They block this turn if able": the creatures the sentence before named (those creatures).
+  if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s)) || (m = /^(those creatures|they) block this turn if able$/i.exec(s))) {
+    const what = parseObject(/^they$/i.test(m[1]!) ? "those creatures" : m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }] : null;
   }
   // Earthbend N (CR 701.66a): "target land you control becomes a 0/0 land creature with haste ...". Each instance has its
@@ -1385,10 +1396,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
   // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
   // Stiltzkin, Moogle Merchant: "... of another target permanent you control": not the source.
-  if ((m = /^(Target player|Target opponent) gains control of ((?:another )?target .+)$/.exec(s))) {
+  // Domineering Will: "Target player gains control of up to three target nonattacking creatures until end of turn": each
+  // of them, until the cleanup step (CR 514.2); the player may be you (rulings for Donate-like targets: any player).
+  if ((m = /^(Target player|Target opponent) gains control of ((?:another )?target .+?|up to (?:two|three) target .+?)( until end of turn)?$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const what = who && parseObject(m[2]!, ctx);
-    return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+    if (!who || what?.ref !== "target" || (what.n && !m[3])) return null;
+    return [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[3] ? "endOfTurn" : "game", giveTo: who }];
   }
   // Sky Swallower: "target opponent gains control of all other permanents you control": each of them at once, the ones you
   // control as it resolves (CR 611.2c), for the rest of the game (rulings: Auras stay where they are; they don't come

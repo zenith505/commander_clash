@@ -485,6 +485,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
+    // "Exactly two cards" (Burning-Rune Demon): the best ones, all of them, or none if there aren't enough.
+    if (pend.kind === "searchLibrary" && pend.exactly) {
+      const best = chooseSearch(s, pid, pend.cards, pend.max);
+      return [{ type: "searchLibrary", player: pid, found: best.length === pend.max ? best : [] }];
+    }
     // "Cards with different mana values" (Seasons Past): the best card of each mana value.
     if (pend.kind === "searchLibrary" && pend.distinctManaValues) {
       const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);

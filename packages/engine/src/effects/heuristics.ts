@@ -58,8 +58,10 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     // "Target player gains control of target permanent you control" (Donate): given to an opponent, a permanent that does
     // its new controller harm (bots don't look for one: with only their own permanents to choose from, they don't cast it).
+    // Domineering Will: control "until end of turn" of creatures taken from their controllers, given to a player chosen to
+    // gain them (the bot itself), so only the creatures are aimed at opponents.
     if (e.type === "continuous" && e.giveTo?.ref === "target") {
-      mark(e.giveTo.index);
+      if (e.duration !== "endOfTurn") mark(e.giveTo.index);
       if (e.what.ref === "target") mark(e.what.index, e.what.n);
     }
     // Fateful Handoff: "... target artifact or creature you control. An opponent gains control of that permanent": given

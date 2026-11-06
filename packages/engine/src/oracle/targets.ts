@@ -123,7 +123,9 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
 }
 
 /** What a "pick" effect picks from: "creature", "nonland permanent", "two lands", "artifact or creature", "Forest". */
-export function pickFilter(phrase: string): TargetSpec | null {
+export function pickFilter(phrase0: string): TargetSpec | null {
+  // Angelic Aberration: "creatures each with base power or toughness 1 or less": each of them with it.
+  const phrase = phrase0.replace(/^([a-z]+s) each with /, "$1 with ");
   // "Artifacts, enchantments, and/or tokens" (Lich-Knights' Conquest): each permanent that's any of them.
   const list = /^((?:[a-z]+s, )+)and\/or ([a-z]+s)$/.exec(phrase.trim());
   if (list && /\btokens\b/.test(phrase)) {
@@ -1894,6 +1896,11 @@ export function parseTargetPhrase(
   // "Creatures you control each with power greater than its base power" (Kutzil).
   if ((m = / (?:each )?with power greater than its? base power$/.exec(p))) {
     extra.powerAboveBase = true;
+    p = p.slice(0, m.index);
+  }
+  // Angelic Aberration: "creatures each with base power or toughness 1 or less": either one at most that.
+  if ((m = / (?:each )?with base power or toughness (\d+) or less$/.exec(p))) {
+    extra.basePtEitherMax = Number(m[1]);
     p = p.slice(0, m.index);
   }
   // "Creature you control with base power or toughness 1" (Sword of the Squeak).

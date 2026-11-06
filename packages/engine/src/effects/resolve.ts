@@ -1029,7 +1029,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
       : m.kind === "mustBeBlocked" && m.combat === "this"
       ? { kind: "mustBeBlocked", combat: s.combatsThisTurn ?? 0 }
       : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.
-      m.kind === "cantAttackPlayers"
+      m.kind === "cantBeSacrificedBy" && m.player === "you"
+      ? { kind: "cantBeSacrificedBy", player: ctx.controller }
+      : m.kind === "cantAttackPlayers"
       ? { kind: "cantAttackPlayers", players: m.players === "highestRoll" ? highestRollers(s, ctx.controller) : m.players, ...(m.combat !== undefined ? { combat: m.combat === "this" ? s.combatsThisTurn ?? 0 : m.combat } : {}) }
       : // "Power and toughness each equal to its mana value" (Karn, the Great Creator): each affected object's own, worked
         // out in the layers (a permanent's mana value doesn't change but by a copy effect).

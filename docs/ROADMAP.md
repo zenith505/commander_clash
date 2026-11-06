@@ -1,6 +1,6 @@
 # Roadmap
 
-29,982 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+29,991 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
@@ -2152,6 +2152,28 @@ line blocks.
    name (White Knight stays White Knight) or a mana symbol. It applies after copy effects and isn't copied (CR 707.2);
    it ends when the object leaves its zone, except a permanent spell's, which goes on with the permanent (CR 400.7a); on
    a spell it can make the spell's targets illegal (Doom Blade's "nonblack" made "nongreen"). +11, 29,931 of 31,936.
+   Round 283 took the next names from the top that no earlier round looked at: Planechase instructions outside a
+   Planechase game do nothing (CR 701.31a): "You may planeswalk" (Start the TARDIS, rulings) and the replacements of
+   rolling planar dice and of planeswalking (Ichor Elixir, Susan Foreman); "If this permanent is on the battlefield, flip
+   a coin. If you win the flip, exile this permanent and return it ... at the beginning of the next end step. If you lose
+   the flip, sacrifice it." granted to all Slivers (Frenetic Sliver; once it has left, no coin, so one flip however many
+   times it's activated in response, rulings); "if a creature card left your graveyard this turn" and "Whenever another
+   Phoenix you control dies, you may cast ~ from your graveyard" (Syrix, Carrier of the Flame: from the graveyard only,
+   so not when it dies with the other Phoenix, rulings; cast as it resolves, paying its costs); "exile the top card of
+   each player's library and put a fetch counter on each of them" and a +1/+1 counter for each noncreature card exiled
+   (Pako, Arcane Retriever; "exiled this way" counts every player's card); "if it has dealt 10 or more damage to that
+   player this turn, they lose the game" (Vessel of the All-Consuming: the damage this object dealt that player this
+   turn, TurnLog.sourceToPlayer); "that player exiles ... until they exile a nonland card. You may put a +1/+1 counter on
+   ~. If you don't, you may cast the exiled nonland card until end of turn and mana of any type can be spent" (Black
+   Widow, Super Spy); "Otherwise, you may put a face-up exiled card they own into their graveyard" (Binding Negotiation,
+   chosen as it resolves, with a browser test for the picker). +9, 29,980 of 31,936 with B113-B115.
+   Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
+   one opponent and a chosen number); Barroom Brawl ("the opponent to your left", then that player may copy it with new
+   targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
+   one of the revealed cards and may cast it free); Hew the Entwood (sacrifice any number of lands as it resolves);
+   Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
+   Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
+   among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
    Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
    opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
    Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game
@@ -5689,8 +5711,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   their owners didn't pay for), Song of Blood (a delayed attack trigger whose bonus counts the creature cards milled as
   it resolved), Expel the Unworthy (a kicker that changes what the spell can target), Kill-Suit Cultist and Goblin
   Psychopath (damage replaced by a destroy or redirected, ordered with other shields, CR 616.1, as Lichenthrope).
-- Out after round B114 (looked at, not done): Binding Negotiation (putting a face-up exiled card into its owner's
-  graveyard: no such choice yet), Titania's Song (its effect continuing until end of turn after it leaves the
+- Out after round B114 (looked at, not done): Titania's Song (its effect continuing until end of turn after it leaves the
   battlefield), Fortunate Few (each player in turn choosing a nonland permanent not already chosen), Magnetic Mountain
   (paying {4} for each of any number of chosen creatures), Equipoise (phasing out the excess, one permanent type after
   another).

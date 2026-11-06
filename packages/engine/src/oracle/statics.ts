@@ -1221,6 +1221,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
   if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
+  if (text === "a creature card left your graveyard this turn") return { kind: "cardLeftYourGraveyard", creature: true };
   if (text === "a permanent was put into your hand from the battlefield this turn") return { kind: "permanentToYourHand" };
   if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
   // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).

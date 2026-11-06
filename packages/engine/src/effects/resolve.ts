@@ -1224,6 +1224,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "predicament":
     case "alternatePicks":
     case "putInLibrary":
+    case "exiledCardToGraveyard":
     case "putInGraveyard":
     case "exileGraveyard":
     case "livingDeath":

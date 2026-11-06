@@ -1262,6 +1262,13 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Nettling Imp: "target non-Wall creature the active player has controlled continuously since the beginning of the turn":
+  // controlled by the player whose turn it is, without a break since the turn began (as for summoning sickness, CR 302.6).
+  const activeSince = /^(.+?) the active player has controlled continuously since the beginning of the turn$/.exec(phrase.trim());
+  if (activeSince) {
+    const head = parseTargetPhrase(activeSince[1]!, opts);
+    return head?.kind === "object" && !head.controller && !head.controlledSinceTurnBegan ? { ...head, activeController: true, controlledSinceTurnBegan: true, text: `${head.text} the active player has controlled continuously since the beginning of the turn` } : null;
+  }
   // Telim'Tor's Edict: "target permanent you own or control": yours by either (CR 108.3, 110.2).
   if (phrase.trim() === "permanent you own or control")
     return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: [{ kind: "object", types: [], notTypes: [], notColors: [], owner: "you", text: "permanent you own" }, { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }], text: "target permanent you own or control" };
@@ -1987,6 +1994,11 @@ export function parseTargetPhrase(
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");
+  } else if ((m = /(?:^| )with (?:a morph ability|morph abilities)(?= other than ~$|$)/.exec(p)) && !extra.anyOf) {
+    // Master of the Veil: "creature with a morph ability", Weaver of Lies: "creatures with morph abilities": morph or
+    // megamorph, a variant of it (CR 702.37b), on the permanent's characteristics now (a face-down one has none, 708.2).
+    extra.anyOf = ["Morph", "Megamorph"].map((k) => ({ kind: "object" as const, keywords: [k], text: k.toLowerCase() }));
+    p = p.slice(0, m.index) + p.slice(m.index + m[0].length);
   } else if ((m = /(?:^| )with a kicker ability$/.exec(p)) && !extra.anyOf) {
     // Murasa Sproutling: "card with a kicker ability": kicker or multikicker, a variant of it (CR 702.33c), as printed.
     extra.anyOf = ["Kicker", "Multikicker"].map((k) => ({ kind: "object" as const, keywords: [k], text: k.toLowerCase() }));

@@ -3736,6 +3736,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
+      if (e.randomFromHand) {
+        // Elkin Lair: one card chosen at random from that player's hand, exiled face up (CR 406.3); that player may play it
+        // this turn, the usual way (rulings: at any point this turn, not only as this resolves).
+        const hand = player(s, from).hand;
+        if (!hand.length) return void log(s, `${player(s, from).name} has no cards in hand.`);
+        const id = hand[Math.floor(nextRandom(s) * hand.length)]!;
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone !== "exile") return;
+        o.mayPlay = { player: from, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        if (s.resolving) (s.resolving.impulsed ??= []).push(o.id);
+        log(s, `${player(s, from).name} exiles ${defOf(s, o).name}, chosen at random, from their hand and may play it this turn.`);
+        return;
+      }
       if (e.hand) {
         // Elder Brain: the whole hand, then that player draws as many as were exiled.
         const sc = (s.resolving!.scratch ??= {});

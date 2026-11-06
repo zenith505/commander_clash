@@ -432,6 +432,11 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "blockHistory", of: { ref: "target", index: ctx.lastObjectTarget }, blocked: true, thisCombat: true };
   // Wall of Nets: "exile all creatures blocked by ~": the attackers it's blocking as this resolves.
   if (/^all creatures blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "blockingIt", blocked: true };
+  // Knight of Valor: "each creature without flanking blocking ~": those blocking it as this resolves that match.
+  // Knight of Valor: "each creature without flanking blocking ~": those blocking it as this resolves without flanking,
+  // granted or not (CR 702.25a).
+  if (!ctx.spell && /^each creature without flanking blocking ~$/i.test(p.trim()))
+    return { ref: "blockingIt", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], notKeywords: ["Flanking"], text: "creature without flanking" } };
   // The Wretched: "gain control of all creatures blocking ~": the same.
   const blockingIt = !ctx.spell ? /^(?:each creature|all creatures) blocking (~|it|that creature)$/i.exec(p.trim()) : null;
   if (blockingIt) {
@@ -1608,6 +1613,13 @@ export function parseTargetPhrase(
   if (blocked) {
     extra.blockedBySource = true;
     p = p.slice(0, blocked.index);
+  }
+  // Kitesail Skirmisher: "another target creature attacking the same player or planeswalker" (as ~): what the source is
+  // attacking as it's chosen and as it resolves (CR 506.2, 608.2b). Only a target, checked as targets are.
+  const sameDefender = opts.target ? / attacking the same player or planeswalker$/.exec(p) : null;
+  if (sameDefender) {
+    extra.attackingSameAsSource = true;
+    p = `attacking ${p.slice(0, sameDefender.index)}`;
   }
   // "Target creature blocking ~" (Master of Arms), "... blocking or blocked by ~" (Cromat), "it" being ~. Only a target:
   // it's checked as targets are (lesserPowerOk), not in a group.

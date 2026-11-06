@@ -210,6 +210,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature goaded this way$/.test(p)) return { count: { kind: "goadedThisWay" } };
   // Heed the Mists: "the milled card's mana value" after "mill a card": that card's, 0 if none was milled.
   if (ctx?.afterMillOne && /^the milled card's mana value$/.test(p)) return { count: { kind: "milledManaValue" } };
+  // Seek: "Search target opponent's library for a card and exile it. You gain life equal to its mana value."
+  if (ctx?.afterSearchExileOne && /^the exiled card's mana value$/.test(p)) return { count: { kind: "searchFoundMv" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // Heretic's Punishment: "the greatest mana value among the milled cards", after "mill three cards".
   if (ctx?.afterMill && /^the greatest mana value among the milled cards$/i.test(p)) return { count: { kind: "milledManaValue", greatest: true } };

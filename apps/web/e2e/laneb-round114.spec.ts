@@ -6,7 +6,8 @@ import { card, controls, resolveUntil } from "./ui";
 
 test("Planar Overlay: choose a Swamp and a Forest to return, the Bayou for both; the only Plains, Island and Mountain go too", async ({ page }) => {
   const s = scene({ hand: ["Planar Overlay"], board: ["Plains", "Island", "Swamp", "Mountain", "Forest", "Bayou"] });
-  const [plains, island, swamp, mountain, forest, bayou] = ["Plains", "Island", "Swamp", "Mountain", "Forest", "Bayou"].map((n) => idsOf(s, n, "battlefield", 0)[0]!);
+  const land = (n: string): string => idsOf(s, n, "battlefield", 0)[0]!;
+  const [plains, island, swamp, mountain, forest, bayou] = [land("Plains"), land("Island"), land("Swamp"), land("Mountain"), land("Forest"), land("Bayou")];
   s.players[0]!.manaPool = { ...s.players[0]!.manaPool, U: 1, C: 2 };
   await open(page, s);
   await card(page, "Planar Overlay", s).click();

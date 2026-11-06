@@ -46,8 +46,32 @@ function manaSourceOrigins(s: GameState, ctx: ResolveCtx): ManaOrigin[] {
 
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "attackDirection": {
+      // Teyo: the direction chosen just before, for every player's attacks until its controller's next turn.
+      const side = s.resolving?.chosen?.direction;
+      if (!side) return;
+      (s.attackDirections ??= []).push({ by: ctx.controller, side });
+      log(s, `Until ${player(s, ctx.controller).name}'s next turn, each player may attack only the nearest opponent to their ${side} and that player's planeswalkers.`);
+      invalidateCharacteristics(s);
+      return;
+    }
+    case "skipChosenThisTurn": {
+      // Fatespinner: that player chooses as it resolves (CR 608.2d); each instance this turn is skipped (CR 614.10).
+      const pid = players(s, e.who, ctx)[0];
+      if (pid === undefined || player(s, pid).lost) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.skipPick === undefined) {
+        s.pending = { kind: "chooseOption", player: pid, source: src, what: "skipChoice", options: ["draw", "main", "combat"], labels: ["Draw step", "Main phase", "Combat phase"], prompt: "choose draw step, main phase, or combat phase: you skip each of them this turn" };
+        return "paused";
+      }
+      const what = sc.skipPick as "draw" | "main" | "combat";
+      sc.skipPick = undefined;
+      (player(s, pid).skips ??= []).push({ what, turn: s.turn, wholeTurn: true });
+      log(s, `${player(s, pid).name} chooses to skip each ${{ draw: "draw step", main: "main phase", combat: "combat phase" }[what]} this turn (${src}).`);
+      return;
+    }
     case "skip": {
-      const words = { untap: "untap step", draw: "draw step", combat: "combat phase", turn: "turn" }[e.skip];
+      const words = { untap: "untap step", draw: "draw step", combat: "combat phase", turn: "turn", main: "main phase" }[e.skip];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         if (e.wholeTurn) {

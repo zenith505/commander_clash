@@ -693,10 +693,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
         return "paused";
       }
-      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
+      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "colors" ? "colors" : e.choice === "basicLandType" || e.choice === "landType" ? "landType" : e.choice === "keyword" ? "keyword" : e.choice === "parity" ? "parity" : e.choice === "direction" ? "direction" : e.choice === "landOrNonland" ? "landOrNonland" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : {}) };
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: e.choice, options: e.options ?? choiceOptions(e.choice, e.except), ...(e.choice === "landOrNonland" ? { labels: ["Land", "Nonland"], prompt: "choose land or nonland." } : e.choice === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way." } : {}) };
         return "paused";
       }
       return;

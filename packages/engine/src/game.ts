@@ -3537,6 +3537,8 @@ function startNextTurn(s: GameState, skipping = false) {
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
   s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
+  // Teyo's direction: until that player's next turn (CR 611.2b), or the turn it would have been (CR 800.4m).
+  if (s.attackDirections) s.attackDirections = s.attackDirections.some((d) => !began.has(d.by)) ? s.attackDirections.filter((d) => !began.has(d.by)) : undefined;
   for (const p of s.players)
     if (began.has(p.id)) {
       p.gainedUntilNextTurn = undefined;
@@ -3807,9 +3809,10 @@ function beginStep(s: GameState, step: Step): void {
   const ap = s.activePlayer;
   // "Skip your next untap step / draw step" replaces the whole step (CR 614.10); a skipped combat phase goes straight to
   // what comes after it.
-  const skipped = step === "untap" || step === "draw" ? step : step === "beginCombat" ? "combat" : undefined;
+  // Fatespinner: a skipped main phase, precombat or postcombat, added ones too (CR 505.1, rulings).
+  const skipped = step === "untap" || step === "draw" ? step : step === "beginCombat" ? "combat" : step === "main1" || step === "main2" ? "main" : undefined;
   if (skipped && takeSkip(s, ap, skipped)) {
-    log(s, `${player(s, ap).name} skips their ${{ untap: "untap step", draw: "draw step", combat: "combat phase" }[skipped]}.`);
+    log(s, `${player(s, ap).name} skips their ${{ untap: "untap step", draw: "draw step", combat: "combat phase", main: "main phase" }[skipped]}.`);
     if (skipped === "combat") s.step = "endCombat";
     return advanceStep(s);
   }
@@ -8967,6 +8970,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "payLifeRound") {
+    // Plague of Vermin: the life this player pays now (checked against `numberRange` above); 0 declines.
+    const st = s.resolving?.scratch?.lifeRounds;
+    if (!st) throw new RulesError("nothing to pay life for");
+    st.pick = Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "secretNumber") {
     // Kept secret until all are revealed (Wheel of Misfortune): the log says only that it was chosen.
     const st = s.resolving?.scratch?.numbers;
@@ -9469,6 +9480,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "skipChoice") {
+    // Fatespinner: the step or phase that player skips each instance of this turn.
+    (r.scratch ??= {}).skipPick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "giveLife") {
     // Wall of Shards: the opponent for one more age counter (see Effect "cumulativeUpkeep" giveLife).
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the opponents offered");
@@ -9928,7 +9945,7 @@ function askEntersChoice(s: GameState): boolean {
     }
     // Greymond: "choose two abilities from among ...": one not chosen already.
     const many = c.many ? (c.options ?? []).filter((k) => !o.chosen?.keywords?.includes(k)) : undefined;
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;
@@ -10297,8 +10314,41 @@ export function describeAttackCost(c: { action: "sacrifice" | "bounce"; filter: 
   return c.action === "sacrifice" ? `sacrifice ${what}` : `return ${what} you control to ${c.n === 1 ? "its owner's hand" : "their owners' hands"}`;
 }
 
+/**
+ * The directions every player's attacks are held to now (Pramikon, Sky Rampart; Teyo, Geometric Tactician): each one
+ * chosen, by a permanent with that ability (none chosen, no effect: rulings) or a Teyo effect still lasting.
+ */
+export function attackDirections(s: GameState): ("left" | "right")[] {
+  const out: ("left" | "right")[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.chosen?.direction && abilitiesOf(s, o).attackNearestChosen) out.push(o.chosen.direction);
+  }
+  for (const d of s.attackDirections ?? []) out.push(d.side);
+  return out;
+}
+
+/**
+ * The nearest opponent of `pid` to their left or right: the next player in turn order is "usually the player seated to the
+ * active player's left" (CR 101.4), so that one is to their left; players who left the game have no seat (CR 800.4a).
+ */
+export function nearestOpponent(s: GameState, pid: PlayerId, side: "left" | "right"): PlayerId | undefined {
+  const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === pid);
+  const i = seats.indexOf(pid);
+  const p = i < 0 ? undefined : seats[(i + (side === "left" ? 1 : seats.length - 1)) % seats.length];
+  return p !== undefined && p !== pid ? p : undefined;
+}
+
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
   const c = characteristics(s, o);
+  // Pramikon, Teyo: only the nearest opponent in each direction that applies, and their planeswalkers, not a battle; two
+  // directions that pick different players leave nothing to attack (rulings).
+  for (const side of attackDirections(s)) {
+    const near = nearestOpponent(s, c.controller, side);
+    const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+    const whose = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+    if (atBattle || whose !== near) return `${c.name} can attack only the nearest opponent to its controller's ${side}${near !== undefined ? ` (${player(s, near).name})` : ""} and their planeswalkers`;
+  }
   // Exalted Dragon: only if the cost can be paid (CR 508.1d, 508.1i).
   if (c.ownAttackCosts.length && !attackCostsPayable(s, c.controller, c.ownAttackCosts)) return `${c.name} can't attack unless you ${c.ownAttackCosts.map(describeAttackCost).join(" and ")}`;
   // Weathered Sentinels: defender stops it attacking anyone but those players themselves (CR 702.3b).

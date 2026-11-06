@@ -343,6 +343,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const k = m[1]!;
     return [{ type: "either", options: [[{ type: "counters", what: { ref: "self" }, counter: k, n: 1 }], [{ type: "removeCounters", what: { ref: "self" }, counter: k, n: 1 }]], labels: [`Put a ${k} counter on ~`, `Remove a ${k} counter from ~`], onlyDoable: true }];
   }
+  // Sigurd, Jarl of Ravensthorpe: "Put a lore counter on target Saga you control or remove one from it"; Jinxed Choker: "Put
+  // a charge counter on ~ or remove one from it": the same choice, as it resolves (CR 608.2d).
+  if ((m = /^Put an? ([a-z]+) counter on (~|target [A-Za-z ]+?) or remove one from it$/.exec(s)) && !ctx.spell) {
+    const k = m[1]!;
+    const what = m[2] === "~" ? { ref: "self" as const } : parseObject(m[2]!, ctx);
+    if (!what || isGroup(what) || (what.ref === "target" && what.n)) return null;
+    const on = m[2] === "~" ? "~" : "it";
+    return [{ type: "either", options: [[{ type: "counters", what, counter: k, n: 1 }], [{ type: "removeCounters", what, counter: k, n: 1 }]], labels: [`Put a ${k} counter on ${on}`, `Remove a ${k} counter from ${on}`], onlyDoable: true }];
+  }
   // Telekinetic Bonds: "If you do, you may tap or untap target permanent": tap, untap or neither, as one question.
   if ((m = /^You may tap or untap (target permanent)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -958,6 +967,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const base = pickFilter(`untapped ${noun}`);
     const filter = base && (m[1] === "another" || m[2]) ? { ...base, notSource: true as const, text: `other ${base.text}` } : base;
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: one ? 1 : num(m[1]!), action: "tap" }];
+  }
+  // Tangle Wire: "that player taps an untapped artifact, creature, or land they control for each fade counter on ~": as
+  // many as it has as this resolves (CR 608.2h), that player's choice, all of them if they have fewer (CR 101.3).
+  if ((m = /^[Tt]hat player taps an untapped artifact, creature, or land they control for each ([a-z]+) counter on ~$/.exec(s))) {
+    const who = parsePlayer("that player", ctx);
+    const kind = counterKind(m[1]!);
+    if (!who || !kind) return null;
+    const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Land"], notTypes: [], notColors: [], tapped: false, controller: "you", text: "untapped artifact, creature, or land they control" };
+    return [{ type: "pick", who, filter, n: { count: { kind: "counters", counter: kind, of: { ref: "self" } } }, action: "tap" }];
   }
   // Zimone's Hypothesis: "Put a +1/+1 counter on a creature": any player's, picked as it resolves, not targeted. Gix's
   // Command: "Put two +1/+1 counters on up to one creature": the same, or none (rulings: chosen as it resolves).

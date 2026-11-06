@@ -1144,6 +1144,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "endCombatPhase":
     case "controlPlayer":
     case "skip":
+    case "attackDirection":
+    case "skipChosenThisTurn":
     case "addPhases":
     case "addUpkeepStep":
     case "addUpkeepPhases":
@@ -1477,6 +1479,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chooseBlocks":
     case "secretNumbers":
     case "bidLife":
+    case "payLifeRounds":
+    case "playerVotes":
       return runVotesEffect(s, e, ctx, src);
     case "may":
     case "repeatMay":

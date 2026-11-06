@@ -1636,6 +1636,12 @@ export function compile(d: CardDef): CompiledCard {
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
     // as Chosen.number (CR 614.12; CR 107.1: the game uses only integers, and no mana value is negative, so 0 or more).
     // "As ~ enters, choose odd or even." (Gollum, Riddle Master), kept as Chosen.parity (CR 614.12).
+    // "As ~ enters, choose left or right." (Pramikon), kept as Chosen.direction (CR 614.12).
+    if (line === "As ~ enters, choose left or right.") {
+      if (out.entersChoose?.some((c) => c.what === "direction")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "direction" });
+      continue;
+    }
     if (line === "As ~ enters, choose odd or even.") {
       if (out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push(raw);
       else (out.entersChoose ??= []).push({ what: "parity" });
@@ -2630,6 +2636,11 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Arboria: a rule for every creature attacking a player (CR 508.1c), not their planeswalkers (rulings).
+    // Pramikon, Sky Rampart: every player's attacks, by the direction chosen as it entered (attackProblem).
+    if (line === "Each player may attack only the nearest opponent in the chosen direction and planeswalkers controlled by that opponent." && out.entersChoose?.some((c) => c.what === "direction")) {
+      out.attackNearestChosen = true;
+      continue;
+    }
     if (line === "Creatures can't attack a player unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn.") {
       out.attackOnlyActive = true;
       continue;

@@ -1,7 +1,7 @@
 # Roadmap
 
-29,931 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,959 of 4,988 (99%), top 10,000: 9,590 of
+29,941 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,960 of 4,988 (99%), top 10,000: 9,601 of
 9,979 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2152,6 +2152,22 @@ line blocks.
    name (White Knight stays White Knight) or a mana symbol. It applies after copy effects and isn't copied (CR 707.2);
    it ends when the object leaves its zone, except a permanent spell's, which goes on with the permanent (CR 400.7a); on
    a spell it can make the spell's targets illegal (Doom Blade's "nonblack" made "nongreen"). +11, 29,931 of 31,936.
+   Round 282 took earlier skips from the top: "choose left or right" and "each player may attack only the nearest
+   opponent in the chosen direction and planeswalkers controlled by that opponent" (Pramikon, Sky Rampart, as it enters;
+   Teyo, Geometric Tactician's −2 until your next turn; left is the next seat in turn order, a player who left the game
+   has no seat, and two directions that disagree allow no attacks at all); "that player chooses draw step, main phase,
+   or combat phase" and skips each instance of it that turn (Fatespinner; both main phases); life paid round after round
+   from you until a whole round goes by with no one paying, a Rat for each 1 life (Plague of Vermin, rulings); secret
+   council votes for players (Mob Verdict: "another player"; Círdan the Shipwright: draws for votes from the active
+   player, then each player with none may put a permanent card from their hand onto the battlefield) and "for each
+   creature with one or more votes, put that many stun counters on it, then tap it" (Trap the Trespassers); a target the
+   damaged player chooses among your opponents' permanents, another opponent you choose if that player left the game
+   (Bladegriff Prototype, CR 800.4g); a lore counter put on target Saga or removed, and a trigger for each lore counter
+   you put on a Saga (Sigurd, Jarl of Ravensthorpe); tapping an untapped artifact, creature or land for each fade
+   counter (Tangle Wire). +10, 29,941 of 31,936.
+   Out after round 282 (looked at, not done): Arena (an activated ability's second target chosen by an opponent);
+   Jinxed Choker (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
+   read).
    Out after round 281 (looked at, not done): Balduvian Shaman (a target "that doesn't have cumulative upkeep" and a
    granted cumulative upkeep that must count for it); Swirl the Mists (every color word in every spell and permanent,
    a static text change); The Animus, King Narfi's Betrayal, Wizard's Spellbook and the rest of the most played

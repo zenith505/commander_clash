@@ -553,6 +553,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.scratch?.punished ?? []).filter((p) => !s.players[p]!.lost).length;
     case "stateIf":
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
+    case "onlyIf": {
+      // Angry Mob's "during your turn" is read inside the layer system too (layer 7a): no characteristics needed for it.
+      const holds = c.cond.kind === "yourTurn" ? (s.activePlayer === ctx.controller) !== !!c.cond.not : !!ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller);
+      return holds ? evalCount(s, c.of, ctx) : 0;
+    }
     case "creaturesLeftThisTurn":
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
     case "typeToYourGraveyardThisTurn":
@@ -1374,6 +1379,8 @@ function describeCount(c: Count): string {
       return "#players punished";
     case "stateIf":
       return "1 if the condition holds";
+    case "onlyIf":
+      return `${describeCount(c.of)} if the condition holds, else 0`;
     case "players":
       return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.choseThisWay ? " who chose to" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.discardedFewerNonland ? ` who didn't discard ${c.discardedFewerNonland} nonland cards` : ""}${c.discardedThisTurn ? " who discarded this turn" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":

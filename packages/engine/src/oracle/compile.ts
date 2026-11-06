@@ -6542,6 +6542,11 @@ function checkCastingLinks(out: CompiledCard) {
   // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
   const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
   if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
+  // Swallow Whole: "the creature tapped to pay ~'s additional cost" needs the spell's one "tap an untapped creature you
+  // control" additional cost, and only the spell is about it.
+  const costTapIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ref":"costTapped"');
+  if (costTapIn([out.triggers, out.statics, out.activated])) bad = true;
+  if (costTapIn(out.spell) && (out.additionalCosts ?? []).filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;

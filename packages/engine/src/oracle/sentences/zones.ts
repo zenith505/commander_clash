@@ -48,6 +48,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // any face-up one (rulings), not only one cast as an Adventure; chosen after seeing their hand, none too.
   if (/^[Pp]ut a card that has an Adventure that player owns from exile into that player's graveyard$/.test(s0) && ctx.lastPlayerTarget !== undefined) return [{ type: "processExile", n: 1, adventureOf: { ref: "target", index: ctx.lastPlayerTarget } }];
   let m: RegExpExecArray | null;
+  // Not Forgotten: "Put target card from a graveyard on your choice of the top or bottom of its owner's library": chosen as
+  // it resolves by its controller (rulings).
+  if ((m = /^[Pp]ut (target card from a graveyard) on your choice of the top or bottom of its owner's library$/.exec(s0))) {
+    const before = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || ctx.targets.length !== before + 1 || ctx.targets[before]!.kind !== "card") return null;
+    return [{ type: "putInLibrary", what, position: "yourChoice" }];
+  }
   // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
   // same as "Return any number of target creature cards ... from your graveyard to the battlefield".
   const fromYard = /^Return from your graveyard to the battlefield (any number of target .+)$/.exec(s0);

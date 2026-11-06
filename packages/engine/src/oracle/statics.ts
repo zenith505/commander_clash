@@ -2536,6 +2536,17 @@ export function parseStatic(line: string): StaticAbility | null {
   if (banner) return { affects: { kind: "filter", types: ["Creature"], sharesWithAttached: banner[1] === "color" ? "color" : "creatureType" }, mods: [{ kind: "modifyPT", power: Number(banner[2]), toughness: Number(banner[3]) }], text: line };
   const st = parseStaticLine(line) ?? parseTransform(line);
   if (st) return lookBackGrant(st);
+  // Angry Mob: "During your turn, ~'s power and toughness are each equal to 2 plus the number of Swamps your opponents
+  // control. During turns other than yours, ~'s power and toughness are each 2.": one characteristic-defining ability
+  // (CR 604.3, layer 7a) that works in every zone, "your" turn being its controller's (its owner's off the battlefield,
+  // CR 109.5).
+  const mob = /^During your turn, ~'s power and toughness are each equal to (\d+) plus (.+)\. During turns other than yours, ~'s power and toughness are each (\d+)\.$/.exec(line);
+  if (mob && mob[1] === mob[3]) {
+    const c = parseCount(mob[2]!, null);
+    if (!c || c.plus || c.times || c.negate || c.half || !staticCountOk(c, { kind: "self" })) return null;
+    const n: AmountExpr = { count: { kind: "onlyIf", cond: { kind: "yourTurn" }, of: c.count }, plus: Number(mob[1]) };
+    return { affects: { kind: "self" }, mods: [{ kind: "definePT", power: n, toughness: n }], text: line };
+  }
 
   // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
   // says the same as "gets ... and has first strike". So does Runechanter's Pike's "has first strike and gets +X/+0,

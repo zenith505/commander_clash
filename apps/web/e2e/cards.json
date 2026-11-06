@@ -5134,6 +5134,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "62ddc5ae-ced9-4319-854c-1a114c6afc3f",
+  "name": "Counsel of the Soratami",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cc187110-1148-4090-bbb8-e205694a39f5",
   "name": "Counterspell",
   "manaCost": "{U}{U}",
@@ -8591,6 +8617,71 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b0c28b2b-a2dd-4b76-bb1c-cec55a0a6784",
+  "name": "Flotsam // Jetsam",
+  "manaCost": "{1}{G/U} // {4}{U/B}{U/B}",
+  "cmc": 8,
+  "typeLine": "Instant // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Mill three cards. Investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Investigate",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Flotsam",
+    "manaCost": "{1}{G/U}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Mill three cards. Investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
+    "colors": [
+     "U",
+     "G"
+    ]
+   },
+   {
+    "name": "Jetsam",
+    "manaCost": "{4}{U/B}{U/B}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Each opponent mills three cards, then you may cast a spell from each opponent's graveyard without paying its mana cost. If a spell cast this way would be put into a graveyard, exile it instead.",
+    "colors": [
+     "U",
+     "B"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "42b01697-8663-4b53-86d5-699063bd0778",
   "name": "Flowstone Sculpture",
   "manaCost": "{6}",
@@ -10320,6 +10411,34 @@
   "commanderLegal": "legal",
   "set": "apc",
   "releasedAt": "2001-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc5d0e18-2d10-47df-9742-2ea6c6d44431",
+  "name": "Guild Feud",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, target opponent reveals the top three cards of their library, may put a creature card from among them onto the battlefield, then puts the rest into their graveyard. You do the same with the top three cards of your library. If two creatures are put onto the battlefield this way, those creatures fight each other.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Fight"
+  ],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

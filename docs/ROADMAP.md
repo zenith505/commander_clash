@@ -3048,7 +3048,7 @@ line blocks.
      cards as a group ("those cards", "one of them", "the greatest mana value among them").
    - Venture still out on other lines: Wandering Troubadour ("if you had a land enter this turn"), Ranger's Hawk ("tap
      another untapped creature you control" as a cost), Immovable Rod, Intrepid Outlander (pack tactics), Radiant
-     Solar, Fifty Feet of Rope, Dungeon Delver (granting Hama Pashar's ability to commanders), Keen-Eared Sentry,
+     Solar, Fifty Feet of Rope, Dungeon Delver (granting Hama Pashar's ability to commanders), Keen-Eared Sentry (done in round B121),
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
@@ -3261,7 +3261,7 @@ line blocks.
      Vortex, Epic Experiment, Collected Conjuring).
    - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
-     (per-recipient damage), Aspect of Wolf (done in round B111), The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
+     (per-recipient damage), Aspect of Wolf (done in round B111), The Goose Mother, Banshee, Chainer's Torment (done in round B121), Doomsday, Death
      Wish, Contaminated Drink (rad
      counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
@@ -4433,7 +4433,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Retched Wretch), Sudden Reclamation, Mind Bomb (each player discards up to three), Renounce ("sacrifice any number
   of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
 - Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
-  Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst, Sivvi's Valor, Treacherous Link,
+  Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst (done in round B121), Sivvi's Valor, Treacherous Link,
   Kitesail Skirmisher, Bill Ferny (done in round 272), Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
 - Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
   hand ... If you revealed a Dragon card or controlled a Dragon as you cast this spell" cycle (Draconic Roar,
@@ -4725,11 +4725,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   less to activate if <condition>" (Esquire of the King, Starport Security, Sewer Crocodile, Razorlash Transmogrant),
   "at least two creatures that share a creature type" (Synchronized Eviction), "as long as it's blocking and you
   control a snow land" (Snow Devil). +34 (28,381 of 31,936 with round 222).
-- Out after round B53 (looked at, not done): Clear the Land (each player reveals), Ninja's Kunai and Blazing Torch
+- Out after round B53 (looked at, not done): Clear the Land (done in round B121), Ninja's Kunai and Blazing Torch
   (granted abilities that sacrifice or name the Equipment), Artificer's Hex (done in round B112) (the creature the enchanted Equipment is
   attached to), Mana Vortex (counter unless you sacrifice, plus a no-lands state trigger), Encircling Fissure
   (prevention for a target opponent's creatures), Ancient Hellkite (done in round B112) (a defending-player target), Alluring Siren
-  ("attacks you if able"), Warren Weirding (done in round B112) (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo
+  ("attacks you if able"), Warren Weirding (done in round B112) (Kindred), Kami of Jealous Thirst (a colored cost cut), Thaumaton Torpedo (done in round B121)
   ("if you attacked with a Spacecraft this turn"), Detention Vortex (only opponents may activate), West Wind Avatar (done in round B105)
   ("sacrifice a token or a land"), Guul Draz Overseer (done in round B113) ("If that land is a Swamp ... instead"), Unnatural Aggression (done in round B113)
   (fight plus an exile replacement), Thunderous Orator (the keyword list), Foundry Helix (done in round B106) and Voltage Surge (what the
@@ -5878,6 +5878,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
   only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
   Channel Harm ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
+- Round B121 (least played first, from the skip lists): Coalition Honor Guard, Standard Bearer and Coalition Flag (an
+  opponent choosing targets for a spell they cast or an ability they activate must choose at least one Flagbearer if able:
+  not for triggered abilities, not its controller, and a Flagbearer that can't be targeted doesn't bind; checked against
+  the whole set of targets, rulings; bots aim harmful spells at an opponent's Flagbearer and helpful ones at their own,
+  and Ken's target picker only highlights targets that still leave the rule met, with a browser test),
+  Reflect Damage (the next damage from a source of your choice dealt to that source's controller, CR 609.7a), Lava Burst
+  (damage to a creature can't be prevented or redirected; damage to a player can, rulings), Ascent of the Worthy (all
+  damage to creatures you control dealt to the chosen one until your next turn; a damage rule that lasts past the
+  turn), Firestorm Phoenix (returns to its owner's hand instead of dying, CR 614.6, and can't be played until that
+  player's next turn; the hand isn't shown revealed in the UI yet), Vine Gecko (the first kicked spell each turn costs {1}
+  less: a spell cast kicked, CR 702.33d, so unkicked spells don't use it up), Thaumaton Torpedo (attacked with a
+  Spacecraft this turn: attacks now record noncreature subtypes too), Clear the Land (each player's top five revealed,
+  lands onto the battlefield tapped, the rest exiled; done player by player in turn order, not all at once, which no
+  replacement or trigger here tells apart), Chainer's Torment (III: an X/X token that deals X damage to you, X fixed as
+  it resolves), Keen-Eared Sentry (each opponent ventures at most once each turn: a second venture does nothing). No new
+  prompts. +12 (30,085 of 31,936 with B120 and round 287).
+- Out after round B121 (looked at, not done): Rain of Gore (life gain "a spell or ability would cause": the cause of a
+  life gain isn't tracked, and lifelink isn't one, rulings), Wall of Shadows ("spells that can target only Walls" depends
+  on every target of every mode, not the ones chosen), Obstinate Familiar ("you may skip that draw instead": the draw
+  replacement offers no way to decline), Breaking // Entering (its Entering half is still unsupported).
 - Out after round B119 (looked at, not done): Gloom (activated abilities of white enchantments cost {3} more: mana
   abilities too, and their cost paths take no tax), Kodama of the Center Tree (soulshift X, X counted as the trigger
   goes on the stack), Invoke the Ancients (a separate counter choice for each of the two tokens created, rulings).
@@ -5915,7 +5935,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Artful Beauty, Echo Chamber, Nova Pentacle and Volcanic Offering (a target "of an opponent's choice" in a spell or an
   activated ability: chosen by that opponent while it's cast or activated, CR 601.2c, which can't pause yet; only
   triggered abilities ask).
-- Out after round B109 (looked at, not done): Chainer's Torment (an X/X token that deals X damage to you, each token if
+- Out after round B109 (looked at, not done): Chainer's Torment (done in round B121) (an X/X token that deals X damage to you, each token if
   several are made, with X fixed as it resolves, rulings), Cruel Calculations (cards put into a graveyard from the library
   this turn: only "from hand or library" is counted).
 - Out after round B108 (looked at, not done): Fade Away (for each creature, a payment or a sacrifice, all players' choices
@@ -6175,7 +6195,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and "then" riders (Biogenic Upgrade), divided prevention (Remedy); "up to X target" with an X that isn't the spell's own (Rats' Feast, Martyr of
   Bones' "up to X target cards from a single graveyard").
 - "Costs {1} less for each target", reductions of colored mana, "the first face-down / kicked spell you cast each
-  turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
+  turn" (Kadena, Vine Gecko, done in round B121), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
   Equip reductions "that target enchanted creature" (Strong Back).
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
 - Protection from a player; protection that doesn't remove other Auras (Benevolent Blessing done in round 277; Spectra Ward done in round B71).
@@ -6278,7 +6298,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "next N damage" among several recipients (Harm's Way). Turn-long rules (`GameState.damageRules`, "a source of your
   choice", Safe Passage) apply after the shields on a permanent or player. A source of your choice is offered from the
   battlefield and the stack only (not a commander in the command zone, which can't deal damage there anyway).
-  Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage), Eye for an Eye's
+  Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage, done in round B121), Eye for an Eye's
   "instead that source deals that much damage to you and ~ deals that much damage to that source's controller",
   Nova Pentacle's "target creature of an opponent's choice",
   "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm) and

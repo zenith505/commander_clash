@@ -9445,6 +9445,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: animatedEot.what.index, filter }, effects: fx });
       continue;
     }
+    // Chainer's Torment: "Create an X/X black Nightmare Horror creature token, where X is half your life total, rounded up.
+    // It deals X damage to you.": X as the token was made, not its power then; each token made (a token doubler's two)
+    // deals it, all at once (rulings, CR 120.3).
+    if (/^It deals X damage to you$/.test(s) && /^Create an X\/X .+ creature token, where X is /.test(sentences[si - 1] ?? "")) {
+      const made = effects.at(-1);
+      if (made?.type !== "createToken" || !made.pt || made.n !== 1 || effects.length !== 1) return null;
+      effects.push({ type: "eachDealsDamage", what: { ref: "created" }, amount: made.pt, recipient: { ref: "you" } });
+      continue;
+    }
     // Too Greedily, Too Deep: "Put target creature card from a graveyard onto the battlefield under your control. That
     // creature deals damage equal to its power to each other creature." The permanent it became (CR 400.7), if it's
     // still there, with its power as it resolves.
@@ -10832,6 +10841,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (joined && !dig) {
       sentences.splice(si, 1, joined[1]!, joined[3]!.charAt(0).toUpperCase() + joined[3]!.slice(1), "Shuffle");
       s = sentences[si]!;
+    }
+    // Clear the Land: "Each player reveals the top five cards of their library, puts all land cards revealed this way onto
+    // the battlefield tapped, and exiles the rest": every land, no choice, under that player's control (CR 110.2a); done
+    // for each player in turn (APNAP, CR 101.4), as nothing is chosen.
+    const clearLand = new RegExp(`^Each player reveals the top ${NUM} cards of their library, puts all land cards revealed this way onto the battlefield tapped, and exiles the rest$`).exec(s);
+    if (clearLand && !dig) {
+      const n = num(clearLand[1]!);
+      if (typeof n !== "number") return null;
+      effects.push({ type: "dig", n, count: n, upTo: false, required: true, filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, into: "battlefield", tapped: true, rest: "exile", reveal: true, each: true });
+      continue;
     }
     // "Look at the top X cards of your library, where X is the number of tokens you created this turn" (Ellyn Harbreeze):
     // X counted as it resolves (CR 107.3c, 608.2h).
@@ -16572,6 +16591,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^If a permanent you control would be put into a graveyard from the battlefield this turn, exile it instead$/.test(s) && /^Return it to the battlefield under its owner's control at the beginning of the next end step\.?$/.test(sentences[si + 1] ?? "") && opts.spell) {
       effects.push({ type: "exileReturnThisTurn" });
       si++;
+      continue;
+    }
+    // Lava Burst: "If ~ would deal damage to a creature, that damage can't be prevented or dealt instead to another
+    // permanent or player": its damage to a creature only, as it's dealt (CR 615.12; rulings: prevention and redirection
+    // still work on its damage to a player, and the creature may be regenerated).
+    if (/^If ~ would deal damage to a creature, that damage can't be prevented or dealt instead to another permanent or player$/.test(s) && opts.spell) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage" || effects.length !== 1) return null;
+      last.toCreaturesUnalterable = true;
       continue;
     }
     // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)

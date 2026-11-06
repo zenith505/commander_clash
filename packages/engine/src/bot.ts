@@ -6,7 +6,7 @@ import { mayPayUse } from "./spend";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { reselectOptions, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -2010,6 +2010,35 @@ function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body:
 }
 
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+  const out = pickTargets(s, pid, printed, forced, sourceId, x);
+  return out && !forced ? withFlagbearer(s, pid, printed, out, sourceId) : out;
+}
+
+/**
+ * Coalition Honor Guard's rule (flagbearerProblem): with no Flagbearer among the targets when one could be chosen, one
+ * slot gets one: an opponent's for a harmful target, our own for a helpful one, else any legal one.
+ */
+function withFlagbearer(s: GameState, pid: PlayerId, printed: AbilityBody, targets: TargetChoice[], sourceId?: string): TargetChoice[] {
+  if (!flagbearerRuleFor(s, pid) || targets.length !== printed.targets.length) return targets;
+  const flags = flagbearers(s);
+  if (!flags.length || targets.some((t) => t.kind === "object" && flags.includes(t.id))) return targets;
+  const harm = harmfulTargets(printed);
+  const src = sourceId ? botSource(s, sourceId) : undefined;
+  let best: { i: number; id: ObjectId; score: number } | undefined;
+  for (const [i, spec] of printed.targets.entries())
+    for (const id of flags) {
+      if (spec.divided || !canChooseTarget(s, printed.targets, targets, i, { kind: "object", id }, pid, src, sourceId)) continue;
+      const mine = controllerOf(s, obj(s, id)) === pid;
+      const score = (harm[i] ? !mine : mine) ? 2 : targets[i]!.kind === "none" ? 1 : 0;
+      if (!best || score > best.score) best = { i, id, score };
+    }
+  if (!best) return targets;
+  const out = [...targets];
+  out[best.i] = { kind: "object", id: best.id };
+  return out;
+}
+
+function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
@@ -5850,7 +5879,8 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
     // controller, Aegis of Honor's, Turn the Tables' attacking creature).
     const back = (r.redirect?.ref === "targetController" && !!r.by?.target) || (r.redirect?.ref === "target" && t.kind === "combat" && r.combat === "only" && r.to?.players === "you" && !r.by);
     if (r.redirect && r.redirect.ref !== "anyTarget" && !back) continue;
-    if (r.redirectToSourceController && t.kind !== "stack") continue;
+    // Reflect Damage: a chosen attacker's damage goes back to its controller too.
+    if (r.redirectToSourceController && t.kind !== "stack" && !r.by?.choose) continue;
     const me = !r.to || r.to.players === "you" || r.to.players === "all" || (!!r.to.target && r.to.target.ref === "anyTarget");
     const mine = !r.to || (!!r.to.objects && r.to.objects.controller !== "opponent") || !!r.to.target;
     const saved = (cs: GameObject[]) => (mine ? cs.reduce((n, c) => n + worth(s, pid, c), 0) : 0);

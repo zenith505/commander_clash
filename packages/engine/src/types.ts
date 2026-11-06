@@ -1248,6 +1248,8 @@ export interface LastKnown {
   suspected?: true;
   /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
   legendary?: true;
+  /** It was snow as it last existed: "if you sacrifice a snow Forest this way" (Gargantuan Gorilla). */
+  snow?: true;
   /** Its colors as it last existed: "if the sacrificed creature was red" (Lyzolda). */
   colors?: Color[];
   /** A land: the types of mana it could produce as it last existed (CR 106.7), for Squandered Resources' "of any type the sacrificed land could produce". */
@@ -1368,9 +1370,10 @@ export interface ContinuousEffect {
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
    * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2); "yourNextUpkeep" as
-   * the upkeep of `turnOf`'s next turn after `sinceTurn` begins.
+   * the upkeep of `turnOf`'s next turn after `sinceTurn` begins; "controllersNextUntap" as the untap step of `turnOf`'s
+   * next turn after `sinceTurn` begins.
    */
-  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "controllersNextUntap" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   sinceTurn?: number;
   /**

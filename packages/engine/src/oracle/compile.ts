@@ -322,7 +322,9 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
   // Psychic Venom, Artifact Possession: a trigger about the enchanted permanent that deals damage to its controller or
   // has them lose life hurts too.
   const hurtsHost = c.triggers.some((tr) => (tr.host === "attached" || tr.activates?.equipped) && allEffects(tr.body.effects).some((e) => (e.type === "damage" && e.to.ref === "subjectController") || (e.type === "loseLife" && e.who.ref === "subjectController")));
-  return { targets: [c.enchantedControllerCantCast || hurtsHost ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
+  // Wellspring, Captivating Glance: a trigger that gains control of the enchanted permanent takes it from its controller.
+  const stealsHost = c.triggers.some((tr) => allEffects(tr.body.effects).some((e) => e.type === "continuous" && e.what.ref === "attached" && !e.giveTo && e.mods.some((m) => m.kind === "control")));
+  return { targets: [c.enchantedControllerCantCast || hurtsHost || stealsHost ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +370,9 @@ export function normalizeSelf(d: CardDef): string {
   // Tamiyo, Compleated Sage: "Create Tamiyo's Notebook, a legendary colorless Book artifact token": the same.
   // Only when the text never names the token again (Volo's Journal is named later, so it stays "~'s Journal" throughout).
   t = t.replace(/(\b[Cc]reate )([A-Z][\w'-]*'s(?: [A-Z][\w'-]*)+)(?=, a legendary )/g, (m: string, a: string, n: string) => t.split(n).length !== 2 ? m : `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Stangg: "create Stangg Twin, a legendary 3/4 red and green Human Warrior creature token": the token's name, the card's
+  // name and one more word.
+  if (full) t = t.replace(new RegExp(`(\\b[Cc]reate )(${esc(full)} [A-Z][\\w'-]*)(?=, a legendary )`, "g"), (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);

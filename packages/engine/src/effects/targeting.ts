@@ -509,6 +509,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.xInCost && !parseManaCost(d.manaCost).hasX) return false;
   if (spec.kickerAbility && !isRealKicker(compileCard(d).kicker)) return false;
+  // Riku of Many Paths: "a modal spell", one with modes, spree too (CR 700.2), as what was cast (a face or half).
+  if (spec.modal && !compileCard(d).spell?.modal) return false;
   if (spec.noXInCost && parseManaCost(d.manaCost).hasX) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
@@ -1058,7 +1060,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -1074,6 +1076,9 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (ofPlayer?.kind === "player" && ofPlayer.id !== o.owner) return false;
   const byPlayer = spec.controlledByTarget === undefined ? undefined : chosen[spec.controlledByTarget];
   if (byPlayer?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) !== byPlayer.id)) return false;
+  // Portal Manipulator: "their opponents control": anyone but that player (CR 102.3).
+  const oppOf = spec.controlledByOpponentOfTarget === undefined ? undefined : chosen[spec.controlledByOpponentOfTarget];
+  if (oppOf?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) === oppOf.id)) return false;
   // Searing Blaze: the earlier target a planeswalker, its controller's (as it last existed, if it has left: rulings, the
   // creature is still dealt its damage).
   const byWalker = byPlayer?.kind === "object" ? s.objects[byPlayer.id] : undefined;

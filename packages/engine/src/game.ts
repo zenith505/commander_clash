@@ -5337,6 +5337,8 @@ export function castProblem(
   if (pendTypes && (choices?.faceDown || !pendTypes.some((t) => isType(d, t)))) return `the spell must be ${pendTypes.map((t) => `${/^[AEIOU]/.test(t) ? "an" : "a"} ${t.toLowerCase()}`).join(" or ")} spell`;
   const pendSuper = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.supertypes : undefined;
   if (pendSuper && (choices?.faceDown || !pendSuper.every((t) => d.supertypes.includes(t)))) return `the spell must be ${pendSuper.join(" ").toLowerCase()}`;
+  const pendFilter = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.spellFilter : undefined;
+  if (pendFilter && (choices?.faceDown || !printedMatches(pendFilter, d))) return `the spell must be a ${pendFilter.text.replace(/ card$/, "")} spell`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));

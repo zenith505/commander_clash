@@ -4938,8 +4938,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if you cast it, ..." (Geological Appraiser): an intervening if (CR 603.4) on how it got there.
       let ifCast = false;
       // "If it was cast" (Wedding Ring): the same, a permanent spell resolving under its caster's control (CR 608.3).
-      // "If he was cast" (Anti-Venom, Horrifying Healer), read as "if ~ was cast": the same.
-      const wasCast = /^if (?:you cast it|it was cast|~ was cast), (.+)$/i.exec(body0);
+      // "If he was cast" (Anti-Venom, Horrifying Healer), read as "if ~ was cast": the same. Uldaros Theorix: "if you cast
+      // him", read as "if you cast ~".
+      const wasCast = /^if (?:you cast it|you cast ~|it was cast|~ was cast), (.+)$/i.exec(body0);
       if (wasCast) {
         if (event !== "selfEnters") return "fail" as const;
         ifCast = true;

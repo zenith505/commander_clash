@@ -2083,6 +2083,20 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (body.targets.length !== printed.targets.length + slots - 1 || printed.targets.length !== 1) return null;
     return Array.from({ length: slots }, (_, k): TargetChoice => (picked[k] ? { kind: "object", id: picked[k]! } : { kind: "none" }));
   }
+  // Portal Manipulator: the creatures attacking us (or our planeswalkers and battles) sent at the player with the most
+  // life among those who don't control them, never ourselves.
+  const turnAt = printed.effects.length === 1 && printed.effects[0]!.type === "reselectAttack" ? printed.effects[0]! : undefined;
+  if (turnAt?.type === "reselectAttack" && turnAt.toPlayer?.ref === "target" && turnAt.toPlayer.index === 0 && many === 1 && printed.targets.length === 2) {
+    const slots = body.targets.length - 1;
+    const onUs = legalTargets(s, body.targets[1]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && obj(s, t.id).attacking === pid ? [t.id] : []));
+    const to = s.players.filter((p) => !p.lost && p.id !== pid && onUs.some((id) => controllerOf(s, obj(s, id)) !== p.id)).sort((a, b) => b.life - a.life)[0];
+    const fallback = s.players.filter((p) => !p.lost && p.id !== pid).sort((a, b) => b.life - a.life)[0];
+    if (!to && !forced) return null;
+    const target = to ?? fallback;
+    if (!target) return null;
+    const picks = to ? onUs.filter((id) => controllerOf(s, obj(s, id)) !== to.id).slice(0, slots) : [];
+    return [{ kind: "player", id: target.id }, ...Array.from({ length: slots }, (_, k): TargetChoice => (picks[k] ? { kind: "object", id: picks[k]! } : { kind: "none" }))];
+  }
   // Goblin Welder: our own cheapest artifact for a costlier artifact card in our graveyard.
   const weld = body.effects.find((e) => e.type === "weld");
   if (weld?.type === "weld") {

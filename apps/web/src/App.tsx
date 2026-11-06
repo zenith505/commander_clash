@@ -4075,6 +4075,8 @@ function LibrarySearch({
                 ? `Chosen ${found.length}; the first goes lowest.`
                 : pending.totalMv !== undefined
                   ? `Chosen ${found.length} of ${pending.max}, total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.`
+                : pending.exactly
+                  ? `Found ${found.length}: exactly ${pending.max} or none.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.shareLandType
@@ -4083,10 +4085,10 @@ function LibrarySearch({
                   ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
-                    : `Found ${found.length} of ${pending.max}.`}
+                    : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}`}
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
-          <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
+          <button disabled={found.length < pending.min || (!!pending.exactly && found.length > 0 && found.length !== pending.max)} onClick={() => onDone(found)}>
             {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>

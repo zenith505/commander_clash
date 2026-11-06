@@ -265,6 +265,8 @@ export interface Characteristics {
   cantAttackOwnerWalkers?: boolean;
   /** "Can't be sacrificed" (CR 701.21). */
   cantBeSacrificed: boolean;
+  /** Call for Aid: these players can't sacrifice it (only its controller could, CR 701.21a). */
+  cantBeSacrificedBy: PlayerId[];
   /** "Can't be turned face up" (Unable to Scream). */
   cantTurnFaceUp: boolean;
   /** "Can't transform" (Bound by Moonsilver), nor convert (CR 701.28f). */
@@ -412,6 +414,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackSamePlayer: false,
     cantAttackOwner: false,
     cantBeSacrificed: false,
+    cantBeSacrificedBy: [],
     cantTurnFaceUp: false,
     cantTransform: false,
     cantCrew: false,
@@ -1936,6 +1939,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.than === "source") {
         if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
       } else c.cantBeBlockedByLesserPower = true;
+      return;
+    case "cantBeSacrificedBy":
+      if (m.player !== "you" && !c.cantBeSacrificedBy.includes(m.player)) c.cantBeSacrificedBy.push(m.player);
       return;
     case "cantAttackPlayers":
       if (typeof m.combat === "number" && m.combat !== (s.combatsThisTurn ?? 0)) return;

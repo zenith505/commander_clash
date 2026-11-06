@@ -1825,6 +1825,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "attackBanThisTurn": {
+      // Call for Aid: "You can't attack that player this turn": that player only, not their planeswalkers (CR 506.2).
+      if (e.protects) {
+        const safe = players(s, e.protects, ctx)[0];
+        if (safe === undefined) return;
+        for (const pid of players(s, e.who, ctx)) {
+          if (pid === safe) continue;
+          (player(s, pid).attackBansThisTurn ??= []).push({ player: safe, turn: s.turn });
+          log(s, `Creatures ${player(s, pid).name} controls can't attack ${player(s, safe).name} this turn.`);
+        }
+        return;
+      }
       const you = player(s, ctx.controller).name;
       for (const pid of players(s, e.who, ctx)) {
         if (pid === ctx.controller) continue;

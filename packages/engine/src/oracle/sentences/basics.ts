@@ -177,8 +177,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Ee]ach player with fewer cards in hand than the player with the most cards in hand draws cards equal to the difference$/.test(s))
     return [{ type: "draw", who: { ref: "eachPlayer" }, n: { count: { kind: "behindMost", filter: { kind: "card", text: "card" }, who: { ref: "eachOne" }, hand: true } } }];
   // An opponent choosing among the cards found or revealed (Gifts Ungiven, Murmurs from Beyond), as parseBody rewrites them.
-  const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
-  const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);
+  // Threats Undetected: "into your library" is shuffled into it (SearchDest shuffleIn).
+  const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : to === "into your library" ? { zone: "libraryTop" as const, shuffleIn: true as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
+  const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard|into your library) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);
   if (opp) {
     const fx = parseSearch(`Search your library for ${opp[1]!}, reveal them, put them ${opp[5]!}, then shuffle`);
     const chooser = opp[2] === "target opponent" ? parsePlayer("target opponent", ctx) : undefined;

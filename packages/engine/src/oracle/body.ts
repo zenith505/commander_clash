@@ -5114,6 +5114,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Mana Seism: "Sacrifice any number of lands, then add that much {C}": one {C} for each land sacrificed.
+    // Kylox, Visionary Inventor: "sacrifice any number of other creatures, then exile the top X cards of your library, where X
+    // is their total power. You may cast any number of instant and/or sorcery spells from among the exiled cards without
+    // paying their mana costs.": the power of each as it last existed (rulings), chosen as it resolves; the spells cast as
+    // it resolves or never, timing ignored, an X as 0 (rulings, CR 608.2g, 107.3b); the others stay exiled.
+    if (/^[Ss]acrifice any number of other creatures$/.test(s) && sentences[si + 1] === "Exile the top X cards of your library, where X is their total power" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast any number of instant and/or sorcery spells from among the exiled cards without paying their mana costs") {
+      const filter = pickFilter("creatures");
+      if (filter?.kind !== "object") return null;
+      const spells: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice", anyNumber: true }, { type: "castFromAmong", who: { ref: "you" }, n: { count: { kind: "sacrificedThisWayTotalPower" } }, filter: spells, asSpell: true });
+      si += 2;
+      continue;
+    }
     const seism = /^[Ss]acrifice any number of lands$/.test(s) && /^(?:[Tt]hen )?[Aa]dd that much \{C\}$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);
     const thatMany = sentences[si + 1]?.replace(/\.$/, "").replace(/^If you do, /, "") ?? "";
@@ -5818,6 +5830,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         { type: "may", effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "put a +1/+1 counter on ~" },
         { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: [{ type: "mayCastFromGraveyard", what: { ref: "revealed" }, inExile: true, anyType: true }] },
       );
+      si += 2;
+      continue;
+    }
+    // Guild Feud (Effect "guildFeud").
+    const feud = /^[Tt]arget opponent reveals the top three cards of their library, may put a creature card from among them onto the battlefield$/.test(s) && sentences[si + 1] === "Puts the rest into their graveyard";
+    if (feud && sentences[si + 2] === "You do the same with the top three cards of your library" && /^If two creatures are put onto the battlefield this way, those creatures fight each other\.?$/.test(sentences[si + 3] ?? "")) {
+      const who = parsePlayer("target opponent", ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "guildFeud", who, n: 3 });
+      si += 3;
+      continue;
+    }
+    // Rohirrim Chargers: "reveal cards from the top of your library until you reveal an Equipment card. Put that card onto the
+    // battlefield attached to that creature, then put the rest on the bottom of your library in a random order.": the
+    // exerted creature; if it's gone or can't be equipped by it, the Equipment enters unattached (rulings, CR 301.5c).
+    if (/^[Rr]eveal cards from the top of your library until you reveal an Equipment card$/.test(s) && sentences[si + 1] === "Put that card onto the battlefield attached to that creature" && /^(?:Then put|Put) the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 2] ?? "")) {
+      const host = parseObject("that creature", ctx);
+      if (host?.ref !== "subject") return null;
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment card" }, found: "battlefield", equipToSubject: true, rest: "bottom" });
       si += 2;
       continue;
     }
@@ -7748,6 +7779,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Jetsam (Flotsam // Jetsam): "you may cast a spell from each opponent's graveyard without paying its mana cost. If a spell
+    // cast this way would be put into a graveyard, exile it instead.": chosen and cast as it resolves, one from each of those
+    // graveyards (not only the milled cards), timing ignored, an X as 0 (rulings, CR 608.2g, 107.3b).
+    if (/^[Yy]ou may cast a spell from each opponent's graveyard without paying its mana cost$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If a spell cast this way would be put into a graveyard, exile it instead") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, anyYard: true, yardOf: { ref: "eachOpponent" }, onePerOwner: true, exileCast: true });
+      si++;
+      continue;
+    }
     // Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard. You may cast any number of spells from
     // among cards exiled this way without paying their mana costs. Then each player who owns a spell you cast this way
     // loses life equal to its mana value." Cast as this resolves, or never (rulings, CR 608.2g); X is 0 (CR 107.3b).
@@ -8081,15 +8120,38 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // costs, timing ignored (CR 608.2g, 601.2).
     // Chandra, Acolyte of Flame: "target instant or sorcery card with mana value 3 or less": only as it's targeted (rulings:
     // an X is 0 then, and the spell can be cast with a greater X).
-    const castPaid = /^[Yy]ou may cast (target .+? card(?: with mana value \d+ or less)? from your graveyard)$/.exec(s);
+    // Harness the Storm: "you may cast target card with the same name as that spell from your graveyard", in a cast trigger:
+    // cast as it resolves or not at all, paying its costs, timing ignored (rulings; CR 608.2g); the name the spell had as
+    // it was cast (TargetSpec.sameNameAsCause). It goes where it would after.
+    if (ctx.castSpell && /^[Yy]ou may cast target card with the same name as that spell from your graveyard$/.test(s)) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget("target card from your graveyard", ctx, "you");
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || t.owner !== "you") return null;
+      ctx.targets[before] = { ...t, sameNameAsCause: true, text: "target card with the same name as that spell from your graveyard" };
+      effects.push({ type: "castNow", what });
+      continue;
+    }
+    // Helmut Zemo, Mastermind: "with mana value less than or equal to his power" (TargetSpec.bound: as it's targeted and
+    // as it resolves, CR 601.2c, 608.2b), then "If you cast a spell this way, put a +1/+1 counter on ~" (castNow sets
+    // whether it was cast).
+    const castPaid = /^[Yy]ou may cast (target .+? card(?: with mana value \d+ or less| with mana value less than or equal to ~'s power)? from your graveyard)$/.exec(s);
     const paidRider = sentences[si + 1]?.replace(/\.$/, "");
     if (castPaid && (paidRider === "If that spell would be put into your graveyard, exile it instead" || paidRider === "If that spell would be put into a graveyard, exile it instead")) {
       const before = ctx.targets.length;
       const what = parseCardTarget(castPaid[1]!, ctx, "you");
       const t = ctx.targets[before];
       if (!what || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      if (/less than or equal to ~'s power/.test(castPaid[1]!) && !t.bound) return null;
       effects.push({ type: "castNow", what, exileAfter: true });
       si++;
+      const ifCast = /^If you cast a spell this way, (put (?:a|an|one|two) \+1\/\+1 counters? on ~)\.?$/.exec(sentences[si + 1] ?? "");
+      if (ifCast) {
+        const then = parseOne(ifCast[1]!.replace(/^put/, "Put"), ctx);
+        if (!then) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: then });
+        si++;
+      }
       continue;
     }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
@@ -15976,6 +16038,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       return null;
+    }
+    // Nascent Metamorph: "target opponent reveals cards from the top of their library until they reveal a creature card. ~
+    // becomes a copy of that card until end of turn. Then that player puts all cards revealed this way on the bottom of their
+    // library in a random order.": the card found stays in the library and goes on the bottom too (rulings).
+    const untilCopy = /^([Tt]arget opponent|[Tt]arget player) reveals cards from the top of their library until they reveal a creature card$/.exec(s);
+    if (untilCopy && /^~ becomes a copy of that card until end of turn$/.test(sentences[si + 1] ?? "") && /^Then that player puts all cards revealed this way on the bottom of their library in a random order\.?$/.test(sentences[si + 2] ?? "")) {
+      const who = parsePlayer(untilCopy[1]!, ctx);
+      if (who?.ref !== "target") return null;
+      effects.push({ type: "revealUntil", who, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "copySelf", rest: "bottom" });
+      si += 2;
+      continue;
     }
     // Consuming Aberration: "each opponent reveals cards from the top of their library until they reveal a land card, then
     // puts those cards into their graveyard". Destroy the Evidence: "Its controller ..." after "Destroy target land", the

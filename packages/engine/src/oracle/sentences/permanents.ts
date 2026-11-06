@@ -1527,9 +1527,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "controlSpell", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }) }];
   }
   // Gaining control (layer 2). "Gain control of target creature until end of turn."
-  if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?)( until end of turn)?$/i.exec(s))) {
+  if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?)( until end of turn| until the end of your next turn)?$/i.exec(s))) {
+    // Stilt-Man, Towering Terror: "until the end of your next turn": through your next turn's cleanup (CR 514.2).
     const what = parseObject(m[1]!, ctx);
-    return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
+    return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] === " until the end of your next turn" ? "endOfYourNextTurn" : m[2] ? "endOfTurn" : "game" }] : null;
   }
   // The Wretched: "gain control of all creatures blocking ~" (with "for as long as you control ~"): those blocking it as this
   // resolves (CR 509.1h; none once it has left combat, CR 506.4), the set locked in then (CR 611.2c). Layer 2.
@@ -1718,9 +1719,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Tolarian Entrancer: "Whenever ~ becomes blocked by a creature, gain control of that creature at end of combat": the
   // blocking creature the trigger is about (the delayed part is "at end of combat", see sentences/basics.ts), for good,
   // whether or not ~ is still around then (rulings).
-  if (/^Gain control of that creature$/.test(s) && ctx.subject && !ctx.spell && !ctx.activated) {
+  // Loki, God of Lies: "Whenever you cast a spell that targets only a single creature, gain control of that creature until
+  // end of turn": the creature that spell targets (the trigger's subject), until the turn ends.
+  if ((m = /^[Gg]ain control of that creature( until end of turn)?$/.exec(s)) && ctx.subject && !ctx.spell && !ctx.activated) {
     const what = parseObject("that creature", ctx);
-    return what?.ref === "subject" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game" }] : null;
+    return what?.ref === "subject" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game" }] : null;
   }
   if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && (ctx.spell || ctx.activated)) {
     const what = parseObject(m[1]!, ctx);
@@ -1925,10 +1928,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
   // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn|your next upkeep)$/i.exec(s))) {
+  // Stilt-Man, Towering Terror: "It gains "This permanent can't be sacrificed" until the end of your next turn": through
+  // your next turn's cleanup (CR 514.2).
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn|your next upkeep|the end of your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
-    return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : m[3] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : m[3] === "your next upkeep" ? "yourNextUpkeep" : m[3] === "the end of your next turn" ? "endOfYourNextTurn" : "yourNextTurn" }] : null;
   }
   // "Gain control of target artifact. Untap it. It gains haste." (Momo's Heist), "Create a token that's a copy of target
   // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined

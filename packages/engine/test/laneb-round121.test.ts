@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { putCounters } from "../src/counters";
-import { botActions, characteristics, chooseTargets, compileCard, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { botActions, characteristics, chooseTargets, compileCard, flagbearerAllows, invalidateCharacteristics, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -139,6 +139,27 @@ describe("Lane B round B121", () => {
     invalidateCharacteristics(s);
     s = settle(run(s, planActivate(s, ap, p, 0, [player(opp)])));
     expect(life(s, opp)).toBe(39);
+  });
+
+  it("the target pickers offer a non-Flagbearer only while the rule can still be met", () => {
+    const { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const sb = putOnBattlefield(s, opp, bearer());
+    const b = putOnBattlefield(s, opp, bear());
+    const one = compileCard(shock).spell!.targets;
+    expect(flagbearerAllows(s, one, [], tgt(sb), ap)).toBe(true);
+    expect(flagbearerAllows(s, one, [], tgt(b), ap)).toBe(false);
+    expect(flagbearerAllows(s, one, [], player(opp), ap)).toBe(false);
+    // Two targets: the first may be anything while the second can still be the Bearer.
+    const two = compileCard(card("Test Two", "Sorcery", "{0}", { oracleText: "Destroy two target creatures." })).spell!.targets;
+    expect(two.length).toBe(2);
+    expect(flagbearerAllows(s, two, [], tgt(b), ap)).toBe(true);
+    expect(flagbearerAllows(s, two, [tgt(b)], tgt(sb), ap)).toBe(true);
+    // A spell that can't target a creature isn't bound.
+    const draw = compileCard(card("Test Draw", "Sorcery", "{0}", { oracleText: "Target player draws a card." })).spell!.targets;
+    expect(flagbearerAllows(s, draw, [], player(opp), ap)).toBe(true);
+    // The Bearer's controller is free.
+    expect(flagbearerAllows(s, one, [], tgt(b), opp)).toBe(true);
   });
 
   it("Flagbearers don't bind triggered abilities", () => {

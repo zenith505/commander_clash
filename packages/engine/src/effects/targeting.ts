@@ -183,6 +183,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackedOrBlockedThisTurn" && o.attacked?.turn !== s.turn && o.blockedTurn !== s.turn) return false;
   if (spec.blockedWith && !blockedWithThisTurn(s, o, spec.blockedWith)) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
+  if (spec.combat === "didntAttackThisCombat" && o.attacked?.turn === s.turn && o.declaredInCombat?.turn === s.turn && o.declaredInCombat.combat === (s.combatsThisTurn ?? 0)) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.controllerCombatDamagedBy && (s.turnLog?.combatDamagedByTypes?.[c.controller] ?? []).filter((e) => e.types.includes("*") || e.types.includes(spec.controllerCombatDamagedBy!.subtype)).length < spec.controllerCombatDamagedBy.min) return false;

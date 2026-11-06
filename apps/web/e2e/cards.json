@@ -17609,6 +17609,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a7be1624-04cc-4ed5-8b05-63b633893dee",
+  "name": "Planar Overlay",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses a land they control of each basic land type. Return those lands to their owners' hands.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pls",
+  "releasedAt": "2001-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9e769a65-7aa5-484d-9493-badb485b5964",
   "name": "Plargg and Nassari",
   "manaCost": "{3}{R}{R}",

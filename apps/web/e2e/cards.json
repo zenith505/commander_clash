@@ -12105,6 +12105,86 @@
   ]
  },
  {
+  "oracleId": "bd43b485-e42e-4c20-adcb-799b0ce18a59",
+  "name": "Jorn, God of Winter // Kaldring, the Rimestaff",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Snow Creature — God // Legendary Snow Artifact",
+  "supertypes": [
+   "Legendary",
+   "Snow"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "God"
+  ],
+  "oracleText": "Whenever Jorn attacks, untap each snow permanent you control.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Jorn, God of Winter",
+    "manaCost": "{2}{G}",
+    "typeLine": "Legendary Snow Creature — God",
+    "supertypes": [
+     "Legendary",
+     "Snow"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "God"
+    ],
+    "oracleText": "Whenever Jorn attacks, untap each snow permanent you control.",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/9/5/950ecba7-90b1-42bc-a5f4-ab8d9e9607ee.jpg?1783928152",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/9/5/950ecba7-90b1-42bc-a5f4-ab8d9e9607ee.jpg?1783928152"
+   },
+   {
+    "name": "Kaldring, the Rimestaff",
+    "manaCost": "{1}{U}{B}",
+    "typeLine": "Legendary Snow Artifact",
+    "supertypes": [
+     "Legendary",
+     "Snow"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "{T}: You may play target snow permanent card from your graveyard this turn. If you do, it enters tapped.",
+    "colors": [
+     "B",
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/9/5/950ecba7-90b1-42bc-a5f4-ab8d9e9607ee.jpg?1783928152",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/9/5/950ecba7-90b1-42bc-a5f4-ab8d9e9607ee.jpg?1783928152"
+   }
+  ]
+ },
+ {
   "oracleId": "794ad296-4718-45b7-ab85-6ae45903ada7",
   "name": "Jungle Wayfinder",
   "manaCost": "{2}{G}",
@@ -22170,6 +22250,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "53d3ef8f-8e0f-4119-8cdc-a0bf076b4e91",
+  "name": "Speedball, New Warrior",
+  "manaCost": "{2}{U/R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Whenever a player casts a spell that targets Speedball, he gets +2/+2 until end of turn. You may choose new targets for that spell.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "04477339-7ed5-4770-9e5c-6e481ffcc858",
   "name": "Spell Blast",
   "manaCost": "{X}{U}",
@@ -27040,6 +27155,36 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ca59fbf4-c774-49d3-8630-108c053e01fb",
+  "name": "Whispersteel Dagger",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+0.\nWhenever equipped creature deals combat damage to a player, you may cast a creature spell from that player's graveyard this turn, and you may spend mana as though it were mana of any color to cast that spell.\nEquip {3}",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "znc",
+  "releasedAt": "2020-09-25",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

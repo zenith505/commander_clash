@@ -3427,6 +3427,15 @@ export function compile(d: CardDef): CompiledCard {
       out.cyclingLess = (out.cyclingLess ?? 0) + Number(cyclingLess[1]);
       continue;
     }
+    // Convergence of Dominion: abilities of cards in your graveyard (not of permanents), generic mana only, while the
+    // condition holds as the cost is worked out.
+    const yardAbilityLess = /^(?:As long as (.+?), )?activated abilities of cards in your graveyard cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that ability's activation cost to less than one mana\.)?$/i.exec(line);
+    if (yardAbilityLess && !out.graveyardActivationLess) {
+      const cond = yardAbilityLess[1] ? parseStaticCondition(yardAbilityLess[1], { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      if (cond === null) out.unsupported.push(raw);
+      else out.graveyardActivationLess = { n: Number(yardAbilityLess[2]), ...(cond ? { if: cond } : {}), ...(yardAbilityLess[3] ? { atLeastOne: true as const } : {}) };
+      continue;
+    }
     const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
     if (youActivateLess && !out.youActivateLess) {
       out.youActivateLess = { n: Number(youActivateLess[1]), ...(youActivateLess[2] ? { atLeastOne: true as const } : {}) };
@@ -4431,6 +4440,10 @@ export function compile(d: CardDef): CompiledCard {
     // Treacherous Link: see staticRules in damage.ts.
     if (line === "All damage that would be dealt to enchanted creature is dealt to its controller instead.") {
       out.attachedDamageToController = true;
+      continue;
+    }
+    if (line === "If damage would be dealt to ~, instead that damage is dealt, but all other damage already dealt to ~ is healed.") {
+      out.healsBeforeDamage = true;
       continue;
     }
     if (line === "Damage isn't removed from ~ during cleanup steps.") {

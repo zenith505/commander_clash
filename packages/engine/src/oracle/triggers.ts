@@ -4066,10 +4066,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const enchanted = parseEnchantedPlayerTrigger(line);
   if (enchanted) return enchanted;
   // Heroic before the other "whenever you cast" triggers.
-  const heroic = /^Whenever you cast a spell that targets ~, (.+)$/.exec(line);
-  if (heroic) {
-    const body = parseBody(heroic[1]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
-    return body ? { event: "selfTargetedByYourSpell", body } : "fail";
+  const heroic = /^Whenever (you|a player) casts? a spell that targets ~, (.+)$/.exec(line);
+  if (heroic && (heroic[1] === "you") === /^Whenever you cast /.test(line)) {
+    // Speedball, New Warrior: "... You may choose new targets for that spell": the spell cast, still on the stack below this
+    // trigger as it resolves (CR 115.7d, its targets changed by this ability's controller).
+    const retarget = /\. You may choose new targets for that spell\.$/.exec(heroic[2]!);
+    const text = retarget ? heroic[2]!.slice(0, retarget.index + 1) : heroic[2]!;
+    const body = parseBody(text.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
+    if (!body) return "fail";
+    if (retarget) body.effects.push({ type: "newTargets", index: -1, cause: true });
+    return { event: "selfTargetedByYourSpell", body: retarget ? { ...body, text: heroic[2]! } : body, ...(heroic[1] === "a player" ? { heroicAnyCaster: true as const } : {}) };
   }
   // Druid of Horns: "Whenever you cast an Aura spell that targets ~, ...": an Aura spell targets what it will enchant (CR
   // 303.4a).

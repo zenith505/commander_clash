@@ -408,7 +408,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (o.id === ctx.sourceId && (o.transforms ?? 0) !== (ctx.sourceTransforms ?? 0)) continue;
         // "Transform target Incubator token you control" (Attentive Skywarden): a double-faced token turns over too.
         if (o.isToken && defOf(s, o).tokenBack) transformToken(s, o);
-        else transformPermanent(s, o, false, e.convert);
+        else if (transformPermanent(s, o, false, e.convert) && s.resolving) s.resolving.transformedThisWay = true;
       }
       return;
     case "becomePrepared":
